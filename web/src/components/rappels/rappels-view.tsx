@@ -38,8 +38,16 @@ import {
 import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
+import { queryKeys } from '@/lib/query-keys';
 import type { Projet } from '@/lib/types';
-import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
+
+const TELECONSEILLERS_ACTIFS: UserFilters = {
+  ...EMPTY_USER_FILTERS,
+  role: 'COMMERCIAL',
+  isActive: true,
+  pageSize: 200,
+};
 
 /** La liste s'arrête à 500 rappels : le reste se dit, il ne se devine pas. */
 function NoteListeTronquee({ affichees, total }: { affichees: number; total: number | undefined }) {
@@ -139,6 +147,13 @@ function RappelsTable({
         icon={ClockIcon}
         title={EMPTY_TEXT[scope].title}
         description={EMPTY_TEXT[scope].description}
+        action={
+          list.data.page > 1 ? (
+            <Button variant="outline" size="sm" onClick={() => onPage(1)}>
+              Revenir à la première page
+            </Button>
+          ) : undefined
+        }
       />
     );
   }
@@ -366,9 +381,22 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
+  const choisirScope = (value: CallbackScope): void => {
+    setScope(value);
+    setPage(1);
+  };
+  const choisirProjet = (value: Projet | null): void => {
+    setProjet(value);
+    setPage(1);
+  };
+  const choisirTeleconseiller = (id: string | null): void => {
+    setAssignedToId(id);
+    setPage(1);
+  };
+
   const overdue = useQuery({
-    queryKey: [...callbackKeys.list('overdue', assignedToId), projet, page],
-    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet ?? undefined, page),
+    queryKey: [...callbackKeys.list('overdue', assignedToId), projet, 1],
+    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet ?? undefined, 1),
   });
 
   const list = useQuery({
@@ -379,9 +407,8 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const filteredItems = (list.data?.items ?? []).filter((cb) => filterCallbackBySearch(cb, search));
 
   const teleconseillers = useQuery({
-    queryKey: callbackKeys.teleconseillers,
-    queryFn: () =>
-      fetchUsers({ ...EMPTY_USER_FILTERS, role: 'COMMERCIAL', isActive: true, pageSize: 200 }),
+    queryKey: queryKeys.commerciaux(TELECONSEILLERS_ACTIFS),
+    queryFn: () => fetchUsers(TELECONSEILLERS_ACTIFS),
     enabled: canFilter,
     staleTime: 300_000,
   });
@@ -397,7 +424,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
     },
   });
 
-  const overdueCount = overdue.data?.items.length ?? 0;
+  const overdueCount = overdue.data?.total ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -414,18 +441,18 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
           search={search}
           setSearch={setSearch}
           projet={projet}
-          setProjet={setProjet}
+          setProjet={choisirProjet}
           canFilter={canFilter}
           teleconseillers={teleconseillers.data?.items ?? []}
           assignedToId={assignedToId}
-          setAssignedToId={setAssignedToId}
+          setAssignedToId={choisirTeleconseiller}
         />
       </div>
 
       <Tabs
         value={scope}
         onValueChange={(value) => {
-          setScope(value as CallbackScope);
+          choisirScope(value as CallbackScope);
         }}
         className="gap-6"
       >

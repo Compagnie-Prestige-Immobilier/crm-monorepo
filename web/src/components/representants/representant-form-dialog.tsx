@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, CheckIcon, LoaderIcon } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -47,6 +47,7 @@ import {
   type RepresentantRelation,
 } from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 const relationItems = (current: RepresentantRelation) =>
   [...new Set<RepresentantRelation>([...REPRESENTANT_RELATION_CHOICES, current])].map(
@@ -744,10 +745,9 @@ export function RepresentantFormDialog({
     representant !== null && relationStatus === 'REFUS' && representant.relationStatus !== 'REFUS';
   const showEditFields = isEdit && !pendantAppel;
 
-  useEffect(() => {
+  useRecalage([open, representant, prefill, savedScript], () => {
     if (!open) return;
     const depart = valeursDeFiche(representant, prefill, savedScript);
-    // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
     setFullName(depart.fullName);
     setPrenom(depart.prenom);
     setEtablissement(depart.etablissement);
@@ -765,7 +765,7 @@ export function RepresentantFormDialog({
     setWhatsappNumber(depart.whatsappNumber);
     setProfession(depart.profession);
     setConflict(null);
-  }, [open, representant, prefill, savedScript]);
+  });
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,

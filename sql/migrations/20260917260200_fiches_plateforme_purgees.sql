@@ -15,3 +15,4 @@ DELETE FROM public.prospects WHERE "plateformeDepuis" IS NOT NULL;
 -- +goose Down
 
 -- Une fiche supprimée ne se reconstitue pas : le journal en garde la trace.
+-- Ce Down ne restaure rien. Revenir en arrière passe par la sauvegarde.

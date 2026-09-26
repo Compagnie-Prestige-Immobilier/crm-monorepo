@@ -184,7 +184,7 @@ func rvSiteHeureOuverte(r *RvSiteReglages, quand, reference time.Time) bool {
 
 // Un RV site se prend à une heure ouverte, vers un site et depuis un point de
 // rencontre encore proposés ; ces champs n'ont pas de sens sur un autre statut.
-func (s *service) rvSiteVerifier(ctx context.Context, b *QualificationCallAttemptBody, code string) error {
+func (s *service) rvSiteVerifier(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody, code string) error {
 	if code != qualificationCodeRvSite {
 		return rvSiteHorsSujet(b)
 	}
@@ -198,13 +198,21 @@ func (s *service) rvSiteVerifier(ctx context.Context, b *QualificationCallAttemp
 	if !rvSiteHeureOuverte(&reglages, b.CallbackAt.In(s.Cfg.TimeZone), b.ClientCreatedAt.In(s.Cfg.TimeZone)) {
 		return rvSiteRefus("PHASE2_RV_SITE_CRENEAU", "Cette date n'est pas ouverte aux RV site. Choisissez un jour et une heure proposés.")
 	}
-	choix, err := s.Q.RvSiteChoixValide(ctx, db.RvSiteChoixValideParams{
+	return rvSiteChoixDisponible(ctx, q, b, reglages.MaxVisites)
+}
+
+// Le verrou tient jusqu'à la fin de la transaction : deux RV simultanés ne voient pas la même place libre.
+func rvSiteChoixDisponible(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody, maxVisites *int) error {
+	if err := q.VerrouCreneauxRvSite(ctx); err != nil {
+		return err
+	}
+	choix, err := q.RvSiteChoixValide(ctx, db.RvSiteChoixValideParams{
 		ProspectID: b.ProspectID, Quand: b.CallbackAt.UTC(), SiteID: *b.SiteID, PointRencontreID: *b.PointRencontreID,
 	})
 	if err != nil {
 		return err
 	}
-	if reglages.MaxVisites != nil && int(choix.Reserves) >= *reglages.MaxVisites {
+	if maxVisites != nil && int(choix.Reserves) >= *maxVisites {
 		return socle.Problem(http.StatusConflict, "PHASE2_RV_SITE_COMPLET", "Cette heure n'est plus disponible. Choisissez-en une autre.")
 	}
 	if !choix.Site || !choix.Point {

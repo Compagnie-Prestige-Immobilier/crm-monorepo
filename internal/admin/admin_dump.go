@@ -287,6 +287,7 @@ func nomFichierDump(id string, at time.Time) string {
 }
 
 func (s *service) executerDump(ctx context.Context, t *travailDump, acteurID string) {
+	defer func() { socle.JournaliserPanique("export de la base", recover()) }()
 	debut := time.Now()
 	t.Status, t.StartedAt, t.FileName = dumpEnCours, &debut, nomFichierDump(t.ID, debut)
 	if err := s.ecrireTravailDump(ctx, t, &acteurID); err != nil {
@@ -324,8 +325,12 @@ func lancerPgDump(ctx context.Context, dsn, destination string) (taille int64, c
 	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 		return 0, "", err
 	}
-	//nolint:gosec // destination = répertoire de configuration + nom produit par le serveur, jamais une entrée client
-	fichier, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	repertoire, err := os.OpenRoot(filepath.Dir(destination))
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { _ = repertoire.Close() }()
+	fichier, err := repertoire.OpenFile(filepath.Base(destination), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return 0, "", err
 	}
@@ -407,8 +412,7 @@ func (s *service) telechargerDump(ctx context.Context, _ *struct{}) (*huma.Strea
 		return nil, socle.Problem(http.StatusNotFound, pasPret, "Aucun export n’est disponible au téléchargement.")
 	}
 	nom := filepath.Base(t.FileName)
-	//nolint:gosec // nom relu de la ligne d'état, ramené à son basename : aucune entrée client
-	fichier, err := os.Open(filepath.Join(repertoireDump(), nom))
+	fichier, err := os.OpenInRoot(repertoireDump(), nom)
 	if err != nil {
 		return nil, s.oublierFichierDump(ctx, &t)
 	}

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { AlertTriangleIcon, CheckIcon, LoaderIcon, SendIcon } from 'lucide-react';
-import { useEffect, useId, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useId, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -337,11 +337,7 @@ export function NotificationComposer({
   const [when, setWhen] = useState<When>('now');
   const [scheduledFor, setScheduledFor] = useState('');
 
-  useEffect(() => {
-    if (open) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- remise à zéro à la fermeture
-    setStep('redaction');
-  }, [open]);
+  if (!open && step !== 'redaction') setStep('redaction');
 
   const rendered = useMemo(() => ({ title: title.trim(), body: body.trim() }), [title, body]);
 

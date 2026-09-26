@@ -9,6 +9,20 @@ export const PORT = new URL(BASE_URL).port || '80';
 export const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://localhost:5432/cpi_v2_dev?sslmode=disable';
 
+// Ces comptes ont un mot de passe connu de quiconque lit ce dépôt : une
+// exécution qui viserait par erreur une base ou un serveur distant les y créerait.
+const HOTES_AUTORISES = new Set(['localhost', '127.0.0.1']);
+if (!HOTES_AUTORISES.has(new URL(DATABASE_URL).hostname)) {
+  throw new Error(
+    `DATABASE_URL doit pointer vers localhost ou 127.0.0.1 pour les outils e2e, reçu : ${DATABASE_URL}`,
+  );
+}
+if (!HOTES_AUTORISES.has(new URL(BASE_URL).hostname)) {
+  throw new Error(
+    `E2E_URL doit pointer vers localhost ou 127.0.0.1 pour les outils e2e, reçu : ${BASE_URL}`,
+  );
+}
+
 export const ROLES = [
   'ADMIN',
   'COMMERCIAL',

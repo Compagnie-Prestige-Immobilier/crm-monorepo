@@ -5,6 +5,7 @@ FROM "users" u
 JOIN "roles" r ON r."id" = u."roleId"
 WHERE u."deletedAt" IS NULL
   AND (lower(u."email") = lower(@identifier) OR lower(u."username") = lower(@identifier))
+ORDER BY u."createdAt", u."id"
 LIMIT 1;
 
 -- name: TouchLastLogin :exec

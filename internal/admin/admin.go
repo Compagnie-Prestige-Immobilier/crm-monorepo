@@ -759,7 +759,7 @@ var domainesPurge = []domainePurge{
 	{cle: "chargesClientele", label: "Comptes chargés de clientèle", hint: "Comptes du closing et tout ce qu’ils ont saisi.", etapes: "chargeClienteleAccounts", requiert: comptesRequierent},
 	{cle: "finances", label: "Comptes Finances générales", hint: "Comptes du pôle, dossiers qu’ils ont ouverts et demandes qu’ils ont déposées.", etapes: "financeAccounts", requiert: "dossiers,demandesClients"},
 	{cle: "supervision", label: "Comptes supervision", hint: "Comptes qui suivent le travail des téléconseillers.", etapes: "supervisionAccounts"},
-	{cle: "directionAccueil", label: "Comptes direction et accueil", hint: "Comptes du comptoir et de la direction commerciale, et le registre qu’ils ont tenu.", etapes: "directionAccounts,accueilAccounts", requiert: nomVisites},
+	{cle: "directionAccueil", label: "Comptes direction et accueil", hint: "Comptes du comptoir et de la direction, et le registre qu’ils ont tenu.", etapes: "directionAccounts,accueilAccounts", requiert: nomVisites},
 	{cle: nomRepresentants, label: "Représentants", hint: "Fiches représentants.", etapes: nomRepresentants, requiert: socle.NomProspects},
 	{cle: socle.NomProspects, label: "Prospects", hint: "Fiches prospects.", etapes: "prospectConversions,prospectJourneys,prospects", requiert: "dossiers,tentatives,fileAppels,demandesClients"},
 	{cle: "lotsExport", label: "Campagnes", hint: "Campagnes de fiches réparties pour le terrain.", etapes: "lotExportReaffectations,lotExportItems,lotsExport"},

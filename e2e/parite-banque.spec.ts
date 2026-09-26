@@ -309,7 +309,8 @@ const FERMES: readonly { role: RoleCompte; libelle: string; ecrans: readonly Ecr
     libelle: 'Téléconseiller',
     ecrans: [DOSSIERS, CLASSEUR, TABLEAU, DEMANDES],
   },
-  { role: 'SUPERVISEUR', libelle: 'Supervision', ecrans: [CLASSEUR, ETAPES] },
+  // L'export suit la permission `exports.banque` de l'API, ouverte à la supervision.
+  { role: 'SUPERVISEUR', libelle: 'Supervision', ecrans: [ETAPES] },
   { role: 'DIRECTION', libelle: 'Direction', ecrans: [CLASSEUR, ETAPES] },
   { role: 'BANQUE_FINANCE', libelle: 'Banque & Finance', ecrans: [ETAPES, ETAPE1] },
 ];

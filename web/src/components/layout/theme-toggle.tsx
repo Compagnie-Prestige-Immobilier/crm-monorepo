@@ -2,7 +2,6 @@
 
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,12 +19,6 @@ const OPTIONS = [
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- drapeau d'hydratation client
-    setMounted(true);
-  }, []);
 
   return (
     <DropdownMenu>
@@ -39,14 +32,8 @@ export function ThemeToggle() {
           />
         }
       >
-        {mounted ? (
-          <>
-            <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
-            <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
-          </>
-        ) : (
-          <MonitorIcon className="size-4 opacity-0" aria-hidden="true" />
-        )}
+        <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
+        <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {OPTIONS.map((option) => {

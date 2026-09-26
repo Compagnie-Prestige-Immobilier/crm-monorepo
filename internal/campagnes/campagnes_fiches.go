@@ -60,7 +60,7 @@ type lotPage struct {
 }
 
 func (s *service) lotCompterFiches(ctx context.Context, row *db.LotParIdRow, agent *string, page lotPage) (int, error) {
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		n, err := s.Q.LotFichesRepresentantsCount(ctx, db.LotFichesRepresentantsCountParams{
 			LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
 		})
@@ -75,7 +75,7 @@ func (s *service) lotCompterFiches(ctx context.Context, row *db.LotParIdRow, age
 func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traitees map[int32]bool,
 	agent *string, page lotPage,
 ) ([]CampagneFiche, error) {
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		lignes, err := s.Q.LotFichesRepresentants(ctx, db.LotFichesRepresentantsParams{
 			LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
 			PageSize: page.taille, PageOffset: page.decalage,

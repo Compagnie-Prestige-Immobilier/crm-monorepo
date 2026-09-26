@@ -33,9 +33,12 @@ var consigneSQL string
 // Un ADMIN lit déjà toute la base par les écrans et les exports : la requête
 // libre ne lui ouvre rien de plus, mais elle doit rester une lecture.
 var (
-	motsInterdits    = regexp.MustCompile(`(?i)\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|vacuum|call|do|merge|refresh|reindex|listen|notify|lock|set|reset|begin|commit|rollback|pg_read_file|pg_read_binary_file|pg_ls_dir|dblink|pg_sleep|lo_import|lo_export)\b`)
-	debutAutorise    = regexp.MustCompile(`(?is)^\s*(select|with)\b`)
-	tablesInterdites = regexp.MustCompile(`(?i)"?(refresh_tokens|support_signalement_images)"?`)
+	motsInterdits = regexp.MustCompile(`(?i)\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|vacuum|call|do|merge|refresh|reindex|listen|notify|lock|set(_config)?|reset|begin|commit|rollback|pg_read_file|pg_read_binary_file|pg_ls_dir|dblink|pg_sleep|lo_import|lo_export|pg_terminate_backend|pg_cancel_backend|pg_stat_activity|pg_stat_statements)\b`)
+	debutAutorise = regexp.MustCompile(`(?is)^\s*(select|with)\b`)
+	// `\b` s'arrête à un mot Postgres cité entre guillemets aussi bien qu'à
+	// une colonne nue : la liste couvre les deux écritures d'une même table.
+	tablesInterdites   = regexp.MustCompile(`(?i)"?(refresh_tokens|support_signalement_images)"?`)
+	colonnesInterdites = regexp.MustCompile(`(?i)"?passwordHash"?|"?formulaireJeton"?`)
 )
 
 type requeteLibre struct {
@@ -56,6 +59,9 @@ func sqlRefusee(sql string) error {
 	if table := tablesInterdites.FindString(sql); table != "" {
 		return fmt.Errorf("table hors de portée : %s", table)
 	}
+	if colonne := colonnesInterdites.FindString(sql); colonne != "" {
+		return fmt.Errorf("colonne hors de portée : %s", colonne)
+	}
 	return nil
 }
 
@@ -69,6 +75,9 @@ func lireEnLectureSeule(ctx context.Context, pool *pgxpool.Pool, sql string) (Ta
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = %d", delaiRequeteMax.Milliseconds())); err != nil {
+		return tableau, err
+	}
+	if _, err := tx.Exec(ctx, "SET LOCAL ROLE assistant_lecture"); err != nil {
 		return tableau, err
 	}
 	rows, err := tx.Query(ctx, fmt.Sprintf("SELECT * FROM (%s) AS reponse LIMIT %d", sql, lignesMax))
@@ -124,8 +133,7 @@ func (s *service) schema(ctx context.Context) (string, error) {
 			FROM information_schema.columns c
 			JOIN information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = c.table_schema
 			WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
-			  AND c.table_name NOT IN ('refresh_tokens', 'goose_db_version', 'support_signalement_images')
-			  AND c.column_name <> 'passwordHash'
+			  AND has_column_privilege('assistant_lecture', format('%I.%I', c.table_schema, c.table_name), c.column_name, 'SELECT')
 			GROUP BY c.table_name ORDER BY c.table_name`)
 		if err != nil {
 			s.schemaErreur = err

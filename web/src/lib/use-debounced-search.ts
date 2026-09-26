@@ -18,6 +18,11 @@ export function useDebouncedSearch(
   delayMs: number = SEARCH_DEBOUNCE_MS,
 ): { draft: string; setDraft: (next: string) => void; reset: (next: string) => void } {
   const [draft, setDraft] = useState(value);
+  const [amont, setAmont] = useState(value);
+  if (amont !== value) {
+    setAmont(value);
+    setDraft(value);
+  }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitRef = useRef(commit);
 
@@ -33,8 +38,6 @@ export function useDebouncedSearch(
 
   useEffect(() => {
     cancel();
-    // oxlint-disable-next-line react/set-state-in-effect -- brouillon recalé sur la valeur amont
-    setDraft(value);
   }, [cancel, value]);
 
   useEffect(() => cancel, [cancel]);

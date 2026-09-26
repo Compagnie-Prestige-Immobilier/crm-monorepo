@@ -57,6 +57,7 @@ import { formatDateTime, formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 import { cn } from '@/lib/utils';
 
 const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -215,11 +216,10 @@ export function RegistreImportView() {
   const enReview = estEnRevue(job, rapportPret, diffs);
 
   // La sélection démarre calée sur le rapport : le serveur pré-coche tout à la détection.
-  useEffect(() => {
+  useRecalage([rapportId, rapportPret, rapportCreated, rapportUpdated], () => {
     if (rapportId === undefined || !rapportPret) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- sélection calée sur le rapport serveur
     setSelection({ created: rapportCreated, updated: rapportUpdated });
-  }, [rapportId, rapportPret, rapportCreated, rapportUpdated]);
+  });
 
   const revueQuery = useQuery({
     queryKey: queryKeys.visitesImportRevue(jobIdKey, page),

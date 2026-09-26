@@ -21,6 +21,7 @@ export function AnimatedNumber({
   const reduced = usePrefersReducedMotion();
   const [shown, setShown] = useState(value);
   const shownRef = useRef(value);
+  if (reduced && shown !== value) setShown(value);
 
   useEffect(() => {
     const from = shownRef.current;
@@ -28,8 +29,6 @@ export function AnimatedNumber({
 
     if (reduced) {
       shownRef.current = value;
-      // oxlint-disable-next-line react/set-state-in-effect -- animation pilotée hors React
-      setShown(value);
       return;
     }
 

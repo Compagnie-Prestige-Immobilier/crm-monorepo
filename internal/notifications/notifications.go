@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -184,12 +185,17 @@ var Garde = map[string]socle.Permission{
 
 // L'heure des rappels vient de l'environnement : elle ne peut pas s'écrire
 // dans le littéral de `tachesDomaines`.
-func cronNotifications(nom, defaut string) string {
+func cronNotifications(nom, defaut string, heuresDeRattrapage int) string {
 	parts := notificationMotifHeureCron.FindStringSubmatch(socle.Env(nom, defaut))
 	if parts == nil {
 		parts = notificationMotifHeureCron.FindStringSubmatch(defaut)
 	}
-	return parts[2] + " " + parts[1] + " * * *"
+	heures := parts[1]
+	if heuresDeRattrapage > 0 {
+		debut, _ := strconv.Atoi(parts[1])
+		heures += "-" + strconv.Itoa(min(debut+heuresDeRattrapage, 23))
+	}
+	return parts[2] + " " + heures + " * * *"
 }
 
 // Gabarits
@@ -1100,7 +1106,7 @@ func (s *service) envoyerVaguesNotifications(ctx context.Context, transport *bre
 			refuse = true
 			slog.Warn("e-mail non parti, sort décidé par issue", "detail", envoi.detail)
 		}
-		s.ecrireVerdictsNotifications(ctx, ids, notificationVerdictsVague(envoi, vague, res.acceptees), res.verdicts)
+		s.ecrireVerdictsNotifications(context.WithoutCancel(ctx), ids, notificationVerdictsVague(envoi, vague, res.acceptees), res.verdicts)
 		renouvele, err := s.Q.RenewDispatchClaim(ctx, db.RenewDispatchClaimParams{Ids: ids, Claim: &jeton})
 		if err == nil && renouvele == int64(len(ids)) {
 			continue

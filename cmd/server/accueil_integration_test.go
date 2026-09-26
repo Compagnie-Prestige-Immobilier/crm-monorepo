@@ -430,6 +430,38 @@ func TestAccueilImportRefuseUnNumeroInconnu(t *testing.T) {
 	}
 }
 
+// Une date ou une heure impossible devenait une visite du 01/01/0001, absente de tous les filtres.
+func TestImportRegistreRefuseDateImpossible(t *testing.T) {
+	br := nouveauBancRegistre(t, "ADMIN")
+	entreprise, objet := "Test "+codeDe(t, br, "visite_entreprises", br.entreprise), "Test "+codeDe(t, br, "visite_objets", br.objet)
+	classeur := classeurRegistre(t, [][]string{
+		{"", "31/04/2019", "09:15", "ADAMA NDIAYE", "", entreprise, "", "", objet, ""},
+		{"", "2019-02-30", "", "BINETA SARR", "", entreprise, "", "", objet, ""},
+		{"", "07/07/2019", "0,99999", "COUMBA FALL", "", entreprise, "", "", objet, ""},
+	})
+	statut, job := br.deposer(classeur)
+	br.attend(statut, http.StatusCreated, "dépôt", job)
+	if job["errorRows"] != float64(2) || job["createdRows"] != float64(1) {
+		t.Fatalf("deux dates impossibles refusées, une ligne créée : %v", job)
+	}
+	for _, e := range job["report"].(map[string]any)["errors"].([]any) {
+		if code := e.(map[string]any)["code"]; code != "VISITE_IMPORT_DATE_ILLISIBLE" {
+			t.Fatalf("code : %v", code)
+		}
+	}
+	statut, applique := appelRegistre(br.banc, http.MethodPost, "/api/v1/visites/import/"+job["id"].(string)+"/apply", nil)
+	br.attend(statut, http.StatusOK, "validation", applique)
+	var instant string
+	if err := br.pool.QueryRow(br.ctx,
+		`SELECT to_char("visitedAt" AT TIME ZONE 'Africa/Dakar', 'YYYY-MM-DD HH24:MI') FROM "visites"
+		 WHERE "createdById" = $1 AND "visitorName" = 'COUMBA FALL'`, br.userID).Scan(&instant); err != nil {
+		t.Fatal(err)
+	}
+	if instant != "2019-07-07 23:59" {
+		t.Fatalf("une fraction de journée proche de 1 reste dans la journée : %s", instant)
+	}
+}
+
 // Une réécriture désigne la visite existante et porte l'empreinte de l'état revu.
 func (br *bancRegistre) reecritureRevue(jobID, visiteID string) {
 	br.t.Helper()

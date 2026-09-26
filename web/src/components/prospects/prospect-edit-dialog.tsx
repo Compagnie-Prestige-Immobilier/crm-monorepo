@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightIcon, LoaderIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -258,26 +258,25 @@ export function ProspectEditDialog({
     staleTime: 5 * 60_000,
   });
 
-  const { register, handleSubmit, reset, setValue, watch, formState } = useForm<ProspectFormInput>({
-    resolver: zodResolver(prospectSchema),
-    defaultValues: {
-      nom: '',
-      prenom: '',
-      phone: '',
-      banqueId: '',
-      syndicatId: '',
-      representantId: '',
-      statut: 'NOUVEAU',
-    },
-  });
+  const { register, handleSubmit, reset, setValue, control, formState } =
+    useForm<ProspectFormInput>({
+      resolver: zodResolver(prospectSchema),
+      defaultValues: {
+        nom: '',
+        prenom: '',
+        phone: '',
+        banqueId: '',
+        syndicatId: '',
+        representantId: '',
+        statut: 'NOUVEAU',
+      },
+    });
 
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (prospect === null) return;
-    setReason('');
-    setReasonError(undefined);
     reset({
       nom: prospect.nom,
       prenom: prospect.prenom,
@@ -318,11 +317,10 @@ export function ProspectEditDialog({
     },
   });
 
-  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-  const banqueId = watch('banqueId');
-  const syndicatId = watch('syndicatId');
-  const representantId = watch('representantId');
-  const statut = watch('statut');
+  const [banqueId, syndicatId, representantId, statut] = useWatch({
+    control,
+    name: ['banqueId', 'syndicatId', 'representantId', 'statut'],
+  });
 
   const { banqueItems, syndicatItems, representantItems, nextSegment } = choixReferentiels(
     reference,
@@ -336,7 +334,12 @@ export function ProspectEditDialog({
     <Dialog
       open={prospect !== null}
       onOpenChange={(open) => {
-        if (!open) onOpenChange(false);
+        if (open) {
+          setReason('');
+          setReasonError(undefined);
+          return;
+        }
+        onOpenChange(false);
       }}
     >
       <DialogContent className="sm:max-w-xl">

@@ -4,7 +4,7 @@ import { ChevronDownIcon, LayoutGridIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import {
   COQUES,
@@ -33,6 +33,16 @@ function persistMoreOpen(open: boolean): void {
   } catch {}
 }
 
+function useMoreOpen(repliActif: boolean): [boolean, (open: boolean) => void] {
+  const [moreOpen, setMoreOpen] = useState(() => repliActif || readMoreOpen());
+  const [repliVu, setRepliVu] = useState(repliActif);
+  if (repliVu !== repliActif) {
+    setRepliVu(repliActif);
+    setMoreOpen(repliActif || readMoreOpen());
+  }
+  return [moreOpen, setMoreOpen];
+}
+
 export function SidebarNav({
   visiteur,
   onNavigate = () => undefined,
@@ -58,13 +68,7 @@ export function SidebarNav({
     ),
   );
 
-  // Fermé au premier rendu, serveur comme client : la préférence est relue
-  // ensuite, comme le repli des filtres avancés.
-  const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- préférence relue après hydratation
-    setMoreOpen(repliActif || readMoreOpen());
-  }, [repliActif]);
+  const [moreOpen, setMoreOpen] = useMoreOpen(repliActif);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">

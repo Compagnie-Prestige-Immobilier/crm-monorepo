@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -300,7 +300,7 @@ export function DepartementFormDialog({
     staleTime: 30 * 60_000,
   });
 
-  const { register, handleSubmit, reset, setValue, watch, formState } =
+  const { register, handleSubmit, reset, setValue, control, formState } =
     useForm<DepartementFormInput>({
       resolver: zodResolver(departementSchema),
       defaultValues: { code: '', name: '', regionId: '' },
@@ -331,8 +331,7 @@ export function DepartementFormDialog({
     },
   });
 
-  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-  const regionId = watch('regionId');
+  const regionId = useWatch({ control, name: 'regionId' });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

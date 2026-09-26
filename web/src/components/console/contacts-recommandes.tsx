@@ -42,9 +42,10 @@ export function ContactsRecommandes({
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium">Contacts recommandés, facultatif</span>
-      {valeurs.map((ligne) => (
+      {valeurs.map((ligne, index) => (
         <div key={ligne.id} className="flex gap-2">
           <Input
+            aria-label={`Nom du contact ${String(index + 1)}`}
             placeholder="Nom (facultatif)"
             value={ligne.nom}
             disabled={disabled}
@@ -53,6 +54,8 @@ export function ContactsRecommandes({
             }}
           />
           <Input
+            type="tel"
+            aria-label={`Téléphone du contact ${String(index + 1)}`}
             placeholder="Téléphone"
             value={ligne.phone}
             disabled={disabled}
@@ -64,6 +67,7 @@ export function ContactsRecommandes({
             type="button"
             variant="ghost"
             size="icon"
+            aria-label={`Retirer le contact ${String(index + 1)}`}
             disabled={disabled}
             onClick={() => {
               onChange(valeurs.filter((autre) => autre.id !== ligne.id));

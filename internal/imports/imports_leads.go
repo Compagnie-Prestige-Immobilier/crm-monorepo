@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -40,7 +39,7 @@ const (
 var releveLeadsEnCours atomic.Bool
 
 func (s *service) releverLeads(ctx context.Context) error {
-	lien := strings.TrimSpace(os.Getenv("IMPORT_LEADS_URL"))
+	lien := strings.TrimSpace(socle.Env("IMPORT_LEADS_URL", ""))
 	if lien == "" || !releveLeadsEnCours.CompareAndSwap(false, true) {
 		return nil
 	}
@@ -213,12 +212,11 @@ func telechargerLeads(ctx context.Context, lien string, maximum int64) (classeur
 		return nil, "", err
 	}
 	client := &http.Client{Jar: jar, Timeout: delaiReleveLeads}
-	//nolint:gosec // lien lu dans l'environnement par l'exploitant, jamais une entrée client
 	requete, err := http.NewRequestWithContext(ctx, http.MethodGet, lienTelechargementLeads(lien), http.NoBody)
 	if err != nil {
 		return nil, "", err
 	}
-	reponse, err := client.Do(requete) //nolint:gosec // même lien, même raison
+	reponse, err := client.Do(requete)
 	if err != nil {
 		return nil, "", err
 	}

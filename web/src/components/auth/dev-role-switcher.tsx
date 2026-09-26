@@ -36,16 +36,19 @@ const FIXTURE_IDENTIFIERS: Record<Exclude<Role, 'ADMIN'>, string> = {
   CHARGE_CLIENTELE: 'fixture.clientele@cpi.sn',
 };
 
+// Hors `vite dev`, les mots de passe viennent seulement de `web/.env.local` : aucun défaut dans le bundle.
 function accountForRole(role: Role): { identifier: string; password: string } {
   if (role === 'ADMIN') {
     return {
       identifier: import.meta.env.VITE_SEED_ADMIN_EMAIL ?? 'admin@cpi.sn',
-      password: import.meta.env.VITE_SEED_ADMIN_PASSWORD ?? 'admin-local-2026',
+      password:
+        import.meta.env.VITE_SEED_ADMIN_PASSWORD ?? (import.meta.env.DEV ? 'admin-local-2026' : ''),
     };
   }
   return {
     identifier: FIXTURE_IDENTIFIERS[role],
-    password: import.meta.env.VITE_SEED_FIXTURE_PASSWORD ?? 'ChangeMoi123456',
+    password:
+      import.meta.env.VITE_SEED_FIXTURE_PASSWORD ?? (import.meta.env.DEV ? 'ChangeMoi123456' : ''),
   };
 }
 
@@ -74,8 +77,8 @@ function useDevLogin(next: string | null | undefined) {
         });
         if (!response.ok) throw new Error('dev login failed');
         const payload = (await response.json()) as { user: SessionUser };
+        queryClient.clear();
         queryClient.setQueryData(meQueryOptions.queryKey, payload.user);
-        await queryClient.invalidateQueries();
         router.replace(next != null && next !== '' ? next : homePathForRole(payload.user.role));
       } catch {
         setError('Le compte dev est indisponible. Lancez `make db` puis réessayez.');

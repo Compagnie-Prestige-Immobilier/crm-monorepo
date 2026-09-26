@@ -229,7 +229,8 @@ func TestSupportConserveLeSignalementQuandGlpiNEstPasRelie(t *testing.T) {
 	}
 	statut, body = b.appelSupport(http.MethodGet, "/api/v1/support/tickets/"+id, nil)
 	b.attend(statut, http.StatusOK, "suivi lisible", body)
-	if body["erreur"] == nil || body["reprenable"] != true { //nolint:revive // comparer a true distingue le champ absent du champ faux
+	reprenable, _ := body["reprenable"].(bool)
+	if body["erreur"] == nil || !reprenable {
 		t.Fatalf("l'auteur doit lire la cause et pouvoir reprendre : %v", body)
 	}
 }
@@ -287,7 +288,8 @@ func TestSupportRepriseReconciliationEtCloisonnementDesAuteurs(t *testing.T) {
 	}
 	statut, body = b.appelSupport(http.MethodGet, chemin, nil)
 	b.attend(statut, http.StatusOK, "suivi relu", body)
-	if body["reprenable"] != true || body["erreur"] == nil { //nolint:revive // comparer a true distingue le champ absent du champ faux
+	reprenable, _ := body["reprenable"].(bool)
+	if !reprenable || body["erreur"] == nil {
 		t.Fatalf("un échec doit être repris ou expliqué : %v", body)
 	}
 

@@ -114,7 +114,7 @@ func lotLignesDuProgramme(rows []db.LotItemsPourPdfJourRow) []lotLigneProgramme 
 
 func (*service) lotProgrammeDe(row *db.LotParIdRow, rows []db.LotItemsPourPdfJourRow, titre, periode string) *lotDonneesProgramme {
 	label := lotScopeLabel(string(row.Cible), lotLireFiltres(row.Filters))
-	if !lotSurRepresentants(string(row.Cible)) {
+	if !lotSurRepresentants(string(row.Cible), row.Projet) {
 		label = "Prospects : " + label
 	}
 	nom := exports.ExportEnteteTeleconseiller
@@ -419,7 +419,7 @@ func (s *service) lotEcrireClasseur(ctx context.Context, row *db.LotParIdRow, so
 		return err
 	}
 	rang := lotLireFiltres(row.Filters).Distribution.TeleconseillerIds
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		err = s.lotFeuilleRepresentants(ctx, row.ID, rang, flux, styleEntete, styleDate)
 	} else {
 		err = s.lotFeuilleProspects(ctx, row.ID, rang, flux, styleEntete, styleDate)

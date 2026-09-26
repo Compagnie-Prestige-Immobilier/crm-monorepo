@@ -15,6 +15,7 @@ ON CONFLICT DO NOTHING;
 
 -- +goose Down
 
+-- Destructif : invente un faux numéro par fiche. Revenir en arrière passe par la sauvegarde.
 -- L'index unique porte sur les fiches vivantes : une même chaîne vide pour
 -- toutes les fiches sans numéro ferait échouer le retour en arrière.
 UPDATE public.prospects SET "phoneE164" = 'SANS-NUMERO-' || "id" WHERE "phoneE164" IS NULL;

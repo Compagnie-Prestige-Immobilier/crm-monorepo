@@ -42,8 +42,12 @@ func (s *service) prospectRequalifier(ctx context.Context, in *ProspectRequalifi
 		if _, err := q.RequalifierJourney(ctx, db.RequalifierJourneyParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID, Projet: projet}); err != nil {
 			return err
 		}
-		if err := q.RequalifierProspect(ctx, db.RequalifierProspectParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID, Projet: projet}); err != nil {
+		remises, err := q.RequalifierProspect(ctx, db.RequalifierProspectParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID})
+		if err != nil {
 			return err
+		}
+		if remises == 0 {
+			return socle.Problem(http.StatusConflict, "PROSPECT_CONVERTI", "Une fiche convertie ou vendue ne se requalifie pas.")
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.requalification_encadrement", prospectEntite, in.ID,
 			map[string]any{"projet": in.Body.Projet, prospectChampStatut: string(avant.Statut), "consent": string(avant.Consent)},

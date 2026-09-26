@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"cpi-go/sql/migrations"
-	"errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -19,12 +18,24 @@ func Migrer(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
-	sqlDB := stdlib.OpenDBFromPool(pool)
+	// Connexion hors du pool applicatif, jamais rendue : un `lock_timeout` posé
+	// sur une connexion empruntée au pool y resterait après le retour au pool,
+	// et raccourcirait sans le vouloir les requêtes applicatives suivantes.
+	connConfig := pool.Config().ConnConfig.Copy()
+	if connConfig.RuntimeParams == nil {
+		connConfig.RuntimeParams = map[string]string{}
+	}
+	// Une contrainte validée sous ACCESS EXCLUSIVE peut attendre une requête en
+	// cours sur la même table : sans borne, elle gèle le panneau le temps de
+	// cette requête plutôt que d'échouer et de laisser goose réessayer.
+	connConfig.RuntimeParams["lock_timeout"] = "5s"
+	sqlDB := stdlib.OpenDB(*connConfig)
+	defer func() { _ = sqlDB.Close() }()
 	fournisseur, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS,
 		goose.WithSessionLocker(verrou), goose.WithLogger(goose.NopLogger()))
 	if err != nil {
-		return errors.Join(err, sqlDB.Close())
+		return err
 	}
 	_, err = fournisseur.Up(ctx)
-	return errors.Join(err, sqlDB.Close())
+	return err
 }

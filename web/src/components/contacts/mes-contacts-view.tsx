@@ -20,12 +20,12 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { useTriLocal } from '@/components/ui/tri-local';
-import { callbackKeys } from '@/lib/data/console';
 import { fetchProspectsAppeles } from '@/lib/data/prospects';
 import { SUIVI_PAGE_SIZE, fetchRepresentantsAppeles } from '@/lib/data/representants';
 import { fetchUsers } from '@/lib/data/users';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { queryKeys } from '@/lib/query-keys';
 import {
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
@@ -34,7 +34,10 @@ import {
   type ProspectRow,
   type RepresentantRow,
 } from '@/lib/types';
-import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
+
+// Comptes fermés et rôles changés compris : leurs appels restent lisibles.
+const TOUS_LES_COMPTES: UserFilters = { ...EMPTY_USER_FILTERS, pageSize: 200 };
 
 type Onglet = 'PROSPECTS' | 'REPRESENTANTS' | 'CLIENTS';
 
@@ -377,9 +380,8 @@ export function MesContactsView({
   });
 
   const teleconseillers = useQuery({
-    queryKey: callbackKeys.teleconseillers,
-    // Comptes fermés et rôles changés compris : leurs appels restent lisibles.
-    queryFn: () => fetchUsers({ ...EMPTY_USER_FILTERS, pageSize: 200 }),
+    queryKey: queryKeys.commerciaux(TOUS_LES_COMPTES),
+    queryFn: () => fetchUsers(TOUS_LES_COMPTES),
     enabled: canFilter,
     staleTime: 300_000,
   });

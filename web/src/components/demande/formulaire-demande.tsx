@@ -2,7 +2,7 @@
 
 import { AlertCircleIcon, CheckCircle2Icon, LoaderIcon } from 'lucide-react';
 import Script from 'next/script';
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import { Field } from '@/components/forms/field';
 import { Liste, type OptionListe } from '@/components/forms/liste';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { getApiClient } from '@/lib/api/browser';
 import {
   aDesCoordonnees,
   CHOIX_WHATSAPP,
@@ -27,6 +28,7 @@ import {
   estRequis,
   etapeDuChamp,
   grouperChamps,
+  lire,
   lireBrouillon,
   MESSAGE_MAX,
   valeursLibre,
@@ -47,6 +49,7 @@ import {
   PROSPECT_TYPES,
 } from '@/lib/data/grand-public';
 import { PAYMENT_MODE_LABELS, PAYMENT_MODES } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 import { apiErrorMessage, cn } from '@/lib/utils';
 
 const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
@@ -130,15 +133,12 @@ export function FormulaireDemande({
   const enCours = phase === 'envoi';
   const enRelecture = phase === 'relecture' || phase === 'envoi';
 
-  // Le brouillon ne peut pas être lu au premier rendu : le serveur rend un
-  // formulaire vide, et l'hydratation exige le même.
-  useEffect(() => {
+  useRecalage([jeton], () => {
     const brouillon = lireBrouillon(jeton);
     if (brouillon === null) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- brouillon relu après hydratation
     setSaisie(brouillon.saisie);
     if (brouillon.etape === 'complement') setPhase('complement');
-  }, [jeton]);
+  });
 
   function retenir(valeurs: Saisie, suivante: Phase): void {
     ecrireBrouillon(jeton, { saisie: valeurs, etape: etapeDe(suivante) });
@@ -201,19 +201,20 @@ export function FormulaireDemande({
     const piege = champDom(PIEGE_CHAMP);
     const corps = {
       ...corpsDemande(saisie, formulaire.champs, formulaire.libres),
+      nom: lire(saisie, 'nom'),
+      prenom: lire(saisie, 'prenom'),
+      phone: lire(saisie, 'phoneE164'),
       turnstileToken,
       ...(piege === '' ? {} : { site: piege }),
     };
 
     try {
-      const reponse = await fetch(`/api/demande/${encodeURIComponent(jeton)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(corps),
+      const { error } = await getApiClient().POST('/api/v1/formulaire-public/{jeton}', {
+        params: { path: { jeton } },
+        body: corps,
       });
-      if (!reponse.ok) {
-        const charge: unknown = await reponse.json().catch(() => null);
-        setRefus(apiErrorMessage(charge, 'Votre demande n’a pas pu être envoyée.'));
+      if (error !== undefined) {
+        setRefus(apiErrorMessage(error, 'Votre demande n’a pas pu être envoyée.'));
         setPhase('relecture');
         return;
       }

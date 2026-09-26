@@ -43,7 +43,7 @@ function Hub() {
         </span>
         <div className="flex-1" />
         <ThemeToggle />
-        <UserMenu user={user} demoEnabled={false} />
+        <UserMenu user={user} />
       </header>
       <main id="contenu-principal" className="cpi-logo-field flex-1 px-4 py-8 md:px-6 md:py-12">
         <Outlet />

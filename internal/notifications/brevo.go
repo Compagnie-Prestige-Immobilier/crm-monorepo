@@ -93,13 +93,21 @@ func ConfigurerBrevo() brevo {
 func (b *brevo) configure() bool { return b.raison == "" }
 
 type corpsBrevo struct {
-	Sender      map[string]string   `json:"sender"`
-	To          []map[string]string `json:"to"`
-	Cc          []map[string]string `json:"cc,omitempty"`
-	Subject     string              `json:"subject"`
-	HTMLContent string              `json:"htmlContent"`
-	TextContent string              `json:"textContent"`
-	Attachment  []map[string]string `json:"attachment,omitempty"`
+	Sender          map[string]string   `json:"sender"`
+	To              []map[string]string `json:"to"`
+	Cc              []map[string]string `json:"cc,omitempty"`
+	Subject         string              `json:"subject"`
+	HTMLContent     string              `json:"htmlContent"`
+	TextContent     string              `json:"textContent"`
+	Attachment      []map[string]string `json:"attachment,omitempty"`
+	MessageVersions []versionBrevo      `json:"messageVersions,omitempty"`
+}
+
+// Une version par destinataire : sans elle, Brevo place tous les `to` d'un
+// même appel dans l'en-tête reçu par chacun, et chaque destinataire lit les
+// adresses des autres.
+type versionBrevo struct {
+	To []map[string]string `json:"to"`
 }
 
 type trancheBrevo struct {
@@ -177,6 +185,7 @@ func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []tra
 	for i, tranche := range tranches {
 		attente.Add(1)
 		go func() {
+			defer func() { socle.JournaliserPanique("envoi Brevo", recover()) }()
 			defer attente.Done()
 			jetons <- struct{}{}
 			defer func() { <-jetons }()
@@ -189,13 +198,25 @@ func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []tra
 
 func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
 	sort := trancheBrevo{destinataires: tranche}
+	adresses := brevoAdresses(tranche)
 	charge := corpsBrevo{
 		Sender:      map[string]string{"email": b.expediteur, notificationCleNom: b.nom},
-		To:          brevoAdresses(tranche),
+		To:          adresses,
 		Cc:          brevoAdresses(message.Copies),
 		Subject:     message.Sujet,
 		HTMLContent: message.HTML,
 		TextContent: message.Texte,
+	}
+	// Avec un seul destinataire, `to` suffit et Brevo rend `messageId`. Au-delà,
+	// `messageVersions` évite que chaque destinataire lise les adresses des autres,
+	// mais Brevo rend alors `messageIds` (voir la lecture de la réponse plus bas).
+	if len(adresses) > 1 {
+		versions := make([]versionBrevo, len(adresses))
+		for i, adresse := range adresses {
+			versions[i] = versionBrevo{To: []map[string]string{adresse}}
+		}
+		charge.To = adresses[:1]
+		charge.MessageVersions = versions
 	}
 	if message.PieceJointe != nil {
 		charge.Attachment = []map[string]string{{
@@ -225,10 +246,14 @@ func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranc
 	if reponse.StatusCode < http.StatusMultipleChoices {
 		sort.ok = true
 		var accuse struct {
-			MessageID string `json:"messageId"`
+			MessageID  string   `json:"messageId"`
+			MessageIDs []string `json:"messageIds"`
 		}
 		if json.NewDecoder(reponse.Body).Decode(&accuse) == nil {
 			sort.messageID = accuse.MessageID
+			if sort.messageID == "" && len(accuse.MessageIDs) > 0 {
+				sort.messageID = accuse.MessageIDs[0]
+			}
 		}
 		return sort
 	}

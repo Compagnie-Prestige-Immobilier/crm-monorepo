@@ -227,6 +227,7 @@ func bornerDepotImport(ctx huma.Context, suite func(huma.Context)) {
 		socle.EcrireProblem(w, r, socle.Problem(http.StatusRequestEntityTooLarge, "IMPORT_FILE_TOO_LARGE", message))
 		return
 	}
+	defer func() { _ = r.MultipartForm.RemoveAll() }()
 	suite(ctx)
 }
 
@@ -428,6 +429,7 @@ type adaptateurImport struct {
 }
 
 func (s *service) executerImport(ctx context.Context, jobID string) {
+	defer func() { socle.JournaliserPanique("import", recover()) }()
 	if err := s.courirImport(ctx, jobID); err != nil {
 		slog.Error("import", "job", jobID, "err", err)
 	}
@@ -582,22 +584,7 @@ func (c *courseImport) ecrireTranche(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	maintenant := time.Now()
-	rangs, err := q.AdvanceImportJob(tctx, db.AdvanceImportJobParams{
-		ProcessedRows: c.totaux.traitees + entier32Import(int64(c.consommees)),
-		CreatedRows:   c.totaux.crees + entier32Import(int64(bilan.crees)),
-		UpdatedRows:   c.totaux.misAJour + entier32Import(int64(bilan.misAJour)),
-		SkippedRows:   c.totaux.ignorees + entier32Import(int64(bilan.ignorees)),
-		ErrorRows:     c.totaux.refusees + entier32Import(int64(len(bilan.erreurs))),
-		Now:           maintenant, ID: c.job.ID, Token: c.jeton,
-	})
-	if err := barriereImport(rangs, err); err != nil {
-		return err
-	}
-	if err := tx.Commit(tctx); err != nil {
-		return err
-	}
-
+	// Une erreur abandonne la course : les totaux en mémoire peuvent avancer avant l'écriture.
 	c.totaux.traitees += entier32Import(int64(c.consommees))
 	c.totaux.crees += entier32Import(int64(bilan.crees))
 	c.totaux.misAJour += entier32Import(int64(bilan.misAJour))
@@ -607,13 +594,28 @@ func (c *courseImport) ecrireTranche(ctx context.Context) error {
 	c.totaux.avertis += entier32Import(int64(len(bilan.avertissements)))
 	c.totaux.avertissements = bornerErreursImport(c.totaux.avertissements, bilan.avertissements)
 	compterCodesImport(c.totaux.compteurs, bilan.avertissements)
+	rapport, err := rapportImport(c.job, &c.totaux, c.vues)
+	if err != nil {
+		return err
+	}
+	rangs, err := q.AdvanceImportJob(tctx, db.AdvanceImportJobParams{
+		ProcessedRows: c.totaux.traitees, CreatedRows: c.totaux.crees, UpdatedRows: c.totaux.misAJour,
+		SkippedRows: c.totaux.ignorees, ErrorRows: c.totaux.refusees, Report: rapport,
+		Now: time.Now(), ID: c.job.ID, Token: c.jeton,
+	})
+	if err := barriereImport(rangs, err); err != nil {
+		return err
+	}
+	if err := tx.Commit(tctx); err != nil {
+		return err
+	}
 	c.tampon, c.consommees = nil, 0
 	c.s.Live.Emettre("imports")
 	return nil
 }
 
-func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton string, totaux *totauxImport, vues int) error {
-	rapport, err := json.Marshal(RapportImportDTO{
+func rapportImport(job *db.ImportJob, totaux *totauxImport, vues int) ([]byte, error) {
+	return json.Marshal(RapportImportDTO{
 		Kind: string(job.Kind), Mode: string(job.Mode), TotalRows: vues,
 		ProcessedRows: int(totaux.traitees), CreatedRows: int(totaux.crees),
 		UpdatedRows: int(totaux.misAJour), SkippedRows: int(totaux.ignorees),
@@ -622,6 +624,10 @@ func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton s
 		WarningRows: int(totaux.avertis), Warnings: totaux.avertissements, Compteurs: totaux.compteurs,
 		Feuilles: totaux.feuilles.liste(),
 	})
+}
+
+func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton string, totaux *totauxImport, vues int) error {
+	rapport, err := rapportImport(job, totaux, vues)
 	if err != nil {
 		return err
 	}

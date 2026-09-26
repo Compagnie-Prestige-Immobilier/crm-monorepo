@@ -47,6 +47,7 @@ import {
   lireBrouillon,
   newAttemptInput,
   pushCallAttempt,
+  uuidV7,
   validateAttempt,
   validateConversion,
   type AttemptDraft,
@@ -224,9 +225,7 @@ export function ConsoleView({
   const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
-
   const consoleFilters = useConsoleFilters();
-
   const reference = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
@@ -1097,6 +1096,8 @@ export function Consignation({
 
   const nomComplet = nomDe(prospect);
   const [now] = useState(() => Date.now());
+  // Un nouvel essai après une réponse perdue doit être dédupliqué par le serveur.
+  const [attemptId] = useState(() => uuidV7());
 
   const { depuis: departChrono, enAttente: brouillonEnAttente } = useBrouillonAuto(
     ouverture,
@@ -1119,7 +1120,7 @@ export function Consignation({
           departChrono ?? new Date().toISOString(),
         );
       }
-      return pushCallAttempt(newAttemptInput(prospect.id, draft));
+      return pushCallAttempt({ ...newAttemptInput(prospect.id, draft), attemptId });
     },
     onSuccess: () => {
       onEnregistre(nomComplet, (precision ?? statut)?.label ?? 'Qualifié');

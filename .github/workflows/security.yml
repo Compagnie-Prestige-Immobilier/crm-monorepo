@@ -11,25 +11,8 @@ name: security
 # ne verra jamais une clé AWS commise, et un dépôt qui n'exécute que gitleaks ne
 # verra jamais une injection SQL.
 on:
-  # `workflow_call` EST CE QUI PERMET DE BLOQUER UNE MISE EN LIGNE.
-  #
-  # Ces quatre scanners tournaient dans LEUR PROPRE workflow, à côté de `ci`.
-  # Deux conséquences, invisibles tant que rien ne se déployait tout seul :
-  #
-  #   · sur un push vers `prod`, ils ne tournaient PAS DU TOUT (`push` ne listait
-  #     que `dev`) — c'est à dire jamais sur le commit réellement mis en ligne ;
-  #   · `needs:` ne franchit pas la frontière d'un workflow. Le job `deploy` de
-  #     `ci.yml` ne pouvait donc pas les attendre, même verts.
-  #
-  # Appelés depuis `ci.yml`, ils deviennent des jobs de CETTE exécution :
-  # `deploy` les met dans son `needs`, et un secret commis ou une dépendance
-  # vulnérable empêche la mise en ligne au lieu de la décorer d'une croix rouge
-  # que personne ne regarde.
-  #
-  # `pull_request` et `push` sont retirés d'ici pour la même raison qu'on ne
-  # déclare pas deux fois la même vérité : `ci.yml` porte désormais ces deux
-  # déclencheurs et appelle ce fichier. Les garder ferait tourner les quatre
-  # scanners DEUX fois par PR.
+  # `ci.yml` porte `pull_request` et `push` et appelle ce fichier : les redéclarer
+  # ici ferait tourner les scanners deux fois par PR.
   workflow_call:
   # Une dépendance saine aujourd'hui est vulnérable demain sans qu'une seule
   # ligne du dépôt n'ait bougé. Sans exécution planifiée, on ne l'apprend qu'au
@@ -65,8 +48,10 @@ jobs:
       - name: gitleaks
         run: |
           VERSION=8.30.1
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /tmp gitleaks
+          curl -sSfL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
           /tmp/gitleaks detect --source . --no-banner --redact --exit-code 1
 
   sast:
@@ -74,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: semgrep/semgrep:1.145.0
+      image: semgrep/semgrep:1.145.0@sha256:b68f9b68483955b85042dac7b4533757779625a02dcf91e470da4c2df1b430be
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -133,6 +118,7 @@ jobs:
           VERSION=2.5.0
           curl -sSfL -o /tmp/osv-scanner \
             "https://github.com/google/osv-scanner/releases/download/v${VERSION}/osv-scanner_linux_amd64"
+          echo "edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c  /tmp/osv-scanner" | sha256sum -c -
           chmod +x /tmp/osv-scanner
           # `go.sum` n'a pas d'extracteur : le scan rendait zéro paquet Go et
           # sortait 0, donc aucune vulnérabilité Go n'a jamais été signalée.

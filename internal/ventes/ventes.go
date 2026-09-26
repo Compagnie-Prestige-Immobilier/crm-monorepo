@@ -26,24 +26,27 @@ import (
 
 type service struct{ *socle.Deps }
 
-var lecteurs = socle.PermissionVentesLire
+var (
+	lecteurs      = socle.PermissionVentesLire
+	gestionnaires = socle.PermissionVentesGerer
+)
 
 var Garde = map[string]socle.Permission{
 	"GET /api/v1/ventes":                     lecteurs,
-	"POST /api/v1/ventes":                    lecteurs,
-	"PATCH /api/v1/ventes/{id}":              lecteurs,
-	"POST /api/v1/ventes/{id}/versements":    lecteurs,
-	"DELETE /api/v1/ventes/{id}":             lecteurs,
-	"POST /api/v1/ventes/{id}/restaurer":     lecteurs,
-	"POST /api/v1/ventes/classeur":           lecteurs,
+	"POST /api/v1/ventes":                    gestionnaires,
+	"PATCH /api/v1/ventes/{id}":              gestionnaires,
+	"POST /api/v1/ventes/{id}/versements":    gestionnaires,
+	"DELETE /api/v1/ventes/{id}":             gestionnaires,
+	"POST /api/v1/ventes/{id}/restaurer":     gestionnaires,
+	"POST /api/v1/ventes/classeur":           gestionnaires,
 	"GET /api/v1/ventes/classeur/fichier":    lecteurs,
 	"GET /api/v1/ventes/configuration":       lecteurs,
-	"POST /api/v1/ventes/sites":              lecteurs,
-	"PATCH /api/v1/ventes/sites/{id}":        lecteurs,
-	"POST /api/v1/ventes/sites/{id}/active":  lecteurs,
-	"POST /api/v1/ventes/canaux":             lecteurs,
-	"PATCH /api/v1/ventes/canaux/{id}":       lecteurs,
-	"POST /api/v1/ventes/canaux/{id}/active": lecteurs,
+	"POST /api/v1/ventes/sites":              gestionnaires,
+	"PATCH /api/v1/ventes/sites/{id}":        gestionnaires,
+	"POST /api/v1/ventes/sites/{id}/active":  gestionnaires,
+	"POST /api/v1/ventes/canaux":             gestionnaires,
+	"PATCH /api/v1/ventes/canaux/{id}":       gestionnaires,
+	"POST /api/v1/ventes/canaux/{id}/active": gestionnaires,
 }
 
 const codeIllisible = "VENTES_CLASSEUR_ILLISIBLE"
@@ -396,9 +399,20 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 	return s.lister(ctx, nil)
 }
 
-// Le dernier classeur déposé remplace les ventes importées avant lui.
+// Le dernier classeur déposé remplace les ventes importées avant lui, sauf
+// celles qui portent un versement ou un archivage saisis hors classeur : les
+// effacer perdrait une écriture financière sans que rien ne la retienne.
 func remplacerClasseur(ctx context.Context, q *db.Queries, classeur *db.InsererClasseurVentesParams, lues []venteLue, telephones []string) error {
-	if err := q.SupprimerVentesImportees(ctx); err != nil {
+	nonRemplacables, err := q.VentesImporteesNonRemplacables(ctx)
+	if err != nil {
+		return err
+	}
+	if nonRemplacables > 0 {
+		return socle.Problem(http.StatusConflict, "VENTES_IMPORT_NON_REMPLACABLES",
+			"Des ventes importées portent un versement ou un archivage saisis hors classeur. Elles doivent être traitées avant un nouveau dépôt.")
+	}
+	err = q.SupprimerVentesImportees(ctx)
+	if err != nil {
 		return err
 	}
 	if err := q.SupprimerClasseursVentes(ctx); err != nil {
@@ -413,8 +427,8 @@ func remplacerClasseur(ctx context.Context, q *db.Queries, classeur *db.InsererC
 	if err := marquerProspectsVendus(ctx, q, classeur.ImporteParId, telephones); err != nil {
 		return err
 	}
-	return database.Auditer(ctx, q, classeur.ImporteParId, "vente.importer", "vente_classeur", classeur.ID, nil,
-		map[string]any{"fichier": classeur.NomFichier, "ventes": len(lues)})
+	return database.Auditer(ctx, q, classeur.ImporteParId, "vente.importer", "vente_classeur", classeur.ID,
+		map[string]any{"ventesRemplacees": true}, map[string]any{"fichier": classeur.NomFichier, "ventes": len(lues)})
 }
 
 func telephonesDesVentesLues(lues []venteLue, region string) []string {
@@ -496,9 +510,15 @@ func lireClasseur(contenu []byte, depuis pgtype.Date) ([]venteLue, error) {
 	if err != nil {
 		return nil, err
 	}
-	versements := lireVersements(echeances)
+	versements, err := lireVersements(echeances)
+	if err != nil {
+		return nil, err
+	}
+	lignes, err := lireVentes(ventes)
+	if err != nil {
+		return nil, err
+	}
 	lues := []venteLue{}
-	lignes := lireVentes(ventes)
 	for i := range lignes {
 		date := lignes[i].DateSouscription
 		if depuis.Valid && (!date.Valid || date.Time.Before(depuis.Time)) {
@@ -567,10 +587,14 @@ func positionsColonnes(entete []string) map[string]int {
 	return positions
 }
 
-func lireVentes(lignes [][]string) []db.InsererVenteParams {
+var colonnesMontants = []string{
+	"PRIX VENTE UNITAIRE", "PRIX TOTAL", "ACOMPTE VERSE", "RELIQUAT", "PART PROPRIETAIRE", "PART APPORTEUR", "PART CPI",
+}
+
+func lireVentes(lignes [][]string) ([]db.InsererVenteParams, error) {
 	ventes := []db.InsererVenteParams{}
 	var col map[string]int
-	for _, ligne := range lignes {
+	for n, ligne := range lignes {
 		if col == nil {
 			if positions := positionsColonnes(ligne); len(positions) == len(colonnesVentes) {
 				col = positions
@@ -581,6 +605,9 @@ func lireVentes(lignes [][]string) []db.InsererVenteParams {
 		client := strings.TrimSpace(cellule("PRENOM & NOM CLIENT"))
 		if client == "" {
 			continue
+		}
+		if nom, illisible := montantIllisible(ligne, col); illisible {
+			return nil, montantRefuse(fmt.Sprintf("Onglet « Tableau des ventes », ligne %d, colonne « %s »", n+1, nom), cellule(nom))
 		}
 		// Une vente sans date reste une vente : l'écarter fausserait les totaux.
 		date := pgtype.Date{}
@@ -598,14 +625,39 @@ func lireVentes(lignes [][]string) []db.InsererVenteParams {
 			PartApporteur:    entier(cellule("PART APPORTEUR")), PartCpi: entier(cellule("PART CPI")),
 		})
 	}
-	return ventes
+	return ventes, nil
+}
+
+func montantIllisible(ligne []string, col map[string]int) (string, bool) {
+	for _, nom := range colonnesMontants {
+		if !montantLisible(celluleA(ligne, col[nom])) {
+			return nom, true
+		}
+	}
+	return "", false
+}
+
+// « 1 500 000 » saisi en texte serait lu zéro : mieux vaut refuser le dépôt.
+func montantLisible(texte string) bool {
+	texte = strings.TrimSpace(texte)
+	if texte == "" {
+		return true
+	}
+	_, err := strconv.ParseFloat(texte, 64)
+	return err == nil
+}
+
+func montantRefuse(ou, valeur string) error {
+	return socle.Problem(http.StatusBadRequest, "VENTES_MONTANT_ILLISIBLE", fmt.Sprintf(
+		"%s : le montant « %s » n’est pas un nombre. Saisissez-le sans espace ni séparateur, puis déposez à nouveau le classeur.",
+		ou, strings.TrimSpace(valeur)))
 }
 
 // Une ligne d'échéances : numéro de la vente, client, téléphone, puis des
 // paires date et montant. « SOLDE » à la place de la première date : rien à suivre.
-func lireVersements(lignes [][]string) map[int32][]versementLu {
+func lireVersements(lignes [][]string) (map[int32][]versementLu, error) {
 	parVente := map[int32][]versementLu{}
-	for _, ligne := range lignes {
+	for n, ligne := range lignes {
 		numero := entier32(celluleA(ligne, 0))
 		if numero == 0 {
 			continue
@@ -615,10 +667,13 @@ func lireVersements(lignes [][]string) map[int32][]versementLu {
 			if !ok {
 				continue
 			}
+			if !montantLisible(ligne[i+1]) {
+				return nil, montantRefuse(fmt.Sprintf("Onglet « Échéances », ligne %d", n+1), ligne[i+1])
+			}
 			parVente[numero] = append(parVente[numero], versementLu{date: date, montant: entier(ligne[i+1])})
 		}
 	}
-	return parVente
+	return parVente, nil
 }
 
 func celluleA(ligne []string, i int) string {

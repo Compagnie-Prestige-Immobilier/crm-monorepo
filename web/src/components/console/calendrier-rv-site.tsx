@@ -1,14 +1,19 @@
 'use client';
 
-import type { components } from '@crm/api-client';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-type Reglages = components['schemas']['RvSiteReglages'];
-type Reservation = components['schemas']['QualificationRvSiteReservation'];
+type Reglages = {
+  jours: number[];
+  heureDebut: number;
+  heureFin: number;
+  maxVisites?: number;
+  horizonJours: number;
+};
+type Reservation = { quand: string; nombre: number };
 
 const JOUR_MS = 24 * 60 * 60 * 1000;
 const ENTETES = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];

@@ -88,8 +88,9 @@ SELECT EXISTS (SELECT 1 FROM "call_attempts" WHERE "id" = $1);
 
 -- name: ProspectPourTentative :one
 SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
-       "phoneE164", "whatsappStatus", "whatsappE164"
-FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
+       "phoneE164", "whatsappStatus", "whatsappE164", "statut"
+FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL
+FOR NO KEY UPDATE;
 
 -- Un rappel promis se tient, même quand la campagne a rendu la fiche, et le
 -- dernier à avoir appelé requalifie depuis « Mes contacts ». Une fiche
@@ -237,14 +238,18 @@ UPDATE "prospect_journeys" SET
 WHERE "id" = @id;
 
 -- name: MarquerProspectPerdu :execrows
-UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id AND "statut" <> 'PERDU';
+UPDATE "prospects" SET "statut" = 'PERDU'
+WHERE "id" = @id AND "statut" NOT IN ('PERDU', 'CONVERTI', 'VENDU');
 
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
   "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
   "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
-  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById"), "rev" = "rev" + 1
+  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById"), "rev" = "rev" + 1,
+  "rendezVousIssue" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousIssue" END,
+  "rendezVousReporteAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousReporteAt" END,
+  "suiteRencontre" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "suiteRencontre" END
 WHERE "id" = @id;
 
 -- name: ListerRappels :many
@@ -289,7 +294,8 @@ WHERE c."status" = 'PENDING'
 -- name: RappelParId :one
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        c."status", p."phoneE164", p."prenom", p."nom", p."projet",
-       u."fullName" AS "assignedToName"
+       u."fullName" AS "assignedToName",
+       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 JOIN "users" u ON u."id" = c."assignedToId"
@@ -320,7 +326,7 @@ WHERE (CAST(sqlc.narg('id') AS text) IS NULL OR o."id" = CAST(sqlc.narg('id') AS
   AND (NOT @ouvertes_seulement::bool OR o."closedAt" IS NULL)
   AND (sqlc.narg('cible')::text IS NULL
        OR (sqlc.narg('cible')::text = 'prospect') = (o."prospectId" IS NOT NULL))
-ORDER BY o."openedAt" ASC, o."id" ASC;
+ORDER BY o."openedAt" DESC, o."id" DESC LIMIT 1;
 
 -- name: CreerOuverture :exec
 INSERT INTO "ouvertures_fiche"
@@ -353,13 +359,6 @@ UPDATE "ouvertures_fiche" SET
   "closingAttemptId" = @attempt_id
 WHERE "id" = @id AND "openedById" = @opened_by_id AND "closedAt" IS NULL;
 
--- name: FermerAutreOuverture :exec
-UPDATE "ouvertures_fiche"
-SET "closedAt" = GREATEST(@at, COALESCE("firstInputAt", "openedAt"))
-WHERE "openedById" = @opened_by_id AND "closedAt" IS NULL
-  AND ("representantId" IS DISTINCT FROM CAST(sqlc.narg('representant_id') AS text)
-       OR "prospectId" IS DISTINCT FROM CAST(sqlc.narg('prospect_id') AS text));
-
 -- name: ComptageOuvertures :many
 SELECT o."openedById", u."fullName" AS "openedByName",
        to_char(date_trunc('day', o."openedAt"), 'YYYY-MM-DD') AS jour,
@@ -391,7 +390,8 @@ WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
   AND (CAST(sqlc.narg('jusqua') AS timestamp) IS NULL
        OR o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp))
 GROUP BY 1, 2, 3
-ORDER BY 3 DESC, 2 ASC;
+ORDER BY 3 DESC, 2 ASC
+LIMIT 3000;
 
 -- name: ListerSuggestions :many
 SELECT s."id", s."sourceRepresentantId", s."suggestedName", s."suggestedPhoneE164",
@@ -504,7 +504,7 @@ WHERE p."id" = $1;
 -- quand le second joint la personne.
 -- name: PrendreLaFiche :execrows
 UPDATE "prospects" p SET "createdById" = @agent, "rev" = p."rev" + 1
-WHERE p."id" = @id AND p."createdById" <> @agent
+WHERE p."id" = @id AND p."createdById" <> @agent AND p."statut" NOT IN ('CONVERTI', 'VENDU')
   AND (@joint::bool OR EXISTS (SELECT 1 FROM "users" u WHERE u."id" = p."createdById" AND u."role" = 'ADMIN'));
 
 -- name: PrendreLeRepresentant :execrows
@@ -525,20 +525,31 @@ SELECT "id", "label" FROM "points_rencontre"
 WHERE "isActive" ORDER BY "position", "label" LIMIT 100;
 
 -- name: RvSiteReservations :many
--- La date d'un rendez-vous est celle du dernier rappel promis, comme à l'accueil.
-SELECT d."quand"::timestamp AS "quand", count(*)::int AS "nombre" FROM (
-  SELECT (SELECT max(sc."scheduledAt") FROM "scheduled_callbacks" sc WHERE sc."prospectId" = p."id") AS "quand"
-  FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
-  WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
-) d
-WHERE d."quand" >= (now() AT TIME ZONE 'UTC')
-GROUP BY d."quand" ORDER BY d."quand" LIMIT 500;
+-- La date d'un rendez-vous se lit comme à l'accueil : le rappel en attente, sinon le dernier honoré.
+SELECT rdv."quand"::timestamp AS "quand", count(*)::int AS "nombre"
+FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+LEFT JOIN LATERAL (
+  SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
+  WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+  ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+) rdv ON true
+WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
+  AND rdv."quand" >= (now() AT TIME ZONE 'UTC')
+GROUP BY rdv."quand" ORDER BY rdv."quand" LIMIT 500;
+
+-- name: VerrouCreneauxRvSite :exec
+SELECT pg_advisory_xact_lock(hashtext('rv_site.creneaux'));
 
 -- name: RvSiteChoixValide :one
 SELECT (SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+        LEFT JOIN LATERAL (
+          SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
+          WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+          ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+        ) rdv ON true
         WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
           AND p."id" <> @prospect_id
-          AND (SELECT max(sc."scheduledAt") FROM "scheduled_callbacks" sc WHERE sc."prospectId" = p."id") = @quand::timestamp
+          AND rdv."quand" = @quand::timestamp
        )::int AS "reserves",
        EXISTS (SELECT 1 FROM "ventes_sites" v WHERE v."actif" AND v."id" = @site_id) AS "site",
        EXISTS (SELECT 1 FROM "points_rencontre" r WHERE r."isActive" AND r."id" = @point_rencontre_id) AS "point";

@@ -5,6 +5,7 @@ import (
 	"cpi-go/db"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"html"
@@ -195,6 +196,14 @@ func courrielHorsHeures(zone *time.Location) *string {
 	return &detail
 }
 
+// Nil si un courriel peut partir maintenant, sinon la raison de le retenir.
+func CourrielSuspendu(cfg *socle.Config) *string {
+	if raison := courrielRetenu(cfg.Base); raison != nil {
+		return raison
+	}
+	return courrielHorsHeures(cfg.TimeZone)
+}
+
 // L'envoi est tracé même sans destinataire ni transport : le journal doit
 // montrer ce qui n'est pas parti et pourquoi.
 func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
@@ -212,10 +221,7 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 		}
 		nomPDF = &c.NomPieceJointe
 	}
-	statut, erreur := CourrielEchec, courrielRetenu(d.Cfg.Base)
-	if erreur == nil {
-		erreur = courrielHorsHeures(d.Cfg.TimeZone)
-	}
+	statut, erreur := CourrielEchec, CourrielSuspendu(d.Cfg)
 	var messageID *string
 	var envoyeLe *time.Time
 	if erreur == nil {
@@ -254,19 +260,33 @@ func (s *service) rejouerCourrielsEnEchec(ctx context.Context) error {
 	}
 	var echecs []error
 	for i := range lignes {
-		l := &lignes[i]
-		statut, messageID, erreur, envoyeLe := expedierCourriel(ctx, &MessageBrevo{
-			Destinataires: courrielAdresses(l.Destinataires), Copies: courrielAdresses(l.Copies),
-			Sujet: l.Sujet, HTML: l.Html, Texte: l.Texte, PieceJointe: courrielPiece(l.NomPieceJointe, l.PieceJointe),
-		})
-		if err := s.Q.CourrielRejeuEnregistre(ctx, db.CourrielRejeuEnregistreParams{
-			ID: l.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
-		}); err != nil {
+		if err := s.rejouerCourriel(ctx, &lignes[i]); err != nil {
 			echecs = append(echecs, err)
 		}
 	}
 	s.Live.Emettre(sujetCourriels)
 	return errors.Join(echecs...)
+}
+
+// La ligne reste verrouillée pendant l'envoi : un second rejeu concurrent la saute au lieu de la renvoyer.
+func (s *service) rejouerCourriel(ctx context.Context, l *db.Courriel) error {
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		_, err := q.CourrielReserverRejeu(ctx, db.CourrielReserverRejeuParams{ID: l.ID, TentativesMax: tentativesCourrielMax})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		statut, messageID, erreur, envoyeLe := expedierCourriel(ctx, &MessageBrevo{
+			Destinataires: courrielAdresses(l.Destinataires), Copies: courrielAdresses(l.Copies),
+			Sujet: l.Sujet, HTML: l.Html, Texte: l.Texte, PieceJointe: courrielPiece(l.NomPieceJointe, l.PieceJointe),
+		})
+		return q.CourrielRejeuEnregistre(ctx, db.CourrielRejeuEnregistreParams{
+			ID: l.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
+		})
+	})
 }
 
 // Un envoi refusé ne se lisait que dans la colonne `erreur` du journal, écran
@@ -544,7 +564,7 @@ var evenementsBrevo = map[string]string{
 // chez Brevo et se compare ici. Sans BREVO_WEBHOOK_SECRET, la route n'existe pas.
 func (s *service) evenementBrevo(ctx context.Context, in *EvenementBrevoInput) (*struct{}, error) {
 	secret := socle.Env("BREVO_WEBHOOK_SECRET", "")
-	if secret == "" || in.Secret != secret {
+	if secret == "" || subtle.ConstantTimeCompare([]byte(in.Secret), []byte(secret)) != 1 {
 		return nil, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Route inconnue.")
 	}
 	statut, connu := evenementsBrevo[in.Body.Event]

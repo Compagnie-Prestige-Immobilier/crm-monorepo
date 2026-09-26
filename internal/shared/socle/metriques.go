@@ -99,6 +99,7 @@ func ViderMetriquesChaqueMinute(ctx context.Context, q *db.Queries) {
 }
 
 func viderMetriques(ctx context.Context, q *db.Queries) {
+	defer func() { JournaliserPanique("vidage des métriques", recover()) }()
 	verrouMetriques.Lock()
 	lot := metriques
 	metriques = map[cleMetrique]*compteurs{}

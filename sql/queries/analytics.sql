@@ -225,7 +225,8 @@ LEFT JOIN LATERAL (
 ) dernier ON TRUE
 LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
 GROUP BY j."id", j."fileName", j."createdAt"
-ORDER BY j."createdAt" DESC;
+ORDER BY j."createdAt" DESC
+LIMIT 500;
 
 -- Le tableau s'arrête à 500 lignes : le total dit ce qu'il ne montre pas.
 -- name: LeadsImportesInteressesTotal :one

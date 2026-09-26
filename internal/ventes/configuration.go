@@ -162,6 +162,9 @@ func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*
 			PartApporteurMode: corps.PartApporteurMode, PartApporteurValeur: corps.PartApporteurValeur,
 			Superficies: superficies,
 		})
+		if err == nil && row.Nom != avant.Nom {
+			err = q.RenommerSiteDesVentes(ctx, db.RenommerSiteDesVentesParams{Ancien: avant.Nom, Nouveau: row.Nom})
+		}
 		return in.ID, traceSite(&avant), traceSite(&row), err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -232,6 +235,9 @@ func (s *service) modifierCanal(ctx context.Context, in *canalVenteModifyInput) 
 			return "", nil, nil, err
 		}
 		row, err = q.ModifierCanalVente(ctx, db.ModifierCanalVenteParams{ID: in.ID, Libelle: strings.TrimSpace(in.Body.Libelle), Ordre: in.Body.Ordre})
+		if err == nil && row.Libelle != avant.Libelle {
+			err = q.RenommerCanalDesVentes(ctx, db.RenommerCanalDesVentesParams{Ancien: avant.Libelle, Nouveau: row.Libelle})
+		}
 		return in.ID, canalDTO(&avant), canalDTO(&row), err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {

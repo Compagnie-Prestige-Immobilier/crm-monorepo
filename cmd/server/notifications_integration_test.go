@@ -21,11 +21,16 @@ import (
 	"github.com/google/uuid"
 )
 
+type brevoVersionRecue struct {
+	To []map[string]string `json:"to"`
+}
+
 type brevoRecu struct {
-	Subject     string              `json:"subject"`
-	To          []map[string]string `json:"to"`
-	HTMLContent string              `json:"htmlContent"`
-	TextContent string              `json:"textContent"`
+	Subject         string              `json:"subject"`
+	To              []map[string]string `json:"to"`
+	HTMLContent     string              `json:"htmlContent"`
+	TextContent     string              `json:"textContent"`
+	MessageVersions []brevoVersionRecue `json:"messageVersions"`
 }
 
 type brevoFactice struct {
@@ -691,5 +696,47 @@ func TestNotificationEmailReserveAuTeleconseiller(t *testing.T) {
 	}
 	if got := b.notificationStatut(id); got != "SENT" {
 		t.Fatalf("l'envoi doit se refermer une fois tout tranché : %s", got)
+	}
+}
+
+// Une annonce à plusieurs téléconseillers partait dans un seul appel Brevo
+// avec un `to` de tous les destinataires : chacun lisait l'adresse des autres.
+func TestAnnonceBrevoUneVersionParDestinataire(t *testing.T) {
+	faux := brevoDeTest(t)
+	b := nouveauBanc(t, "ADMIN")
+	emailA := "annonce-a-" + uuid.NewString() + "@cpi.sn"
+	emailB := "annonce-b-" + uuid.NewString() + "@cpi.sn"
+	commercialA := b.notificationCompte("COMMERCIAL", emailA)
+	commercialB := b.notificationCompte("COMMERCIAL", emailB)
+	b.notificationPurge(commercialA, commercialB)
+	b.notificationAdminConnecte()
+
+	sujet := "Annonce plateau " + uuid.NewString()
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/notifications", map[string]any{
+		"title": sujet, "body": "Même message pour tout le plateau.",
+		"audience": "USERS", "audienceUserIds": []string{commercialA, commercialB},
+	})
+	b.attend(statut, http.StatusCreated, "composition immédiate", body)
+
+	appels := faux.pour(sujet)
+	if len(appels) != 1 {
+		t.Fatalf("un seul appel Brevo attendu pour les deux destinataires, %d reçu(s)", len(appels))
+	}
+	appel := appels[0]
+	if len(appel.To) != 1 {
+		t.Fatalf("le `to` de l'appel ne doit porter qu'une adresse, le reste va dans messageVersions : %v", appel.To)
+	}
+	if len(appel.MessageVersions) != 2 {
+		t.Fatalf("une version par destinataire attendue, %d reçue(s)", len(appel.MessageVersions))
+	}
+	vues := map[string]bool{}
+	for _, version := range appel.MessageVersions {
+		if len(version.To) != 1 {
+			t.Fatalf("une version ne doit porter qu'un seul `to` : %v", version.To)
+		}
+		vues[version.To[0]["email"]] = true
+	}
+	if !vues[emailA] || !vues[emailB] {
+		t.Fatalf("les deux destinataires doivent apparaître, chacun dans sa version : %v", vues)
 	}
 }

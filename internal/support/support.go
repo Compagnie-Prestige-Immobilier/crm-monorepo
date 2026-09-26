@@ -524,7 +524,10 @@ func entier32(n int) int32 {
 	if n > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(n) //nolint:gosec // la borne au-dessus ramène n dans int32
+	if n < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(n)
 }
 
 func nonConfigure() error {

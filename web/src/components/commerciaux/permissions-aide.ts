@@ -68,6 +68,7 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'roles.administrer': 'Créer des rôles et régler leurs permissions, dont celle-ci.',
   'support.plateforme': 'Ouvrir la plateforme de support GLPI.',
   'support.signaler': 'Signaler un problème au support depuis un écran.',
+  'ventes.gerer': 'Saisir et corriger les ventes, déposer le classeur, régler sites et canaux.',
   'ventes.lire': 'Consulter les ventes.',
   'visites.detruire': 'Détruire définitivement une visite archivée.',
   'visites.voir_archivees': 'Consulter les visites archivées.',

@@ -7,6 +7,7 @@ import (
 	"cpi-go/db"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -171,5 +172,77 @@ func TestAssistantPorteeParTeleconseiller(t *testing.T) {
 	}
 	if sien := lire(&b.userID); sien.Prospects != 2 || sien.Convertis != 1 {
 		t.Fatalf("limité à son portefeuille : 2 fiches et 1 conversion attendues, reçu %+v", sien)
+	}
+}
+
+// Répond au format Groq : la première question (choix de l'outil) reçoit un
+// outil vide, ce qui fait tomber un ADMIN sur la requête SQL libre ; la
+// seconde (schéma en main) reçoit la requête interdite fournie par le test.
+func fauxModeleSQL(t *testing.T, sql string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var requete struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requete); err != nil {
+			t.Fatal(err)
+		}
+		var entree map[string]any
+		for _, m := range requete.Messages {
+			if m.Role == "user" {
+				_ = json.Unmarshal([]byte(m.Content), &entree)
+			}
+		}
+		contenu := `{"outil":""}`
+		if _, surSchema := entree["schema"]; surSchema {
+			reponse, err := json.Marshal(map[string]string{"sql": sql})
+			if err != nil {
+				t.Fatal(err)
+			}
+			contenu = string(reponse)
+		}
+		corps, err := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"content": contenu}}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(corps)
+	}))
+}
+
+// La liste noire de l'assistant laissait passer `set_config`, qui annule le
+// délai posé sur la transaction, et rien ne l'empêchait de lire les hachages
+// de mots de passe avant que la colonne ne soit explicitement fermée.
+func TestAssistantSQLNeLitPasLesHachages(t *testing.T) {
+	essais := []struct{ nom, sql string }{
+		{"hachage", `select "passwordHash" from users`},
+		{"delai", `select set_config('statement_timeout','0',true)`},
+	}
+	for _, essai := range essais {
+		t.Run(essai.nom, func(t *testing.T) {
+			faux := fauxModeleSQL(t, essai.sql)
+			t.Cleanup(faux.Close)
+			t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
+			t.Setenv("GROQ_API_KEY", "jeton-essai")
+			t.Setenv("GROQ_URL", faux.URL)
+
+			b := nouveauBanc(t, "ADMIN")
+			statut, body := b.connexion(b.email, "motdepasse")
+			b.attend(statut, http.StatusOK, "connexion", body)
+
+			statut, body = b.appel(http.MethodPost, "/api/v1/assistant/questions",
+				map[string]string{"question": "peux-tu lire ceci pour moi ?"}, true)
+			if statut != http.StatusUnprocessableEntity {
+				t.Fatalf("requête interdite : 422 attendu, %d reçu %v", statut, body)
+			}
+			if code, _ := body["code"].(string); code != "ASSISTANT_REQUETE_REFUSEE" {
+				t.Fatalf("code ASSISTANT_REQUETE_REFUSEE attendu, reçu %v", body)
+			}
+		})
 	}
 }

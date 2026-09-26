@@ -63,7 +63,7 @@ export const resetPasswordSchema = z
 export type ResetPasswordFormInput = z.infer<typeof resetPasswordSchema>;
 
 export const NEW_PASSWORD_MIN_LENGTH = 8;
-export const NEW_PASSWORD_MAX_LENGTH = 24;
+export const NEW_PASSWORD_MAX_LENGTH = 128;
 
 export const changePasswordSchema = z
   .object({

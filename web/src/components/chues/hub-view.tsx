@@ -59,7 +59,7 @@ export function HubView({
     retry: false,
   });
 
-  const enRetard = retards.data?.items.length ?? 0;
+  const enRetard = retards.data?.total ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -134,7 +134,7 @@ export function HubView({
             <Chiffre
               pending={rappels.isPending}
               failed={rappels.isError}
-              valeur={rappels.data?.items.length}
+              valeur={rappels.data?.total}
               legende={encadrement ? 'dus aujourd’hui chez les téléconseillers' : 'dus aujourd’hui'}
               enRetard={enRetard}
             />

@@ -43,6 +43,9 @@ func nouveauProblem(status int, detail string, errs ...error) *ProblemError {
 	if cm, ok := messagesParStatut[status]; ok {
 		p.Code, p.Message = cm[0], cm[1]
 	}
+	if status >= http.StatusInternalServerError {
+		return p
+	}
 	for _, e := range errs {
 		var d huma.ErrorDetailer
 		if errors.As(e, &d) {

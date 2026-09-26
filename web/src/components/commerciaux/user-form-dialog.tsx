@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -103,10 +103,11 @@ export function UserFormDialog({
   const queryClient = useQueryClient();
   const [aConfirmer, setAConfirmer] = useState<UserFormInput | null>(null);
 
-  const { register, handleSubmit, reset, setValue, watch, formState } = useForm<UserFormInput>({
+  const { register, handleSubmit, reset, setValue, control, formState } = useForm<UserFormInput>({
     resolver: zodResolver(userFormSchema(user === undefined ? 'create' : 'edit')),
     defaultValues: valeursDuCompte(undefined),
   });
+  const roleId = useWatch({ control, name: 'roleId' });
   const erreurs = formState.errors;
 
   useEffect(() => {
@@ -179,11 +180,10 @@ export function UserFormDialog({
             )}
           </Field>
           <ChampRole
-            // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-            roleId={watch('roleId')}
+            roleId={roleId}
             erreur={erreurs.roleId?.message}
-            onChange={(roleId) => {
-              setValue('roleId', roleId, { shouldDirty: true, shouldValidate: true });
+            onChange={(choisi) => {
+              setValue('roleId', choisi, { shouldDirty: true, shouldValidate: true });
             }}
           />
           {user === undefined ? <ChampMotDePasse form={{ register, formState }} /> : null}

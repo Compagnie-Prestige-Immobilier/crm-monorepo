@@ -20,6 +20,7 @@ import (
 	"path"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -34,15 +35,32 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Posée par `-ldflags="-X main.revision=…"` au build de l'image ; vide en
+// développement, où le binaire n'est jamais celui qui tourne en production.
+var revision string
+
 type SanteOutput struct {
 	Body struct {
-		Status string `json:"status"`
+		Status   string `json:"status"`
+		Revision string `json:"revision,omitempty"`
+	}
+}
+
+// Réglages globaux au processus : les reposer à chaque base de démonstration
+// montée pendant que le serveur sert serait une écriture concurrente.
+var globalesPosees sync.Once
+
+func poserGlobales() {
+	// Le panneau itère sur les listes sans garde : le contrat promet `[]`, jamais `null`.
+	huma.DefaultArrayNullable = false
+	socle.InstallerErreurs()
+	if index, err := fs.ReadFile(web.Dist, "dist/index.html"); err == nil {
+		empreinte := sha256.Sum256(index)
+		socle.VersionPanneau = hex.EncodeToString(empreinte[:8])
 	}
 }
 
 func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool, reg *registre) (huma.API, error) {
-	// Le panneau itère sur les listes sans garde : le contrat promet `[]`, jamais `null`.
-	huma.DefaultArrayNullable = false
 	conf := huma.DefaultConfig("CPI GO", "2.0.0")
 	conf.DocsPath, conf.OpenAPIPath, conf.SchemasPath = "", "", ""
 	conf.CreateHooks = nil
@@ -62,6 +80,7 @@ func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool, reg *reg
 	huma.Get(api, "/health/live", func(context.Context, *struct{}) (*SanteOutput, error) {
 		out := &SanteOutput{}
 		out.Body.Status = "ok"
+		out.Body.Revision = revision
 		return out, nil
 	})
 	if err := monterDomaines(api, d); err != nil {
@@ -74,10 +93,6 @@ func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool, reg *reg
 
 func servirPanneau(mux *http.ServeMux) {
 	dist, _ := fs.Sub(web.Dist, "dist")
-	if index, err := fs.ReadFile(dist, "index.html"); err == nil {
-		empreinte := sha256.Sum256(index)
-		socle.VersionPanneau = hex.EncodeToString(empreinte[:8])
-	}
 	fichiers := http.FileServerFS(dist)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
@@ -123,7 +138,7 @@ type instance struct {
 }
 
 func instancier(cfg *socle.Config, pool *pgxpool.Pool, reg *registre) (*instance, error) {
-	socle.InstallerErreurs()
+	globalesPosees.Do(poserGlobales)
 	mux := http.NewServeMux()
 	d := nouveauDeps(pool, cfg, reg.annuaire)
 	if cfg.Base == socle.BasePublique {
@@ -310,6 +325,8 @@ func ouvrirBase(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	// génétique replanifie chaque appel (82 ms mesurés pour 0,7 ms d'exécution).
 	poolCfg.ConnConfig.RuntimeParams["join_collapse_limit"] = "1"
 	poolCfg.ConnConfig.RuntimeParams["from_collapse_limit"] = "1"
+	// Les colonnes `timestamp` sont sans fuseau : `now()` y écrit l'heure du fuseau de session.
+	poolCfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
 	// Par défaut pgx plafonne à `max(4, NumCPU)`, soit 4 connexions sur le
 	// conteneur de production : un export global en tient une pendant 120 s.
 	poolCfg.MaxConns, poolCfg.MinConns, poolCfg.MaxConnLifetime = 10, 2, 30*time.Minute
@@ -324,7 +341,29 @@ func ouvrirBase(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		pool.Close()
 		return nil, fmt.Errorf("migrations : %w", err)
 	}
+	signalerSuperutilisateur(ctx, pool)
 	return pool, nil
+}
+
+// Une injection SQL sur une connexion superutilisateur donne COPY PROGRAM et
+// DROP : la procédure de rétrogradation est dans infra/dokploy/README.md.
+func signalerSuperutilisateur(ctx context.Context, pool *pgxpool.Pool) {
+	if socle.Env("NODE_ENV", "") == nodeEnvDevelopment {
+		return
+	}
+	var super bool
+	if err := pool.QueryRow(ctx, `SELECT rolsuper FROM pg_roles WHERE rolname = current_user`).Scan(&super); err == nil && super {
+		slog.Warn("la connexion applicative est superutilisateur Postgres : rétrograder le rôle (audit B53)")
+	}
+}
+
+// Les liens des courriels et du formulaire public en dépendent : un serveur
+// hors développement ne démarre pas sans elle.
+func publicWebURLRenseignee() error {
+	if socle.Env("NODE_ENV", "") != nodeEnvDevelopment && socle.Env("PUBLIC_WEB_URL", "") == "" {
+		return errors.New("PUBLIC_WEB_URL est requis hors développement")
+	}
+	return nil
 }
 
 func run(ctx context.Context, openapi, roles, sonde, seed bool) error {
@@ -341,6 +380,9 @@ func run(ctx context.Context, openapi, roles, sonde, seed bool) error {
 	}
 	if sonde {
 		return sonder(ctx, cfg.Port)
+	}
+	if err := publicWebURLRenseignee(); err != nil {
+		return err
 	}
 	if cfg.DatabaseURL == "" {
 		return errors.New("DATABASE_URL manquante")
@@ -371,11 +413,13 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 	reg := nouveauRegistre(socle.NouvelAnnuaire())
 	var principal *instance
 	var fermer []func()
+	// Le planificateur s'arrête avant les pools : une tâche en vol écrit encore
+	// le verdict Brevo, sans quoi la notification repart au démarrage suivant.
 	defer func() {
-		reg.fermerTout()
 		for i := len(fermer) - 1; i >= 0; i-- {
 			fermer[i]()
 		}
+		reg.fermerTout()
 	}()
 	for _, base := range bases {
 		pool, err := ouvrirBase(ctx, base.DatabaseURL)
@@ -408,17 +452,18 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 	// vident dans la base publique, celle du mux qui porte le middleware.
 	go socle.ViderMetriquesChaqueMinute(ctx, principal.deps.Q)
 	srv := assembler(cfg, reg, principal.mux)
-	srv.RegisterOnShutdown(principal.deps.Live.Fermer)
+	srv.RegisterOnShutdown(reg.fermerFlux)
 	erreurs := make(chan error, 1)
 	go func() {
-		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port, "bases", noms)
+		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port, "bases", noms, "revision", revision)
 		erreurs <- srv.ListenAndServe()
 	}()
 	select {
 	case err := <-erreurs:
 		return err
 	case <-ctx.Done():
-		arret, annuler := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		// Swarm tue le conteneur 10 s après SIGTERM : finir avant, pour que le pool et les crons se ferment.
+		arret, annuler := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
 		defer annuler()
 		return srv.Shutdown(arret)
 	}

@@ -5,11 +5,11 @@ import {
   GrandPublicTableSkeleton,
 } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { canExportProspects } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/')({
-  beforeLoad: guardRoles(['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardPermission('prospects.lire'),
   component: GrandPublicPage,
   pendingComponent: Loading,
 });

@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { EtapeSkeleton } from '@/components/chues/etapes';
 import { RepScript } from '@/components/console/rep-script';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/appels-representants')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: TeleconseilAppelsRepresentantsPage,
   pendingComponent: Loading,
 });

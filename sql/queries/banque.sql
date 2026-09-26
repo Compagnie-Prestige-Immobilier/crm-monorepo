@@ -214,8 +214,10 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
                                  WHERE d ->> 'statut' <> 'accepte'))))
        OR i."statutDistant" = ANY(sqlc.arg('statuts')::text[]))
   AND (NOT sqlc.arg('a_signaler')::boolean OR i."completeSignaleeLe" IS NULL)
+  AND (sqlc.narg('id')::text IS NULL OR i."id" = sqlc.narg('id')::text)
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id" AND c."deletedAt" IS NULL)
-ORDER BY i."decideeLe" DESC NULLS LAST, i."soumiseLe" DESC NULLS LAST, i."id" DESC;
+ORDER BY i."decideeLe" DESC NULLS LAST, i."soumiseLe" DESC NULLS LAST, i."id" DESC
+LIMIT 2000;
 
 -- name: BankInscriptionSignalee :exec
 UPDATE "inscriptions_plateforme" SET "completeSignaleeLe" = $2 WHERE "id" = $1;
@@ -223,12 +225,13 @@ UPDATE "inscriptions_plateforme" SET "completeSignaleeLe" = $2 WHERE "id" = $1;
 -- name: BankCaseSuivi :one
 SELECT c."id", c."reference", c."customerName", c."customerPhoneE164", c."amountXof", c."rejectionDetail",
        b."name" AS "banqueName", s."label" AS "stageLabel", s."type" AS "stageType", c."createdAt",
-       COALESCE(p."lastCallById", p."createdById") AS "suiviParId", su."fullName" AS "suiviParName",
-       COALESCE((SELECT pj."projet"::text FROM "prospect_journeys" pj WHERE pj."prospectId" = c."prospectId" ORDER BY pj."createdAt" LIMIT 1), 'CHUES')::text AS "projet",
+       su."id" AS "suiviParId", su."fullName" AS "suiviParName",
+       COALESCE(i."projet"::text, (SELECT pj."projet"::text FROM "prospect_journeys" pj WHERE pj."prospectId" = c."prospectId" ORDER BY pj."createdAt" LIMIT 1), 'CHUES')::text AS "projet",
        r."label" AS "rejectionLabel"
 FROM "bank_cases" c
 INNER JOIN "banques" b ON b."id" = c."processingBankId"
 INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
+LEFT JOIN "inscriptions_plateforme" i ON i."id" = c."inscriptionId"
 LEFT JOIN "prospects" p ON p."id" = c."prospectId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 LEFT JOIN "bank_rejection_reasons" r ON r."id" = c."rejectionReasonId"

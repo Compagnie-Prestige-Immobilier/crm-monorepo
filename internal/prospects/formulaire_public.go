@@ -341,6 +341,10 @@ func (s *service) formulaireAviserParEmail(ctx context.Context, parametres *Pros
 	if len(messages) == 0 {
 		return nil
 	}
+	if raison := notifications.CourrielSuspendu(s.Cfg); raison != nil {
+		slog.Info("avis de demande publique non expédié", "prospectId", prospectID, "cause", *raison)
+		return nil
+	}
 	transport := notifications.ConfigurerBrevo()
 	if envoi := transport.Envoyer(ctx, messages); envoi.Statut != notifications.BrevoEnvoye {
 		slog.Warn("avis de demande publique non remis", "prospectId", prospectID, "statut", envoi.Statut)
@@ -665,7 +669,9 @@ func formulaireChampsLibresJSON(reponses map[string]string) ([]byte, error) {
 // n'est jamais réécrit, et la fiche rapprochée par e-mail garde le sien.
 func (s *service) formulaireCompleter(ctx context.Context, existant *db.ProspectParTelephoneRow, saisie *formulaireSaisie) error {
 	maj := prospectNouvelleMaj()
-	maj.set("origin", formulairePublicOrigine)
+	if existant.Origin == nil {
+		maj.set("origin", formulairePublicOrigine)
+	}
 	maj.set("aRevoirAt", time.Now())
 	formulaireCombler(maj, prospectChampNom, &existant.Nom, &saisie.nom)
 	formulaireCombler(maj, socle.ProspectChampPrenom, &existant.Prenom, &saisie.prenom)

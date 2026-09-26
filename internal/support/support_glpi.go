@@ -193,6 +193,7 @@ func (g glpi) rattacherAuGroupe(ctx context.Context, session string, compte int)
 	groupes := make(chan []groupe, 1)
 	erreurs := make(chan error, 2)
 	go func() {
+		defer func() { socle.JournaliserPanique("groupe GLPI", recover()) }()
 		var lues []groupe
 		chemin := "/Group?" + url.Values{"searchText[name]": {"^" + groupeCommercial + "$"}, plageGlpi: {"0-5"}}.Encode()
 		if err := g.appeler(ctx, session, http.MethodGet, chemin, "", nil, &lues); err != nil {
@@ -205,6 +206,7 @@ func (g glpi) rattacherAuGroupe(ctx context.Context, session string, compte int)
 		Groupe int `json:"groups_id"`
 	}, 1)
 	go func() {
+		defer func() { socle.JournaliserPanique("membres GLPI", recover()) }()
 		var lues []struct {
 			Groupe int `json:"groups_id"`
 		}
@@ -226,6 +228,8 @@ func (g glpi) rattacherAuGroupe(ctx context.Context, session string, compte int)
 			luesMembres = lues
 		case err := <-erreurs:
 			return 0, err
+		case <-ctx.Done():
+			return 0, ctx.Err()
 		}
 	}
 	if len(luesGroupes) == 0 {

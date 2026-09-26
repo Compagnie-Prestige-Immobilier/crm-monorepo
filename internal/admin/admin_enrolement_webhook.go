@@ -45,6 +45,7 @@ func (s *service) tirageDemandeParPlateforme(ctx context.Context, in *Enrolement
 }
 
 func (s *service) tirerEnArrierePlan(parent context.Context, projet string) {
+	defer func() { socle.JournaliserPanique("tirage plateforme", recover()) }()
 	ctx, arreter := context.WithTimeout(parent, webhookTirageDelai)
 	defer arreter()
 	bilan := s.tirer(ctx, projet)

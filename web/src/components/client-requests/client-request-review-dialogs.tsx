@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, LoaderIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -35,6 +35,7 @@ import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption, Syndicat } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 export function ClientRequestReviewDialogs({
   pending,
@@ -163,11 +164,10 @@ function ApproveDialog({
   const [representant, setRepresentant] = useState<string | null>(null);
   const [syndicat, setSyndicat] = useState<string | null>(null);
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par demande
+  useRecalage([request?.id], () => {
     setRepresentant(null);
     setSyndicat(null);
-  }, [request?.id]);
+  });
 
   const {
     data: reference,
@@ -279,10 +279,9 @@ function RejectDialog({
   const reasonId = useId();
   const [reason, setReason] = useState('');
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par demande
+  useRecalage([request?.id], () => {
     setReason('');
-  }, [request?.id]);
+  });
 
   const reject = useMutation({
     mutationFn: () => {

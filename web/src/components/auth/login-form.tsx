@@ -158,6 +158,7 @@ export function LoginForm({ next }: { next?: string | null }) {
   const [bases, setBases] = useState<string[] | null>(null);
   const [base, setBase] = useState(baseCourante);
   const [demoRole, setDemoRole] = useState<Role>('ADMIN');
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
 
   useEffect(() => {
     resetSessionExpiryGuard();
@@ -212,6 +213,7 @@ export function LoginForm({ next }: { next?: string | null }) {
       }
 
       const payload: unknown = await response.json().catch(() => null);
+      queryClient.clear();
       queryClient.setQueryData(
         meQueryOptions.queryKey,
         ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
@@ -228,6 +230,8 @@ export function LoginForm({ next }: { next?: string | null }) {
   }
 
   async function onDemoSubmit(): Promise<void> {
+    if (demoSubmitting) return;
+    setDemoSubmitting(true);
     setServerError(null);
     try {
       const response = await fetch('/api/v1/auth/demo-login', {
@@ -244,6 +248,7 @@ export function LoginForm({ next }: { next?: string | null }) {
       }
 
       const payload: unknown = await response.json().catch(() => null);
+      queryClient.clear();
       queryClient.setQueryData(
         meQueryOptions.queryKey,
         ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
@@ -251,6 +256,8 @@ export function LoginForm({ next }: { next?: string | null }) {
       router.replace(next != null && next !== '' ? next : homePathForRole(demoRole));
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');
+    } finally {
+      setDemoSubmitting(false);
     }
   }
 
@@ -310,8 +317,8 @@ export function LoginForm({ next }: { next?: string | null }) {
         </div>
       )}
 
-      <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? (
+      <Button type="submit" size="lg" disabled={isSubmitting || demoSubmitting} className="w-full">
+        {isSubmitting || demoSubmitting ? (
           <>
             <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
             Connexion…

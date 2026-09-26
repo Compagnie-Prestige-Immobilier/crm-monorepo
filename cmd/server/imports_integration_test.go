@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"cpi-go/internal/imports"
 	"cpi-go/internal/shared/socle"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,20 +145,20 @@ func (b *banc) deposerClasseur(chemin, nom string, contenu []byte) (statut int, 
 	return reponseHTTP.StatusCode, corpsLu
 }
 
-func (b *banc) attendreImport(identifiant, attendu string) map[string]any {
+func (b *banc) attendreImportReussi(identifiant string) map[string]any {
 	b.t.Helper()
 	for range 400 {
 		statut, body := b.appel(http.MethodGet, "/api/v1/imports/"+identifiant, nil, false)
 		b.attend(statut, http.StatusOK, "état de l’import", body)
-		if body["status"] == attendu {
+		if body["status"] == "succeeded" {
 			return body
 		}
-		if body["status"] == "failed" && attendu != "failed" {
+		if body["status"] == "failed" {
 			b.t.Fatalf("import échoué : %v %v", body["failureCode"], body["failureMsg"])
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	b.t.Fatalf("l’import n’a pas atteint l’état %q", attendu)
+	b.t.Fatalf("l’import %s n’a pas abouti", identifiant)
 	return nil
 }
 
@@ -229,7 +231,7 @@ func TestImportRepresentantsCompteLesDoublonsDuFichier(t *testing.T) {
 		t.Fatalf("un import naît en simulation : %v", body["mode"])
 	}
 
-	final := b.attendreImport(body["id"].(string), "succeeded")
+	final := b.attendreImportReussi(body["id"].(string))
 	if final["createdRows"] != float64(1_197) || final["skippedRows"] != float64(3) || final["processedRows"] != float64(1_200) {
 		t.Fatalf("compteurs : créées %v, ignorées %v, traitées %v", final["createdRows"], final["skippedRows"], final["processedRows"])
 	}
@@ -802,6 +804,39 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
 }
 
+// B08 : un onglet d'octobre à décembre doit toujours corriger l'inversion
+// jour/mois. Avant correction, seules les quatre premières lettres du mois
+// étaient comparées au préfixe complet de l'abréviation : « oct », « nov » et
+// « déc » ne faisaient plus reconnaître l'onglet, qui perdait sa date pivot.
+// L'onglet porte l'an dernier : le jour de l'onglet doit rester dans le passé
+// pour que la correction s'applique, comme au dépôt réel d'un classeur.
+func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	anPasse := time.Now().UTC().Year() - 1
+	base := time.Now().UnixNano() % 10_000_000
+	telephone := fmt.Sprintf("+22177%07d", base)
+	nomClasseur := fmt.Sprintf("Leads du 1 oct %d %d.xlsx", anPasse, base)
+	b.nettoyerLeadsTest([]string{telephone}, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	nomOnglet := fmt.Sprintf("Leads 1 oct %d", anPasse)
+	// Excel a rangé « 01/10 » au 10 janvier : jour et mois inversés.
+	premierOctobre := ongletLeadsBrutTest{nom: nomOnglet, lignes: [][]any{
+		{rangExcelTest(time.Date(anPasse, time.January, 10, 9, 0, 0, 0, time.UTC)), "Aminata Diop", "aminata." + telephone[5:] + "@example.sn", "Payé", telephone, canalMetaChuesTest, "à rappeler"},
+	}}
+
+	travail := b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{premierOctobre}), nomClasseur)
+	a := b.ficheLeadTest(telephone)
+	if !a.creeLe.UTC().Equal(time.Date(anPasse, time.October, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Fatalf("date corrigée sur l'onglet d'octobre : %v", a.creeLe.UTC())
+	}
+	b.attendRapportTest(travail, "total=1 created=1 updated=0 skipped=0 errors=0 warnings=1", map[string]float64{
+		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1,
+	})
+}
+
 // « projet | canal | créée le | note », lisible d'un coup dans l'échec.
 func (f *ficheLeadTest) resume() string {
 	remarque := ""
@@ -948,5 +983,153 @@ func TestProspectSansNumeroUneSeuleFicheParAdresseEtProjet(t *testing.T) {
 	}
 	if err := ecrire(); err == nil {
 		t.Fatal("la seconde fiche sans numéro au même courriel doit être refusée")
+	}
+}
+
+// Le modèle rempli avec ses propres listes se relit sans perte ; une banque ou
+// une méthode hors liste refuse la ligne au lieu d'être effacée en silence.
+func TestImportProspectsRelitLeModele(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	b.connecterImport()
+	b.purgerTravauxImport()
+	banque := uuid.NewString()
+	sigle := "BT" + strings.ToUpper(banque[:6])
+	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
+	base := time.Now().UnixNano() % 10_000_000
+	telephones := []string{fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22176%07d", base), fmt.Sprintf("+22178%07d", base)}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = ANY($1))`, telephones)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "banques" WHERE "id" = $1`, banque)
+	})
+
+	classeur := b.modeleProspectsRempli([][]string{
+		{"Ndiaye", "Awa", telephones[0], "", sigle, "", "Enrôlement sur place"},
+		{"Sow", "Binta", telephones[1], "", "BANQUE-INCONNUE", "", ""},
+		{"Fall", "Modou", telephones[2], "", sigle, "", "Pigeon voyageur"},
+	})
+
+	statut, body := b.deposerClasseur("/api/v1/imports/prospects", "prospects.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
+	simulation := b.attendreImportReussi(body["id"].(string))
+	rapport, _ := simulation["report"].(map[string]any)
+	erreurs, _ := rapport["errors"].([]any)
+	codes := map[string]bool{}
+	for _, brute := range erreurs {
+		codes[texteDe(brute.(map[string]any)["code"])] = true
+	}
+	if len(erreurs) != 2 || !codes["PROSPECT_IMPORT_BANQUE_INCONNUE"] || !codes["PROSPECT_IMPORT_METHODE_INCONNUE"] {
+		t.Fatalf("banque et méthode inconnues doivent refuser leur ligne : %v", erreurs)
+	}
+
+	statut, body = b.appel(http.MethodPost, "/api/v1/imports/"+texteDe(body["id"])+"/apply", nil, true)
+	b.attend(statut, http.StatusOK, "application", body)
+	b.attendreImportReussi(texteDe(body["id"]))
+	var phase, methode, banqueLue string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "phase2Status"::text, "enrollmentMethod"::text, "banqueId" FROM "prospects" WHERE "phoneE164" = $1`,
+		telephones[0]).Scan(&phase, &methode, &banqueLue); err != nil {
+		t.Fatal(err)
+	}
+	if phase != "METHOD_OBTAINED" || methode != "APPOINTMENT" || banqueLue != banque {
+		t.Fatalf("« Enrôlement sur place » relu : %s, %s, banque %s", phase, methode, banqueLue)
+	}
+	var refusees int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]).Scan(&refusees); err != nil {
+		t.Fatal(err)
+	}
+	if refusees != 0 {
+		t.Fatalf("les lignes refusées ne s'écrivent pas : %d fiches", refusees)
+	}
+}
+
+func (b *banc) modeleProspectsRempli(lignes [][]string) []byte {
+	statut, _, modele := b.classeur("/api/v1/export/prospects-modele.xlsx")
+	b.attend(statut, http.StatusOK, "modèle prospects", nil)
+	for index, ligne := range lignes {
+		for rang, valeur := range ligne {
+			cellule, _ := excelize.CoordinatesToCellName(rang+1, index+imports.PremiereLigneImport)
+			if err := modele.SetCellStr("Prospects", cellule, valeur); err != nil {
+				b.t.Fatal(err)
+			}
+		}
+	}
+	var tampon bytes.Buffer
+	if err := modele.Write(&tampon); err != nil {
+		b.t.Fatal(err)
+	}
+	return tampon.Bytes()
+}
+
+// Chaque ligne porte une note aléatoire pour dépasser 1 Mo sans se compresser :
+// c'est ce dépassement qui fait écrire le multipart sur le disque temporaire.
+func classeurRepresentantsVolumineux(t *testing.T, departement string, lignes int) []byte {
+	t.Helper()
+	fichier := excelize.NewFile()
+	defer func() { _ = fichier.Close() }()
+	feuille := fichier.GetSheetName(0)
+	for rang := range imports.ColonnesRepresentantsImport {
+		cellule, _ := excelize.CoordinatesToCellName(rang+1, 1)
+		if err := fichier.SetCellStr(feuille, cellule, imports.EnteteRepresentantImport(rang)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index := range lignes {
+		ligne := index + imports.PremiereLigneImport
+		valeurs := []string{
+			fmt.Sprintf("Représentant %04d", index),
+			fmt.Sprintf("77%07d", 1_000_000+index),
+			departement,
+		}
+		for rang, valeur := range valeurs {
+			cellule, _ := excelize.CoordinatesToCellName(rang+1, ligne)
+			if err := fichier.SetCellStr(feuille, cellule, valeur); err != nil {
+				t.Fatal(err)
+			}
+		}
+		bourrage := make([]byte, 24_000)
+		if _, err := rand.Read(bourrage); err != nil {
+			t.Fatal(err)
+		}
+		noteCellule, _ := excelize.CoordinatesToCellName(5, ligne)
+		if err := fichier.SetCellStr(feuille, noteCellule, base64.StdEncoding.EncodeToString(bourrage)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var tampon bytes.Buffer
+	if err := fichier.Write(&tampon); err != nil {
+		t.Fatal(err)
+	}
+	return tampon.Bytes()
+}
+
+// B86 : au-delà de 1 Mo, `ParseMultipartForm` écrit le fichier reçu sur le
+// disque avant de rendre la main au dépôt ; `bornerDepotImport` doit l'effacer,
+// sinon chaque gros classeur laisse un `multipart-*` derrière lui.
+func TestImportNeLaissePasDeFichierTemporaire(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	dossierTemporaire := t.TempDir()
+	t.Setenv("TMPDIR", dossierTemporaire)
+	b.connecterImport()
+	b.purgerTravauxImport()
+	_, departement := b.departementImport()
+
+	classeur := classeurRepresentantsVolumineux(t, departement, 100)
+	if len(classeur) <= 1<<20 {
+		t.Fatalf("le classeur de test doit dépasser 1 Mo pour forcer l'écriture sur disque, %d octets produits", len(classeur))
+	}
+	statut, body := b.deposerClasseur("/api/v1/imports/representants", "gros-classeur.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt d’un classeur de plus de 1 Mo", body)
+	b.attendreImportReussi(body["id"].(string))
+
+	restes, err := os.ReadDir(dossierTemporaire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entree := range restes {
+		if strings.HasPrefix(entree.Name(), "multipart-") {
+			t.Fatalf("fichier temporaire du dépôt jamais supprimé : %s", entree.Name())
+		}
 	}
 }

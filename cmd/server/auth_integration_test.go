@@ -35,6 +35,15 @@ type banc struct {
 	dsn    string
 }
 
+// Hors développement, semer une base de démonstration exige ce mot de passe ;
+// les tests tournent sans NODE_ENV et n'exportent que TEST_DATABASE_URL.
+func TestMain(m *testing.M) {
+	if os.Getenv("SEED_FIXTURE_PASSWORD") == "" {
+		_ = os.Setenv("SEED_FIXTURE_PASSWORD", "fixtures-de-test-2026")
+	}
+	os.Exit(m.Run())
+}
+
 func nouveauBanc(t *testing.T, role string) *banc {
 	t.Helper()
 	ctx := context.Background()

@@ -33,12 +33,15 @@ type service struct {
 
 // `maxAge` en secondes ; -1 efface le cookie (Max-Age=0), ce qu'une durée négative
 // convertie en secondes n'obtenait pas.
-func cookieSession(ctx context.Context, jeton string, maxAge int) http.Cookie {
-	c := http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge} //nolint:gosec // G124 : hors TLS (poste de développement, téléphone sur le réseau local) un cookie Secure serait jeté par le navigateur ; choix du propriétaire du 10 septembre 2026
-	if !socle.ConnexionSecurisee(ctx) {
-		c.Name, c.Secure = socle.NomCookieClair, false
+// `maxAge` en secondes ; -1 efface le cookie (Max-Age=0). Hors TLS (poste de
+// développement, téléphone sur le réseau local), un cookie Secure serait jeté
+// par le navigateur : le cookie clair change de nom et ne porte pas l'attribut.
+func cookieSession(ctx context.Context, jeton string, maxAge int) string {
+	if socle.ConnexionSecurisee(ctx) {
+		c := http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge}
+		return c.String()
 	}
-	return c
+	return fmt.Sprintf("%s=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax", socle.NomCookieClair, jeton, max(maxAge, 0))
 }
 
 // La session arrive sous l'un ou l'autre nom de cookie selon le transport.
@@ -93,7 +96,7 @@ type CompteConnecte struct {
 }
 
 type SessionOutput struct {
-	SetCookie http.Cookie `header:"Set-Cookie"`
+	SetCookie string `header:"Set-Cookie"`
 	Body      struct {
 		User CompteConnecte `json:"user"`
 	}
@@ -214,7 +217,7 @@ func (s *service) bases(context.Context, *struct{}) (*BasesOutput, error) {
 }
 
 type LogoutOutput struct {
-	SetCookie http.Cookie `header:"Set-Cookie"`
+	SetCookie string `header:"Set-Cookie"`
 }
 
 func (s *service) logout(ctx context.Context, in *CookieInput) (*LogoutOutput, error) {

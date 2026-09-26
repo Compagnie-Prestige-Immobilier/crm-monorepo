@@ -140,7 +140,7 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	if pageSize < 1 || pageSize > rappelsPageSizeMax {
 		pageSize = rappelsPageSizeDefaut
 	}
-	p.PageOffset = int32((page - 1) * pageSize) //nolint:gosec // page et pageSize sont bornés juste au-dessus
+	p.PageOffset = int32(page-1) * int32(pageSize)
 	p.PageSize = int32(pageSize)
 	if in.Projet != "" {
 		p.Projet = &in.Projet
@@ -201,6 +201,10 @@ func (s *service) qualificationReporterRappel(ctx context.Context, in *Qualifica
 	}
 	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
+	}
+	if row.RendezVous && row.Status == db.ScheduledCallbackStatusPENDING {
+		return nil, socle.Problem(http.StatusConflict, "RENDEZ_VOUS_NON_REPORTABLE",
+			"Un rendez-vous ne se décale pas de 15 minutes : changez sa date en requalifiant la fiche.")
 	}
 	maintenant := time.Now().UTC()
 	if row.Status == db.ScheduledCallbackStatusPENDING {
@@ -339,11 +343,11 @@ func (s *service) qualificationOuvrirFiche(ctx context.Context, in *Qualificatio
 	return s.qualificationOuvertureConcurrente(ctx, &u, b.ID, err)
 }
 
-// Le 23505 avorte la transaction : la relecture qui sépare le rejeu du verrou
-// se fait donc après son annulation.
+// Le 23505 avorte la transaction : la relecture qui sépare le rejeu d'un
+// identifiant pris se fait donc après son annulation.
 func (s *service) qualificationOuvertureConcurrente(ctx context.Context, u *socle.Utilisateur, id string, cause error) (*QualificationOuvertureOutput, error) {
 	var p *socle.ProblemError
-	if !errors.As(cause, &p) || p.Code != "OUVERTURE_FICHE_DEJA_OUVERTE" {
+	if !errors.As(cause, &p) || p.Code != "OUVERTURE_ID_PRIS" {
 		return nil, cause
 	}
 	rows, err := s.Q.ListerOuvertures(ctx, db.ListerOuverturesParams{ID: &id})
@@ -410,8 +414,8 @@ func qualificationCreerOuverture(ctx context.Context, q *db.Queries, u *socle.Ut
 	if !errors.As(err, &pg) || pg.Code != "23505" {
 		return QualificationOuvertureFicheDTO{}, err
 	}
-	return QualificationOuvertureFicheDTO{}, socle.Problem(http.StatusConflict, "OUVERTURE_FICHE_DEJA_OUVERTE",
-		"Une fiche est déjà ouverte. Qualifiez-la avant d’en ouvrir une autre.")
+	return QualificationOuvertureFicheDTO{}, socle.Problem(http.StatusConflict, "OUVERTURE_ID_PRIS",
+		"Cet identifiant d’ouverture appartient déjà à un autre téléconseiller.")
 }
 
 type QualificationOuvertureCouranteOutput struct {
@@ -436,7 +440,7 @@ func (s *service) qualificationOuvertureCourante(ctx context.Context, in *Qualif
 	}
 	out := &QualificationOuvertureCouranteOutput{}
 	if len(rows) > 0 {
-		dto := qualificationOuvertureDTO(&rows[len(rows)-1])
+		dto := qualificationOuvertureDTO(&rows[0])
 		out.Body = &dto
 	}
 	return out, nil
@@ -600,7 +604,7 @@ func qualificationSuggestionDTO(row *db.ListerSuggestionsRow) QualificationSugge
 
 type QualificationSuggestionsInput struct {
 	Status   string `query:"status" enum:",A_APPELER,APPELE,ABANDONNE"`
-	Page     int32  `query:"page" minimum:"1" default:"1"`
+	Page     int32  `query:"page" minimum:"1" maximum:"10000" default:"1"`
 	PageSize int32  `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
 }
 

@@ -11,8 +11,12 @@ setup: db gen ## base locale, dépendances, code généré, en une commande
 	pnpm --dir web install
 
 db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sème référentiels, comptes et 60 jours de données de développement
+	@case "$(DB)" in \
+	  postgres://localhost*|postgres://127.0.0.1*|postgresql://localhost*|postgresql://127.0.0.1*) ;; \
+	  *) echo "DB doit pointer vers localhost ou 127.0.0.1 : $(DB)" >&2; exit 1 ;; \
+	esac
 	@psql "$(DB)" -Atc 'select 1' >/dev/null 2>&1 || { \
-	  createdb cpi_v2_dev && psql "$(DB)" -v ON_ERROR_STOP=1 -q -f sql/schema.sql; }
+	  createdb $(firstword $(subst ?, ,$(notdir $(DB)))) && psql "$(DB)" -v ON_ERROR_STOP=1 -q -f sql/schema.sql; }
 	SEED_ADMIN_EMAIL=$${SEED_ADMIN_EMAIL:-admin@cpi.sn} SEED_ADMIN_USERNAME=$${SEED_ADMIN_USERNAME:-admin} \
 	NODE_ENV=development SEED_ADMIN_PASSWORD=$${SEED_ADMIN_PASSWORD:-admin-local-2026} go run ./cmd/server -seed
 
@@ -28,8 +32,8 @@ dev: db ## base créée et semée si besoin, .env chargé, API sur :4000 et Vite
 	  pnpm --dir web dev & \
 	  go run ./cmd/server ; wait
 
-build: gen ## panneau embarqué + binaire ./cpi-go
-	pnpm --dir web build
+build: gen ## panneau embarqué + binaire ./cpi-go, avec la bascule de rôle du poste local
+	VITE_BASCULE_ROLES=1 pnpm --dir web build
 	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cpi-go ./cmd/server
 
 test: ## tests d'intégration contre TEST_DATABASE_URL

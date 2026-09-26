@@ -7,3 +7,6 @@ storage
 cpi-go
 .git
 .env
+.env.*
+.yolo
+.secrets.generated

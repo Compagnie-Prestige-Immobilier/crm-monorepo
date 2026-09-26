@@ -51,6 +51,7 @@ export function FilterCombobox({
   const [search, setSearch] = useState('');
   const triggerId = useId();
   const labelId = useId();
+  const listeId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const ouvrir = (next: boolean): void => {
@@ -82,8 +83,9 @@ export function FilterCombobox({
                 id={triggerId}
                 ref={triggerRef}
                 variant="outline"
-                // oxlint-disable-next-line jsx-a11y/role-has-required-aria-props -- aria posé par Base UI
                 role="combobox"
+                aria-expanded={open}
+                aria-controls={listeId}
                 onBlur={onBlur}
                 aria-labelledby={`${labelId} ${triggerId}`}
                 aria-haspopup="listbox"
@@ -125,6 +127,7 @@ export function FilterCombobox({
                 }}
               />
               <ComboboxList
+                id={listeId}
                 options={options}
                 value={value}
                 search={search}
@@ -164,6 +167,7 @@ export function FilterCombobox({
 }
 
 export function ComboboxList({
+  id,
   options,
   value,
   search,
@@ -173,6 +177,7 @@ export function ComboboxList({
   onClose,
   onCreate,
 }: {
+  id?: string | undefined;
   options: readonly FilterOption[];
   value: string | null;
   search: string;
@@ -183,7 +188,7 @@ export function ComboboxList({
   onCreate?: ((search: string) => void) | undefined;
 }) {
   return (
-    <CommandList>
+    <CommandList id={id}>
       <CommandEmpty>Aucun résultat.</CommandEmpty>
       <CommandGroup>
         <CommandItem

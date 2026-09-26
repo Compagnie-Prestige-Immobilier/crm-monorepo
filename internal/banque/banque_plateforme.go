@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -49,18 +48,18 @@ type InscriptionsAOuvrirOutput struct {
 	}
 }
 
-func (s *service) inscriptionsCompletes(ctx context.Context, projet string, aSignaler bool) ([]db.BankInscriptionsCompletesRow, error) {
+func (s *service) inscriptionsCompletes(ctx context.Context, projet string, aSignaler bool, id *string) ([]db.BankInscriptionsCompletesRow, error) {
 	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, projet)
 	if err != nil {
 		return nil, err
 	}
 	return s.Q.BankInscriptionsCompletes(ctx, db.BankInscriptionsCompletesParams{
-		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler,
+		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler, ID: id,
 	})
 }
 
 func (s *service) inscriptionsAOuvrir(ctx context.Context, in *InscriptionsAOuvrirInput) (*InscriptionsAOuvrirOutput, error) {
-	lignes, err := s.inscriptionsCompletes(ctx, in.Projet, false)
+	lignes, err := s.inscriptionsCompletes(ctx, in.Projet, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,11 +99,11 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return insc, err
 	}
-	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, string(insc.Projet))
+	completes, err := s.inscriptionsCompletes(ctx, string(insc.Projet), false, &insc.ID)
 	if err != nil {
 		return insc, err
 	}
-	if !inscriptionComplete(insc.StatutDistant, insc.DecideeLe, statuts) {
+	if len(completes) == 0 {
 		return insc, socle.Problem(http.StatusUnprocessableEntity, "BANK_CASE_INSCRIPTION_INCOMPLETE",
 			"Le dossier n’est pas encore validé sur la plateforme : statut « "+insc.StatutDistant+" ».")
 	}
@@ -114,12 +113,13 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 // Sans fiche rapprochée, le dossier porte l'identité de l'inscription : les
 // plateformes suivent seules leurs inscrits, le CRM n'a plus de fiche à opposer.
 func (s *service) prospectDuDossier(ctx context.Context, insc *db.BankInscriptionPourDossierRow) (db.BankCaseProspectRow, error) {
+	identite := db.BankCaseProspectRow{Nom: insc.Nom, Prenom: insc.Prenom, PhoneE164: insc.PhoneE164}
 	if insc.ProspectId == nil {
-		return db.BankCaseProspectRow{Nom: insc.Nom, Prenom: insc.Prenom, PhoneE164: insc.PhoneE164}, nil
+		return identite, nil
 	}
 	prospect, err := s.Q.BankCaseProspect(ctx, *insc.ProspectId)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return prospect, socle.Problem(http.StatusNotFound, "BANK_CASE_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
+		return identite, nil
 	}
 	return prospect, err
 }
@@ -156,13 +156,6 @@ func (s *service) creerDossier(ctx context.Context, in *CreationDossierInput) (*
 	}
 	dossier, err := s.dossier(ctx, id, "", ref)
 	return &DossierOutput{Body: dossier}, err
-}
-
-func inscriptionComplete(statut string, decideeLe *time.Time, statuts []string) bool {
-	if len(statuts) == 0 {
-		return decideeLe != nil
-	}
-	return slices.Contains(statuts, statut)
 }
 
 var prefixeReference = map[db.Projet]string{db.ProjetCHUES: "CHUES", db.ProjetGRANDPUBLIC: "GP"}
@@ -202,7 +195,7 @@ func texteOuTiret(v *string) string {
 // lui, part de la plateforme : ici, seule la notification in-app.
 func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string) (int, error) {
 	s := &service{d}
-	lignes, err := s.inscriptionsCompletes(ctx, projet, true)
+	lignes, err := s.inscriptionsCompletes(ctx, projet, true, nil)
 	if err != nil || len(lignes) == 0 {
 		return 0, err
 	}
@@ -261,12 +254,14 @@ func (s *service) signalerIssue(ctx context.Context, id, typeEtape string) {
 		valeurs["motif"] = valeur
 	}
 	chemin := "/" + coqueDe(r.Projet) + "/dossiers/" + r.ID
-	if _, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
-		Title: "Dossier bancaire " + issue + " : " + r.CustomerName, Category: "DOSSIER", Route: chemin,
-		Body:     r.Reference + ", " + r.BanqueName + ". " + detail + " : " + valeur + ".",
-		Audience: "USERS", AudienceUserIDs: []string{r.SuiviParId},
-	}); err != nil {
-		slog.Warn("issue du dossier : notification in-app non créée", "dossier", id, "err", err)
+	if r.SuiviParId != nil {
+		if _, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
+			Title: "Dossier bancaire " + issue + " : " + r.CustomerName, Category: "DOSSIER", Route: chemin,
+			Body:     r.Reference + ", " + r.BanqueName + ". " + detail + " : " + valeur + ".",
+			Audience: "USERS", AudienceUserIDs: []string{*r.SuiviParId},
+		}); err != nil {
+			slog.Warn("issue du dossier : notification in-app non créée", "dossier", id, "err", err)
+		}
 	}
 	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          typeCourriel,

@@ -68,6 +68,7 @@ function listeFacultative<TItem>(
 }
 
 const REPRESENTANTS_PAR_PAGE = 200;
+const REPRESENTANTS_PAGES_MAX = 25;
 
 const optionRepresentant = (representant: {
   id: string;
@@ -89,7 +90,12 @@ async function representantsComplets(client: ApiClient): Promise<FilterOption[]>
     params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: 1 } },
   });
   const options = listeFacultative(premiere, optionRepresentant);
-  const pageCount = premiere.data?.meta.pageCount ?? 1;
+  const pageCount = Math.min(premiere.data?.meta.pageCount ?? 1, REPRESENTANTS_PAGES_MAX);
+  if ((premiere.data?.meta.pageCount ?? 1) > REPRESENTANTS_PAGES_MAX) {
+    console.warn(
+      `Liste des représentants limitée aux ${REPRESENTANTS_PAGES_MAX * REPRESENTANTS_PAR_PAGE} premiers.`,
+    );
+  }
   const suites = await Promise.all(
     Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
       client.GET('/api/v1/representants', {

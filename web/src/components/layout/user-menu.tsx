@@ -1,19 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ChevronDownIcon,
-  FlaskConicalIcon,
-  KeyRoundIcon,
-  LogOutIcon,
-  UserIcon,
-} from 'lucide-react';
+import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { meQueryOptions } from '@/api/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,34 +21,10 @@ import {
 import { initials } from '@/lib/format';
 import type { SessionUser } from '@/lib/types';
 
-export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
+export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
-
-  let workspaceLabel = 'Ouvrir l’espace démo';
-  if (user.workspace === 'demo') workspaceLabel = 'Quitter l’espace démo';
-  if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';
-
-  async function switchWorkspace(): Promise<void> {
-    // L'écran resterait sur la fiche, mais son ouverture appartient à l'espace
-    // qu'on vient de quitter : la qualification n'aurait plus où atterrir.
-    setPending('workspace');
-    try {
-      const workspace = user.workspace === 'demo' ? 'public' : 'demo';
-      const response = await fetch('/api/auth/workspace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspace }),
-      });
-      if (!response.ok) throw new Error('workspace switch failed');
-      router.refresh();
-      setPending(null);
-    } catch {
-      toast.error('Le changement d’espace a échoué. Réessayez.');
-      setPending(null);
-    }
-  }
+  const [pending, setPending] = useState<'logout' | null>(null);
 
   async function signOut(): Promise<void> {
     setPending('logout');
@@ -67,7 +36,7 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         headers: { Origin: window.location.origin },
       });
       if (!response.ok) throw new Error('logout failed');
-      queryClient.setQueryData(meQueryOptions.queryKey, null);
+      queryClient.clear();
       router.replace('/connexion');
     } catch {
       toast.error('La déconnexion a échoué. Réessayez.');
@@ -112,21 +81,6 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
           <KeyRoundIcon aria-hidden="true" />
           Mot de passe
         </DropdownMenuItem>
-        {demoEnabled ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={pending !== null}
-              closeOnClick={false}
-              onClick={() => {
-                void switchWorkspace();
-              }}
-            >
-              <FlaskConicalIcon aria-hidden="true" />
-              {workspaceLabel}
-            </DropdownMenuItem>
-          </>
-        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"

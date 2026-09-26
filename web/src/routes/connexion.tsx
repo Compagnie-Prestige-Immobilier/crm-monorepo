@@ -1,9 +1,16 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { InfoIcon } from 'lucide-react';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
-import { DevRoleButtons } from '@/components/auth/dev-role-switcher';
+
+// Absent du bundle de production : seul `make build` pose VITE_BASCULE_ROLES.
+const DevRoleButtons =
+  import.meta.env.VITE_BASCULE_ROLES === '1'
+    ? lazy(() =>
+        import('@/components/auth/dev-role-switcher').then((m) => ({ default: m.DevRoleButtons })),
+      )
+    : null;
 import { Facade } from '@/components/auth/facade';
 import { LoginForm } from '@/components/auth/login-form';
 import { homePathForRole } from '@/components/layout/nav-items';
@@ -86,7 +93,11 @@ function ConnexionPage() {
           ) : null}
 
           <div className="mt-8">
-            <DevRoleButtons next={suite ?? null} className="mb-6" />
+            {DevRoleButtons ? (
+              <Suspense fallback={null}>
+                <DevRoleButtons next={suite ?? null} className="mb-6" />
+              </Suspense>
+            ) : null}
             <LoginForm next={suite ?? null} />
           </div>
         </div>

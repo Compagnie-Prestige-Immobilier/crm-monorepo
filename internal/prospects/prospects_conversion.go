@@ -96,9 +96,7 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	}
 	maintenant := time.Now()
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
-		if err := q.ConvertirJourney(ctx, db.ConvertirJourneyParams{
-			ID: journey.ID, ConvertedAt: &maintenant, ConvertedById: &u.ID,
-		}); err != nil {
+		if err := prospectMarquerJourneyConverti(ctx, q, journey.ID, u.ID, maintenant); err != nil {
 			return err
 		}
 		if err := q.UpsertConversion(ctx, db.UpsertConversionParams{
@@ -121,6 +119,17 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	// défaire une adhésion déjà acquise.
 	s.prospectAviserAdhesion(ctx, &u, item, &corps, maintenant)
 	return &ProspectOutput{Body: *item}, nil
+}
+
+func prospectMarquerJourneyConverti(ctx context.Context, q *db.Queries, journeyID, convertisseurID string, quand time.Time) error {
+	modifiees, err := q.ConvertirJourney(ctx, db.ConvertirJourneyParams{ID: journeyID, ConvertedAt: &quand, ConvertedById: &convertisseurID})
+	if err != nil {
+		return err
+	}
+	if modifiees == 0 {
+		return socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI", "Cette fiche est déjà convertie.")
+	}
+	return nil
 }
 
 // L'avis d'adhésion aux adresses réglées par l'administrateur. Sans destinataire
@@ -197,7 +206,8 @@ type ProspectVendreInput struct {
 // Seule une fiche convertie devient vendue ; le dépôt du classeur fait le même geste.
 func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	if _, err := s.prospectModifiable(ctx, &u, in.ID); err != nil {
+	existant, err := s.prospectModifiable(ctx, &u, in.ID)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
@@ -210,7 +220,7 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 				"Seule une fiche convertie peut être marquée vendue.")
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.vendre", prospectEntite, in.ID,
-			map[string]any{prospectChampStatut: string(db.ProspectStatutCONVERTI)},
+			map[string]any{prospectChampStatut: string(existant.Statut)},
 			map[string]any{prospectChampStatut: string(db.ProspectStatutVENDU)})
 	}); err != nil {
 		return nil, err
@@ -226,8 +236,14 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 // fait disparaître la personne des listes de son projet, et un dossier encaissé
 // pointerait vers une fiche qu'aucun écran ne montre plus.
 func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, sourceID, targetID string, preferSource bool) error {
-	if err := q.SoftDeleteProspect(ctx, sourceID); err != nil {
+	disparue := socle.Problem(http.StatusConflict, "MERGE_PROSPECT_GONE",
+		"L’une des deux fiches vient d’être fusionnée ou supprimée. Rechargez la page.")
+	supprimees, err := q.SoftDeleteProspect(ctx, sourceID)
+	if err != nil {
 		return err
+	}
+	if supprimees == 0 {
+		return disparue
 	}
 	if err := prospectDeplacerParcours(ctx, q, sourceID, targetID); err != nil {
 		return err
@@ -246,10 +262,14 @@ func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, so
 	if err := q.DeplacerDemandesClient(ctx, db.DeplacerDemandesClientParams{CreatedProspectId: &sourceID, CreatedProspectId_2: &targetID}); err != nil {
 		return err
 	}
-	if err := q.FusionnerProspect(ctx, db.FusionnerProspectParams{
+	fusionnees, err := q.FusionnerProspect(ctx, db.FusionnerProspectParams{
 		PreferSource: preferSource, SourceID: sourceID, TargetID: targetID,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
+	}
+	if fusionnees == 0 {
+		return disparue
 	}
 	return database.Auditer(ctx, q, u.ID, "prospect.merge", prospectEntite, targetID,
 		map[string]string{"sourceId": sourceID},
@@ -970,6 +990,33 @@ func (s *service) prospectJournal(ctx context.Context, in *ProspectJournalInput)
 		})
 	}
 	return out, nil
+}
+
+// `WHERE revueAt IS NULL` et non un simple UPDATE : deux revues simultanées
+// écriraient deux auteurs, et c'est le PREMIER qui a relu la demande.
+func (s *service) prospectRevue(ctx context.Context, in *ProspectIDInput) (*ProspectOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	existant, err := s.Q.ProspectVivant(ctx, in.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusNotFound, prospectCodeIntrouvable, prospectIntrouvable)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
+		return nil, err
+	}
+	if existant.Statut != db.ProspectStatutCONVERTI && existant.Statut != db.ProspectStatutVENDU {
+		return nil, socle.Problem(http.StatusBadRequest, "PROSPECT_REVUE_REQUIRES_CONVERSION", "Seule une demande convertie se revoit.")
+	}
+	if err := s.Q.MarquerProspectRevue(ctx, db.MarquerProspectRevueParams{ID: in.ID, RevueById: &u.ID}); err != nil {
+		return nil, err
+	}
+	item, err := s.prospectLire(ctx, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ProspectOutput{Body: *item}, nil
 }
 
 func prospectMonterConversion(api huma.API, s *service) {

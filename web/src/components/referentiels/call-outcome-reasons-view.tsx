@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon, PencilIcon, PlusIcon, PowerIcon, PowerOffIcon, RadioIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -346,9 +346,11 @@ function ReasonFormDialog({
   const isEdit = reason !== undefined;
   const locked = isLocked(reason);
 
-  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<ReasonFormValues>({
-    defaultValues: EMPTY,
-  });
+  const { register, handleSubmit, reset, control, setValue, formState } = useForm<ReasonFormValues>(
+    {
+      defaultValues: EMPTY,
+    },
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -369,12 +371,10 @@ function ReasonFormDialog({
     );
   }, [open, reason, reset]);
 
-  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-  const effect = watch('effect');
-  const color = watch('color');
+  const [effect, color, parent] = useWatch({ control, name: ['effect', 'color', 'parent'] });
   const { parentChoisi, effetRetenu, descriptionEffet, parents } = deriverParent(
     racines,
-    watch('parent'),
+    parent,
     effect,
   );
 

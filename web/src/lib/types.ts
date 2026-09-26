@@ -177,6 +177,7 @@ export const PERMISSIONS = [
   'roles.administrer',
   'support.plateforme',
   'support.signaler',
+  'ventes.gerer',
   'ventes.lire',
   'visites.detruire',
   'visites.voir_archivees',

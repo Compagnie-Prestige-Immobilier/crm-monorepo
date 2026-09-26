@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, LoaderIcon, SendIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +28,7 @@ import { fetchBanques } from '@/lib/data/reference';
 import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { useRecalage } from '@/lib/use-recalage';
 
 function canSubmitClientRequest(fields: {
   nom: string;
@@ -149,15 +150,14 @@ export function ClientRequestDialog({
     enabled: open,
   });
 
-  useEffect(() => {
+  useRecalage([open, initialTerm], () => {
     if (!open) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
     setSent(false);
     const fields = splitInitialTerm(initialTerm);
     setPhone(fields.phone);
     setNom(fields.nom);
     setPrenom(fields.prenom);
-  }, [open, initialTerm]);
+  });
 
   const create = useMutation({
     mutationFn: () => {

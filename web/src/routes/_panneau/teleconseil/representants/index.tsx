@@ -2,11 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { RepresentantsView } from '@/components/representants/representants-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { canExportRepresentants, peut, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/representants/')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: TeleconseilRepresentantsPage,
   pendingComponent: Loading,
 });

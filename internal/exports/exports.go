@@ -83,7 +83,6 @@ const (
 	ExportEnteteRepresentant      = "Représentant"
 	ExportEnteteDepartement       = "Département"
 	ExportEnteteIef               = "IEF"
-	exportEnteteCommercial        = "Commercial"
 	ExportEnteteProfession        = "Profession"
 	ExportEnteteWhatsapp          = "WhatsApp"
 	exportEnteteDernierResultat   = "Dernier résultat"
@@ -532,7 +531,7 @@ func (s *service) exportRepresentants(ctx context.Context, in *ExportRepresentan
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille(exportNomFeuilleRepresentants,
-		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteEtablissement, ExportEnteteDepartement, ExportEnteteIef, ExportEnteteQualification, exportEnteteCommercial, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
+		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteEtablissement, ExportEnteteDepartement, ExportEnteteIef, ExportEnteteQualification, ExportEnteteTeleconseiller, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
 		[]float64{30, 20, 26, 24, 26, 20, 26, 12, 40, 20, 20}, nil)
 	if err != nil {
 		_ = c.f.Close()
