@@ -506,8 +506,6 @@ function AdvanceAmountField({
         id={amountId}
         inputMode="numeric"
         autoComplete="off"
-        // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-        autoFocus
         value={amount ?? ''}
         placeholder="1200000"
         aria-describedby={`${amountId}-apercu`}
@@ -831,8 +829,6 @@ export function RejectDialog({
                   id={detailId}
                   value={detail}
                   maxLength={2000}
-                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-                  autoFocus
                   aria-describedby={`${detailId}-aide`}
                   onChange={(event) => {
                     setDetail(event.target.value);

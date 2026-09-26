@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PencilIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
@@ -231,6 +231,7 @@ function ModifierLaFiche({
   onEnregistre: (prospect: ProspectRow) => void;
 }) {
   const [ouverte, setOuverte] = useState(false);
+  const prenomRef = useRef<HTMLInputElement>(null);
   if (!canEdit) return null;
 
   return (
@@ -245,7 +246,10 @@ function ModifierLaFiche({
         Modifier
       </Button>
       <Dialog open={ouverte} onOpenChange={setOuverte}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent
+          initialFocus={prenomRef}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"
+        >
           <DialogHeader>
             <DialogTitle>
               Modifier {prospect.prenom} {prospect.nom}
@@ -259,6 +263,7 @@ function ModifierLaFiche({
             <GrandPublicProspectForm
               embedded
               initial={prospect}
+              prenomRef={prenomRef}
               onSaved={(saved) => {
                 onEnregistre(saved);
                 setOuverte(false);
