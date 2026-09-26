@@ -1,8 +1,11 @@
 import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
+import { toast } from 'sonner';
 
 import { getApiClient } from '@/lib/api/browser';
+import { estTronque } from '@/lib/api/query-params';
 import { uuidV7 } from '@/lib/data/console';
+import { formatNumber } from '@/lib/format';
 
 export type OuvertureFiche = components['schemas']['QualificationOuvertureFicheDTO'];
 export type ComptageOuvertures = components['schemas']['QualificationComptageJourDTO'];
@@ -49,7 +52,14 @@ export async function fetchComptageOuvertures(
   query: { from?: string; to?: string; openedById?: string } = {},
   client: ApiClient = getApiClient(),
 ): Promise<ComptageOuvertures[]> {
-  return unwrap(await client.GET('/api/v1/ouvertures/comptage', { params: { query } })).items;
+  const page = unwrap(await client.GET('/api/v1/ouvertures/comptage', { params: { query } }));
+  if (estTronque(page)) {
+    toast.warning(
+      `Comptage des ouvertures limité aux ${formatNumber(page.items.length)} lignes les plus récentes. Choisissez une période plus courte.`,
+      { id: 'plafond-ouvertures' },
+    );
+  }
+  return page.items;
 }
 
 export function secondesEcoulees(depuis: string, now: number): number {

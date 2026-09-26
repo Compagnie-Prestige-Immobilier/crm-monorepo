@@ -237,11 +237,14 @@ export function HistoireDeLaFiche({ prospect, role }: { prospect: ProspectRow; r
   });
   const evenements: EvenementHistorique[] = [
     ...evenementsDeLaFiche(prospect),
-    ...(appels.data ?? []).map(evenementAppel),
+    ...(appels.data?.items ?? []).map(evenementAppel),
     ...(releves.data ?? []).filter((r) => r.attemptId === null).map(evenementReleve),
-    ...(segments.data ?? []).map(evenementSegment),
-    ...(journal.data ?? []).map(evenementJournal),
+    ...(segments.data?.items ?? []).map(evenementSegment),
+    ...(journal.data?.items ?? []).map(evenementJournal),
   ];
+  const plafondsAtteints = [appels.data, segments.data, journal.data].flatMap((liste) =>
+    liste?.tronque === true ? [liste.items.length] : [],
+  );
   const sources = voitLeSegment(role)
     ? [appels, releves, segments, journal]
     : [appels, releves, journal];
@@ -262,6 +265,11 @@ export function HistoireDeLaFiche({ prospect, role }: { prospect: ProspectRow; r
             'Aucune bascule enregistrée. Ni méthode obtenue, ni revue, ni changement de segment.',
         }}
       />
+      {plafondsAtteints.map((plafond, index) => (
+        <p key={index} className="text-[0.75rem] text-muted-foreground">
+          Liste limitée aux {formatNumber(plafond)} éléments les plus récents.
+        </p>
+      ))}
     </CarteHistoire>
   );
 }

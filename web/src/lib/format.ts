@@ -74,6 +74,15 @@ export function formatShortDate(iso: string): string {
   return shortDateFormatter.format(new Date(iso));
 }
 
+/** `jour` : minuit du poste au jour calendaire de Dakar (UTC+0 toute l'année), pour date-fns. */
+export function reperesDakar(iso: string): { jour: Date; heure: string } {
+  const at = new Date(iso);
+  return {
+    jour: new Date(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
+    heure: String(at.getUTCHours()).padStart(2, '0'),
+  };
+}
+
 const DEVICE_CALL_LABELS: Record<string, string> = {
   sortant: 'Sortant',
   entrant: 'Entrant',

@@ -4,9 +4,9 @@ import { lazy, Suspense, useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 
-// Absent du bundle de production : seul `make build` pose VITE_BASCULE_ROLES.
+// Absent du bundle de production : seuls `vite dev` et `make build` l'incluent.
 const DevRoleButtons =
-  import.meta.env.VITE_BASCULE_ROLES === '1'
+  import.meta.env.DEV || import.meta.env.VITE_BASCULE_ROLES === '1'
     ? lazy(() =>
         import('@/components/auth/dev-role-switcher').then((m) => ({ default: m.DevRoleButtons })),
       )

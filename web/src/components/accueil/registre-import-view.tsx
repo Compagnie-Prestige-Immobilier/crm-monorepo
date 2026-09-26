@@ -445,9 +445,7 @@ export function RegistreImportView() {
         <CardContent className="flex flex-col gap-3">
           {/* Zone de dépôt doublée d'un champ de fichier réel : le glisser-déposer
               n'est pas atteignable au clavier. */}
-          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
-          <label
-            htmlFor={inputId}
+          <div
             onDragOver={(event) => {
               event.preventDefault();
               setDragging(true);
@@ -460,35 +458,39 @@ export function RegistreImportView() {
               setDragging(false);
               accept(event.dataTransfer.files.item(0));
             }}
-            className={cn(
-              'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
-              'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
-              'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-              dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
-            )}
           >
-            <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
-            <span className="text-[0.9375rem] font-[600]">
-              Glissez le classeur ici, ou choisissez un fichier
-            </span>
-            <span className="text-[0.8125rem] text-muted-foreground">
-              Format .xlsx, 25 Mo au maximum.
-            </span>
-            <input
-              id={inputId}
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED}
-              className="sr-only"
-              disabled={deposit.isPending}
-              onChange={(event) => {
-                accept(event.target.files?.item(0) ?? null);
-                // Vidé pour que redéposer le même fichier corrigé émette bien un
-                // nouvel évènement `change`.
-                event.target.value = '';
-              }}
-            />
-          </label>
+            <label
+              htmlFor={inputId}
+              className={cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
+                'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
+                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+                dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
+              )}
+            >
+              <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
+              <span className="text-[0.9375rem] font-[600]">
+                Glissez le classeur ici, ou choisissez un fichier
+              </span>
+              <span className="text-[0.8125rem] text-muted-foreground">
+                Format .xlsx, 25 Mo au maximum.
+              </span>
+              <input
+                id={inputId}
+                ref={inputRef}
+                type="file"
+                accept={ACCEPTED}
+                className="sr-only"
+                disabled={deposit.isPending}
+                onChange={(event) => {
+                  accept(event.target.files?.item(0) ?? null);
+                  // Vidé pour que redéposer le même fichier corrigé émette bien un
+                  // nouvel évènement `change`.
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </div>
 
           {deposit.isPending ? (
             <p role="status" className="flex items-center gap-2 text-[0.875rem]">
