@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 import { compteDe } from './comptes';
+import { ecrire, lire } from './donnees-admin';
 import { apiDe, creerProspect, purger, suffixe } from './donnees-listes';
 
 /** Ce qu'un ADMIN coche dans « Utilisateurs et rôles » pour ouvrir l'écran au comptoir. */
@@ -58,6 +59,7 @@ test.describe('rendez-vous au comptoir', () => {
   });
 
   test.afterAll(async () => {
+    await ecrire('DELETE FROM "visites" WHERE "visitorName" = $1', [`Awa ${nom}`]);
     await poserPermissions(permissionsAvant);
     await purger({ prospects: [convoque] });
   });
@@ -70,8 +72,16 @@ test.describe('rendez-vous au comptoir', () => {
     await expect(onglet).toBeVisible();
 
     await onglet.click();
+    // Le comptoir ouvre sur la journée : le rendez-vous de demain n'y est pas.
+    await expect(page.getByRole('button', { name: 'Aujourd’hui' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     const ligne = page.getByRole('row').filter({ hasText: nom });
+    await expect(ligne).toHaveCount(0);
+    await page.getByRole('button', { name: 'Toutes les dates' }).click();
     await expect(ligne).toHaveCount(1);
+    await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
 
     // Les types trient la file : un RV CPI ne s'affiche pas sous RV site.
     await page.getByRole('tab', { name: 'RV site', exact: true }).click();
@@ -82,6 +92,27 @@ test.describe('rendez-vous au comptoir', () => {
     // La venue se confirme depuis la liste : ouvrir chaque fiche ferait perdre la file.
     await ligne.getByRole('button', { name: /^Confirmer la venue/ }).click();
     await expect(ligne.getByText('Venu', { exact: true }).first()).toBeVisible();
+
+    // Venu, il passe au registre sans ressaisir son nom ni son numéro.
+    await ligne.getByRole('button', { name: 'Enregistrer la visite' }).click();
+    const fenetre = page.getByRole('dialog', { name: 'Enregistrer une visite' });
+    await expect(fenetre.getByLabel('PRENOM ET NOMS')).toHaveValue(`Awa ${nom}`);
+    await expect(fenetre.getByLabel('TELEPHONES')).toHaveValue(/^\+221 77 /);
+    const [choix] = await lire<{ entreprise: string; objet: string }>(
+      `SELECT (SELECT "label" FROM "visite_entreprises" WHERE "isActive" ORDER BY "sortOrder" LIMIT 1) AS entreprise,
+              (SELECT "label" FROM "visite_objets" WHERE "isActive" ORDER BY "sortOrder" LIMIT 1) AS objet`,
+    );
+    await fenetre.getByRole('combobox', { name: /ENTREPRISE/u }).click();
+    await page.getByRole('option', { name: choix?.entreprise, exact: true }).click();
+    await fenetre.getByRole('combobox', { name: /OBJET VISITE/u }).click();
+    await page.getByRole('option', { name: choix?.objet, exact: true }).click();
+    await fenetre.getByRole('button', { name: 'Enregistrer la visite' }).click();
+    await expect(fenetre).toHaveCount(0);
+    const visites = await lire<{ phoneE164: string }>(
+      'SELECT "phoneE164" FROM "visites" WHERE "visitorName" = $1',
+      [`Awa ${nom}`],
+    );
+    expect(visites, 'visite enregistrée au registre').toHaveLength(1);
 
     // Le filtre des venues sépare ce qui est confirmé de ce qui attend.
     await page.getByRole('combobox', { name: 'Venue' }).click();

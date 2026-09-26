@@ -322,7 +322,6 @@ function DetailRow({ user, observedAt }: { user: SupervisedUser; observedAt: str
             <Fact label="Cadence médiane" value={formatDuration(user.medianGapSeconds)} />
             <Fact label="Temps mort" value={formatDeadTime(user.deadSeconds, user.deadGaps)} />
             <Fact label="Reprises" value={formatNumber(user.repeatCalls)} />
-            <Fact label="Retard de synchro" value={formatDuration(user.medianUploadLagSeconds)} />
             <Fact
               label="Dernière saisie"
               value={formatElapsed(minutesSince(user.lastWriteAt, observedAt))}

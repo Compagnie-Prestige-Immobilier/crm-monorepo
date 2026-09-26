@@ -305,8 +305,6 @@ export interface ActivityColumn {
   key: ActivityKey;
   label: string;
   taux?: boolean;
-  /** Une durée en secondes, affichée en minutes et secondes. */
-  duree?: boolean;
 }
 
 /**
@@ -324,11 +322,6 @@ export const FAMILLE_LABELS: Record<ActivityFamille, string> = {
 export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   representants: [
     { key: 'repCalls', label: 'Appels' },
-    { key: 'repConfirmedCalls', label: 'Confirmés' },
-    { key: 'repDetectedCalls', label: 'Détectés' },
-    { key: 'repUnloggedCalls', label: 'Non consignés' },
-    { key: 'repConfirmRate', label: 'Confirmation', taux: true },
-    { key: 'repAvgCallSeconds', label: 'Durée moy.', duree: true },
     // « Joints » est la famille : les acceptés en sont un détail, pas un voisin.
     { key: 'repReached', label: 'Joints' },
     { key: 'repFichesAcceptees', label: 'Acceptés' },
@@ -344,11 +337,6 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   ],
   prospects: [
     { key: 'calls', label: 'Appels' },
-    { key: 'confirmedCalls', label: 'Confirmés' },
-    { key: 'detectedCalls', label: 'Détectés' },
-    { key: 'unloggedCalls', label: 'Non consignés' },
-    { key: 'confirmRate', label: 'Confirmation', taux: true },
-    { key: 'avgCallSeconds', label: 'Durée moy.', duree: true },
     { key: 'methodObtained', label: 'Méthodes' },
     { key: 'unreachable', label: 'Injoignables' },
     { key: 'wrongNumber', label: 'Faux numéros' },

@@ -353,7 +353,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
             onTogglePause={live.togglePause}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editing ? (
             <TiroirWidgets
               placees={placees}

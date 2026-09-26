@@ -471,7 +471,7 @@ export function SyntheseSites({
   const sites = parSite(ventes, configuration);
   const vendus = sites.filter((ligne) => ligne.ventes > 0);
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {vendus.length > 0 ? (
         <>
           <Card>

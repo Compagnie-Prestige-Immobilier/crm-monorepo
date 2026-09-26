@@ -270,7 +270,7 @@ function CarteInscription({
           <div className="mt-auto flex flex-wrap gap-2">
             <Button type="button" disabled={pending} onClick={onOuvrir}>
               <FolderPlusIcon aria-hidden="true" />
-              Ouvrir le dossier
+              Créer le dossier
             </Button>
             <Button type="button" variant="outline" onClick={onLirePieces}>
               <FolderOpenIcon aria-hidden="true" />
@@ -346,7 +346,7 @@ function ChoixBanqueDialog({
               if (banqueId !== null) onConfirm(banqueId);
             }}
           >
-            Ouvrir le dossier
+            Créer le dossier
           </Button>
         </DialogFooter>
       </DialogContent>

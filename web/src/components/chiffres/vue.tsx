@@ -34,6 +34,7 @@ import {
   type Jeux,
   type SourceChiffre,
 } from '@/components/chiffres/sources';
+import { BoutonFiltres, classeRepliable } from '@/components/filters/bouton-filtres';
 import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -363,6 +364,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
   const live = useLive();
   const queryClient = useQueryClient();
   const { data: user } = useQuery(meQueryOptions);
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
 
   const projet: Projet | null = filters.projet;
   const voitLesMontants = peut(user, 'chiffres.voir_montants');
@@ -496,6 +498,10 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
       <ChiffresToolbar
         filters={filters}
         onFiltersChange={setFilters}
+        filtresOuverts={filtresOuverts}
+        onBasculerFiltres={() => {
+          setFiltresOuverts(!filtresOuverts);
+        }}
         equipe={equipe}
         projet={projet}
         live={live}
@@ -523,7 +529,9 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
       />
 
       {/* « Comparer à » n'agit que sur le registre des visites : ici il serait inerte. */}
-      <SelecteurPeriode filters={filters} onChange={setFilters} comparaison={false} />
+      <div className={classeRepliable(filtresOuverts)}>
+        <SelecteurPeriode filters={filters} onChange={setFilters} comparaison={false} />
+      </div>
 
       {(() => {
         if (shouldShowError({ isError: enErreur || dispositionQuery.isError, hasData }))
@@ -550,7 +558,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
           return (
             <Card>
               <CardContent className="py-10 text-center text-[0.9375rem] text-muted-foreground">
-                Cet écran est vide. Ouvrez « Composer l’écran » pour y poser vos chiffres.
+                Cet écran est vide. Ouvrez « Organiser les graphiques » pour y poser vos chiffres.
               </CardContent>
             </Card>
           );
@@ -606,6 +614,8 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
 function ChiffresToolbar({
   filters,
   onFiltersChange,
+  filtresOuverts,
+  onBasculerFiltres,
   equipe,
   projet,
   live,
@@ -631,6 +641,8 @@ function ChiffresToolbar({
 }: {
   filters: ChiffresFilters;
   onFiltersChange: (patch: Partial<ChiffresFilters>) => void;
+  filtresOuverts: boolean;
+  onBasculerFiltres: () => void;
   equipe: readonly { id: string; fullName: string }[];
   projet: Projet | null;
   live: ReturnType<typeof useLive>;
@@ -660,53 +672,56 @@ function ChiffresToolbar({
         <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
           {periodeAffichee(filters)}
         </p>
-        <Select
-          value={filters.projet ?? 'tous'}
-          onValueChange={(value) => {
-            if (value === null) return;
-            onFiltersChange({ projet: value === 'tous' ? null : (value as Projet) });
-          }}
-        >
-          <SelectTrigger size="sm" aria-label="Projet regardé" className="w-40">
-            <SelectValue>{(valeur: string) => libelleNomProjet(valeur)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tous">Tous les projets</SelectItem>
-            <SelectItem value="CHUES">CHUES</SelectItem>
-            <SelectItem value="GRAND_PUBLIC">Grand Public</SelectItem>
-          </SelectContent>
-        </Select>
-        {equipe.length > 0 ? (
+        <BoutonFiltres ouverts={filtresOuverts} onBasculer={onBasculerFiltres} />
+        <div className={classeRepliable(filtresOuverts)}>
           <Select
-            value={filters.teleconseiller ?? 'tous'}
+            value={filters.projet ?? 'tous'}
             onValueChange={(value) => {
               if (value === null) return;
-              onFiltersChange({ teleconseiller: value === 'tous' ? null : value });
+              onFiltersChange({ projet: value === 'tous' ? null : (value as Projet) });
             }}
           >
-            <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
-              {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
-                  déclencheur affichait l'identifiant du téléconseiller. */}
-              <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
+            <SelectTrigger size="sm" aria-label="Projet regardé" className="w-40">
+              <SelectValue>{(valeur: string) => libelleNomProjet(valeur)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
-              {equipe.map((personne) => (
-                <SelectItem key={personne.id} value={personne.id}>
-                  {personne.fullName}
-                </SelectItem>
-              ))}
+              <SelectItem value="tous">Tous les projets</SelectItem>
+              <SelectItem value="CHUES">CHUES</SelectItem>
+              <SelectItem value="GRAND_PUBLIC">Grand Public</SelectItem>
             </SelectContent>
           </Select>
-        ) : null}
-        <SelecteurCampagne
-          projet={projet}
-          value={filters.campagne}
-          onChange={(campagne) => {
-            onFiltersChange({ campagne });
-          }}
-        />
-        <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
+          {equipe.length > 0 ? (
+            <Select
+              value={filters.teleconseiller ?? 'tous'}
+              onValueChange={(value) => {
+                if (value === null) return;
+                onFiltersChange({ teleconseiller: value === 'tous' ? null : value });
+              }}
+            >
+              <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
+                {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
+                  déclencheur affichait l'identifiant du téléconseiller. */}
+                <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
+                {equipe.map((personne) => (
+                  <SelectItem key={personne.id} value={personne.id}>
+                    {personne.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <SelecteurCampagne
+            projet={projet}
+            value={filters.campagne}
+            onChange={(campagne) => {
+              onFiltersChange({ campagne });
+            }}
+          />
+          <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <LiveIndicator
@@ -737,7 +752,6 @@ function ChiffresToolbar({
           dirty={dirty}
           pending={savePending}
           isAdmin={isAdmin}
-          entryLabel="Composer l’écran"
           onEnter={onEnter}
           onSave={onSave}
           onCancel={onCancel}

@@ -644,9 +644,24 @@ func (s *service) equipeDuPlateau(ctx context.Context, perimetre perimetreSuperv
 	return lignesAgregat[ligneDeLEquipe](ctx, s, `
 	SELECT u."id" AS id, u."fullName" AS nom, u."isActive" AS actif
 	FROM "users" u
-	WHERE `+perimetre.teleconseiller(p)+`
+	WHERE `+perimetre.teleconseiller(p)+` AND u."role" = 'COMMERCIAL'::"Role"
 	GROUP BY u."id", u."fullName", u."isActive"
 	ORDER BY u."fullName" ASC`, p.args)
+}
+
+// Un compte désactivé qui a agi dans la fenêtre reste : ses actes sont au total.
+func equipeEnPoste(equipe []ligneDeLEquipe, lignes []ligneParTeleconseiller) []ligneDeLEquipe {
+	aAgi := make(map[string]bool, len(lignes))
+	for _, ligne := range lignes {
+		aAgi[ligne.ID] = true
+	}
+	enPoste := make([]ligneDeLEquipe, 0, len(equipe))
+	for _, membre := range equipe {
+		if membre.Actif || aAgi[membre.ID] {
+			enPoste = append(enPoste, membre)
+		}
+	}
+	return enPoste
 }
 
 func (s *service) histogrammesDesProspects(ctx context.Context, perimetre perimetreSupervision) (parTeleconseiller, parRepresentant []ligneDHistogramme, err error) {
@@ -1052,6 +1067,7 @@ func (s *service) calculerLActivite(ctx context.Context, f *FiltreDeSupervision)
 			return ActiviteDesTeleconseillers{}, err
 		}
 	}
+	equipe = equipeEnPoste(equipe, faits.parTeleconseiller)
 	activite := assemblerLActivite(perimetre, &faits)
 	activite.Teleconseillers = make([]TeleconseillerSupervise, 0, len(equipe))
 	for _, membre := range equipe {
