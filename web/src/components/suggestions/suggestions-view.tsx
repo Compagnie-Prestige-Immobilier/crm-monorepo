@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { QueryErrorState } from '@/components/query-error-state';
+import { MeilleursParrains } from '@/components/suggestions/meilleurs-parrains';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -164,6 +165,7 @@ export function SuggestionsView() {
 
   return (
     <div className="flex flex-col gap-6">
+      <MeilleursParrains />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
           Ce sont des contacts recommandés par un représentant, pas encore des prospects.

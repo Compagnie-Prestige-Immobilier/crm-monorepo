@@ -131,9 +131,22 @@ function SectionParrainage({ prospectId }: { prospectId: string }) {
           </span>
         </Ligne>
       )}
+      {data.suivi.recommandes > 0 && (
+        <Ligne label="Suivi du parrainage">
+          <span className="tabular-nums">
+            {compte(data.suivi.recommandes, 'numéro recommandé', 'numéros recommandés')},{' '}
+            {compte(data.suivi.fiches, 'fiche créée', 'fiches créées')},{' '}
+            {compte(data.suivi.convertis, 'converti', 'convertis')},{' '}
+            {compte(data.suivi.vendus, 'vendu', 'vendus')}
+          </span>
+        </Ligne>
+      )}
     </>
   );
 }
+
+const compte = (n: number, un: string, plusieurs: string): string =>
+  `${n} ${n > 1 ? plusieurs : un}`;
 
 function formatAnciennete(mois: number): string {
   if (mois < 12) return `${String(mois)} mois`;
