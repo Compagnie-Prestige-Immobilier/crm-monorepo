@@ -201,8 +201,11 @@ test.describe('parcours 1, cache vidé au changement de compte', () => {
     await connecter(page, compteB.identifiant, compteB.motDePasse);
     await expect(page.getByRole('button', { name: `Compte de ${compteB.nom}` })).toBeVisible();
 
+    const reponse = page.waitForResponse('**/api/v1/phase2/callbacks**');
     await page.getByRole('link', { name: 'Rappels promis' }).click();
-    await expect(ligneDuRappel(page, ficheDeA.phoneE164)).toBeHidden({ timeout: 500 });
+    await expect(page.getByRole('tab', { name: /En retard/u })).toBeVisible();
+    expect(await ligneDuRappel(page, ficheDeA.phoneE164).count()).toBe(0);
+    await reponse;
     await expect(ligneDuRappel(page, ficheDeA.phoneE164)).toHaveCount(0);
   });
 });

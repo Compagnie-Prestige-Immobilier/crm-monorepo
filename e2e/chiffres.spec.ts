@@ -124,7 +124,10 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
 test.describe('parcours 9, la supervision', () => {
   test.use({ storageState: SUPERVISEUR.etat });
 
-  test('un battement fait passer un compte de « Inactif » à « Connecté »', async ({ page }) => {
+  test('un battement fait passer un compte de « Inactif » à « Connecté »', async ({
+    page,
+    browser,
+  }) => {
     expect(veilleur, 'le compte de veille n’a pas été créé').not.toBeNull();
     const compte = veilleur as CompteCree;
 
@@ -138,15 +141,23 @@ test.describe('parcours 9, la supervision', () => {
       compte.motDePasse,
       '198.51.100.75',
     );
-    const reponse = await battant.post('/api/v1/presence/beat', { data: {} });
-    expect(reponse.status(), await reponse.text()).toBeLessThan(300);
+    const poste = await browser.newContext({ storageState: await battant.storageState() });
     await battant.dispose();
+    await (await poste.newPage()).goto('/teleconseil/console');
 
-    const battement = await ligne<{ userId: string }>(
-      'SELECT "userId" FROM agent_heartbeats WHERE "userId" = $1',
-      [compte.id],
-    );
-    expect(battement?.userId, 'le battement n’est pas écrit en base').toBe(compte.id);
+    await expect
+      .poll(
+        async () =>
+          (
+            await ligne<{ userId: string }>(
+              'SELECT "userId" FROM agent_heartbeats WHERE "userId" = $1',
+              [compte.id],
+            )
+          )?.userId,
+        { message: 'le battement n’est pas écrit en base' },
+      )
+      .toBe(compte.id);
+    await poste.close();
 
     await page.reload();
     await expect(rangee).toContainText('Connecté');

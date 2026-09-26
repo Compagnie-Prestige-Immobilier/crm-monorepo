@@ -164,6 +164,33 @@ test.describe('parcours 7, les listes CHUES', () => {
   });
 });
 
+test.describe('parcours 7, modifier un prospect depuis la liste', () => {
+  test.use({ storageState: compteDe('ADMIN').etat });
+
+  test('le motif de bascule saisi pour une fiche ne passe pas à la suivante', async ({ page }) => {
+    await page.goto('/teleconseil/prospects');
+    await chercher(page, 'Recherche');
+    const fenetre = page.getByRole('dialog', { name: 'Modifier le prospect' });
+    const motif = fenetre.getByRole('textbox', { name: /Motif de la bascule/u });
+
+    const basculer = async (nom: string): Promise<void> => {
+      await page.getByRole('button', { name: `Actions pour ${nom}` }).click();
+      await page.getByRole('menuitem', { name: 'Modifier' }).click();
+      await fenetre.getByRole('combobox', { name: /Banque/u }).click();
+      await page.getByRole('option').first().click();
+      await expect(motif).toBeVisible();
+    };
+
+    await basculer(`Aminata CHUES ${cle}`);
+    await motif.fill('Salaire domicilié ailleurs');
+    await fenetre.getByRole('button', { name: 'Annuler' }).click();
+    await expect(fenetre).toBeHidden();
+
+    await basculer(`Ousmane GP ${cle}`);
+    await expect(motif).toHaveValue('');
+  });
+});
+
 test.describe('parcours 7, la liste et la fiche Grand Public', () => {
   test.use({ storageState: compteDe('ADMIN').etat });
 

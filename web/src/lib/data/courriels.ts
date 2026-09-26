@@ -24,6 +24,7 @@ export const COURRIEL_TYPE_LABELS: Record<string, string> = {
   DOSSIER_REJETE: 'Dossier bancaire rejeté',
   PROSPECT_ENROLEMENT: 'Enrôlement',
   IMPORT_LEADS: 'Relevé des leads',
+  FORMULAIRE_PUBLIC: 'Formulaire public',
 };
 
 export const COURRIEL_STATUT_LABELS: Record<Courriel['statut'], string> = {

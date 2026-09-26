@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRightIcon } from 'lucide-react';
 
 import { fetchProspectSegmentHistory } from '@/lib/data/prospects';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { SEGMENT_LABELS } from '@/lib/types';
 
 export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
@@ -27,7 +27,7 @@ export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
     );
   }
 
-  if (data.length === 0) {
+  if (data.items.length === 0) {
     return (
       <p className="text-[0.75rem] text-muted-foreground">
         Cette fiche n’a jamais changé de segment.
@@ -39,7 +39,7 @@ export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
     <div className="flex flex-col gap-2">
       <p className="text-[0.75rem] font-[600]">Bascules déjà enregistrées</p>
       <ul className="flex flex-col gap-2">
-        {data.map((change) => (
+        {data.items.map((change) => (
           <li key={change.id} className="rounded-md border border-border px-3 py-2">
             <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
               <span>{SEGMENT_LABELS[change.fromSegment]}</span>
@@ -55,6 +55,11 @@ export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
           </li>
         ))}
       </ul>
+      {data.tronque ? (
+        <p className="text-[0.75rem] text-muted-foreground">
+          Liste limitée aux {formatNumber(data.items.length)} éléments les plus récents.
+        </p>
+      ) : null}
     </div>
   );
 }

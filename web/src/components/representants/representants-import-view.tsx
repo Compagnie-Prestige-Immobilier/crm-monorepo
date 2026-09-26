@@ -141,9 +141,7 @@ export function RepresentantsImportView() {
             `onDrop` fermerait l'écran à qui n'utilise pas la souris. Le `label`
             porte le clic, l'`input` porte le focus et l'annonce.
           */}
-          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
-          <label
-            htmlFor={inputId}
+          <div
             onDragOver={(event) => {
               event.preventDefault();
               setDragging(true);
@@ -156,32 +154,36 @@ export function RepresentantsImportView() {
               setDragging(false);
               accept(event.dataTransfer.files.item(0));
             }}
-            className={cn(
-              'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
-              'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
-              'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-              dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
-            )}
           >
-            <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
-            <span className="text-[0.9375rem] font-[600]">
-              {file === null ? 'Glissez le classeur ici, ou choisissez un fichier' : file.name}
-            </span>
-            <span className="text-[0.8125rem] text-muted-foreground">
-              Format .xlsx, 10 Mo au maximum.
-            </span>
-            <input
-              id={inputId}
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED}
-              className="sr-only"
-              onChange={(event) => {
-                accept(event.target.files?.item(0) ?? null);
-                event.target.value = '';
-              }}
-            />
-          </label>
+            <label
+              htmlFor={inputId}
+              className={cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
+                'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
+                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+                dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
+              )}
+            >
+              <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
+              <span className="text-[0.9375rem] font-[600]">
+                {file === null ? 'Glissez le classeur ici, ou choisissez un fichier' : file.name}
+              </span>
+              <span className="text-[0.8125rem] text-muted-foreground">
+                Format .xlsx, 10 Mo au maximum.
+              </span>
+              <input
+                id={inputId}
+                ref={inputRef}
+                type="file"
+                accept={ACCEPTED}
+                className="sr-only"
+                onChange={(event) => {
+                  accept(event.target.files?.item(0) ?? null);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </div>
 
           {simulate.isPending ? (
             <p role="status" className="flex items-center gap-2 text-[0.875rem]">

@@ -14,7 +14,7 @@ import {
   PrinterIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 
 import { ArchiverVisite } from '@/components/accueil/archiver-visite';
 import { ImpressionDialog } from '@/components/accueil/impression-dialog';
@@ -477,6 +477,7 @@ export function RegistreView() {
   const telechargement = useFileDownload();
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
+  const nomVisiteurRef = useRef<HTMLInputElement>(null);
 
   const [impressionOuverte, setImpressionOuverte] = useState(false);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
@@ -743,7 +744,10 @@ export function RegistreView() {
       ) : null}
 
       <Dialog open={ajoutOuvert} onOpenChange={setAjoutOuvert}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent
+          initialFocus={nomVisiteurRef}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl"
+        >
           <DialogHeader>
             <DialogTitle>Enregistrer une visite</DialogTitle>
           </DialogHeader>
@@ -751,7 +755,11 @@ export function RegistreView() {
               lui-même, entreprise conservée, focus sur le nom. Trois visiteurs
               de la même société s'enregistrent d'affilée, ce que la fermeture
               automatique rendait impossible. L'accueil ferme quand il a fini. */}
-          <VisiteForm referentiels={referentiels.data} onSaved={rafraichir} />
+          <VisiteForm
+            referentiels={referentiels.data}
+            nomRef={nomVisiteurRef}
+            onSaved={rafraichir}
+          />
         </DialogContent>
       </Dialog>
 

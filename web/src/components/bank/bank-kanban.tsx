@@ -20,6 +20,7 @@ import {
   KanbanProvider,
 } from '@/components/ui/kanban';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { ListeBornee } from '@/lib/api/query-params';
 import { bankBasePath, EMPTY_BANK_FILTERS } from '@/lib/bank-filters';
 import {
   createBankCaseTransition,
@@ -72,6 +73,30 @@ function decider(dossier: BankCase, cible: BankCaseStage): Decision {
   return { genre: 'direct' };
 }
 
+function AvisDePlafonds({
+  dossiersTotal,
+  aOuvrir,
+}: {
+  dossiersTotal: number;
+  aOuvrir: ListeBornee<InscriptionAOuvrir> | undefined;
+}) {
+  return (
+    <>
+      {dossiersTotal > PLAFOND_CARTES ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Les {formatNumber(PLAFOND_CARTES)} derniers dossiers mis à jour sont affichés. La liste
+          montre tout.
+        </p>
+      ) : null}
+      {aOuvrir?.tronque === true ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Dossiers à ouvrir limités aux {formatNumber(aOuvrir.items.length)} plus récents.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function cartesDe(dossiers: BankCase[], inscriptions: InscriptionAOuvrir[]): Carte[] {
   return [
     ...inscriptions.map((inscription) => ({
@@ -113,17 +138,12 @@ export function BankKanban({ projet }: { projet?: Projet | null | undefined } = 
 
   return (
     <div className="flex flex-col gap-3">
-      {dossiers.data.total > PLAFOND_CARTES ? (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          Les {formatNumber(PLAFOND_CARTES)} derniers dossiers mis à jour sont affichés. La liste
-          montre tout.
-        </p>
-      ) : null}
+      <AvisDePlafonds dossiersTotal={dossiers.data.total} aOuvrir={aOuvrir.data} />
       <Tableau
         projet={p}
         dossiers={dossiers.data.items}
         etapes={[...etapes.data].sort((a, b) => a.position - b.position)}
-        inscriptions={aOuvrir.data ?? []}
+        inscriptions={aOuvrir.data?.items ?? []}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import type { components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -28,21 +29,10 @@ interface RvSiteSaisie {
 
 const VIDE: RvSiteSaisie = { siteId: '', pointRencontreId: '', pointRencontreCommentaire: '' };
 
-type Choix = {
-  reglages: {
-    jours: number[];
-    heureDebut: number;
-    heureFin: number;
-    maxVisites?: number;
-    horizonJours: number;
-  };
-  reservations: Array<{ quand: string; nombre: number }>;
-  sites: Array<{ id: string; nom: string; prix: number }>;
-  points: Array<{ id: string; label: string }>;
-};
+type Choix = components['schemas']['QualificationRvSiteOutputBody'];
 
 async function fetchRvSite(): Promise<Choix> {
-  return unwrap(await getApiClient().GET('/api/v1/phase2/rv-site')) as unknown as Choix;
+  return unwrap(await getApiClient().GET('/api/v1/phase2/rv-site'));
 }
 
 function corpsRvSite(saisie: RvSiteSaisie) {

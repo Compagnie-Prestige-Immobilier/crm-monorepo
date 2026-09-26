@@ -3,20 +3,13 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HubView } from '@/components/chues/hub-view';
 import { LienFormulairePublic } from '@/components/chues/lien-formulaire-public';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/')({
   beforeLoad: ({ context }) => {
-    guardRoles([
-      'ADMIN',
-      'COMMERCIAL',
-      'CHARGE_CLIENTELE',
-      'SUPERVISEUR',
-      'DIRECTION',
-      'BANQUE_FINANCE',
-    ])({ context });
     if (context.user.role === 'BANQUE_FINANCE') throw redirect({ href: '/finance' });
+    guardPermission('fiches.tenir')({ context });
     if (['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(context.user.role)) {
       throw redirect({ href: '/teleconseil/tableau-de-bord' });
     }

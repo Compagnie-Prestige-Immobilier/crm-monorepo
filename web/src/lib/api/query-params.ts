@@ -67,6 +67,16 @@ export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   };
 }
 
+export interface ListeBornee<T> {
+  items: T[];
+  tronque: boolean;
+}
+
+/** Le serveur pose `tronque` quand il a coupé la liste à son plafond. */
+export function estTronque(page: object): boolean {
+  return 'tronque' in page && page.tronque === true;
+}
+
 export function flattenPage<T>(payload: {
   items: T[];
   meta: { total: number; page: number; pageSize: number; pageCount: number };
