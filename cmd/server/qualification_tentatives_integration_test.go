@@ -38,6 +38,61 @@ func TestOuvertureRepriseDuBrouillonDUneFicheQuittee(t *testing.T) {
 	}
 }
 
+// Un rappel annulé par erreur se rétablit, sauf si un autre rappel est déjà promis.
+func TestRappelAnnuleSeRetablit(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	rappelPromis(b, fiche, b.userID)
+	var rappel string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "id" FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche).Scan(&rappel); err != nil {
+		t.Fatal(err)
+	}
+	enAttente := `SELECT count(*)::int FROM "scheduled_callbacks" WHERE "id" = $1 AND "status" = 'PENDING'`
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappel+"/cancel", nil)
+	b.attend(statut, http.StatusOK, "annulation", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappel+"/retablir", nil)
+	b.attend(statut, http.StatusOK, "rétablissement", body)
+	if qualificationCompte(b, enAttente, rappel) != 1 {
+		t.Fatal("le rappel rétabli est de nouveau en attente")
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappel+"/cancel", nil)
+	b.attend(statut, http.StatusOK, "seconde annulation", body)
+	rappelPromis(b, fiche, b.userID)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappel+"/retablir", nil)
+	b.attend(statut, http.StatusConflict, "un autre rappel est promis", body)
+	if qualificationCompte(b, enAttente, rappel) != 0 {
+		t.Fatal("un seul rappel en attente par fiche")
+	}
+}
+
+// Le panneau masque « Reporter » et « Annuler » sur un rendez-vous : la liste le lui dit.
+func TestRappelsDisentSiCEstUnRendezVous(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}))
+	b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/callbacks?scope=all&pageSize=100", nil)
+	b.attend(statut, http.StatusOK, "rappels", body)
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		ligne, _ := item.(map[string]any)
+		if ligne["prospectId"] == fiche {
+			if rendezVous, _ := ligne["rendezVous"].(bool); !rendezVous || ligne["reasonCode"] != "RV_CPI" {
+				t.Fatalf("rendez-vous et code attendus : %v", ligne)
+			}
+			return
+		}
+	}
+	t.Fatalf("le rendez-vous figure dans les rappels : %d ligne(s)", len(items))
+}
+
 // Un poste en avance ne fige pas le dernier appel : on garde le dernier réellement passé.
 func TestTentativeHorlogeEnAvanceNeFigePasLaFiche(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
