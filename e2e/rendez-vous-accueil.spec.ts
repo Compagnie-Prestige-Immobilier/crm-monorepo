@@ -98,14 +98,17 @@ test.describe('rendez-vous au comptoir', () => {
     const fenetre = page.getByRole('dialog', { name: 'Enregistrer une visite' });
     await expect(fenetre.getByLabel('PRENOM ET NOMS')).toHaveValue(`Awa ${nom}`);
     await expect(fenetre.getByLabel('TELEPHONES')).toHaveValue(/^\+221 77 /);
-    const [choix] = await lire<{ entreprise: string; objet: string }>(
+    const [choix = { entreprise: '', objet: '' }] = await lire<{
+      entreprise: string;
+      objet: string;
+    }>(
       `SELECT (SELECT "label" FROM "visite_entreprises" WHERE "isActive" ORDER BY "sortOrder" LIMIT 1) AS entreprise,
               (SELECT "label" FROM "visite_objets" WHERE "isActive" ORDER BY "sortOrder" LIMIT 1) AS objet`,
     );
     await fenetre.getByRole('combobox', { name: /ENTREPRISE/u }).click();
-    await page.getByRole('option', { name: choix?.entreprise, exact: true }).click();
+    await page.getByRole('option', { name: choix.entreprise, exact: true }).click();
     await fenetre.getByRole('combobox', { name: /OBJET VISITE/u }).click();
-    await page.getByRole('option', { name: choix?.objet, exact: true }).click();
+    await page.getByRole('option', { name: choix.objet, exact: true }).click();
     await fenetre.getByRole('button', { name: 'Enregistrer la visite' }).click();
     await expect(fenetre).toHaveCount(0);
     const visites = await lire<{ phoneE164: string }>(
