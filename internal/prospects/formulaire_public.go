@@ -69,9 +69,8 @@ var formulaireDurees = []FormulaireTrancheDuree{
 	{Mois: 120, Libelle: "Plus de 10 ans"},
 }
 
-// La méthode d'enrôlement clôt le dossier et nomme l'auteur du closing : un
-// visiteur non vérifié ne peut pas se déclarer converti. La date de rendez-vous
-// n'existe qu'avec elle.
+// Sans méthode d'enrôlement ni date de rendez-vous : un visiteur non vérifié ne se
+// déclare pas converti.
 var FormulaireChampsPublics = []string{
 	prospectChampNom, socle.ProspectChampPrenom, socle.ProspectChampPhone, prospectChampEmail,
 	socle.ProspectChampProfession, prospectChampDureeEtablissement, prospectChampFonctionnaire,
@@ -245,9 +244,8 @@ func (s *service) formulaireRecevoir(ctx context.Context, in *FormulaireDemandeI
 	if err := formulaireVerifierTurnstile(ctx, in.Body.TurnstileToken); err != nil {
 		return nil, err
 	}
-	// Le lien porte le compte qui l'a partagé, et c'est lui qui devient auteur :
-	// `createdById` est obligatoire, et un compte tiré au hasard rendrait la
-	// fiche invisible au téléconseiller qui a démarché.
+	// Le compte qui a partagé le lien devient auteur : sinon la fiche échapperait au
+	// téléconseiller qui a démarché.
 	agentID, err := s.Q.AgentParJeton(ctx, in.Jeton)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "LIEN_INVALIDE", formulaireLienMort)
@@ -271,10 +269,8 @@ func (s *service) formulaireRecevoir(ctx context.Context, in *FormulaireDemandeI
 	return out, nil
 }
 
-// Supervision et compte partageur dans la boîte de réception, la même chose par
-// e-mail, et l'accusé au visiteur s'il a laissé une adresse. L'e-mail de
-// supervision part d'ici et non de l'expédition des notifications : celle-ci ne
-// sert que les téléconseillers, par choix, et l'encadrement doit l'être aussi.
+// L'e-mail de supervision part d'ici : l'expédition des notifications ne sert que
+// les téléconseillers, et l'encadrement doit l'être aussi.
 func (s *service) formulairePrevenir(ctx context.Context, agentID, prospectID string, in *FormulaireDemandeInput, saisie *formulaireSaisie) error {
 	parametres, err := s.prospectLireParametres(ctx)
 	if err != nil {
@@ -445,9 +441,8 @@ func formulaireDateLongue(instant time.Time) string {
 	return strconv.Itoa(instant.Day()) + " " + formulaireMois[instant.Month()-1] + " " + strconv.Itoa(instant.Year())
 }
 
-// Un champ masqué puis envoyé quand même est ignoré : une page en cache ou un
-// robot ne doit pas faire échouer un vrai visiteur. Un champ exigé et absent,
-// lui, arrête l'envoi.
+// Un champ masqué mais envoyé est ignoré (page en cache, robot) ; un champ exigé
+// et absent arrête l'envoi.
 func (s *service) formulaireRetenir(ctx context.Context, in *FormulaireDemandeInput) (formulaireSaisie, error) {
 	corps := &in.Body
 	saisie := formulaireSaisie{champsLibres: map[string]string{}}
@@ -599,9 +594,8 @@ func (s *service) formulaireRapprocherOuCreer(ctx context.Context, agentID strin
 	if err == nil {
 		return id, nil
 	}
-	// Deux onglets arrivent ici ensemble : l'index unique partiel a laissé
-	// passer une seule insertion, et le perdant reprend le rapprochement au lieu
-	// de rendre une erreur au visiteur.
+	// Deux onglets simultanés : l'index unique n'a laissé passer qu'une insertion,
+	// le perdant reprend le rapprochement au lieu d'échouer.
 	concurrent, trouve, relecture := s.formulaireTrouver(ctx, saisie)
 	if relecture != nil || !trouve {
 		return "", err
@@ -609,9 +603,8 @@ func (s *service) formulaireRapprocherOuCreer(ctx context.Context, agentID strin
 	return concurrent.ID, s.formulaireCompleter(ctx, &concurrent, saisie)
 }
 
-// Le TÉLÉPHONE fait foi : il porte l'index unique partiel. L'e-mail ne sert qu'à
-// rattraper le numéro inconnu, et quand les deux désignent deux fiches, celle du
-// numéro l'emporte : fusionner serait destructeur.
+// Le TÉLÉPHONE fait foi (index unique partiel) ; l'e-mail ne rattrape qu'un numéro
+// inconnu, et la fiche du numéro l'emporte : fusionner serait destructeur.
 func (s *service) formulaireTrouver(ctx context.Context, saisie *formulaireSaisie) (db.ProspectParTelephoneRow, bool, error) {
 	parNumero, err := s.Q.ProspectParTelephone(ctx, &saisie.phoneE164)
 	if err == nil {
@@ -767,10 +760,8 @@ func formulaireReponsesAbsentes(deja []byte, saisies map[string]string) []byte {
 	return encode
 }
 
-// La seule barrière anti-robot de la route publique, à côté du champ piège.
-// Sans clé secrète l'envoi est REFUSÉ : une vérification qui se désactive quand
-// sa configuration manque ne protège rien, et personne ne s'apercevrait qu'elle
-// est tombée.
+// Seule barrière anti-robot avec le champ piège : sans clé secrète l'envoi est
+// REFUSÉ, une vérification qui se désactive en silence ne protège rien.
 func formulaireVerifierTurnstile(ctx context.Context, jeton *string) error {
 	config := formulaireTurnstile
 	if config.secret == "" {

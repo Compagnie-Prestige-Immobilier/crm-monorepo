@@ -836,9 +836,8 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 	return t, err
 }
 
-// L'adhésion se consigne par le formulaire : une méthode d'enrôlement sur un
-// appel joint clôt la fiche sur la méthode obtenue, quel que soit le statut
-// choisi, qui reste le motif de la tentative. Un appel non joint la refuse.
+// Une méthode d'enrôlement sur un appel joint clôt la fiche sur la méthode obtenue,
+// quel que soit le statut choisi ; un appel non joint la refuse.
 func qualificationAdhesionParFormulaire(b *QualificationCallAttemptBody, t *qualificationTentative) error {
 	if b.Method == nil && t.regle.exigeMethode {
 		return socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_REQUIRED",
@@ -1016,9 +1015,8 @@ func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Ut
 	return nil
 }
 
-// Tout ce qui refuse la tentative avant la moindre écriture. Le rejeu n'est PAS
-// revérifié : le verdict d'une tentative déjà admise se redemande sans que
-// l'état du prospect puisse le retirer.
+// Refus avant toute écriture. Le rejeu n'est PAS revérifié : le verdict d'une
+// tentative admise ne dépend plus de l'état du prospect.
 func qualificationPreVol(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody) (prospect db.ProspectPourTentativeRow, parcours db.ParcoursDuProspectRow, duplicate bool, err error) {
 	if prospect, err = q.ProspectPourTentative(ctx, b.ProspectID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1162,9 +1160,8 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 	return err
 }
 
-// Un premier appel sort la fiche et son parcours de « Nouveau » : c'est
-// l'appel qui fait progresser le statut, pas une saisie manuelle. Le journal
-// de la fiche le dit.
+// Un premier appel sort la fiche et son parcours de « Nouveau », et le journal de
+// la fiche le dit.
 func qualificationMarquerContacte(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID, journeyID string) error {
 	rangs, err := q.MarquerProspectContacte(ctx, prospectID)
 	if err != nil {
@@ -1231,9 +1228,8 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	return q.CorrigerProspectParTentative(ctx, p)
 }
 
-// EB-23 côté prospect : la contradiction ne lève pas. AUTRE_NUMERO sans numéro
-// retombe sur AUCUN, ce que dit la réponse « non » quand aucun second numéro ne
-// suit. Seul un numéro illisible refuse la tentative.
+// La contradiction ne lève pas : AUTRE_NUMERO sans numéro retombe sur AUCUN.
+// Seul un numéro illisible refuse la tentative.
 func qualificationWhatsappProspect(b *QualificationCallAttemptBody, courant *db.ProspectPourTentativeRow, region string) (statut *string, majNumero bool, numero *string, err error) {
 	if b.WhatsappStatus == nil && b.WhatsappE164 == nil {
 		return nil, false, nil, nil
@@ -1278,7 +1274,6 @@ func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, i *qualifi
 	if quand == nil && !i.regle.accepteCallbackAt {
 		// L'appel a tenu la promesse sans en prendre une nouvelle : le rappel
 		// promis se clôt sur cette tentative au lieu de rester en retard.
-		// (La clôture de parcours, plus bas, referme ce qui s'y ajoute.)
 		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: i.attemptID, ProspectID: i.prospectID})
 	}
 	if quand == nil {

@@ -232,9 +232,8 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 	return &ProspectOutput{Body: *item}, nil
 }
 
-// TOUT ce qui pend à la source suit : un parcours resté sur une fiche supprimée
-// fait disparaître la personne des listes de son projet, et un dossier encaissé
-// pointerait vers une fiche qu'aucun écran ne montre plus.
+// TOUT ce qui pend à la source suit : un parcours ou un dossier resté sur la fiche
+// supprimée disparaîtrait des listes et des écrans.
 func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, sourceID, targetID string, preferSource bool) error {
 	disparue := socle.Problem(http.StatusConflict, "MERGE_PROSPECT_GONE",
 		"L’une des deux fiches vient d’être fusionnée ou supprimée. Rechargez la page.")
@@ -283,9 +282,8 @@ func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, so
 		map[string]any{"targetId": targetID, "preferSource": preferSource})
 }
 
-// `@@unique(prospectId, projet)` interdit le simple déplacement : quand les deux
-// fiches suivent le même projet il faut choisir, et le parcours PORTEUR de la
-// conversion survit toujours.
+// L'unicité (prospectId, projet) interdit le simple déplacement : sur un même projet,
+// le parcours PORTEUR de la conversion survit toujours.
 func prospectDeplacerParcours(ctx context.Context, q *db.Queries, sourceID, targetID string) error {
 	depart, err := q.JourneysAFusionner(ctx, sourceID)
 	if err != nil {
@@ -712,9 +710,8 @@ type ProspectTextesUsine struct {
 	AccuseReceptionCorps string `json:"accuseReceptionCorps"`
 }
 
-// Les deux textes viennent mot pour mot de l'expression de besoins ; les liens,
-// l'adresse et le numéro naissent VIDES : inventer une URL enverrait les
-// prospects nulle part sans que personne ne s'en aperçoive.
+// Textes repris mot pour mot de l'expression de besoins ; liens, adresse et numéro
+// naissent VIDES : une URL inventée enverrait les prospects nulle part.
 var prospectParametresUsine = ProspectParametresChues{
 	MessageWhatsapp: "Bonjour {prenom}, suite à notre échange, voici le lien pour compléter votre demande " +
 		"d’adhésion CPI CHUES : {lien}. Je reste joignable au {telephoneTeleconseiller}. " +
@@ -754,9 +751,8 @@ const (
 	prospectPrefixeParametre = "chues."
 )
 
-// Les deux textes que la supervision et la direction écrivent aussi. Tout le
-// reste engage l'entreprise au-delà d'un message : un lien faux détourne des
-// inscriptions, et la liste des destinataires décide qui lit les demandes.
+// Seuls textes que la supervision et la direction écrivent aussi : liens et
+// destinataires engagent l'entreprise au-delà d'un message.
 var prospectTextesPartages = []string{prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps}
 
 var prospectClesParametres = []string{
