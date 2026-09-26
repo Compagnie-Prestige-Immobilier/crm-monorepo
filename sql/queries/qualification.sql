@@ -386,13 +386,11 @@ CROSS JOIN LATERAL (
 ) deja
 WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
        OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
-  AND (CAST(sqlc.narg('depuis') AS timestamp) IS NULL
-       OR o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp))
-  AND (CAST(sqlc.narg('jusqua') AS timestamp) IS NULL
-       OR o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp))
+  AND o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
+  AND o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
 GROUP BY 1, 2, 3
-ORDER BY 3 DESC, 2 ASC
-LIMIT 3000;
+ORDER BY 3 DESC, 2 ASC, 1
+LIMIT 3001;
 
 -- name: ListerSuggestions :many
 SELECT s."id", s."sourceRepresentantId", s."suggestedName", s."suggestedPhoneE164",

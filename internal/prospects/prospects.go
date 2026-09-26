@@ -655,7 +655,8 @@ type ProspectCallAttempt struct {
 
 type ProspectCallAttemptsOutput struct {
 	Body struct {
-		Items []ProspectCallAttempt `json:"items"`
+		Items   []ProspectCallAttempt `json:"items"`
+		Tronque bool                  `json:"tronque" doc:"Plus de 500 lignes : seules les 500 plus récentes sont rendues."`
 	}
 }
 
@@ -677,6 +678,7 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 		return nil, err
 	}
 	out := &ProspectCallAttemptsOutput{}
+	lignes, out.Body.Tronque = prospectHistoriqueBorne(lignes)
 	out.Body.Items = make([]ProspectCallAttempt, 0, len(lignes))
 	for i := range lignes {
 		l := &lignes[i]

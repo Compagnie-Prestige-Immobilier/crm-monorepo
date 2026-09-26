@@ -804,6 +804,22 @@ func TestFusionCroiseeSansInterblocage(t *testing.T) {
 	}
 }
 
+// Au-delà de 500 lignes, le journal de la fiche rend les plus récentes et dit qu'il est tronqué.
+func TestProspectJournalTronqueLeDit(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	id := creerProspect(b, "Diallo", numeroDeCourse(7))["id"].(string)
+	qualificationExec(b, `INSERT INTO "audit_logs" ("id","userId","action","entity","entityId","after")
+		SELECT gen_random_uuid()::text, $1, 'prospect.update', 'prospect', $2, '{}'::jsonb FROM generate_series(1, 501)`, b.userID, id)
+
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+id+"/journal", nil, nil)
+	b.attend(statut, http.StatusOK, "journal de la fiche", body)
+	if items, _ := body["items"].([]any); len(items) != 500 || body["tronque"] != true {
+		t.Fatalf("journal : %d lignes, tronqué %v ; attendu 500 et true", len(items), body["tronque"])
+	}
+}
+
 // Une fiche ne naît pas CONVERTI sans offre ni conversion signée.
 func TestProspectCreationRefuseConverti(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
