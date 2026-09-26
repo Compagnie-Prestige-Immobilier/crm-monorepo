@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/db"
 	"cpi-go/internal/notifications"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
@@ -772,6 +773,29 @@ func TestCourrielOperationnelUnSeulToAvecCopie(t *testing.T) {
 	if len(appel.To) != 2 || len(appel.Cc) != 1 || len(appel.MessageVersions) != 0 {
 		t.Fatalf("to %v, cc %v, %d version(s) : un `to` à deux adresses et aucune version attendus", appel.To, appel.Cc, len(appel.MessageVersions))
 	}
+}
+
+// Un courriel créé la veille au soir et définitivement refusé ce matin figure dans l'alerte d'incident.
+func TestCourrielEchecDuSoirCiteParLAlerte(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	cause := "refus-" + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte",
+		"statut","erreur","tentatives","createdAt","updatedAt")
+		VALUES ($1,'DOSSIER_REJETE','Refus','{banque@test.cpi}','{}','inscription',$1,'<p>x</p>','x','ECHEC',$2,3,now() - interval '30 hours',now())`,
+		courrielID, cause)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	incidents, err := db.New(b.pool).IncidentsDesDernieresHeures(b.ctx, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range incidents {
+		if incidents[i].Erreur != nil && *incidents[i].Erreur == cause {
+			return
+		}
+	}
+	t.Fatalf("le courriel refusé dans les dernières 24 h doit figurer dans l'alerte : %d incident(s)", len(incidents))
 }
 
 // Un « Renvoyer » pendant que le rejeu tient la ligne ne l'expédie pas une seconde fois.
