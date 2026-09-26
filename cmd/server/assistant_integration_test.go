@@ -175,9 +175,8 @@ func TestAssistantPorteeParTeleconseiller(t *testing.T) {
 	}
 }
 
-// Répond au format Groq : la première question (choix de l'outil) reçoit un
-// outil vide, ce qui fait tomber un ADMIN sur la requête SQL libre ; la
-// seconde (schéma en main) reçoit la requête interdite fournie par le test.
+// Format Groq : un outil vide envoie un ADMIN vers la requête SQL libre, puis
+// la question qui porte le schéma reçoit la requête fournie par le test.
 func fauxModeleSQL(t *testing.T, sql string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -215,13 +214,13 @@ func fauxModeleSQL(t *testing.T, sql string) *httptest.Server {
 	}))
 }
 
-// La liste noire de l'assistant laissait passer `set_config`, qui annule le
-// délai posé sur la transaction, et rien ne l'empêchait de lire les hachages
-// de mots de passe avant que la colonne ne soit explicitement fermée.
+// `select *` et la ligne entière passent le filtre de texte : seul le rôle de lecture les arrête.
 func TestAssistantSQLNeLitPasLesHachages(t *testing.T) {
 	essais := []struct{ nom, sql string }{
 		{"hachage", `select "passwordHash" from users`},
 		{"delai", `select set_config('statement_timeout','0',true)`},
+		{"etoile", `select * from users`},
+		{"ligne", `select u from users u`},
 	}
 	for _, essai := range essais {
 		t.Run(essai.nom, func(t *testing.T) {
