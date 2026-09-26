@@ -45,7 +45,9 @@ function Panneau() {
   useEffect(() => {
     if (!peutTenirUneFiche(user)) return;
     const battre = (): void => {
-      void fetch('/api/v1/presence/beat', { method: 'POST', credentials: 'same-origin' });
+      fetch('/api/v1/presence/beat', { method: 'POST', credentials: 'same-origin' }).catch(
+        () => undefined,
+      );
     };
     battre();
     const id = window.setInterval(battre, PRESENCE_INTERVALLE_MS);
