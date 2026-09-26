@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { venteDuClasseur } from '@/components/ventes/ventes-tableaux';
 import {
   addVenteVersement,
   formatFcfa,
@@ -51,6 +52,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
   const verse = totalVerse(vente);
   const reste = Math.max(0, vente.prixTotal - verse);
   const parEcheance = montantEcheance(vente, reste);
+  const classeur = venteDuClasseur(vente);
   const ajout = useMutation({
     mutationFn: () => addVenteVersement(vente.id, { date, montant }),
     onSuccess: () => {
@@ -96,7 +98,14 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
               <CheckCircle2Icon className="size-5" aria-hidden="true" />
               Cette vente est soldée.
             </p>
-          ) : (
+          ) : null}
+          {!vente.soldee && classeur ? (
+            <p className="rounded-md bg-muted p-3">
+              Vente du classeur : saisissez ses versements dans l’onglet « Échéances », puis
+              déposez-le à nouveau.
+            </p>
+          ) : null}
+          {vente.soldee || classeur ? null : (
             <form
               className="flex flex-col gap-3"
               onSubmit={(event) => {
@@ -174,6 +183,7 @@ function Etiquettes({ vente }: { vente: Vente }) {
       <Badge variant={vente.soldee ? 'success' : 'warning'}>
         {vente.soldee ? 'Soldée' : 'À solder'}
       </Badge>
+      {venteDuClasseur(vente) ? <Badge variant="outline">Classeur</Badge> : null}
     </span>
   );
 }
