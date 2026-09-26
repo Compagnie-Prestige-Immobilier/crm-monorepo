@@ -300,6 +300,12 @@ const PageVentes = memo(function PageVentes({
           <PlusIcon aria-hidden="true" /> Nouvelle vente
         </Button>
       </div>
+      {data.tronque ? (
+        <p className="rounded-md bg-warning-surface p-3 text-warning">
+          Seules les ventes les plus récentes sont affichées : les plus anciennes manquent à la
+          recherche et aux totaux.
+        </p>
+      ) : null}
       {visibles.length === 0 ? (
         <p className="p-6 text-center text-muted-foreground">
           Aucun client ne correspond à cette recherche.

@@ -18,6 +18,7 @@ export type CanalVenteCreationInput = components['schemas']['CanalVenteInputBody
 export interface VentesData {
   classeur: ClasseurVentes | null;
   ventes: Vente[];
+  tronque: boolean;
   parTeleconseiller: VenteParTeleconseiller[];
 }
 
