@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/assistant"
 	"cpi-go/internal/campagnes"
 	"cpi-go/internal/referentiels"
 	"cpi-go/internal/shared/database"
@@ -42,6 +43,8 @@ const (
 	ecranVisites     = "visites"
 	ecranChues       = "chues"
 	ecranGrandPublic = "grand-public"
+	ecranPilotage    = "pilotage"
+	sourceCalcul     = "calcul"
 
 	marqueTuile            = "tuile"
 	marqueTableau          = "tableau"
@@ -50,6 +53,9 @@ const (
 	taillePleine           = "pleine"
 	presetEssentiel        = "essentiel"
 	sourceFichesOuvertes   = "fiches-ouvertes"
+	sourceTauxExploitation = "taux-d-exploitation"
+	marqueCourbe           = "courbe"
+	champWidgets           = "body.widgets"
 )
 
 var Garde = map[string]socle.Permission{
@@ -1006,6 +1012,7 @@ var (
 		ecranVisites:     sourcesVisites,
 		ecranChues:       slices.Concat(sourcesQualification, sourcesProspects, sourcesEnrolement),
 		ecranGrandPublic: slices.Concat(sourcesProspects, sourcesEnrolement),
+		ecranPilotage:    slices.Concat(sourcesQualification, sourcesProspects, sourcesEnrolement),
 	}
 
 	marquesCategorie   = strings.Split("barres-horizontales,barres-verticales,camembert,anneau,tableau", ",")
@@ -1025,11 +1032,20 @@ var (
 	regleChiffre    = regleMarque{marqueTuile, marquesChiffre}
 	regleClassement = regleMarque{"barres-horizontales", marquesCategorie}
 	regleMatrice    = regleMarque{"carte-de-chaleur", marquesMatrice}
-	regleTemporelle = regleMarque{"courbe", marquesTemporelles}
+	regleTemporelle = regleMarque{marqueCourbe, marquesTemporelles}
 	regleAnneau     = regleMarque{"anneau", marquesComposition}
 	regleTableau    = regleMarque{marqueTableau, marquesTableau}
 	regleCamembert  = regleMarque{marqueCamembert, marquesComposition}
 )
+
+// Les marques d'un calcul suivent la forme de ses données, comme la table
+// COMPATIBLES du panneau.
+var reglesParForme = map[string]regleMarque{
+	assistant.FormeScalaire:    regleChiffre,
+	assistant.FormeClassement:  regleClassement,
+	assistant.FormeSerie:       {marqueCourbe, strings.Split("courbe,aire,escalier,barres-verticales,mixte,tableau", ",")},
+	assistant.FormeComposition: {"barres-empilees", marquesComposition},
+}
 
 // Marque par défaut de chaque source et marques compatibles avec sa forme de
 // données ; une marque devenue incompatible retombe sur le défaut plutôt que
@@ -1040,7 +1056,7 @@ var reglesParSource = map[string]regleMarque{
 	"par-entreprise":      regleClassement, "par-objet": regleClassement,
 	"par-direction": regleClassement, "par-destinataire": regleClassement,
 	"par-agent": regleClassement, "par-jour": regleTemporelle,
-	"par-mois":               {"courbe", append(slices.Clone(marquesTemporelles), "barres-groupees")},
+	"par-mois":               {marqueCourbe, append(slices.Clone(marquesTemporelles), "barres-groupees")},
 	"par-heure":              {marqueBarresVerticales, strings.Split("barres-verticales,courbe,aire,radar,aire-polaire", ",")},
 	"par-jour-semaine":       {marqueBarresVerticales, strings.Split("barres-verticales,radar,aire-polaire,camembert", ",")},
 	"par-heure-jour-semaine": regleMatrice, "par-entreprise-objet": regleMatrice,
@@ -1055,7 +1071,7 @@ var reglesParSource = map[string]regleMarque{
 	"joints-non-joints":                 {marqueBarresVerticales, marquesCategorie},
 	"statuts-par-famille":               {"barres-empilees", marquesComposition},
 	"joignabilite-par-creneau":          regleMatrice,
-	"taux-d-exploitation":               regleCamembert,
+	sourceTauxExploitation:              regleCamembert,
 	"representants-par-departement":     regleClassement, "representants-par-ief": regleClassement,
 	"representants-jamais-appeles": regleChiffre, "representants-injoignables": regleChiffre,
 	"taux-de-joignabilite": regleChiffre, "prospects-notes": regleChiffre,
@@ -1093,6 +1109,14 @@ func widgetsDe(liste ...string) []DispositionWidget {
 	return widgets
 }
 
+func widgetCalcul(titre, outil, axe, mesure, periode, taille string) DispositionWidget {
+	c := &assistant.Calcul{Outil: outil, Axe: axe, Periode: periode}
+	if mesure != "" {
+		c.Mesures = []string{mesure}
+	}
+	return DispositionWidget{Source: sourceCalcul, Calcul: c, Titre: titre, Taille: taille}
+}
+
 var dispositionsUsine = map[string][]DispositionWidget{
 	ecranVisites: widgetsDe("total-visites", "moyenne-journaliere", "jour-le-plus-charge", "par-jour", "par-entreprise", "par-objet", "par-direction", "par-destinataire", "par-mois", "par-heure", "qualite-de-saisie"),
 	// Les prospects d'abord : c'est le travail de chaque jour. Les représentants
@@ -1102,7 +1126,7 @@ var dispositionsUsine = map[string][]DispositionWidget{
 		widgetsDe("taux-de-joignabilite", "adhesions", "taux-de-contact", "taux-de-qualification", "taux-de-reiteration"),
 		[]DispositionWidget{
 			{Source: "appels-par-jour", Taille: taillePleine},
-			{Source: "taux-d-exploitation", Marque: marqueCamembert, Taille: taillePleine},
+			{Source: sourceTauxExploitation, Marque: marqueCamembert, Taille: taillePleine},
 			{Source: "par-teleconseiller", Marque: marqueTableau},
 			{Source: sourceFichesOuvertes, Taille: taillePleine},
 		},
@@ -1118,12 +1142,32 @@ var dispositionsUsine = map[string][]DispositionWidget{
 		[]DispositionWidget{{Source: sourceFichesOuvertes, Taille: taillePleine}},
 		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "par-banque", "enrolement-par-jour", "enrolement-par-etape"),
 	),
+	// Ce qu'un PMO lit d'abord : l'argent et les objectifs, puis la chaîne de
+	// conversion, Banque & Finance, l'exploitation et les risques.
+	ecranPilotage: {
+		widgetCalcul("Ventes du mois", "ventes", "", "Montant", "ce-mois", ""),
+		widgetCalcul("Encaissé ce mois", "ventes", "", "Encaissé", "ce-mois", ""),
+		widgetCalcul("Objectifs : avancement", "objectifs", "objectif", "Avancement", "ecran", taillePleine),
+		{Source: "de-l-appel-a-l-encaissement", Titre: "Entonnoir du portefeuille", Taille: taillePleine},
+		widgetCalcul("Reliquat des ventes de l'année", "ventes", "", "Reliquat", "cette-annee", ""),
+		widgetCalcul("Échéances en retard", "echeances_en_retard", "", "Montant dû", "ecran", ""),
+		widgetCalcul("Dossiers Banque & Finance par étape", "dossiers_bancaires", "etape", "Dossiers", "90-derniers-jours", ""),
+		{Source: "delais-medians"},
+		widgetCalcul("Dossiers bloqués plus de 7 jours", "dossiers_bancaires", "", "Bloqués plus de 7 jours", "90-derniers-jours", ""),
+		{Source: "taux-de-joignabilite"},
+		widgetCalcul("Rappels en retard", "rappels", "", "En retard", "90-derniers-jours", ""),
+		{Source: sourceTauxExploitation, Marque: marqueCamembert},
+		widgetCalcul("Rendez-vous honorés", "rendez_vous", "", "Taux honorés", "ce-mois", ""),
+		widgetCalcul("Visites du mois", "visites", "jour", "", "ce-mois", ""),
+		widgetCalcul("Risques de la semaine", "risques", "risque", "Nombre", "7-derniers-jours", ""),
+	},
 }
 
 // Ce que la direction voit en plus : les montants.
 var dispositionsUsineDirection = map[string][]DispositionWidget{
-	ecranVisites: {},
-	ecranChues:   widgetsDe("encaisse", "duree-moyenne-de-communication", "duree-moyenne-sur-la-fiche", "de-l-appel-a-l-encaissement"),
+	ecranVisites:  {},
+	ecranPilotage: {},
+	ecranChues:    widgetsDe("encaisse", "duree-moyenne-de-communication", "duree-moyenne-sur-la-fiche", "de-l-appel-a-l-encaissement"),
 	ecranGrandPublic: slices.Concat(
 		[]DispositionWidget{{Source: "encaisse", Taille: "demi"}},
 		widgetsDe("duree-moyenne-de-communication", "duree-moyenne-sur-la-fiche", "de-l-appel-a-l-encaissement", "methodes-d-adhesion"),
@@ -1139,7 +1183,9 @@ type DispositionPresentation struct {
 }
 
 type DispositionWidget struct {
-	Source       string                   `json:"source" maxLength:"60"`
+	Source       string                   `json:"source" maxLength:"60" doc:"« calcul » pour un calcul de l'assistant."`
+	Calcul       *assistant.Calcul        `json:"calcul,omitempty" doc:"Seulement quand la source vaut « calcul »."`
+	Titre        string                   `json:"titre,omitempty" maxLength:"80"`
 	Marque       string                   `json:"marque,omitempty" enum:"barres-verticales,barres-horizontales,barres-empilees,barres-100,barres-groupees,courbe,aire,escalier,anneau,camembert,aire-polaire,radar,nuage,bulles,mixte,jauge,carte-de-chaleur,tableau,tuile,tuile-courbe"`
 	Taille       string                   `json:"taille,omitempty" enum:"demi,pleine"`
 	Presentation *DispositionPresentation `json:"presentation,omitempty"`
@@ -1161,11 +1207,11 @@ type DispositionOutput struct {
 }
 
 type DispositionInput struct {
-	Ecran string `path:"ecran" enum:"visites,chues,grand-public"`
+	Ecran string `path:"ecran" enum:"visites,chues,grand-public,pilotage"`
 }
 
 type EcrireDispositionInput struct {
-	Ecran string `path:"ecran" enum:"visites,chues,grand-public"`
+	Ecran string `path:"ecran" enum:"visites,chues,grand-public,pilotage"`
 	Body  struct {
 		Preset  string              `json:"preset,omitempty" enum:"essentiel,affluence,organisation,complet"`
 		Widgets []DispositionWidget `json:"widgets" maxItems:"40"`
@@ -1176,18 +1222,33 @@ func CleDispositionDefaut(ecran string) string {
 	return "tableau-de-bord." + ecran + ".disposition-par-defaut"
 }
 
+// La clé d'un calcul est son paramétrage : deux calculs du même outil cohabitent.
+func identiteWidget(ecran string, w *DispositionWidget) (cle string, regle regleMarque, admis bool) {
+	if w.Source != sourceCalcul {
+		w.Calcul = nil
+		return w.Source, reglesParSource[w.Source], slices.Contains(sourcesParEcran[ecran], w.Source)
+	}
+	if w.Calcul == nil {
+		return "", regle, false
+	}
+	c := *w.Calcul
+	forme, admis := assistant.NettoyerCalcul(&c)
+	w.Calcul = &c
+	return sourceCalcul + ":" + assistant.CleCalcul(&c), reglesParForme[forme], admis
+}
+
 // Retire les sources étrangères à l'écran, déduplique, plafonne, et remet une
 // marque cohérente avec la forme des données.
 func nettoyerWidgets(ecran string, widgets []DispositionWidget) []DispositionWidget {
-	admises := sourcesParEcran[ecran]
 	vues := map[string]bool{}
 	propres := make([]DispositionWidget, 0, len(widgets))
 	for _, w := range widgets {
-		if !slices.Contains(admises, w.Source) || vues[w.Source] {
+		cle, regle, admis := identiteWidget(ecran, &w)
+		if !admis || vues[cle] {
 			continue
 		}
-		vues[w.Source] = true
-		regle := reglesParSource[w.Source]
+		vues[cle] = true
+		w.Titre = strings.TrimSpace(w.Titre)
 		if w.Marque == "" || !slices.Contains(regle.compatibles, w.Marque) {
 			w.Marque = regle.defaut
 		}
@@ -1245,10 +1306,7 @@ func reponseDisposition(d Disposition, source string, updatedAt *time.Time) *Dis
 func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*DispositionOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	rendre := func(d Disposition, source string, updatedAt *time.Time) *DispositionOutput {
-		if !u.Peut(socle.PermissionEnrolementAdministrer) {
-			d = sansEnrolement(d)
-		}
-		return reponseDisposition(d, source, updatedAt)
+		return reponseDisposition(visiblePour(&u, d), source, updatedAt)
 	}
 	sienne, err := s.Q.GetDashboardLayout(ctx, db.GetDashboardLayoutParams{UserId: u.ID, Ecran: in.Ecran})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -1272,27 +1330,35 @@ func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*D
 	return rendre(dispositionUsine(in.Ecran, montants), "usine", nil), nil
 }
 
-// L'enrôlement ne sort pas de la cellule pilotage : son API refuse les autres
-// rôles, et la carte resterait vide, sans moyen de la retirer de l'écran.
-func sansEnrolement(d Disposition) Disposition {
+// L'enrôlement ne sort pas de la cellule pilotage et un calcul ne se montre
+// qu'à qui a l'outil : sinon la carte resterait vide, sans moyen de la retirer.
+func visiblePour(u *socle.Utilisateur, d Disposition) Disposition {
+	enrolement := u.Peut(socle.PermissionEnrolementAdministrer)
 	d.Widgets = slices.DeleteFunc(slices.Clone(d.Widgets), func(w DispositionWidget) bool {
-		return slices.Contains(sourcesEnrolement, w.Source)
+		if w.Calcul != nil {
+			return !assistant.CalculPermis(u, w.Calcul)
+		}
+		return !enrolement && slices.Contains(sourcesEnrolement, w.Source)
 	})
 	return d
 }
 
 func dispositionAEcrire(ecran, preset string, widgets []DispositionWidget) (Disposition, []byte, error) {
 	vues := map[string]bool{}
-	admises := sourcesParEcran[ecran]
 	for _, w := range widgets {
-		if vues[w.Source] {
+		cle, _, admis := identiteWidget(ecran, &w)
+		if vues[cle] {
 			return Disposition{}, nil, huma.Error422UnprocessableEntity("source en double",
-				&huma.ErrorDetail{Location: "body.widgets", Message: "Chaque source ne peut apparaître qu’une seule fois dans la disposition.", Value: w.Source})
+				&huma.ErrorDetail{Location: champWidgets, Message: "Chaque source ou calcul ne peut apparaître qu’une seule fois dans la disposition.", Value: w.Source})
 		}
-		vues[w.Source] = true
-		if !slices.Contains(admises, w.Source) {
+		vues[cle] = true
+		if !admis && w.Source == sourceCalcul {
+			return Disposition{}, nil, huma.Error422UnprocessableEntity("calcul inconnu",
+				&huma.ErrorDetail{Location: champWidgets, Message: "Ce calcul n’existe pas : outil, axe, mesure ou période inconnus.", Value: w.Calcul})
+		}
+		if !admis {
 			return Disposition{}, nil, huma.Error422UnprocessableEntity("source inconnue de cet écran",
-				&huma.ErrorDetail{Location: "body.widgets", Message: "Cette source n’appartient pas à l’écran " + ecran + ".", Value: w.Source})
+				&huma.ErrorDetail{Location: champWidgets, Message: "Cette source n’appartient pas à l’écran " + ecran + ".", Value: w.Source})
 		}
 	}
 	if preset == "" {
@@ -1313,7 +1379,7 @@ func (s *service) ecrireDisposition(ctx context.Context, in *EcrireDispositionIn
 	if err != nil {
 		return nil, err
 	}
-	return reponseDisposition(d, "utilisateur", &ecrite), nil
+	return reponseDisposition(visiblePour(&u, d), "utilisateur", &ecrite), nil
 }
 
 func (s *service) effacerDisposition(ctx context.Context, in *DispositionInput) (*OkAdminOutput, error) {
