@@ -69,10 +69,10 @@ function texteACopier(ticket: TicketKairo, libelleStatut: string): string {
   const lignes: string[] = [`Ticket n° ${String(ticket.id)} (${libelleStatut}) · ${ticket.projet}`];
   if (ticket.jevConfiance && ticket.jevConfiance > 0) {
     lignes.push(
-      `Classification JEV : ${ticket.jevCategorie || 'CODE_DEFECT'} (${String(Math.round(ticket.jevConfiance * 100))}%)`,
+      `Tri automatique : ${ticket.jevCategorie || 'CODE_DEFECT'} (${String(Math.round(ticket.jevConfiance * 100))}%)`,
     );
   }
-  if (ticket.prUrl) lignes.push(`PR : ${ticket.prUrl}`);
+  if (ticket.prUrl) lignes.push(`Correction proposée : ${ticket.prUrl}`);
   if (ticket.resume) lignes.push(`Résumé : ${ticket.resume}`);
   if (ticket.cause) lignes.push(`Origine : ${ticket.cause}`);
   if (ticket.notes) lignes.push(`Points d’attention : ${ticket.notes}`);
@@ -86,7 +86,7 @@ function BadgeJEV(props: { categorie?: string | undefined; confiance?: number | 
   const lib = props.categorie ? `· ${props.categorie}` : '';
   return (
     <Badge variant="outline" className="font-mono text-xs">
-      JEV {lib} ({String(pct)}%)
+      Tri automatique {lib} ({String(pct)} %)
     </Badge>
   );
 }
@@ -159,7 +159,7 @@ function PiedTicket(props: {
             className={buttonVariants({ variant: 'default', size: 'sm' })}
           >
             <GitPullRequestIcon className="size-3.5" />
-            Ouvrir la PR
+            Ouvrir la correction
           </a>
           <Button
             variant="outline"

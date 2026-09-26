@@ -1,7 +1,7 @@
 /** Les explications partagées par l'écran d'une plateforme et par la synthèse. */
 
 export const AIDE_RAPPROCHEMENT =
-  'Cette personne était-elle déjà connue du CRM ? À chaque tirage, le connecteur cherche un prospect du même projet portant le même téléphone, puis à défaut le même e-mail. S’il en trouve un, l’inscription est rapprochée et son détail ouvre la fiche. Sinon elle reste non rapprochée. Rien n’est écrit sur le prospect.\n\nCe que ça mesure : ces enrôlements viennent-ils de notre prospection, ou les gens arrivent-ils d’eux-mêmes sur la plateforme ?';
+  'Cette personne était-elle déjà connue du CRM ? À chaque lecture de la plateforme, le connecteur cherche un prospect du même projet portant le même téléphone, puis à défaut le même e-mail. S’il en trouve un, l’inscription est rapprochée et son détail ouvre la fiche. Sinon elle reste non rapprochée. Rien n’est écrit sur le prospect.\n\nCe que ça mesure : ces enrôlements viennent-ils de notre prospection, ou les gens arrivent-ils d’eux-mêmes sur la plateforme ?';
 
 export const AIDE_TAUX_RAPPROCHEMENT =
   'Part des inscriptions déjà connues du CRM.\n\nUn taux élevé veut dire que le travail des teleconseillers se retrouve sur les plateformes. Un taux bas veut dire soit que ces inscriptions sont spontanées, soit que le rapprochement échoue, par exemple parce que le téléphone n’est pas saisi de la même façon des deux côtés.';
