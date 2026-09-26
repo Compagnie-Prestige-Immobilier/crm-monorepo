@@ -20,9 +20,8 @@ const (
 	qualificationCleStatut             = "statut"
 )
 
-// Une fiche classée que le téléconseiller requalifie revient en cours. Sans
-// cela le statut restait celui du premier classement, et l'écran affichait
-// « Refus » sur une fiche dont le dernier appel disait autre chose.
+// Une fiche classée que le téléconseiller requalifie revient en cours : son statut
+// suit le dernier appel, pas le premier classement.
 func qualificationRouvrirFiche(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID string, parcours *db.ParcoursDuProspectRow) (QualificationProspectPhase2StateDTO, error) {
 	if parcours.Phase2Status == db.Phase2StatusPENDING {
 		return qualificationEtatRelu(ctx, q, prospectID)
@@ -68,9 +67,8 @@ type QualificationRequalifierProspectOutput struct {
 	Body QualificationProspectPhase2StateDTO
 }
 
-// L'encadrement pose le motif sans appel : la fiche suit l'effet du motif
-// comme après un appel, mais aucune tentative n'est comptée à personne et le
-// rappel promis revient au dernier appelant.
+// Motif posé sans appel par l'encadrement : effet d'un appel, sans tentative
+// comptée ; le rappel promis revient au dernier appelant.
 func (s *service) qualificationRequalifierProspect(ctx context.Context, in *QualificationRequalifierProspectInput) (*QualificationRequalifierProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	motif, err := s.qualificationMotifDeLIssue(ctx, in.Body.ReasonCode)

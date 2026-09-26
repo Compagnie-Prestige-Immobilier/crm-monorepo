@@ -92,10 +92,8 @@ SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL
 FOR NO KEY UPDATE;
 
--- Un rappel promis se tient, même quand la campagne a rendu la fiche, et le
--- dernier à avoir appelé requalifie depuis « Mes contacts ». Une fiche
--- attribuée à un autre échappe à son créateur et à l'encadrement : deux
--- personnes appelleraient la même.
+-- Un rappel promis se tient même campagne rendue ; une fiche attribuée à un autre
+-- échappe à son créateur et à l'encadrement, sinon deux personnes l'appelleraient.
 -- name: ProspectAttribue :one
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
@@ -498,9 +496,8 @@ LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 WHERE p."id" = $1;
 
--- Une fiche que personne ne suit encore (titulaire = compte d'import) va au
--- premier qui l'appelle ; entre téléconseillers, elle change de main seulement
--- quand le second joint la personne.
+-- Une fiche du compte d'import va au premier qui l'appelle ; entre téléconseillers,
+-- elle change de main seulement quand le second joint la personne.
 -- name: PrendreLaFiche :execrows
 UPDATE "prospects" p SET "createdById" = @agent, "rev" = p."rev" + 1
 WHERE p."id" = @id AND p."createdById" <> @agent AND p."statut" NOT IN ('CONVERTI', 'VENDU')

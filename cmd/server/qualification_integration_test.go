@@ -758,10 +758,7 @@ func TestAnnuairePhase2PagineDansLaPorteeDuTeleconseiller(t *testing.T) {
 	}
 }
 
-// La codification des leads (docs/decisions/codification-leads.md) : la précision
-// consigne l'appel sans commentaire, le rendez-vous devient un rappel promis, la
-// méthode du formulaire vaut adhésion quel que soit le statut, et « À supprimer »
-// sort la fiche du reste à appeler sans la détruire.
+// Parcours de docs/decisions/codification-leads.md.
 func TestCodificationLeads(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	revenu := uuid.NewString()
@@ -1011,9 +1008,8 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 	}
 }
 
-// « Tout » régroupe les onglets Intéressés, Hésitants et Rendez-vous : un
-// injoignable n'y figure pas, et le rendez-vous téléphonique reste écarté
-// comme dans l'onglet Rendez-vous seul.
+// « Tout » regroupe Intéressés, Hésitants et Rendez-vous, sans injoignable ni
+// rendez-vous téléphonique.
 func TestQualificationToutRegroupeIntereseHesitantEtRendezVous(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	interesse := qualificationProspect(b)

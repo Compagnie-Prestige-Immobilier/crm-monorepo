@@ -795,10 +795,8 @@ type ProspectConflictExisting struct {
 	CreatedAt             string  `json:"createdAt,omitempty"`
 }
 
-// 409 nommant la fiche existante ET son propriétaire : sans le nom, la même
-// saisie est rejouée indéfiniment. La lecture est GLOBALE parce que l'index
-// unique partiel l'est ; l'identité civile d'une fiche d'autrui ne sort pas,
-// sinon ce 409 devient un annuaire interrogeable numéro par numéro.
+// Lecture GLOBALE comme l'index unique : le 409 nomme la fiche et son propriétaire,
+// jamais l'identité civile d'une fiche d'autrui (sinon, un annuaire par numéro).
 func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisateur, phoneE164 string, saufID *string) error {
 	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: &phoneE164, SaufID: saufID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -1129,8 +1127,7 @@ var prospectTransitions = map[db.ProspectStatut][]db.ProspectStatut{
 }
 
 // `CONVERTI` porte une conversion signée et datée : on n'y entre que par la
-// confirmation dédiée, sinon un simple PATCH y menait depuis n'importe quel
-// état, sans consentement et sans auteur.
+// confirmation dédiée.
 func prospectStatutModifiable(u *socle.Utilisateur, courant db.ProspectStatut, demande *string) error {
 	if demande == nil || *demande == string(courant) || u.Peut(socle.PermissionFichesForcerTransition) {
 		return nil
@@ -1254,8 +1251,7 @@ type prospectWhatsappSaisi struct {
 	numeroFourni bool
 }
 
-// NE LÈVE JAMAIS : des fiches portent un numéro WhatsApp saisi bien avant que le
-// statut n'existe. Le statut se déduit alors du numéro, et AUTRE_NUMERO sans
+// NE LÈVE JAMAIS : sans statut, il se déduit du numéro saisi ; AUTRE_NUMERO sans
 // numéro retombe sur AUCUN pour tenir le CHECK de la table.
 func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant, phoneE164 *string) (statut *db.WhatsappStatus, numero *string) {
 	if saisi.statut == nil && !saisi.numeroFourni {
@@ -1339,9 +1335,8 @@ type ProspectFusionInput struct {
 	}
 }
 
-// La source est supprimée dans la MÊME transaction que la mise à jour de la
-// cible : entre les deux, les deux fiches partageraient le même numéro vivant et
-// l'index unique partiel refuserait l'écriture.
+// Source supprimée dans la MÊME transaction que la cible : sinon deux fiches
+// vivantes partageraient le numéro et l'index unique refuserait l'écriture.
 func (s *service) prospectFusionner(ctx context.Context, in *ProspectFusionInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	corps := in.Body

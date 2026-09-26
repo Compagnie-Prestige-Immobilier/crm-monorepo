@@ -95,9 +95,8 @@ func nettoyerProspects(b *banc, userIDs ...string) {
 	})
 }
 
-// Le formulaire public n'exige que ce que l'administrateur a réglé : le
-// catalogue d'usine rend obligatoires la banque, le syndicat et le revenu, que
-// ce dépôt de test ne peuple pas. Le réglage précédent est remis en place.
+// Le catalogue d'usine exige banque, syndicat et revenu, que ce banc ne peuple pas ;
+// le réglage précédent revient à la fin du test.
 func reglagesPublicsSansObligation(b *banc) {
 	b.t.Helper()
 	cle := "conversion.champs.CHUES"
