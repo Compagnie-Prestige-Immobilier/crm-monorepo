@@ -307,6 +307,11 @@ docker exec -i <postgres> psql -U crm -d postgres \
 
 `crm_avant_restauration` se supprime une fois le service vérifié.
 
+Une fois le rôle `crm_app` en place (section suivante), créer la base par
+`CREATE DATABASE crm_restauree OWNER crm_app` et ajouter `--role=crm_app` à
+`pg_restore` : restaurées par `crm` sans droits, les tables seraient
+inaccessibles au service.
+
 Exercice du 26 septembre 2026, sur la base locale : dump `-Fc` gzippé de 1,4 Mo,
 restauration dans une base neuve avec les options ci-dessus, mêmes 77 tables,
 même dernière migration et même nombre de fiches, rejeu des droits de l'assistant
@@ -314,20 +319,86 @@ sans erreur. À refaire sur un dump de production dès que le canal S3 est actif
 
 ## Rôle Postgres sans superutilisateur
 
-L'image `postgres` fait de `crm` un superutilisateur : une injection SQL y
-obtiendrait `COPY … PROGRAM`. Le binaire l'écrit en avertissement au démarrage
-tant que c'est le cas. Une seule fois, sur le conteneur Postgres de Dokploy :
+L'image `postgres` fait de `crm` son superutilisateur d'amorçage : une injection
+SQL y obtiendrait `COPY … PROGRAM`, et ce rôle ne peut pas être rétrogradé. Le
+binaire l'écrit en avertissement au démarrage tant qu'il s'y connecte. On crée
+donc un rôle applicatif neuf, `crm_app`, propriétaire des objets ; `crm` reste
+le superutilisateur des sauvegardes Dokploy, des extensions et des réparations.
+
+Ordre imposé : d'abord déployer la version qui porte
+`20260925220000_assistant_lecture.sql`, appliquée par `crm` au démarrage (elle
+crée `assistant_lecture` et retire `set_config` à `PUBLIC`, ce qu'un rôle
+ordinaire ne peut pas faire). Ensuite seulement, application arrêtée :
 
 ```bash
+# 1. Le rôle, autorisé à créer les bases de démonstration et à endosser assistant_lecture.
 docker exec -i <postgres> psql -U crm -d postgres -v ON_ERROR_STOP=1 \
-  -c "CREATE ROLE postgres SUPERUSER LOGIN PASSWORD '<secret gardé dans .secrets.generated>'" \
-  -c "ALTER ROLE crm NOSUPERUSER NOCREATEROLE NOCREATEDB"
-docker exec -i <postgres> psql -U crm -d crm -Atc 'select rolsuper from pg_roles where rolname = current_user'
+  -c "CREATE ROLE crm_app LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD '<secret gardé dans .secrets.generated>'" \
+  -c "GRANT assistant_lecture TO crm_app"
+
+# 2. Dans chaque base servie, puis dans template1, modèle des bases de démonstration créées ensuite.
+for base in crm crm_demo template1; do
+  docker exec -i <postgres> psql -U crm -d "$base" -v ON_ERROR_STOP=1 \
+    -c 'REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM PUBLIC' \
+    -c 'GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO crm_app'
+done
+
+# 3. Dans chaque base servie : la base, le schéma et ses objets passent à crm_app.
+#    REASSIGN OWNED BY crm est refusé : crm, rôle d'amorçage, possède le catalogue.
+for base in crm crm_demo; do
+  docker exec -i <postgres> psql -U crm -d "$base" -v ON_ERROR_STOP=1 <<'SQL'
+ALTER DATABASE :"DBNAME" OWNER TO crm_app;
+ALTER SCHEMA public OWNER TO crm_app;
+DO $$
+DECLARE
+  ordre text;
+BEGIN
+  FOR ordre IN
+    SELECT format('ALTER %s %s OWNER TO crm_app', CASE c.relkind WHEN 'v' THEN 'VIEW'
+             WHEN 'm' THEN 'MATERIALIZED VIEW' WHEN 'S' THEN 'SEQUENCE' ELSE 'TABLE' END, c.oid::regclass)
+    FROM pg_class c
+    WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm', 'S')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+                        AND (d.deptype = 'e' OR (c.relkind = 'S' AND d.deptype IN ('a', 'i'))))
+    UNION ALL
+    SELECT format('ALTER TYPE %s OWNER TO crm_app', t.oid::regtype)
+    FROM pg_type t
+    WHERE t.typnamespace = 'public'::regnamespace AND t.typtype IN ('e', 'd')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid AND d.deptype = 'e')
+    UNION ALL
+    SELECT format('ALTER ROUTINE %s OWNER TO crm_app', p.oid::regprocedure)
+    FROM pg_proc p
+    WHERE p.pronamespace = 'public'::regnamespace
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
+  LOOP
+    EXECUTE ordre;
+  END LOOP;
+END $$;
+SQL
+done
 ```
 
-`crm` reste propriétaire de la base et de ses tables : migrations et service
-tournent comme avant, seul le superutilisateur `postgres` sert aux extensions
-et aux réparations.
+4. Dans Dokploy, remplacer `crm:<mdp>` par `crm_app:<secret>` dans `DATABASE_URL`
+   et dans chaque `DATABASE_URL_<NOM>` de `cpi-go` (le service Postgres garde
+   `crm`), puis redéployer.
+5. Vérifier : l'avertissement de démarrage a disparu, une question à l'assistant
+   répond, l'export de la base aboutit, et :
+
+```bash
+docker exec -i <postgres> psql -U crm_app -d crm -Atc 'select rolsuper from pg_roles where rolname = current_user'   # f
+docker exec -i <postgres> pg_dump -U crm_app -d crm --schema=public -f /dev/null && echo pg_dump ok
+```
+
+Toute migration postérieure tourne sous `crm_app` : une extension non
+approuvée (`trusted`) ou un droit sur `pg_catalog` se pose à la main avec `crm`.
+
+Exercice du 26 septembre 2026, Postgres 16 local, base jetable migrée par `crm`
+puis passée à `crm_app` : avant l'étape 2, `pg_dump` sous `crm_app` échoue sur
+`set_config` ; après, il réussit, `SET ROLE assistant_lecture` lit `prospects`
+et se voit refuser `users` et `set_config`, `CREATE DATABASE` réussit et
+`-seed` passe sous `crm_app`. Une base créée par `crm_app` puis migrée par lui
+reçoit toutes les migrations ; sans l'étape 2 sur son modèle, `set_config`
+y reste ouvert à `assistant_lecture`, d'où `template1` dans la boucle.
 
 ## Après la mise en ligne
 
