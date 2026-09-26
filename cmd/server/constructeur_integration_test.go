@@ -200,6 +200,8 @@ func TestConstructeurSansFournisseur(t *testing.T) {
 	exigerChampsJSON(b, calculDe(body["proposition"]), map[string]string{"outil": "ventes", "mesures": "[Encaissé]", "periode": "ce-mois"}, "encaissé des ventes du mois")
 	body = construire(b, "par site le mois dernier", body["proposition"])
 	exigerChampsJSON(b, calculDe(body["proposition"]), map[string]string{"axe": "site", "mesures": "[Encaissé]", "periode": "mois-dernier"}, "ajustement sans modèle")
+	body = construire(b, "ventes du mois par site", nil)
+	exigerChampsJSON(b, calculDe(body["proposition"]), map[string]string{"outil": "ventes", "axe": "site", "periode": "ce-mois"}, "ventes du mois par site")
 	exigerRefus(b, construire(b, "la météo de demain", nil), "demande hors sujet")
 	exigerRefus(b, construire(bancAssistant(t, "ACCUEIL"), "Les ventes du mois", nil), "calcul sans l'assistant")
 }

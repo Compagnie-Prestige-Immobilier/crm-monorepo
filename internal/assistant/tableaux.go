@@ -565,6 +565,16 @@ func touches(demande []string, texte string) int {
 	return n
 }
 
+func horsDemande(demande []string, libelle string) int {
+	n := 0
+	for _, m := range mots(libelle) {
+		if len(m) >= 4 && !slices.Contains(motsVides, m) && !slices.ContainsFunc(demande, func(d string) bool { return rejoint(d, m) }) {
+			n++
+		}
+	}
+	return n
+}
+
 type candidat struct {
 	proposition Proposition
 	score       int
@@ -583,7 +593,7 @@ func (k *constructeur) chercher(base *Proposition) []Proposition {
 	}
 	retenues := []Proposition{}
 	for _, t := range k.classer() {
-		if t.score == 0 || len(retenues) > alternativesMax {
+		if t.score <= 0 || len(retenues) > alternativesMax {
 			break
 		}
 		if p, ok := k.valider(&t.proposition); ok && !contient(retenues, &p) {
@@ -593,18 +603,24 @@ func (k *constructeur) chercher(base *Proposition) []Proposition {
 	return retenues
 }
 
+// Le libellé pèse plus que les mesures, qui pèsent plus que la description ;
+// un axe demandé que l'outil connaît compte, un mot du libellé non demandé retire.
 func (k *constructeur) classer() []candidat {
 	demande := k.motsUtiles()
 	trouves := make([]candidat, 0, len(k.catalogue)+len(k.permis))
 	for _, e := range k.catalogue {
-		score := 2*touches(demande, e.Libelle) + touches(demande, e.Description+" "+e.Groupe)
+		score := 3*touches(demande, e.Libelle) + touches(demande, e.Description+" "+e.Groupe) - horsDemande(demande, e.Libelle)
 		trouves = append(trouves, candidat{Proposition{Source: e.ID}, score})
 	}
 	for _, nom := range slices.Sorted(maps.Keys(k.permis)) {
 		o := outils[nom]
-		score := 2*touches(demande, o.libelle+" "+strings.Join(o.mesures, " ")) + touches(demande, o.description)
 		c := Calcul{Outil: nom, Periode: periodeEcran}
 		k.ajuster(&c)
+		score := 3*touches(demande, o.libelle) + 2*touches(demande, strings.Join(o.mesures, " ")) +
+			touches(demande, o.description) - horsDemande(demande, o.libelle)
+		if score > 0 && c.Axe != "" {
+			score += 2
+		}
 		trouves = append(trouves, candidat{Proposition{Calcul: &c}, score})
 	}
 	slices.SortStableFunc(trouves, func(a, b candidat) int { return b.score - a.score })
