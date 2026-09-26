@@ -256,3 +256,13 @@ WHERE v."deletedAt" IS NULL
        OR v."reference" LIKE '%' || upper(sqlc.narg('recherche')::text) || '%')
 ORDER BY v."reference" ASC
 LIMIT 1000;
+
+-- name: VentesSommesDues :many
+SELECT v."numero", v."dateSouscription", v."client", v."site", v."nombreLots", v."numerosLots", v."prixTotal",
+    v."partProprietaire", v."partApporteur", v."representant", v."partCpi", v."reliquat",
+    (v."acompte" + COALESCE((SELECT SUM(vv."montant") FROM "ventes_versements" vv WHERE vv."venteId" = v."id"), 0))::bigint AS "encaisse"
+FROM "ventes" v
+WHERE v."archiveeLe" IS NULL AND v."dateSouscription" BETWEEN @du::date AND @au::date
+    AND (sqlc.narg('site')::text IS NULL OR v."site" = sqlc.narg('site')::text)
+ORDER BY v."site", v."dateSouscription", v."numero", v."id"
+LIMIT @limite::bigint;

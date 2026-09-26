@@ -544,8 +544,8 @@ LEFT JOIN LATERAL (
   ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
 ) rdv ON true
 WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
-  AND rdv."quand" >= (now() AT TIME ZONE 'UTC')
-GROUP BY rdv."quand" ORDER BY rdv."quand" LIMIT 500;
+  AND rdv."quand" >= @du::timestamp AND rdv."quand" < @au::timestamp
+GROUP BY rdv."quand" ORDER BY rdv."quand" LIMIT 1000;
 
 -- name: VerrouCreneauxRvSite :exec
 SELECT pg_advisory_xact_lock(hashtext('rv_site.creneaux'));

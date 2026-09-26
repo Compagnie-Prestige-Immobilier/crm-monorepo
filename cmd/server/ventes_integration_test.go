@@ -794,3 +794,177 @@ func ventesImportees(reponse map[string]any) []map[string]any {
 	}
 	return importees
 }
+
+// Stock de trois lots : une saisie et une correction simultanées ne le dépassent pas.
+func TestVenteStockDuSite(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	suffixe := strings.ToUpper(b.userID[:8])
+	reglage := map[string]any{
+		"nom": "SITE STOCK " + suffixe, "ordre": 99, "totalLots": 3, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 0, "partApporteurMode": "AUCUNE", "partApporteurValeur": 0,
+	}
+	statut, site := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", reglage, nil)
+	b.attend(statut, http.StatusOK, "site avec stock", site)
+	nom, siteID := fmt.Sprint(site["nom"]), fmt.Sprint(site["id"])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "site" = $1`, nom)
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, siteID)
+	})
+	if site["lotsVendus"] != float64(0) || site["lotsRestants"] != float64(3) {
+		t.Fatalf("site neuf : %v vendus, %v restants", site["lotsVendus"], site["lotsRestants"])
+	}
+	vente := func(client string, lots int) map[string]any {
+		corps := venteComptant(client + " " + suffixe)
+		corps["site"], corps["nombreLots"] = nom, lots
+		return corps
+	}
+	statut, premiere := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT A", 1), nil)
+	b.attend(statut, http.StatusCreated, "premier lot", premiere)
+	cheminA := fmt.Sprintf("/api/v1/ventes/%v", premiere["id"])
+
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil,
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT B", 2), nil)
+			return statut
+		},
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A", 2), nil)
+			return statut
+		})
+	if (statuts[0] == http.StatusConflict) == (statuts[1] == http.StatusConflict) {
+		t.Fatalf("une seule des deux écritures tient dans le stock : %v", statuts)
+	}
+	vendus := venteCompteTest(t, b, `SELECT COALESCE(sum("nombreLots"), 0)::int FROM "ventes" WHERE "site" = $1`, nom)
+	if lu := stockDuSite(t, b, siteID); vendus != 3 || lu["lotsVendus"] != float64(3) || lu["lotsRestants"] != float64(0) {
+		t.Fatalf("trois lots vendus attendus : %d en base, %v", vendus, lu)
+	}
+
+	statut, refus := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT C", 1), nil)
+	b.attend(statut, http.StatusConflict, "stock épuisé", refus)
+	if refus["code"] != "VENTE_STOCK_EPUISE" {
+		t.Fatalf("code %v", refus["code"])
+	}
+	reglage["totalLots"] = 1
+	statut, site = appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+siteID, reglage, nil)
+	b.attend(statut, http.StatusOK, "stock abaissé", site)
+	if site["lotsRestants"] != float64(-2) {
+		t.Fatalf("stock dépassé de deux lots : %v", site["lotsRestants"])
+	}
+	lotsA := venteCompteTest(t, b, `SELECT "nombreLots" FROM "ventes" WHERE "id" = $1`, premiere["id"])
+	statut, corrigee := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A CORRIGE", lotsA), nil)
+	b.attend(statut, http.StatusOK, "correction sans lot de plus sur un stock dépassé", corrigee)
+	statut, _ = appelJSON(b, http.MethodDelete, cheminA, nil, nil)
+	b.attend(statut, http.StatusNoContent, "archivage", nil)
+	if lu := stockDuSite(t, b, siteID); lu["lotsVendus"] != float64(3-lotsA) {
+		t.Fatalf("une vente archivée ne compte plus : %v", lu)
+	}
+}
+
+func stockDuSite(t *testing.T, b *banc, id string) map[string]any {
+	t.Helper()
+	statut, configuration := appelJSON(b, http.MethodGet, "/api/v1/ventes/configuration", nil, nil)
+	b.attend(statut, http.StatusOK, "configuration", configuration)
+	for _, s := range configuration["sites"].([]any) {
+		if site := s.(map[string]any); site["id"] == id {
+			return site
+		}
+	}
+	t.Fatalf("site %s absent de la configuration", id)
+	return nil
+}
+
+func venteACredit(b *banc, client string, prix, acompte int64, echeances, periodicite, jour int, premier string) int64 {
+	b.t.Helper()
+	var id int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement")
+		VALUES ('SAISIE', 0, 'CPI', DATE '2025-10-01', $1, '77 000 00 66', 'THIEO', 1, '', '', $2::bigint, $2, $3::bigint, $2 - $3, 0, 0, $2,
+		'CREDIT', $4, $5, $6, $7::date) RETURNING "id"`, client, prix, acompte, echeances, periodicite, jour, premier).Scan(&id); err != nil {
+		b.t.Fatal(err)
+	}
+	return id
+}
+
+// Des dates fixes et passées : seul le nombre de jours de retard dépend du jour de l'exécution.
+func TestEcheancesEnRetard(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT RETARD " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client) })
+	enRetard := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 1, '2026-01-12', 100000)`, enRetard)
+	bimestriel := venteACredit(b, client, 200000, 0, 2, 2, 5, "2025-11-10")
+	aJour := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 1, '2026-03-01', 300000)`, aJour)
+	aVenir := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2099-01-10")
+	archivee := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`UPDATE "ventes" SET "archiveeLe" = now() WHERE "id" = $1`, archivee)
+
+	lignes := echeancesEnRetard(t, b)
+	for _, absente := range []int64{aJour, aVenir, archivee} {
+		if _, trouvee := lignes[absente]; trouvee {
+			t.Fatalf("la vente %d n'est pas en retard : %v", absente, lignes[absente])
+		}
+	}
+	local := time.Now().In(dakar(t))
+	aujourdhui := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	jours := func(date string) float64 {
+		d, _ := time.Parse(time.DateOnly, date)
+		return aujourdhui.Sub(d).Hours() / 24
+	}
+	exigerRetard(t, lignes[enRetard], map[string]any{
+		"montantDu": float64(200000), "echeancesManquees": float64(2), "premiereImpayee": "2026-02-10",
+		"derniereEcheance": "2026-03-10", "joursRetard": jours("2026-02-10"), "telephoneE164": "+221770000066",
+	})
+	if !strings.Contains(fmt.Sprint(lignes[enRetard]["messageWhatsapp"]), "200 000 FCFA") {
+		t.Fatalf("le message donne le montant dû : %v", lignes[enRetard]["messageWhatsapp"])
+	}
+	exigerRetard(t, lignes[bimestriel], map[string]any{
+		"montantDu": float64(200000), "echeancesManquees": float64(2), "premiereImpayee": "2025-11-10",
+		"derniereEcheance": "2026-01-05", "joursRetard": jours("2025-11-10"),
+	})
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/ventes/echeances-en-retard?taille=201", nil, nil)
+	b.attend(statut, http.StatusUnprocessableEntity, "page trop grande", body)
+	superviseur := nouveauBanc(t, "SUPERVISEUR")
+	connecte(superviseur)
+	statut, body = appelJSON(superviseur, http.MethodGet, "/api/v1/ventes/echeances-en-retard", nil, nil)
+	superviseur.attend(statut, http.StatusForbidden, "sans ventes.lire", body)
+}
+
+func exigerRetard(t *testing.T, ligne, attendu map[string]any) {
+	t.Helper()
+	for cle, valeur := range attendu {
+		if ligne[cle] != valeur {
+			t.Fatalf("%s : %v attendu, ligne %v", cle, valeur, ligne)
+		}
+	}
+}
+
+func dakar(t *testing.T) *time.Location {
+	t.Helper()
+	zone, err := time.LoadLocation("Africa/Dakar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return zone
+}
+
+func echeancesEnRetard(t *testing.T, b *banc) map[int64]map[string]any {
+	t.Helper()
+	parVente := map[int64]map[string]any{}
+	for page := 1; ; page++ {
+		statut, body := appelJSON(b, http.MethodGet, fmt.Sprintf("/api/v1/ventes/echeances-en-retard?taille=200&page=%d", page), nil, nil)
+		b.attend(statut, http.StatusOK, "échéances en retard", body)
+		lignes, _ := body["lignes"].([]any)
+		for _, l := range lignes {
+			ligne := l.(map[string]any)
+			parVente[int64(ligne["venteId"].(float64))] = ligne
+		}
+		if len(lignes) < 200 {
+			return parVente
+		}
+	}
+}

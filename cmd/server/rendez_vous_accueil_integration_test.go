@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"testing"
@@ -254,4 +255,43 @@ func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
 	if !contientFiche(body, fiche) {
 		t.Fatal("le nouveau rendez-vous doit revenir dans le filtre « à confirmer »")
 	}
+}
+
+// « Rappeler dans 1 h », « 2 h » ou « demain matin » ; sans durée, toujours 15 minutes.
+func TestReportRappelDurees(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	fiches := map[string]string{}
+	for _, motif := range []string{"CALLBACK", "RV_CPI"} {
+		fiche := qualificationProspect(b)
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": motif, "callbackAt": quand}))
+		b.attend(statut, http.StatusOK, motif+" consigné", body)
+		fiches[motif] = "/api/v1/phase2/callbacks/" + rappelEnAttente(b, fiche) + "/snooze"
+	}
+	zone, err := time.LoadLocation("Africa/Dakar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := time.Now().In(zone)
+	demain := time.Date(local.Year(), local.Month(), local.Day()+1, 8, 30, 0, 0, zone)
+	for duree, attendu := range map[string]time.Time{
+		"?duree=1h": time.Now().Add(time.Hour), "?duree=2h": time.Now().Add(2 * time.Hour),
+		"?duree=demain": demain, "": time.Now().Add(15 * time.Minute),
+	} {
+		statut, body := qualificationEnvoi(b, http.MethodPost, fiches["CALLBACK"]+duree, nil)
+		b.attend(statut, http.StatusOK, "report "+duree, body)
+		lu, _ := time.Parse(time.RFC3339, fmt.Sprint(body["scheduledAt"]))
+		if lu.Sub(attendu).Abs() > 5*time.Second {
+			t.Fatalf("report %q : %v, attendu %v", duree, lu, attendu)
+		}
+	}
+	statut, body := qualificationEnvoi(b, http.MethodPost, fiches["CALLBACK"]+"?duree=3h", nil)
+	b.attend(statut, http.StatusUnprocessableEntity, "durée hors liste", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, fiches["RV_CPI"]+"?duree=demain", nil)
+	b.attend(statut, http.StatusConflict, "un rendez-vous physique ne se reporte pas", body)
 }

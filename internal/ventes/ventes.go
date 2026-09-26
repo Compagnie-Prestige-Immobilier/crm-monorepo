@@ -41,6 +41,7 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/ventes/classeur":           gestionnaires,
 	"GET /api/v1/ventes/classeur/fichier":    lecteurs,
 	"GET /api/v1/ventes/configuration":       lecteurs,
+	"GET " + cheminEcheancesEnRetard:         lecteurs,
 	"POST /api/v1/ventes/sites":              gestionnaires,
 	"PATCH /api/v1/ventes/sites/{id}":        gestionnaires,
 	"POST /api/v1/ventes/sites/{id}/active":  gestionnaires,
@@ -95,6 +96,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		Summary: "Les sites et canaux proposés à la saisie.",
 	}, s.configuration)
 	monterConfiguration(api, s)
+	monterEcheances(api, s)
 }
 
 type VersementDTO struct {

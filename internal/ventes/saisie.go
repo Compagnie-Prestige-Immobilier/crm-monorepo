@@ -6,6 +6,7 @@ import (
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -82,6 +83,7 @@ type VenteOutput struct {
 type ventePreparee struct {
 	Vente         db.InsererVenteSaisieParams
 	TelephoneE164 string
+	TotalLots     *int32
 }
 
 func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput, error) {
@@ -93,7 +95,7 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if err := q.VerrouNumerotationVentes(ctx); err != nil {
+		if err := verrouillerStock(ctx, q, &preparee, nil); err != nil {
 			return err
 		}
 		preparee.Vente.Numero, err = q.ProchainNumeroVente(ctx)
@@ -135,6 +137,9 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 		}
 		preparee, err := s.preparer(ctx, q, &in.Body, &avant)
 		if err != nil {
+			return err
+		}
+		if err := verrouillerStock(ctx, q, &preparee, &avant); err != nil {
 			return err
 		}
 		versements, err := q.TotalVersementsVente(ctx, id)
@@ -340,7 +345,38 @@ func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, a
 		},
 	}
 	sortie.TelephoneE164, _ = database.NormaliserTelephone(contexte.telephone, s.Cfg.PhoneRegion)
+	sortie.TotalLots = contexte.site.TotalLots
 	return sortie, nil
+}
+
+// Le verrou de numérotation sérialise aussi le stock. Une correction qui
+// n'ajoute pas de lot au site passe même si le stock est déjà dépassé.
+func verrouillerStock(ctx context.Context, q *db.Queries, preparee *ventePreparee, avant *db.Vente) error {
+	if err := q.VerrouNumerotationVentes(ctx); err != nil {
+		return err
+	}
+	vente := &preparee.Vente
+	if preparee.TotalLots == nil {
+		return nil
+	}
+	var exclue int64
+	if avant != nil {
+		if avant.Site == vente.Site && vente.NombreLots <= avant.NombreLots {
+			return nil
+		}
+		exclue = avant.ID
+	}
+	vendus, err := lotsVendus(ctx, q, []string{vente.Site}, exclue)
+	if err != nil {
+		return err
+	}
+	restants := *preparee.TotalLots - vendus[vente.Site]
+	if vente.NombreLots <= restants {
+		return nil
+	}
+	return socle.Problem(http.StatusConflict, "VENTE_STOCK_EPUISE", fmt.Sprintf(
+		"Il reste %d lot(s) sur le site %s : réduisez le nombre de lots ou mettez à jour le stock du site.",
+		max(restants, 0), vente.Site))
 }
 
 const (

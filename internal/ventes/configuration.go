@@ -26,6 +26,8 @@ type SiteVenteDTO struct {
 	PartApporteurMode      string           `json:"partApporteurMode"`
 	PartApporteurValeur    int64            `json:"partApporteurValeur"`
 	Superficies            []SuperficieSite `json:"superficies"`
+	LotsVendus             int32            `json:"lotsVendus" doc:"Lots des ventes non archivées du site."`
+	LotsRestants           *int32           `json:"lotsRestants" doc:"Nul sans stock renseigné ; négatif si le classeur a vendu plus que le stock."`
 }
 
 type SuperficieSite struct {
@@ -100,9 +102,17 @@ func (s *service) configuration(ctx context.Context, _ *struct{}) (*VentesConfig
 	if err != nil {
 		return nil, err
 	}
+	noms := make([]string, len(sites))
+	for i := range sites {
+		noms[i] = sites[i].Nom
+	}
+	vendus, err := lotsVendus(ctx, s.Q, noms, 0)
+	if err != nil {
+		return nil, err
+	}
 	out := &VentesConfigurationOutput{}
 	for i := range sites {
-		dto, err := siteDTO(&sites[i])
+		dto, err := siteDTO(&sites[i], vendus[sites[i].Nom])
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +147,7 @@ func (s *service) creerSite(ctx context.Context, in *siteVenteInput) (*SiteVente
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
-	return sortieSite(&row)
+	return s.sortieSite(ctx, &row)
 }
 
 func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*SiteVenteOutput, error) {
@@ -174,7 +184,7 @@ func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
-	return sortieSite(&row)
+	return s.sortieSite(ctx, &row)
 }
 
 type siteVenteModifyInput struct {
@@ -208,7 +218,7 @@ func (s *service) activerSite(ctx context.Context, in *siteVenteIDInput) (*SiteV
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
-	return sortieSite(&row)
+	return s.sortieSite(ctx, &row)
 }
 
 type CanalVenteOutput struct{ Body CanalVenteDTO }
@@ -300,12 +310,30 @@ func reponseActivation[T any](err error, code, message string, sortie T, emettre
 	return &sortie, nil
 }
 
-func siteDTO(site *db.VentesSite) (SiteVenteDTO, error) {
+func lotsVendus(ctx context.Context, q *db.Queries, sites []string, exclue int64) (map[string]int32, error) {
+	lignes, err := q.LotsVendusParSite(ctx, db.LotsVendusParSiteParams{Sites: sites, Exclue: exclue})
+	if err != nil {
+		return nil, err
+	}
+	parSite := make(map[string]int32, len(lignes))
+	for _, l := range lignes {
+		parSite[l.Site] = l.Lots
+	}
+	return parSite, nil
+}
+
+func siteDTO(site *db.VentesSite, vendus int32) (SiteVenteDTO, error) {
 	superficies := []SuperficieSite{}
 	if err := json.Unmarshal(site.Superficies, &superficies); err != nil {
 		return SiteVenteDTO{}, err
 	}
+	var restants *int32
+	if site.TotalLots != nil {
+		reste := *site.TotalLots - vendus
+		restants = &reste
+	}
 	return SiteVenteDTO{
+		LotsVendus: vendus, LotsRestants: restants,
 		ID: site.ID, Nom: site.Nom, Actif: site.Actif, Ordre: site.Ordre, TotalLots: site.TotalLots,
 		SuperficieDefaut: site.SuperficieDefaut, PrixUnitaireDefaut: site.PrixUnitaireDefaut,
 		PartProprietaireParLot: site.PartProprietaireParLot, PartApporteurMode: site.PartApporteurMode,
@@ -313,8 +341,12 @@ func siteDTO(site *db.VentesSite) (SiteVenteDTO, error) {
 	}, nil
 }
 
-func sortieSite(site *db.VentesSite) (*SiteVenteOutput, error) {
-	dto, err := siteDTO(site)
+func (s *service) sortieSite(ctx context.Context, site *db.VentesSite) (*SiteVenteOutput, error) {
+	vendus, err := lotsVendus(ctx, s.Q, []string{site.Nom}, 0)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := siteDTO(site, vendus[site.Nom])
 	if err != nil {
 		return nil, err
 	}

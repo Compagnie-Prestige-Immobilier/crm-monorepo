@@ -34,6 +34,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/phase2/callbacks":                         socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/directory":                         socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/rv-site":                           socle.PermissionFichesTenir,
+	"GET " + cheminCreneauxRvSite:                          socle.PermissionFichesTenir,
 	"GET /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"PUT /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"POST /api/v1/phase2/callbacks/{id}/cancel":            socle.PermissionQualificationRappels,
