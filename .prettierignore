@@ -10,3 +10,4 @@ web/src/api/schema.d.ts
 e2e/.auth/
 e2e/.roles.json
 e2e/fixtures/
+.claude/worktrees
