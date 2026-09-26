@@ -45,6 +45,15 @@ async function widgetsDe(userId: string): Promise<string[]> {
 
 const blocsDe = (page: Page) => page.getByRole('button', { name: /^À propos de / });
 
+// Un jeu de comptes par fichier de parcours : les téléconseillers débordent la page de 25.
+async function toutesLesLignesTeleconseillers(page: Page): Promise<void> {
+  const legende = page.getByRole('table', { name: /^Téléconseillers/ }).locator('caption');
+  const nombre = Number((await legende.textContent())?.replace(/\D/g, ''));
+  if (nombre <= 25) return;
+  await page.getByRole('combobox', { name: 'Lignes' }).first().click();
+  await page.getByRole('option', { name: '100', exact: true }).click();
+}
+
 async function reporterRappelIntrusif(page: Page): Promise<void> {
   const reporter = page.getByRole('button', { name: 'Plus tard' });
   if ((await reporter.count()) > 0) {
@@ -133,6 +142,7 @@ test.describe('parcours 9, la supervision', () => {
 
     await page.goto('/teleconseil/supervision?volet=comptes');
     await reporterRappelIntrusif(page);
+    await toutesLesLignesTeleconseillers(page);
     const rangee = page.getByRole('row').filter({ hasText: compte.identifiant });
     await expect(rangee).toContainText('Inactif');
 
@@ -160,6 +170,7 @@ test.describe('parcours 9, la supervision', () => {
     await poste.close();
 
     await page.reload();
+    await toutesLesLignesTeleconseillers(page);
     await expect(rangee).toContainText('Connecté');
   });
 
