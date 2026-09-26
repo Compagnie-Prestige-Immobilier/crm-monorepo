@@ -52,7 +52,7 @@ jobs:
         run: |
           git fetch -q --depth=1 origin "$BASE"
           max=$(git ls-tree --name-only FETCH_HEAD sql/migrations/ | grep -o '[0-9]\{14\}' | sort | tail -1)
-          git diff --name-only --diff-filter=A FETCH_HEAD HEAD -- sql/migrations | grep -o '[0-9]\{14\}' \
+          git diff --name-only --no-renames --diff-filter=A FETCH_HEAD HEAD -- sql/migrations | grep -o '[0-9]\{14\}' \
             | awk -v max="$max" '$1 <= max { print "::error::migration " $1 " <= " max; bad = 1 } END { exit bad }'
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
