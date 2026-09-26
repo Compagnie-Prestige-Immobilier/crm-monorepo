@@ -11,7 +11,6 @@ export function BarreEdition({
   dirty,
   pending,
   isAdmin,
-  entryLabel = 'Organiser les graphiques',
   entryVariant = 'outline',
   onEnter,
   onSave,
@@ -22,8 +21,7 @@ export function BarreEdition({
   dirty: boolean;
   pending: boolean;
   isAdmin: boolean;
-  /** Ce que dit la porte d'entrée du mode organisation, et son poids visuel. */
-  entryLabel?: string;
+  /** Le poids visuel de la porte d'entrée du mode organisation. */
   entryVariant?: 'outline' | 'ghost';
   onEnter: () => void;
   onSave: () => void;
@@ -37,7 +35,7 @@ export function BarreEdition({
     return (
       <Button type="button" variant={entryVariant} onClick={onEnter}>
         <LayoutGridIcon aria-hidden="true" />
-        {entryLabel}
+        Organiser les graphiques
       </Button>
     );
   }

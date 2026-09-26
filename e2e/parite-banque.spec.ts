@@ -90,8 +90,8 @@ test.afterAll(async () => {
     `%${NOM_DEMANDE}%`,
     `%${NOM_BANQUE}%`,
   ]);
-  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
   await effacerBanque(banqueId);
+  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
 });
 
 test.describe('parité banque, les écrans du dossier bancaire', () => {
@@ -141,7 +141,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   }) => {
     await page.goto('/finance/dossiers/nouveau');
     const carte = page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` });
-    await carte.getByRole('button', { name: 'Ouvrir le dossier' }).click();
+    await carte.getByRole('button', { name: 'Créer le dossier' }).click();
     await expect(page.getByText(/^Dossier CHUES-BF-\d{4}-\d{6} ouvert\.$/u)).toBeVisible();
 
     const ouvert = await dossierDInscription(inscriptionAwa);
@@ -166,7 +166,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     // Les plateformes suivent seules leurs inscrits : le dossier prend l'identité
     // de l'inscription, sans fiche au CRM.
     const orpheline = page.getByRole('listitem').filter({ hasText: `Coumba ${NOM_CLIENT}` });
-    await expect(orpheline.getByRole('button', { name: 'Ouvrir le dossier' })).toBeEnabled();
+    await expect(orpheline.getByRole('button', { name: 'Créer le dossier' })).toBeEnabled();
     expect(
       await compter(`SELECT count(*) AS n FROM bank_cases WHERE "inscriptionId" = $1`, [
         inscriptionAwa,

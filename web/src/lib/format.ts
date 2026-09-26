@@ -31,6 +31,11 @@ export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }
 
+/** `compte(2, 'dossier')` : « 2 dossiers » ; 0 et 1 restent au singulier. */
+export function compte(value: number, singulier: string, pluriel = `${singulier}s`): string {
+  return `${formatNumber(value)} ${Math.abs(value) >= 2 ? pluriel : singulier}`;
+}
+
 export function formatDecimal(value: number): string {
   return decimalFormatter.format(value);
 }
