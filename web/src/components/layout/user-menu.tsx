@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
       });
       if (!response.ok) throw new Error('logout failed');
       queryClient.clear();
+      queryClient.setQueryData(meQueryOptions.queryKey, null);
       router.replace('/connexion');
     } catch {
       toast.error('La déconnexion a échoué. Réessayez.');
