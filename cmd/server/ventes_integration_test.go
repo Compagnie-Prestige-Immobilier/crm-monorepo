@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/internal/shared/socle"
 	"fmt"
 	"io"
 	"net/http"
@@ -72,6 +73,24 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	superviseur.attend(statut, http.StatusForbidden, "lecture par un superviseur", reponse)
 }
 
+// Au-delà du plafond, ce sont les ventes les plus anciennes qui manquent, et la réponse le dit.
+func TestVentesListeTronqueeAuxPlusRecentes(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT PLAFOND " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client) })
+	b.exec(`INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone", "site", "nombreLots",
+		"numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat", "partProprietaire", "partApporteur", "partCpi")
+		SELECT 'SAISIE', 0, 'CPI', DATE '2090-01-01' - i, $1, '770000004', 'THIEO', 1, '', '', 1, 1, 0, 1, 0, 0, 1
+		FROM generate_series(0, 5000) i`, client)
+	statut, liste := appelJSON(b, http.MethodGet, "/api/v1/ventes", nil, nil)
+	b.attend(statut, http.StatusOK, "liste des ventes", liste)
+	ventes, _ := liste["ventes"].([]any)
+	if tronque, _ := liste["tronque"].(bool); !tronque || len(ventes) != 5000 || ventes[0].(map[string]any)["dateSouscription"] != "2090-01-01" {
+		t.Fatalf("5 000 ventes, les plus récentes d’abord, et l’indication de troncature : %v, %d ventes", liste["tronque"], len(ventes))
+	}
+}
+
 func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.T) {
 	b := nouveauBanc(t, "DIRECTION")
 	connecte(b)
@@ -137,11 +156,7 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 	})
 }
 
-// B04 : corriger une vente sans toucher site, lots ni prix doit garder ses
-// parts propriétaire, apporteur et CPI telles que saisies. Avant correction,
-// `corriger` recalculait toujours sur la règle du site en vigueur : changer la
-// règle après coup modifiait la part de l'apporteur sans qu'aucun montant
-// saisi n'ait changé.
+// Corriger une vente sans toucher site, lots ni prix garde ses parts, même si la règle du site a changé.
 func TestVenteCorrectionGardeSesParts(t *testing.T) {
 	b := nouveauBanc(t, "DIRECTION")
 	connecte(b)
@@ -187,10 +202,41 @@ func TestVenteCorrectionGardeSesParts(t *testing.T) {
 	}
 }
 
-// B05 : redéposer le classeur des ventes ne doit jamais effacer un versement
-// ou un archivage saisis hors classeur sur une vente importée. Avant
-// correction, `remplacerClasseur` supprimait toutes les ventes IMPORT sans
-// exception, cascade comprise sur leurs versements.
+// Le classeur fait foi pour ses ventes : le panneau ne les corrige pas, ne les archive pas et n'y verse rien.
+func TestVenteImporteeRefuseLesEcrituresDuPanneau(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurVentesTest(t))
+	b.attend(statut, http.StatusOK, "dépôt", reponse)
+	vente := ventesImportees(reponse)[0]
+	chemin := fmt.Sprintf("/api/v1/ventes/%d", int64(vente["id"].(float64)))
+	correction := map[string]any{
+		"canal": vente["canal"], "dateSouscription": "2026-09-05", "client": vente["client"], "telephone": "77 000 00 01",
+		"site": vente["site"], "nombreLots": vente["nombreLots"], "numerosLots": "", "superficie": "",
+		"prixUnitaire": vente["prixUnitaire"], "acompte": 0, "modePaiement": "COMPTANT",
+	}
+	for _, ecriture := range []struct {
+		methode, chemin string
+		corps           map[string]any
+	}{
+		{http.MethodPatch, chemin, correction},
+		{http.MethodPost, chemin + "/versements", map[string]any{"date": "2026-09-19", "montant": 500000}},
+		{http.MethodDelete, chemin, nil},
+		{http.MethodPost, chemin + "/restaurer", nil},
+	} {
+		statut, corps := appelJSON(b, ecriture.methode, ecriture.chemin, ecriture.corps, nil)
+		b.attend(statut, http.StatusConflict, ecriture.methode+" "+ecriture.chemin, corps)
+		if corps["code"] != "VENTE_DU_CLASSEUR" {
+			t.Fatalf("%s %s : code %v", ecriture.methode, ecriture.chemin, corps["code"])
+		}
+	}
+}
+
+// Un versement saisi au panneau et absent du nouveau classeur bloque le dépôt ; sa seule trace au journal ne bloque plus rien.
 func TestDepotClasseurNeFaitPasDisparaitreUnVersement(t *testing.T) {
 	b := nouveauBanc(t, "DIRECTION")
 	connecte(b)
@@ -199,29 +245,121 @@ func TestDepotClasseurNeFaitPasDisparaitreUnVersement(t *testing.T) {
 		b.exec(`DELETE FROM "ventes_classeurs"`)
 	})
 	contenu := classeurVentesTest(t)
-
 	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
 	b.attend(statut, http.StatusOK, "premier dépôt", reponse)
-	ventes, _ := reponse["ventes"].([]any)
-	if len(ventes) == 0 {
-		t.Fatalf("le premier dépôt doit créer des ventes : %v", reponse)
+	var venteID int64
+	for _, vente := range ventesImportees(reponse) {
+		if vente["numero"] == float64(2) {
+			venteID = int64(vente["id"].(float64))
+		}
 	}
-	venteID := int64(ventes[0].(map[string]any)["id"].(float64))
-
-	statut, vente := appelJSON(b, http.MethodPost, fmt.Sprintf("/api/v1/ventes/%d/versements", venteID), map[string]any{
-		"date": "2026-09-19", "montant": 500000,
-	}, nil)
-	b.attend(statut, http.StatusCreated, "versement hors classeur sur une vente importée", vente)
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 3, '2026-09-19', 250000)`, venteID)
+	b.exec(`INSERT INTO "audit_logs" ("id", "userId", "action", "entity", "entityId", "before")
+		VALUES (gen_random_uuid()::text, $1, 'vente.versement_ajouter', 'vente', $2::bigint::text, '{"montant": 250000}')`, b.userID, venteID)
 
 	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
-	b.attend(statut, http.StatusConflict, "redépôt bloqué tant que le versement n'est pas traité", reponse)
-
-	if n := venteCompteTest(t, b, `SELECT count(*)::int FROM "ventes_versements" WHERE "venteId" = $1`, venteID); n != 1 {
+	b.attend(statut, http.StatusConflict, "redépôt qui effacerait le versement saisi au panneau", reponse)
+	if reponse["code"] != "VENTES_VERSEMENTS_HORS_CLASSEUR" || !strings.Contains(fmt.Sprint(reponse["message"]), "n° 2 ") {
+		t.Fatalf("le refus nomme la vente en cause : %v", reponse)
+	}
+	if n := venteCompteTest(t, b, `SELECT count(*)::int FROM "ventes_versements" WHERE "venteId" = $1`, venteID); n != 3 {
 		t.Fatalf("le versement saisi hors classeur ne doit pas disparaître : %d", n)
 	}
-	if n := venteCompteTest(t, b, `SELECT count(*)::int FROM "ventes" WHERE "id" = $1`, venteID); n != 1 {
-		t.Fatalf("la vente portant le versement doit rester en base : %d", n)
+
+	b.exec(`DELETE FROM "ventes_versements" WHERE "venteId" = $1 AND "rang" = 3`, venteID)
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "redépôt une fois le versement retiré, malgré son ancienne trace", reponse)
+	remplacees := venteCompteTest(t, b, `SELECT jsonb_array_length("before"->'ventes') FROM "audit_logs"
+		WHERE "userId" = $1 AND "action" = 'vente.importer' ORDER BY "at" DESC, "id" DESC LIMIT 1`, b.userID)
+	versements := venteCompteTest(t, b, `SELECT jsonb_array_length(v->'versements') FROM "audit_logs" a,
+		jsonb_array_elements(a."before"->'ventes') v
+		WHERE a."userId" = $1 AND a."action" = 'vente.importer' AND (v->>'id')::bigint = $2`, b.userID, venteID)
+	if remplacees != 3 || versements != 2 {
+		t.Fatalf("la trace du dépôt garde les ventes remplacées et leurs versements : %d ventes, %d versements", remplacees, versements)
 	}
+}
+
+// Un dépôt numérote ses ventes sous le même verrou qu'une saisie.
+func TestDepotAttendLeVerrouDeNumerotation(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT NUMERO " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	contenu := classeurVentesTest(t)
+	deposer := func() int {
+		statut, _ := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", contenu)
+		return statut
+	}
+	creer := func() int {
+		statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", venteComptant(client), nil)
+		return statut
+	}
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil, deposer, creer)
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusCreated {
+		t.Fatalf("dépôt puis saisie aboutissent : %v", statuts)
+	}
+}
+
+// « - », « #N/A » et cellule vide valent zéro ; un montant vraiment illisible refuse le dépôt en nommant sa ligne.
+func TestDepotClasseurMontantsVidesOuIllisibles(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	contenu := classeurModifie(t, map[string]string{"P3": "-", "Q4": "#N/A"}, map[string]string{"E5": "#N/A"})
+	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "dépôt avec « - » et « #N/A »", reponse)
+	for _, vente := range ventesImportees(reponse) {
+		versements, _ := vente["versements"].([]any)
+		if vente["numero"] == float64(2) && (vente["partCpi"] != float64(0) || len(versements) != 1) {
+			t.Fatalf("« #N/A » vaut zéro dans une part et aucun versement dans les échéances : %v", vente)
+		}
+	}
+
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurModifie(t, map[string]string{"K4": "1 500 000"}, nil))
+	b.attend(statut, http.StatusBadRequest, "dépôt avec un montant illisible", reponse)
+	if !strings.Contains(fmt.Sprint(reponse["message"]), "ligne 4") {
+		t.Fatalf("le refus nomme la ligne : %v", reponse)
+	}
+}
+
+// Un rôle qui ne fait que lire les ventes ne saisit rien et ne dépose aucun classeur.
+func TestVentesLecteurNePeutPasEcrire(t *testing.T) {
+	admin := adminConnecte(t)
+	roleID := creerRolePersonnalise(admin, "Lecteur ventes "+admin.userID[:8], socle.Direction,
+		[]string{string(socle.PermissionPanneauAcceder), string(socle.PermissionVentesLire)})
+	_, email := compteDuRole(admin, roleID)
+	lecteur := adminSession(admin, email)
+	statut, corps := appelJSON(lecteur, http.MethodPost, "/api/v1/ventes", venteComptant("CLIENT LECTEUR"), nil)
+	lecteur.attend(statut, http.StatusForbidden, "saisie par un lecteur", corps)
+	statut, corps = lecteur.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurVentesTest(t))
+	lecteur.attend(statut, http.StatusForbidden, "dépôt par un lecteur", corps)
+}
+
+func classeurModifie(t *testing.T, ventes, echeances map[string]string) []byte {
+	t.Helper()
+	f, err := excelize.OpenReader(bytes.NewReader(classeurVentesTest(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for feuille, cellules := range map[string]map[string]string{"1. TABLEAU DES VENTES": ventes, "2. ECHEANCES MENSUELLES": echeances} {
+		for cellule, valeur := range cellules {
+			if err := f.SetCellStr(feuille, cellule, valeur); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	var tampon bytes.Buffer
+	if err := f.Write(&tampon); err != nil {
+		t.Fatal(err)
+	}
+	return tampon.Bytes()
 }
 
 // Changer la règle d'un site change les parts des ventes suivantes : l'ancienne valeur reste lisible.
@@ -291,8 +429,35 @@ func TestVenteAncienneCorrigeableSurSiteEtCanalRetires(t *testing.T) {
 		"acompte": 0, "modePaiement": "CREDIT", "nombreEcheances": 10,
 	}, nil)
 	b.attend(statut, http.StatusOK, "correction d’une ancienne vente", vente)
-	if vente["telephone"] == "770000001" || vente["jourVersement"] != nil {
+	if vente["telephone"] == "770000001" || vente["jourVersement"] != nil || vente["partCpi"] != float64(5000000) {
 		t.Fatalf("vente ancienne corrigée : %v", vente)
+	}
+}
+
+// Une ancienne vente dont la part CPI est négative se corrige encore, tant que ses parts ne sont pas recalculées.
+func TestVenteAncienneAPartCpiNegativeResteCorrigeable(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	var venteID int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement")
+		VALUES ('SAISIE', 0, 'CPI', 'CLIENT PARTS NEGATIVES', '770000003', 'THIEO', 1, '', '', 1000000, 1000000, 0, 1000000,
+		900000, 200000, -100000, 'COMPTANT') RETURNING "id"`).Scan(&venteID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+	})
+	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-01", "client": "CLIENT PARTS NEGATIVES", "telephone": "77 000 00 03",
+		"site": "THIEO", "nombreLots": 1, "numerosLots": "", "superficie": "", "prixUnitaire": 1000000, "acompte": 0,
+		"modePaiement": "COMPTANT", "email": "client.parts@exemple.sn",
+	}, nil)
+	b.attend(statut, http.StatusOK, "correction de l’e-mail", vente)
+	if vente["email"] != "client.parts@exemple.sn" || vente["partCpi"] != float64(-100000) {
+		t.Fatalf("e-mail corrigé, parts inchangées : %v", vente)
 	}
 }
 
@@ -452,6 +617,8 @@ func venteArchiveePuisSoldee(t *testing.T, b *banc, venteID int64, corps map[str
 	if int64(vente["id"].(float64)) != venteID {
 		t.Fatalf("vente restaurée : %v", vente)
 	}
+	statut, vente = appelJSON(b, http.MethodPost, "/api/v1/ventes/999999999999/restaurer", nil, nil)
+	b.attend(statut, http.StatusNotFound, "restauration d’une vente inconnue", vente)
 	corps["modePaiement"] = "COMPTANT"
 	delete(corps, "nombreEcheances")
 	corps["acompte"] = 100000
