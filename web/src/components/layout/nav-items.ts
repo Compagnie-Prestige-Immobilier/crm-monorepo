@@ -12,6 +12,7 @@ import {
   FolderOpenIcon,
   HeadsetIcon,
   HouseIcon,
+  LandmarkIcon,
   LayoutDashboardIcon,
   LibraryIcon,
   ListChecksIcon,
@@ -27,6 +28,8 @@ import {
   SettingsIcon,
   SlidersHorizontalIcon,
   SparklesIcon,
+  Trash2Icon,
+  TrendingUpIcon,
   UploadIcon,
   UserPlusIcon,
   UsersIcon,
@@ -129,8 +132,8 @@ export const COQUES: readonly CoqueEntry[] = [
     id: 'admin',
     label: 'Admin',
     path: '/admin',
-    description: 'Comptes, listes de référence, imports et paramètres',
-    acces: ['ADMIN'],
+    description: 'Comptes, imports, listes de référence et réglages',
+    acces: (visiteur) => everyItem(visiteur, 'admin').length > 0,
   },
 ];
 
@@ -180,12 +183,8 @@ const ENCADREMENT: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
 
 /**
  * Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la
- * règle.
- *
- * Une SEULE section par coque, et l'ordre des entrées EST l'ordre de la barre.
- * L'ADMIN et l'agent bancaire gardent leur propre suite d'entrées, écrite
- * d'affilée : ils ne lisent ni les mêmes intitulés ni le même ordre sur les
- * mêmes écrans.
+ * règle. L'ordre des entrées EST l'ordre de la barre ; les entrées `secondary`
+ * de toutes les sections d'une coque se rangent sous un seul « Plus ».
  */
 const SECTIONS: readonly NavSection[] = [
   {
@@ -246,13 +245,13 @@ const SECTIONS: readonly NavSection[] = [
         icon: ArchiveIcon,
         description: 'Retirées du registre, à détruire après trente jours',
         acces: 'visites.voir_archivees',
-        secondary: true,
+        hidden: true,
       },
     ],
   },
   {
     coque: 'teleconseil',
-    title: null,
+    title: 'Piloter',
     items: [
       {
         href: '/teleconseil/tableau-de-bord',
@@ -262,12 +261,57 @@ const SECTIONS: readonly NavSection[] = [
         acces: 'analytics.superviser',
       },
       {
-        href: '/teleconseil/leads-importes',
-        label: 'Leads importés',
-        icon: UploadIcon,
-        description: 'Fiches très intéressées et qualité des classeurs',
-        acces: 'analytics.superviser',
+        href: '/teleconseil/campagnes',
+        label: 'Campagnes d’appels',
+        icon: MegaphoneIcon,
+        description: 'Fiches exportées et distribution',
+        acces: 'campagnes.superviser',
       },
+      {
+        href: '/teleconseil/interesses',
+        label: 'Intéressés, hésitants et RDV',
+        icon: HeartHandshakeIcon,
+        description: 'Fiches fermées à suivre',
+        acces: 'prospects.superviser',
+      },
+      {
+        href: '/ventes',
+        label: 'Ventes',
+        icon: TrendingUpIcon,
+        description: 'Tableau des ventes',
+        acces: ['DIRECTION'],
+      },
+      {
+        href: '/finance',
+        label: 'Banque & Finance',
+        icon: LandmarkIcon,
+        description: 'Vue d’ensemble des dossiers',
+        acces: ['DIRECTION'],
+      },
+      {
+        href: '/teleconseil/pole-deploiement',
+        label: 'Pôle déploiement',
+        icon: UsersRoundIcon,
+        description: 'Qualité de la base représentants et rendement départemental',
+        acces: 'analytics.superviser',
+        hidden: true,
+        onglet: '/teleconseil/tableau-de-bord',
+      },
+      {
+        href: '/teleconseil/pole-marketing',
+        label: 'Pôle marketing',
+        icon: ActivityIcon,
+        description: 'Qualité des prospects amenés et conversion par canal',
+        acces: 'analytics.superviser',
+        hidden: true,
+        onglet: '/teleconseil/tableau-de-bord',
+      },
+    ],
+  },
+  {
+    coque: 'teleconseil',
+    title: 'Appeler',
+    items: [
       {
         href: '/teleconseil',
         label: 'Mon travail',
@@ -305,11 +349,38 @@ const SECTIONS: readonly NavSection[] = [
         acces: 'fiches.tenir',
       },
       {
+        href: '/teleconseil/interesses',
+        label: 'Rendez-vous',
+        icon: HeartHandshakeIcon,
+        description: 'Rendez-vous obtenus et leur suivi',
+        acces: (visiteur) =>
+          !peut(visiteur, 'prospects.superviser') && peut(visiteur, 'rendez_vous.suivre'),
+      },
+      {
+        href: '/teleconseil/prospects',
+        label: 'Prospects',
+        icon: UsersIcon,
+        description: 'Les fiches déjà notées',
+        // Le téléconseiller et le chargé de clientèle appellent depuis leur
+        // console : cette liste suit le travail des autres.
+        acces: 'prospects.superviser',
+        secondary: true,
+      },
+      {
         href: '/teleconseil/supervision',
         label: 'Superviser l’équipe',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         acces: 'analytics.superviser',
+        secondary: true,
+      },
+      {
+        href: '/teleconseil/leads-importes',
+        label: 'Leads importés',
+        icon: UploadIcon,
+        description: 'Fiches très intéressées et qualité des classeurs',
+        acces: 'analytics.superviser',
+        secondary: true,
       },
       {
         href: '/teleconseil/mes-contacts',
@@ -336,70 +407,20 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/teleconseil/prospects',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Les fiches déjà notées',
-        // Le téléconseiller et le chargé de clientèle appellent depuis leur
-        // console : cette liste suit le travail des autres.
-        acces: 'prospects.superviser',
-        secondary: true,
-      },
-      {
-        href: '/teleconseil/interesses',
-        label: 'Intéressés, hésitants et RDV',
-        icon: HeartHandshakeIcon,
-        description: 'Fiches fermées à suivre',
-        acces: 'prospects.superviser',
-      },
-      {
-        href: '/teleconseil/interesses',
-        label: 'Rendez-vous',
-        icon: HeartHandshakeIcon,
-        description: 'Rendez-vous obtenus et leur suivi',
-        acces: (visiteur) =>
-          !peut(visiteur, 'prospects.superviser') && peut(visiteur, 'rendez_vous.suivre'),
-      },
-      {
-        href: '/teleconseil/campagnes',
-        label: 'Campagnes d’appels',
-        icon: MegaphoneIcon,
-        description: 'Fiches exportées et distribution',
-        acces: 'campagnes.superviser',
-      },
-      {
-        href: '/teleconseil/pole-deploiement',
-        label: 'Pôle déploiement',
-        icon: UsersRoundIcon,
-        description: 'Qualité de la base représentants et rendement départemental',
-        acces: 'analytics.superviser',
-        hidden: true,
-        onglet: '/teleconseil/tableau-de-bord',
-      },
-      {
-        href: '/teleconseil/pole-marketing',
-        label: 'Pôle marketing',
-        icon: ActivityIcon,
-        description: 'Qualité des prospects amenés et conversion par canal',
-        acces: 'analytics.superviser',
-        hidden: true,
-        onglet: '/teleconseil/tableau-de-bord',
-      },
-      {
         href: '/teleconseil/parametres-chues',
-        label: 'Paramètres',
+        label: 'Réglages des projets',
         icon: SlidersHorizontalIcon,
-        description: 'Réglages CHUES et Grand Public',
+        description: 'CHUES et Grand Public : segments, liens et destinataires',
         acces: 'prospects.superviser',
         secondary: true,
       },
       {
-        href: '/teleconseil/representants/import',
-        label: 'Importer des représentants',
-        icon: UploadIcon,
-        description: 'Classeur de représentants',
-        acces: 'imports.administrer',
-        hidden: true,
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Issues d’appel, banques, syndicats, départements',
+        acces: 'referentiels.superviser',
+        secondary: true,
       },
     ],
   },
@@ -430,7 +451,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/finance/demandes-clients',
-        label: 'Demandes de création de client',
+        label: 'Clients à créer',
         icon: UserPlusIcon,
         description: 'Créations de client demandées',
         acces: 'banque.dossiers',
@@ -504,21 +525,78 @@ const SECTIONS: readonly NavSection[] = [
   },
   {
     coque: 'admin',
-    title: null,
+    title: 'Au quotidien',
     items: [
       {
-        href: '/admin/tableau-de-bord',
-        label: 'Tableau de bord',
-        icon: LayoutDashboardIcon,
-        description: 'Supervision, enrôlement, déploiement et marketing',
-        acces: 'parametres.administrer',
+        href: '/admin/commerciaux',
+        label: 'Comptes et rôles',
+        icon: UsersIcon,
+        description: 'Comptes, rôles et accès',
+        acces: 'comptes.administrer',
       },
       {
-        href: '/admin/assistant',
-        label: 'Assistant',
-        icon: SparklesIcon,
-        description: 'Questions sur les appels, les conversions et les prévisions',
-        acces: 'assistant.utiliser',
+        href: '/admin/imports',
+        label: 'Importer un classeur',
+        icon: UploadIcon,
+        description: 'Dépôt de classeurs et suivi des travaux',
+        acces: 'imports.administrer',
+      },
+      {
+        href: '/admin/journal',
+        label: 'Journal des actions',
+        icon: ScrollTextIcon,
+        description: 'Qui a fait quoi : campagnes, comptes, enrôlement, base',
+        acces: 'exploitation.administrer',
+      },
+      {
+        href: '/admin/exploitation',
+        label: 'Envois et tâches',
+        icon: ActivityIcon,
+        description: 'Courriels envoyés, tâches planifiées et erreurs',
+        acces: 'exploitation.administrer',
+      },
+    ],
+  },
+  {
+    coque: 'admin',
+    title: 'Réglages',
+    items: [
+      {
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Issues d’appel, banques, syndicats, départements',
+        acces: 'referentiels.superviser',
+      },
+      {
+        href: '/admin/referentiels/issues-appel',
+        label: 'Issues d’appel',
+        icon: ListChecksIcon,
+        description: 'Motifs proposés après un appel',
+        acces: 'referentiels.superviser',
+        hidden: true,
+        onglet: '/admin/referentiels',
+      },
+      {
+        href: '/admin/courriels',
+        label: 'Courriels et messages',
+        icon: MailIcon,
+        description: 'Destinataires et textes des envois automatiques',
+        acces: 'courriels.administrer',
+      },
+      {
+        href: '/admin/notifications',
+        label: 'Notifications',
+        icon: BellIcon,
+        description: 'Annonces et rappels envoyés',
+        acces: 'notifications.administrer',
+      },
+      {
+        href: '/admin/champs-conversion',
+        label: 'Champs de la conversion',
+        icon: ListChecksIcon,
+        description: 'Ordre, visibilité et champs ajoutés',
+        acces: 'formulaires.administrer',
       },
       {
         href: '/admin/enrolement',
@@ -528,85 +606,26 @@ const SECTIONS: readonly NavSection[] = [
         acces: 'enrolement.administrer',
       },
       {
-        href: '/admin/commerciaux',
-        label: 'Utilisateurs et rôles',
-        icon: UsersIcon,
-        description: 'Comptes, rôles et accès',
-        acces: 'comptes.administrer',
-      },
-    ],
-  },
-  {
-    coque: 'admin',
-    title: 'Référentiels & Données',
-    items: [
-      {
-        href: '/admin/referentiels',
-        label: 'Listes de référence',
-        icon: LibraryIcon,
-        description: 'Départements, banques, syndicats',
-        acces: 'referentiels.superviser',
-      },
-      {
-        href: '/admin/imports',
-        label: 'Importer un fichier Excel',
-        icon: UploadIcon,
-        description: 'Dépôt de classeurs et suivi des travaux',
-        acces: 'imports.administrer',
-      },
-      {
-        href: '/admin/champs-conversion',
-        label: 'Champs de la conversion',
-        icon: ListChecksIcon,
-        description: 'Ordre, visibilité et champs ajoutés',
-        acces: 'formulaires.administrer',
+        href: '/admin/assistant',
+        label: 'Assistant',
+        icon: SparklesIcon,
+        description: 'Questions sur les appels, les conversions et les prévisions',
+        acces: 'assistant.utiliser',
         secondary: true,
       },
-    ],
-  },
-  {
-    coque: 'admin',
-    title: 'Communication',
-    items: [
       {
-        href: '/admin/notifications',
-        label: 'Envoyer une notification',
-        icon: BellIcon,
-        description: 'Annonces et rappels envoyés',
-        acces: 'notifications.administrer',
-      },
-      {
-        href: '/admin/courriels',
-        label: 'Courriels',
-        icon: MailIcon,
-        description: 'Destinataires et textes des envois automatiques',
-        acces: 'courriels.administrer',
-      },
-    ],
-  },
-  {
-    coque: 'admin',
-    title: 'Système & Audit',
-    items: [
-      {
-        href: '/admin/journal',
-        label: 'Journal des actions',
-        icon: ScrollTextIcon,
-        description: 'Qui a fait quoi : campagnes, comptes, enrôlement, base',
-        acces: 'exploitation.administrer',
+        href: '/admin/bases',
+        label: 'Bases de démonstration',
+        icon: DatabaseIcon,
+        description: 'Copies d’exemple pour former, sans toucher aux données réelles',
+        acces: 'bases.administrer',
+        secondary: true,
       },
       {
         href: '/admin/parametres',
-        label: 'Paramètres',
-        icon: SettingsIcon,
-        description: 'Démonstration et suppression',
-        acces: 'parametres.administrer',
-      },
-      {
-        href: '/admin/exploitation',
-        label: 'Exploitation',
-        icon: ActivityIcon,
-        description: 'Trafic, erreurs, tâches planifiées et courriels',
+        label: 'Suppression des données',
+        icon: Trash2Icon,
+        description: 'Suppression définitive et copie de la base',
         acces: 'exploitation.administrer',
         secondary: true,
       },
@@ -616,14 +635,6 @@ const SECTIONS: readonly NavSection[] = [
         icon: BotIcon,
         description: 'Tickets GLPI traités, pause, relance et reformulation IA',
         acces: 'exploitation.administrer',
-        secondary: true,
-      },
-      {
-        href: '/admin/bases',
-        label: 'Bases de démonstration',
-        icon: DatabaseIcon,
-        description: 'Copies d’exemple pour former, sans toucher aux données réelles',
-        acces: 'bases.administrer',
         secondary: true,
       },
     ],
@@ -662,6 +673,11 @@ export function coquesForRole(visiteur: Visiteur): { entry: CoqueEntry; allowed:
   return COQUES.map((entry) => ({ entry, allowed: ouvert(visiteur, entry.acces) }));
 }
 
+/** Sans choix à faire, l'écran des espaces et ses liens disparaissent. */
+export function aPlusieursEspaces(visiteur: Visiteur): boolean {
+  return COQUES.filter((entry) => ouvert(visiteur, entry.acces)).length > 1;
+}
+
 /** Tout ce que ce rôle peut ouvrir dans cette coque, entrées hors barre comprises. */
 function everyItem(visiteur: Visiteur, coque: Coque): NavItem[] {
   return SECTIONS.filter((section) => section.coque === coque).flatMap((section) =>
@@ -691,15 +707,7 @@ export function coqueHomePath(visiteur: Visiteur, coque: Coque): string {
   return first?.href ?? HUB_PATH;
 }
 
-/**
- * Écran d'atterrissage après connexion : premier écran selon le rôle.
- *
- * - Accueil : registre des visites (`/accueil`) ;
- * - téléconseiller et chargé de clientèle : Mon travail (`/teleconseil`) ;
- * - direction : leads importés (`/teleconseil/leads-importes`) ;
- * - superviseur, admin : tableau de bord Téléconseil (`/teleconseil/tableau-de-bord`) ;
- * - Banque & Finance : vue d’ensemble (`/finance`).
- */
+/** Écran d'atterrissage après connexion, selon le rôle. */
 export function homePathForRole(role: Role): string {
   switch (role) {
     case 'ACCUEIL':
@@ -708,10 +716,10 @@ export function homePathForRole(role: Role): string {
     case 'CHARGE_CLIENTELE':
       return '/teleconseil';
     case 'DIRECTION':
-      return '/teleconseil/leads-importes';
     case 'SUPERVISEUR':
-    case 'ADMIN':
       return '/teleconseil/tableau-de-bord';
+    case 'ADMIN':
+      return '/admin/commerciaux';
     case 'BANQUE_FINANCE':
       return '/finance';
     default:
@@ -747,12 +755,19 @@ export function isNavItemActive(visiteur: Visiteur, pathname: string, item: NavI
   return (courant?.onglet ?? courant?.href) === item.href;
 }
 
+/** Une fiche ouverte, quel que soit le chemin : sans cette règle, le préfixe le plus long est « Mon travail ». */
+const FICHE_PROSPECT =
+  /^\/(?:teleconseil\/prospects\/(?!nouveau$)|(?:teleconseil|grand-public)\/appel\/)[^/]+$/u;
+
 function matchNavItem(visiteur: Visiteur, pathname: string): NavItem | undefined {
   const coque = coqueOf(pathname);
   if (coque === null) return undefined;
   // Sur la liste COMPLÈTE : un écran hors barre garde son titre et sa
   // surbrillance, c'est tout ce que `hidden` lui retire.
-  return everyItem(visiteur, coque)
+  const items = everyItem(visiteur, coque);
+  const fiche = items.find((item) => item.href === '/teleconseil/console');
+  if (fiche !== undefined && FICHE_PROSPECT.test(pathname)) return fiche;
+  return items
     .sort((a, b) => b.href.length - a.href.length)
     .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
