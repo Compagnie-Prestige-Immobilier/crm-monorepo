@@ -1427,7 +1427,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 		err := q.ReaffecterProspects(ctx, db.ReaffecterProspectsParams{
 			RepresentantID: corps.RepresentantID, CommercialID: corps.CommercialID, Ids: ids,
 		})
-		apres := map[string]any{"prospectIds": ids, "representantId": corps.RepresentantID, "commercialId": corps.CommercialID}
+		apres := map[string]any{"nombre": len(ids), "representantId": corps.RepresentantID, "commercialId": corps.CommercialID}
 		for i := 0; err == nil && i < len(ids); i++ {
 			err = database.Auditer(ctx, q, u.ID, "prospect.reassign", prospectEntite, ids[i], nil, apres)
 		}
