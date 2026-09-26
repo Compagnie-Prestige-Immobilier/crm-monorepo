@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -574,16 +574,19 @@ function DureeField({
 export function GrandPublicProspectForm({
   embedded = false,
   initial,
+  prenomRef: prenomRefDuDialogue,
   onSaved,
 }: {
   embedded?: boolean;
   /** Présent : le formulaire MODIFIE cette fiche au lieu d'en créer une. */
   initial?: ProspectRow;
+  prenomRef?: RefObject<HTMLInputElement | null> | undefined;
   onSaved?: (prospect: ProspectRow) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const prenomRef = useRef<HTMLInputElement>(null);
+  const prenomRefLocal = useRef<HTMLInputElement>(null);
+  const prenomRef = prenomRefDuDialogue ?? prenomRefLocal;
 
   const [depart] = useState(() => (initial === undefined ? DEPART_VIDE : departDepuis(initial)));
   const [prenom, setPrenom] = useState(depart.prenom);
@@ -777,8 +780,6 @@ export function GrandPublicProspectForm({
                   value={prenom}
                   maxLength={120}
                   autoComplete="off"
-                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
-                  autoFocus
                   onChange={(event) => {
                     setPrenom(event.target.value);
                   }}

@@ -134,14 +134,16 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
             ) : null}
             {issue === 'HONORE' ? (
               <div className="grid gap-2">
-                <Label>Suite après rencontre</Label>
+                <p id="rendez-vous-suite" className="text-[0.9375rem] font-[600] leading-none">
+                  Suite après rencontre
+                </p>
                 <Tabs
                   value={suite ?? ''}
                   onValueChange={(value) => {
                     setSuite(value as Suite);
                   }}
                 >
-                  <TabsList className="w-full">
+                  <TabsList aria-labelledby="rendez-vous-suite" className="w-full">
                     {Object.entries(SUITES).map(([value, label]) => (
                       <TabsTrigger key={value} value={value} className="flex-1">
                         {label}

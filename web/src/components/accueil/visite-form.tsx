@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
 
 import { DatePicker } from '@/components/filters/date-picker';
@@ -10,7 +10,6 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   VISITE_COLONNES,
@@ -234,7 +233,7 @@ function ChampDate({
   if (correction) {
     return (
       <div className="flex flex-col gap-1.5">
-        <Label>{VISITE_COLONNES.date}</Label>
+        <p className="text-[0.9375rem] font-[600] leading-none">{VISITE_COLONNES.date}</p>
         <p className="py-2 text-[0.9375rem] font-[600]">{date === null ? '' : formatDate(date)}</p>
       </div>
     );
@@ -255,16 +254,19 @@ function ChampDate({
 export function VisiteForm({
   referentiels,
   visite = null,
+  nomRef: nomRefDuDialogue,
   onSaved,
   onCancel,
 }: {
   referentiels: VisiteReferentiels | undefined;
   visite?: Visite | null;
+  nomRef?: RefObject<HTMLInputElement | null> | undefined;
   onSaved: (visite: Visite) => void;
   onCancel?: (() => void) | undefined;
 }) {
   const dateId = useId();
-  const nomRef = useRef<HTMLInputElement>(null);
+  const nomRefLocal = useRef<HTMLInputElement>(null);
+  const nomRef = nomRefDuDialogue ?? nomRefLocal;
 
   const depart = valeursInitiales(visite);
   const [date, setDate] = useState<string | null>(depart.date);
@@ -374,8 +376,6 @@ export function VisiteForm({
               {...props}
               ref={nomRef}
               maxLength={NOM_MAX}
-              // oxlint-disable-next-line jsx-a11y/no-autofocus -- saisie au comptoir, champ premier
-              autoFocus={!correction}
               autoComplete="off"
               value={visitorName}
               onChange={(event) => {
