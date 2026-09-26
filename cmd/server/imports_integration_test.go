@@ -993,6 +993,7 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	t.Setenv("IMPORTS_DIR", t.TempDir())
 	b.connecterImport()
 	b.purgerTravauxImport()
+	debut := time.Now()
 	banque := uuid.NewString()
 	sigle := "BT" + strings.ToUpper(banque[:6])
 	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
@@ -1014,6 +1015,9 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
 	simulation := b.attendreImportReussi(body["id"].(string))
 	rapport, _ := simulation["report"].(map[string]any)
+	if total := entierDuRapport(rapport, "totalRows"); total != 3 {
+		t.Fatalf("la ligne d'exemple du modèle ne se lit pas : %d lignes au lieu de 3", total)
+	}
 	erreurs, _ := rapport["errors"].([]any)
 	codes := map[string]bool{}
 	for _, brute := range erreurs {
@@ -1040,6 +1044,14 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	}
 	if refusees != 0 {
 		t.Fatalf("les lignes refusées ne s'écrivent pas : %d fiches", refusees)
+	}
+	var exemples int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = '+221771234567' AND "createdAt" >= $1`,
+		debut).Scan(&exemples); err != nil {
+		t.Fatal(err)
+	}
+	if exemples != 0 {
+		t.Fatalf("la ligne d'exemple a créé %d fiche(s)", exemples)
 	}
 }
 
