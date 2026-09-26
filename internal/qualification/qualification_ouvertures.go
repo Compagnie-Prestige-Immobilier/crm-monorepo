@@ -627,6 +627,7 @@ type QualificationSuggestionDTO struct {
 	ID                          string  `json:"id" format:"uuid"`
 	SourceRepresentantID        string  `json:"sourceRepresentantId" format:"uuid"`
 	SourceRepresentantShortCode string  `json:"sourceRepresentantShortCode"`
+	SourceRepresentantName      string  `json:"sourceRepresentantName"`
 	SuggestedName               *string `json:"suggestedName"`
 	SuggestedPhoneE164          string  `json:"suggestedPhoneE164"`
 	Note                        *string `json:"note"`
@@ -644,6 +645,7 @@ func qualificationSuggestionDTO(row *db.ListerSuggestionsRow) QualificationSugge
 	return QualificationSuggestionDTO{
 		ID: row.ID, SourceRepresentantID: row.SourceRepresentantId,
 		SourceRepresentantShortCode: qualificationCodeCourt(row.SourceRepresentantId),
+		SourceRepresentantName:      row.SourceRepresentantName,
 		SuggestedName:               row.SuggestedName, SuggestedPhoneE164: row.SuggestedPhoneE164,
 		Note: row.Note, Status: string(row.Status), SuggestedByID: row.SuggestedById,
 		SuggestedByName: row.SuggestedByName, ResolvedRepresentantID: row.ResolvedRepresentantId,

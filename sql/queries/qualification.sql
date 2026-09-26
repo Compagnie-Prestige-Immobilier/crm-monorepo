@@ -403,9 +403,11 @@ LIMIT 3001;
 SELECT s."id", s."sourceRepresentantId", s."suggestedName", s."suggestedPhoneE164",
        s."note", s."status", s."suggestedById", u."fullName" AS "suggestedByName",
        s."resolvedRepresentantId", s."clientCreatedAt", s."createdAt",
+       COALESCE(src."fullName", '') AS "sourceRepresentantName",
        COUNT(*) OVER ()::int AS total
 FROM "representant_suggestions" s
 JOIN "users" u ON u."id" = s."suggestedById"
+LEFT JOIN "representants" src ON src."id" = s."sourceRepresentantId"
 WHERE s."deletedAt" IS NULL
   AND (@tous::bool OR s."suggestedById" = @agent)
   AND (CAST(sqlc.narg('id') AS text) IS NULL OR s."id" = CAST(sqlc.narg('id') AS text))
