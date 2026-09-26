@@ -273,7 +273,7 @@ const PageVentes = memo(function PageVentes({
             <Button size="lg" onClick={onAjouter}>
               <PlusIcon aria-hidden="true" /> Nouvelle vente
             </Button>
-            <DepotClasseur premier={false} />
+            <DepotClasseur remplace={classeur !== null} />
           </div>
         }
       />
@@ -336,7 +336,7 @@ const PageVentes = memo(function PageVentes({
               <DownloadIcon aria-hidden="true" /> Télécharger le classeur
             </Button>
           )}
-          <DepotClasseur premier={false} />
+          <DepotClasseur remplace={classeur !== null} />
         </div>
       </div>
     </div>
