@@ -26,7 +26,8 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'courriels.administrer': 'Régler les courriels envoyés par le CRM.',
   'donnees.voir_supprimees': 'Voir les fiches et données supprimées.',
   'enrolement.administrer': 'Suivre les inscriptions de la plateforme et régler l’enrôlement.',
-  'exploitation.administrer': 'Consulter le journal d’exploitation et purger des données.',
+  'exploitation.administrer':
+    'Suivre les envois et les tâches, lire le journal des actions et supprimer des données.',
   'exports.banque': 'Exporter les dossiers Banque & Finance.',
   'exports.globaux': 'Exporter les données de supervision (Excel global).',
   'exports.modeles': 'Télécharger les modèles de fichiers d’import.',
