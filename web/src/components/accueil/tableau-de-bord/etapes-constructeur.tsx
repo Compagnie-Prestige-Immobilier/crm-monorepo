@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { CheckIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 
+import {
+  useDonneesApercu,
+  type ChargementDonnees,
+} from '@/components/accueil/tableau-de-bord/apercu-donnees';
 import { renderMark } from '@/components/accueil/tableau-de-bord/grille';
 import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
@@ -16,16 +19,10 @@ import { ChartCard } from '@/components/dashboard/chart-card';
 import { marqueTexte } from '@/components/dashboard/chart-visual';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchCalculs, type Proposition } from '@/lib/data/disposition';
+import type { Proposition } from '@/lib/data/disposition';
 
 export type ArgsApercu = { proposition: Proposition; marque: DashboardMarque };
-export interface ChargementDonnees {
-  plage: { du: string; au: string };
-  cleDonnees: readonly unknown[];
-  chargerSource: (source: string) => Promise<DonneesSource | null>;
-}
 
-const AUCUNE = 'Aucune donnée pour cet indicateur sur la période.';
 const VIDE = 'Rien sur la période.';
 const MULTI_SERIES: readonly DashboardMarque[] = [
   'barres-empilees',
@@ -46,29 +43,6 @@ export function useFocus<T extends HTMLElement>(pret = true) {
     if (pret) ref.current?.focus();
   }, [pret]);
   return ref;
-}
-
-async function donneesDe(
-  proposition: Proposition,
-  chargement: ChargementDonnees,
-): Promise<{ donnees?: DonneesSource; erreur?: string }> {
-  if (proposition.calcul !== undefined) {
-    const [rendu] = await fetchCalculs([proposition.calcul], chargement.plage);
-    if (rendu?.donnees !== undefined) return { donnees: rendu.donnees };
-    return { erreur: rendu?.erreur ?? AUCUNE };
-  }
-  const donnees =
-    proposition.source === undefined ? null : await chargement.chargerSource(proposition.source);
-  return donnees === null ? { erreur: AUCUNE } : { donnees };
-}
-
-function useDonnees(proposition: Proposition, chargement: ChargementDonnees) {
-  const { du, au } = chargement.plage;
-  const cible = proposition.calcul ?? proposition.source ?? null;
-  return useQuery({
-    queryKey: ['tableau-de-bord', 'apercu', cible, du, au, ...chargement.cleDonnees],
-    queryFn: () => donneesDe(proposition, chargement),
-  });
 }
 
 /** Une seule série : aucune forme qui empile ou groupe plusieurs séries. */
@@ -156,7 +130,12 @@ export function Comprendre({
 
 function EtatDonnees({ pending, erreur }: { pending: boolean; erreur: string | undefined }) {
   if (pending) return <Skeleton className="h-40 w-full rounded-md" />;
-  return <p className="text-destructive">{erreur ?? AUCUNE}</p>;
+  return <p className="text-destructive">{erreur}</p>;
+}
+
+function Note({ texte }: { texte: string | undefined }) {
+  if (texte === undefined) return null;
+  return <p className="text-[0.8125rem] text-muted-foreground">{texte}</p>;
 }
 
 export function Forme({
@@ -168,13 +147,14 @@ export function Forme({
   chargement: ChargementDonnees;
   onChoisir: (marque: DashboardMarque) => void;
 }) {
-  const { data, isPending } = useDonnees(proposition, chargement);
+  const { data, isPending } = useDonneesApercu(proposition, chargement);
   const donnees = data?.donnees;
   return (
     <div className="flex flex-col gap-4 p-6">
       <p className="font-display text-[1.0625rem] font-[600]">
         Comment afficher « {proposition.titre} » ?
       </p>
+      <Note texte={data?.note} />
       {donnees === undefined ? (
         <EtatDonnees pending={isPending} erreur={data?.erreur} />
       ) : (
@@ -226,7 +206,7 @@ export function Apercu({
   onAjouter: () => void;
   onAutreForme: () => void;
 }) {
-  const { data, isPending } = useDonnees(args.proposition, chargement);
+  const { data, isPending } = useDonneesApercu(args.proposition, chargement);
   const donnees = data?.donnees;
   const oui = useFocus<HTMLButtonElement>(donnees !== undefined);
   // Nivo mesure son conteneur pendant le morphing, encore à la taille de la vignette.
@@ -234,6 +214,7 @@ export function Apercu({
   return (
     <div className="flex flex-col gap-4 p-6">
       <p className="font-display text-[1.0625rem] font-[600]">C’est celui-ci ?</p>
+      <Note texte={data?.note} />
       <motion.div layoutId={`forme-${args.marque}`} onLayoutAnimationComplete={() => setPose(true)}>
         <ChartCard
           title={args.proposition.titre}
