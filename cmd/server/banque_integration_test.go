@@ -843,6 +843,20 @@ func TestBanqueMotifVideRefuse(t *testing.T) {
 	}
 }
 
+func TestBanqueInscriptionsAOuvrirSignalentLeurPlafond(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
+		("id","projet","identifiantDistant","nom","prenom","statutDistant","decideeLe","chargeUtile","dernierTirageAt","updatedAt")
+		SELECT gen_random_uuid()::text,'CHUES','test-' || $1 || '-' || n,'Sy','Awa','validated',now(),'{}',now(),now()
+		FROM generate_series(1, 2001) n`, s.banqueID)
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
+	if items, _ := body["items"].([]any); len(items) != 2000 || body["truncated"] != true {
+		t.Fatalf("2000 inscriptions et le plafond signalé attendus : %d, truncated=%v", len(items), body["truncated"])
+	}
+}
+
 // Plateforme locale : l'archive CHUES est relue à chaque pièce, une pièce Grand Public
 // sans Content-Length au-delà du plafond est refusée plutôt que servie tronquée.
 func TestBanquePiecesDUnePlateformeLocale(t *testing.T) {
