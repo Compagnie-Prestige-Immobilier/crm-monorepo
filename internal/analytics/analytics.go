@@ -26,8 +26,7 @@ const (
 )
 
 // LEFT et non INNER : syndicat, banque et représentant sont NULLABLES depuis le
-// Grand Public. En jointure interne ces fiches disparaissaient de tous les
-// agrégats, sans erreur, à côté de listes qui les comptaient.
+// Grand Public, et une jointure interne retirerait ces fiches des agrégats.
 const deProspectsEtReferentiels = `
   FROM "prospects" p
   LEFT JOIN "representants" r ON r."id" = p."representantId"
@@ -51,9 +50,8 @@ func litToutLeTravail(u *socle.Utilisateur) bool {
 	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
-// Même entrée de cache pour tous ceux qui voient tout et partagent un rôle ;
-// un téléconseiller n'a que la sienne. Clé par rôle attribué, pas par rôle de
-// base : un rôle personnalisé n'a pas forcément les permissions de sa base.
+// Une entrée par rôle attribué pour ceux qui voient tout (un rôle personnalisé n'a
+// pas forcément les permissions de sa base) ; un téléconseiller a la sienne.
 func porteeDeCache(ctx context.Context) string {
 	u := socle.UtilisateurCourant(ctx)
 	if !litToutLeTravail(&u) {
@@ -163,9 +161,8 @@ func porteeDeLecture(u *socle.Utilisateur, f *FiltreDesAnalyses, p *parametresSQ
 	if !f.IncludeDeleted || !u.Peut(socle.PermissionDonneesVoirSupprimees) {
 		conditions = append(conditions, `p."deletedAt" IS NULL`)
 	}
-	// Sans ce filtre un total « par département » dépasse le total global.
-	// `IS NULL` couvre les deux cas : représentant supprimé écarté, fiche sans
-	// représentant — tout le Grand Public — comptée.
+	// Représentant supprimé écarté, fiche sans représentant (Grand Public) comptée :
+	// sinon un total « par département » dépasse le total global.
 	return append(conditions, `r."deletedAt" IS NULL`)
 }
 
@@ -656,9 +653,8 @@ type ligneDesDelais struct {
 	N3 int32
 }
 
-// Médiane et non moyenne : un dossier oublié six mois déplacerait une moyenne de
-// plusieurs semaines. Un couple incomplet ou inversé est une mesure à jeter,
-// l'horloge du téléphone posant `clientCreatedAt`.
+// Médiane et non moyenne : un dossier oublié six mois fausserait la moyenne. Un
+// couple inversé (horloge du téléphone dans `clientCreatedAt`) est jeté.
 func medianeEtNeuviemeDecile(depuis, vers, suffixe string) string {
 	duree := `EXTRACT(EPOCH FROM (` + vers + ` - ` + depuis + `)) / 86400.0`
 	exploitable := depuis + ` IS NOT NULL AND ` + vers + ` IS NOT NULL AND ` + vers + ` >= ` + depuis

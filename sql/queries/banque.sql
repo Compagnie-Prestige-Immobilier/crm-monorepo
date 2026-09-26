@@ -217,7 +217,7 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
   AND (sqlc.narg('id')::text IS NULL OR i."id" = sqlc.narg('id')::text)
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id" AND c."deletedAt" IS NULL)
 ORDER BY i."decideeLe" DESC NULLS LAST, i."soumiseLe" DESC NULLS LAST, i."id" DESC
-LIMIT 2000;
+LIMIT sqlc.arg('prendre')::bigint;
 
 -- name: BankInscriptionSignalee :exec
 UPDATE "inscriptions_plateforme" SET "completeSignaleeLe" = $2 WHERE "id" = $1;

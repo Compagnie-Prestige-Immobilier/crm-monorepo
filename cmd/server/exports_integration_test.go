@@ -62,9 +62,8 @@ type exportJeu struct {
 	reference    string
 }
 
-// Un représentant, un prospect au nom piégé et une visite : de quoi remplir
-// une ligne de chaque feuille. Tout libellé est suffixé, la base de test étant
-// partagée avec les autres domaines et portant des contraintes d'unicité.
+// Une ligne par feuille : représentant, prospect au nom piégé, visite. Libellés
+// suffixés, la base de test étant partagée et soumise à des unicités.
 func exportSemer(b *banc) exportJeu {
 	b.t.Helper()
 	j := exportJeu{

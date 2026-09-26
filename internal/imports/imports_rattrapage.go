@@ -13,10 +13,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// RATTRAPAGE PONCTUEL, À RETIRER APRÈS USAGE, avec ses deux requêtes dans
-// `sql/queries/imports.sql` et le bouton du panneau. Les fiches importées avant
-// le 13 septembre 2026 n'ont pas d'onglet : leur classeur est relu et l'onglet
-// posé en rapprochant par téléphone, exactement comme l'import l'avait lu.
+// Rattrapage ponctuel, à retirer avec ses requêtes et son bouton : pose l'onglet
+// des fiches importées avant le 13 septembre 2026, rapprochées par téléphone.
 const cheminRattrapageFeuilles = "POST /api/v1/imports/rattraper-feuilles"
 
 type RattrapageClasseur struct {
@@ -45,9 +43,8 @@ func (s *service) rattraperFeuilles(ctx context.Context, _ *struct{}) (*Rattrapa
 	if err != nil {
 		return nil, err
 	}
-	// L'échéance efface le classeur du disque : les travaux les plus anciens
-	// n'ont plus rien à relire. Le même document vit toujours sur SharePoint, et
-	// le rapprochement se fait par téléphone, pas par fichier.
+	// Le classeur des travaux anciens est effacé du disque : SharePoint garde le même
+	// document, et le rapprochement se fait par téléphone.
 	recours := classeurDepuisSharePoint(ctx)
 	if recours != "" {
 		defer func() { _ = os.Remove(recours) }()

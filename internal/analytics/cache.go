@@ -10,10 +10,8 @@ type entreeCache struct {
 	expire time.Time
 }
 
-// Reprend `@Cached` de la v1 : même TTL par route, même clé
-// `route:portée:filtres` où la portée vaut le rôle quand il lit tout, et
-// l'identifiant sinon. Sans cela deux téléconseillers se serviraient la même
-// réponse.
+// Clé `route:portée:filtres`, la portée valant le rôle quand il lit tout et
+// l'identifiant sinon, pour que deux téléconseillers ne partagent pas une réponse.
 type cacheMemoire struct {
 	mu      sync.RWMutex
 	entrees map[string]entreeCache

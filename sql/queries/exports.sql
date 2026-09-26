@@ -1,6 +1,5 @@
--- Classeurs d'export. Les pages sont keyset : $1 nul = première page.
--- Les prospects filtrés, les représentants filtrés et les dossiers bancaires
--- ont des prédicats optionnels et restent en pgx direct (plan.md 2.1).
+-- Pages keyset : $1 nul = première page. Les exports à prédicats optionnels
+-- (prospects, représentants, dossiers) restent en pgx direct (plan.md 2.1).
 
 -- name: ExportBanquesActives :many
 SELECT "shortName" FROM "banques" WHERE "isActive" ORDER BY "sortOrder" ASC, "shortName" ASC;

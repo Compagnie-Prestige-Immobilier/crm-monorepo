@@ -44,17 +44,21 @@ type InscriptionsAOuvrirInput struct {
 
 type InscriptionsAOuvrirOutput struct {
 	Body struct {
-		Items []InscriptionAOuvrir `json:"items"`
+		Items     []InscriptionAOuvrir `json:"items"`
+		Truncated bool                 `json:"truncated" doc:"Plus de 2000 inscriptions à ouvrir : seules les plus récentes sont listées."`
 	}
 }
 
+const inscriptionsCompletesMax = 2000
+
+// Une ligne de plus que le plafond : sa présence dit que la liste est tronquée.
 func (s *service) inscriptionsCompletes(ctx context.Context, projet string, aSignaler bool, id *string) ([]db.BankInscriptionsCompletesRow, error) {
 	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, projet)
 	if err != nil {
 		return nil, err
 	}
 	return s.Q.BankInscriptionsCompletes(ctx, db.BankInscriptionsCompletesParams{
-		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler, ID: id,
+		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler, ID: id, Prendre: inscriptionsCompletesMax + 1,
 	})
 }
 
@@ -64,6 +68,9 @@ func (s *service) inscriptionsAOuvrir(ctx context.Context, in *InscriptionsAOuvr
 		return nil, err
 	}
 	out := &InscriptionsAOuvrirOutput{}
+	if len(lignes) > inscriptionsCompletesMax {
+		lignes, out.Body.Truncated = lignes[:inscriptionsCompletesMax], true
+	}
 	out.Body.Items = make([]InscriptionAOuvrir, 0, len(lignes))
 	for i := range lignes {
 		r := &lignes[i]
@@ -190,9 +197,8 @@ func texteOuTiret(v *string) string {
 	return *v
 }
 
-// Appelé après chaque tirage : chaque inscription devenue complète est marquée
-// avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel,
-// lui, part de la plateforme : ici, seule la notification in-app.
+// Marquée avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel
+// part de la plateforme : ici, seule la notification in-app.
 func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string) (int, error) {
 	s := &service{d}
 	lignes, err := s.inscriptionsCompletes(ctx, projet, true, nil)

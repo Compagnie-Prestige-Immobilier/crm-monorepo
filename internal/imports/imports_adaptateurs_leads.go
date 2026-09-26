@@ -29,9 +29,8 @@ func provenanceEtDateGrandPublicImport(ligne *ligneGrandPublicImport, cellules m
 	ligne.plateforme = plateformeGrandPublicImport(canal)
 }
 
-// Le canal nomme le réseau, la règle nomme la campagne : elle seule sait à quel
-// projet le prospect répondait, et passe avant le libellé exact d'un canal.
-// Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
+// La règle de provenance nomme la campagne, donc le projet : elle passe avant le
+// canal. Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
 func provenanceGrandPublicImport(canal, provenance string, etat *etatGrandPublicImport) provenanceImport {
 	cle := cleImport(canal)
 	if cle != "" {
@@ -174,10 +173,8 @@ func echangerJourMoisImport(t time.Time) time.Time {
 
 func memeJourImport(a, b time.Time) bool { return a.Year() == b.Year() && a.YearDay() == b.YearDay() }
 
-// Le jour de l'onglet fait foi : Excel a rangé « 11/09/2026 » au 9 novembre.
-// Une date qui tombe le jour de l'onglet, à l'endroit ou inversée, n'est pas
-// revérifiée contre l'horloge du serveur : l'onglet lui-même peut être relevé
-// avant la date qu'il annonce.
+// Le jour de l'onglet fait foi, même à venir : Excel a rangé « 11/09/2026 » au
+// 9 novembre, et l'onglet peut être relevé avant le jour qu'il annonce.
 func dateLeadImport(brut, feuille string, numero int, maintenant time.Time) (time.Time, *erreurLigneImport) {
 	date := lireDateBruteLeadImport(brut)
 	if jour, ok := jourDeLaFeuilleImport(feuille, maintenant); ok {

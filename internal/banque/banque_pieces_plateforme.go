@@ -9,51 +9,9 @@ import (
 	"log/slog"
 	"path"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
-
-// L'archive CHUES se lit en entier pour servir une seule pièce : la garder
-// quelques minutes évite N téléchargements pour les N pièces d'un dossier.
-const (
-	archiveGardeeDuree = 3 * time.Minute
-	archivesGardeesMax = 4
-)
-
-type archiveGardee struct {
-	contenu []byte
-	expire  time.Time
-}
-
-var archivesRecentes = struct {
-	sync.Mutex
-	parDossier map[string]archiveGardee
-}{parDossier: map[string]archiveGardee{}}
-
-func archiveRecente(cle string) ([]byte, bool) {
-	archivesRecentes.Lock()
-	defer archivesRecentes.Unlock()
-	entree, ok := archivesRecentes.parDossier[cle]
-	if !ok || time.Now().After(entree.expire) {
-		delete(archivesRecentes.parDossier, cle)
-		return nil, false
-	}
-	return entree.contenu, true
-}
-
-func garderArchive(cle string, contenu []byte) {
-	archivesRecentes.Lock()
-	defer archivesRecentes.Unlock()
-	maintenant := time.Now()
-	for autre, entree := range archivesRecentes.parDossier {
-		if maintenant.After(entree.expire) || len(archivesRecentes.parDossier) >= archivesGardeesMax {
-			delete(archivesRecentes.parDossier, autre)
-		}
-	}
-	archivesRecentes.parDossier[cle] = archiveGardee{contenu: contenu, expire: maintenant.Add(archiveGardeeDuree)}
-}
 
 // Ce que Grand Public rend pour une pièce : une URL signée de courte durée,
 // jamais un chemin de stockage.
@@ -117,29 +75,28 @@ func pieceDuGrandPublic(ctx context.Context, source *sourceDesPieces, code strin
 }
 
 // CHUES refuse le téléchargement pièce par pièce au compte machine, mais lui
-// ouvre l'archive du dossier : on l'ouvre ici plutôt que de demander un droit
-// de plus à la plateforme.
+// ouvre l'archive du dossier.
 func archiveChues(ctx context.Context, base, jeton string, charge []byte) ([]byte, error) {
+	adresse, err := adresseArchiveChues(base, charge)
+	if err != nil {
+		return nil, err
+	}
+	corps, _, err := lirePlateformeBrut(ctx, adresse, jeton)
+	return corps, err
+}
+
+func adresseArchiveChues(base string, charge []byte) (string, error) {
 	var distant struct {
 		Dossier *struct {
 			ID json.RawMessage `json:"id"`
 		} `json:"dossier"`
 	}
 	if json.Unmarshal(charge, &distant) != nil || distant.Dossier == nil {
-		return nil, errors.New("aucun dossier ouvert sur la plateforme CHUES")
+		return "", errors.New("aucun dossier ouvert sur la plateforme CHUES")
 	}
 	// Le flux d'intégration rend l'identifiant en chaîne, l'ancienne route en nombre.
 	dossier := strings.Trim(string(distant.Dossier.ID), `"`)
-	cle := base + "/dossiers/" + dossier + "/archive"
-	if contenu, ok := archiveRecente(cle); ok {
-		return contenu, nil
-	}
-	corps, _, err := lirePlateformeBrut(ctx, cle, jeton)
-	if err != nil {
-		return nil, err
-	}
-	garderArchive(cle, corps)
-	return corps, nil
+	return base + "/dossiers/" + dossier + "/archive", nil
 }
 
 func piecesDeLArchive(archive []byte) ([]PieceDeposee, error) {

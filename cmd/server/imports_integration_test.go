@@ -489,9 +489,8 @@ func classeurLeads(t *testing.T, telephone string) []byte {
 	return buf.Bytes()
 }
 
-// Le lien SharePoint, joué en local : une redirection qui pose un cookie, puis
-// le classeur, comme le vrai. Le nom du classeur est propre au test : le vrai
-// relevé écrit dans la même base.
+// Le lien SharePoint joué en local : une redirection qui pose un cookie, puis le
+// classeur. Le nom est propre au test, le vrai relevé écrit dans la même base.
 func (b *banc) lienDesLeads(classeur []byte, nomFichier string) string {
 	b.t.Helper()
 	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -750,10 +749,8 @@ const (
 	libelleMetaTest    = "Meta (Facebook et Instagram)"
 )
 
-// La codification du classeur des leads (docs/decisions/import-leads.md) : le
-// jour de l'onglet corrige la date, « Canal » décide du projet, une ligne sans
-// identité se signale, le classeur relu met la fiche à jour sans toucher à son
-// projet ni à sa campagne.
+// docs/decisions/import-leads.md : l'onglet corrige la date, « Canal » décide du
+// projet, le classeur relu met la fiche à jour sans toucher projet ni campagne.
 func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -804,12 +801,7 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
 }
 
-// B08 : un onglet d'octobre à décembre doit toujours corriger l'inversion
-// jour/mois. Avant correction, seules les quatre premières lettres du mois
-// étaient comparées au préfixe complet de l'abréviation : « oct », « nov » et
-// « déc » ne faisaient plus reconnaître l'onglet, qui perdait sa date pivot.
-// L'onglet porte l'an dernier : le jour de l'onglet doit rester dans le passé
-// pour que la correction s'applique, comme au dépôt réel d'un classeur.
+// « oct », « nov » et « déc » font reconnaître l'onglet, qui corrige alors l'inversion jour/mois.
 func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -835,6 +827,45 @@ func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
 	b.attendRapportTest(travail, "total=1 created=1 updated=0 skipped=0 errors=0 warnings=1", map[string]float64{
 		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1,
 	})
+}
+
+// Un onglet sans année relevé avant le jour qu'il annonce garde l'année courante.
+func TestImportLeadsOngletSansAnneeGardeLAnneeCourante(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	maintenant := time.Now().UTC()
+	annee := maintenant.Year()
+	demain := maintenant.AddDate(0, 0, 1)
+	anneeOctobre := annee
+	if time.Date(annee, time.October, 1, 0, 0, 0, 0, time.UTC).After(maintenant.AddDate(0, 6, 0)) {
+		anneeOctobre--
+	}
+	base := time.Now().UnixNano() % 10_000_000
+	tels := []string{fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22177%07d", (base+1)%10_000_000)}
+	nomClasseur := fmt.Sprintf("Leads sans année %d.xlsx", base)
+	b.nettoyerLeadsTest(tels, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	onglets := []ongletLeadsBrutTest{
+		{nom: fmt.Sprintf("Leads %d %s", demain.Day(), socle.MoisEnLettres[demain.Month()-1]), lignes: [][]any{
+			{"", "Aminata Diop", "", "Payé", tels[0], canalMetaChuesTest, ""},
+		}},
+		{nom: "Leads 1 oct", lignes: [][]any{
+			{"", "Moussa Ndiaye", "", "Payé", tels[1], canalMetaChuesTest, ""},
+		}},
+	}
+
+	b.releverLeadsTest(classeurLeadsBrut(t, entete, onglets), nomClasseur)
+	attendus := []time.Time{
+		time.Date(annee, demain.Month(), demain.Day(), 0, 0, 0, 0, time.UTC),
+		time.Date(anneeOctobre, time.October, 1, 0, 0, 0, 0, time.UTC),
+	}
+	for i, telephone := range tels {
+		if lue := b.ficheLeadTest(telephone).creeLe.UTC(); !lue.Equal(attendus[i]) {
+			t.Fatalf("onglet « %s » : %v, attendu %v", onglets[i].nom, lue, attendus[i])
+		}
+	}
 }
 
 // « projet | canal | créée le | note », lisible d'un coup dans l'échec.
@@ -927,8 +958,7 @@ func projetsDesParcoursTest(b *banc, prospectID string) []string {
 	return parcours
 }
 
-// Une ligne de lead sans téléphone n'écrit aucune fiche : personne ne pourrait
-// l'appeler, et le relevé horaire la recréait à chaque passage. Le rapport la dit.
+// Une ligne de lead sans téléphone n'écrit aucune fiche, et le rapport la signale.
 func TestImportLeadsIgnoreEtSignaleUneLigneSansTelephone(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -993,6 +1023,7 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	t.Setenv("IMPORTS_DIR", t.TempDir())
 	b.connecterImport()
 	b.purgerTravauxImport()
+	debut := time.Now()
 	banque := uuid.NewString()
 	sigle := "BT" + strings.ToUpper(banque[:6])
 	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
@@ -1014,6 +1045,9 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
 	simulation := b.attendreImportReussi(body["id"].(string))
 	rapport, _ := simulation["report"].(map[string]any)
+	if total := entierDuRapport(rapport, "totalRows"); total != 3 {
+		t.Fatalf("la ligne d'exemple du modèle ne se lit pas : %d lignes au lieu de 3", total)
+	}
 	erreurs, _ := rapport["errors"].([]any)
 	codes := map[string]bool{}
 	for _, brute := range erreurs {
@@ -1034,12 +1068,11 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	if phase != "METHOD_OBTAINED" || methode != "APPOINTMENT" || banqueLue != banque {
 		t.Fatalf("« Enrôlement sur place » relu : %s, %s, banque %s", phase, methode, banqueLue)
 	}
-	var refusees int
-	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]).Scan(&refusees); err != nil {
-		t.Fatal(err)
-	}
-	if refusees != 0 {
+	if refusees := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]); refusees != 0 {
 		t.Fatalf("les lignes refusées ne s'écrivent pas : %d fiches", refusees)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = '+221771234567' AND "createdAt" >= $1`, debut); n != 0 {
+		t.Fatalf("la ligne d'exemple a créé %d fiche(s)", n)
 	}
 }
 
@@ -1103,9 +1136,8 @@ func classeurRepresentantsVolumineux(t *testing.T, departement string, lignes in
 	return tampon.Bytes()
 }
 
-// B86 : au-delà de 1 Mo, `ParseMultipartForm` écrit le fichier reçu sur le
-// disque avant de rendre la main au dépôt ; `bornerDepotImport` doit l'effacer,
-// sinon chaque gros classeur laisse un `multipart-*` derrière lui.
+// Au-delà de 1 Mo, `ParseMultipartForm` écrit sur le disque : le dépôt ne doit
+// laisser aucun `multipart-*` derrière lui.
 func TestImportNeLaissePasDeFichierTemporaire(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	t.Setenv("IMPORTS_DIR", t.TempDir())

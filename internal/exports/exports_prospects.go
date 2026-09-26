@@ -180,9 +180,8 @@ func exportSegmentSQL(segment string) string {
 	return "(" + syndicat + " AND " + banque + ")"
 }
 
-// Portée, filtres et suppression logique, partagés par les lignes et par la
-// feuille Synthèse : deux clauses distinctes feraient diverger le total du
-// tableau de bord et le nombre de lignes du classeur.
+// Partagé par les lignes et la feuille Synthèse : deux clauses distinctes feraient
+// diverger le total du tableau de bord et le nombre de lignes.
 func exportConditionsProspects(u *socle.Utilisateur, in *ExportProspectsInput, segment string) (*exportPredicat, error) {
 	p := &exportPredicat{}
 	exportPorteeDeLecture(p, u)

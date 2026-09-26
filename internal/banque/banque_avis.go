@@ -8,9 +8,8 @@ import (
 	"log/slog"
 )
 
-// L'échec d'un avis n'annule pas la demande, déjà écrite : la perdre sur une
-// panne du canal d'alerte remettrait l'agent bancaire dans l'impasse que ce
-// module lève.
+// L'échec d'un avis n'annule pas la demande, déjà écrite : une panne du canal
+// d'alerte ne doit pas la perdre.
 func (s *service) banqueAviser(ctx context.Context, etape, auteur string, avis *notifications.CreationNotification) {
 	if _, err := notifications.Composer(ctx, s.Deps, auteur, avis); err != nil {
 		slog.Warn("notification non émise", "etape", etape, "err", err)

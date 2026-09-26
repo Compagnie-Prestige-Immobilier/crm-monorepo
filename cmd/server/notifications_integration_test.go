@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/db"
 	"cpi-go/internal/notifications"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
@@ -28,6 +29,7 @@ type brevoVersionRecue struct {
 type brevoRecu struct {
 	Subject         string              `json:"subject"`
 	To              []map[string]string `json:"to"`
+	Cc              []map[string]string `json:"cc"`
 	HTMLContent     string              `json:"htmlContent"`
 	TextContent     string              `json:"textContent"`
 	MessageVersions []brevoVersionRecue `json:"messageVersions"`
@@ -272,9 +274,8 @@ func TestNotificationDeuxExpediteursConcurrentsNenvoientQuUneFois(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	// Brevo tient la ligne le temps que le second expéditeur lise : sans ce
-	// délai les deux passages se suivent au lieu de se chevaucher, et le test
-	// ne prouverait plus rien du bail.
+	// Brevo tient la ligne pendant que le second expéditeur lit : sans ce délai, les
+	// deux passages se suivent au lieu de se chevaucher.
 	faux.mu.Lock()
 	faux.delai = 300 * time.Millisecond
 	faux.mu.Unlock()
@@ -481,6 +482,15 @@ func TestNotificationEcheanceVenteLaVeille(t *testing.T) {
 	s := b.notificationService()
 	client := "CLIENT ECHEANCE " + uuid.NewString()[:8]
 	demain := notifications.JourNotification(s, time.Now().Add(24*time.Hour))
+	lointaines := "AAA ECHEANCE LOINTAINE " + uuid.NewString()[:8]
+	if _, err := b.pool.Exec(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "jourVersement", "premierVersement")
+		SELECT 'SAISIE', 0, 'CPI', $1 || n, '770000000', 'THIEO', 1, '', '', 4000000, 4000000, 0, 4000000,
+		0, 0, 4000000, 'CREDIT', 1, 5, $2::date + 400 FROM generate_series(1, 5000) n`, lointaines, demain); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "client" LIKE $1 || '%'`, lointaines) })
 	var venteID int64
 	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
 		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
@@ -699,8 +709,7 @@ func TestNotificationEmailReserveAuTeleconseiller(t *testing.T) {
 	}
 }
 
-// Une annonce à plusieurs téléconseillers partait dans un seul appel Brevo
-// avec un `to` de tous les destinataires : chacun lisait l'adresse des autres.
+// Une annonce à plusieurs téléconseillers : chacun ne lit que sa propre adresse.
 func TestAnnonceBrevoUneVersionParDestinataire(t *testing.T) {
 	faux := brevoDeTest(t)
 	b := nouveauBanc(t, "ADMIN")
@@ -738,5 +747,83 @@ func TestAnnonceBrevoUneVersionParDestinataire(t *testing.T) {
 	}
 	if !vues[emailA] || !vues[emailB] {
 		t.Fatalf("les deux destinataires doivent apparaître, chacun dans sa version : %v", vues)
+	}
+}
+
+// Un courriel opérationnel part en un seul exemplaire : tous ses destinataires dans `to`, la copie une fois.
+func TestCourrielOperationnelUnSeulToAvecCopie(t *testing.T) {
+	faux := brevoDeTest(t)
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationAdminConnecte()
+	sujet := "Dossier encaissé " + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte","statut","updatedAt")
+		VALUES ($1,'DOSSIER_ENCAISSE',$2,'{banque-a@test.cpi,banque-b@test.cpi}','{copie@test.cpi}','inscription',$1,'<p>x</p>','x','ECHEC',now())`,
+		courrielID, sujet)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
+	b.attend(statut, http.StatusOK, "renvoi", body)
+	appels := faux.pour(sujet)
+	if len(appels) != 1 {
+		t.Fatalf("un seul appel Brevo attendu, %d reçu(s)", len(appels))
+	}
+	appel := appels[0]
+	if len(appel.To) != 2 || len(appel.Cc) != 1 || len(appel.MessageVersions) != 0 {
+		t.Fatalf("to %v, cc %v, %d version(s) : un `to` à deux adresses et aucune version attendus", appel.To, appel.Cc, len(appel.MessageVersions))
+	}
+}
+
+// Un courriel créé la veille au soir et définitivement refusé ce matin figure dans l'alerte d'incident.
+func TestCourrielEchecDuSoirCiteParLAlerte(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	cause := "refus-" + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte",
+		"statut","erreur","tentatives","createdAt","updatedAt")
+		VALUES ($1,'DOSSIER_REJETE','Refus','{banque@test.cpi}','{}','inscription',$1,'<p>x</p>','x','ECHEC',$2,3,now() - interval '30 hours',now())`,
+		courrielID, cause)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	incidents, err := db.New(b.pool).IncidentsDesDernieresHeures(b.ctx, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range incidents {
+		if incidents[i].Erreur != nil && *incidents[i].Erreur == cause {
+			return
+		}
+	}
+	t.Fatalf("le courriel refusé dans les dernières 24 h doit figurer dans l'alerte : %d incident(s)", len(incidents))
+}
+
+// Un « Renvoyer » pendant que le rejeu tient la ligne ne l'expédie pas une seconde fois.
+func TestCourrielRenvoiPendantLeRejeuNeDoublePas(t *testing.T) {
+	faux := brevoDeTest(t)
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationAdminConnecte()
+	sujet := "Refus de dossier " + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte","statut","updatedAt")
+		VALUES ($1,'DOSSIER_REJETE',$2,'{banque@test.cpi}','{}','inscription',$1,'<p>x</p>','x','ECHEC',now())`, courrielID, sujet)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	rejeu, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rejeu.Exec(b.ctx, `SELECT 1 FROM "courriels" WHERE "id" = $1 FOR UPDATE`, courrielID); err != nil {
+		t.Fatal(err)
+	}
+	liberation := time.AfterFunc(2*time.Second, func() { _ = rejeu.Rollback(b.ctx) })
+	defer func() {
+		if liberation.Stop() {
+			_ = rejeu.Rollback(b.ctx)
+		}
+	}()
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
+	b.attend(statut, http.StatusConflict, "renvoi d'une ligne en cours d'envoi", body)
+	if n := len(faux.pour(sujet)); n != 0 {
+		t.Fatalf("aucun envoi tant que le rejeu tient la ligne, %d reçu(s)", n)
 	}
 }
