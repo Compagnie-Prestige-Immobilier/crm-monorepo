@@ -8,11 +8,11 @@ import { RepresentantFormDialog } from '@/components/representants/representant-
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
-import { countPendingProspects } from '@/lib/data/phase2';
+import { fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { fetchRepresentants } from '@/lib/data/representants';
 import { formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
+import { NON_QUALIFIES, SANS_PROSPECT } from '@/components/chues/hub-filters';
 
 /**
  * L'écran d'ouverture du projet CHUES : trois étapes, dans l'ordre, chacune
@@ -42,24 +42,12 @@ export function HubView({
     queryFn: () => fetchRepresentants(SANS_PROSPECT),
   });
 
-  const enAttente = useQuery({
-    queryKey: hubKeys.prospectsEnAttente,
-    queryFn: () => countPendingProspects('ALL', 'CHUES'),
+  // Mêmes critères que « Reste à appeler » de la fiche prospect.
+  const resteAAppeler = useQuery({
+    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', 'mon-travail'],
+    queryFn: () =>
+      fetchProspectsAQualifier({ projet: null, search: '', resteAAppeler: true, page: 1 }),
   });
-
-  const rappels = useQuery({
-    queryKey: [...callbackKeys.list('today', null), 'CHUES'],
-    queryFn: () => fetchCallbacks('today', null, undefined, 'CHUES'),
-    retry: false,
-  });
-
-  const retards = useQuery({
-    queryKey: [...callbackKeys.list('overdue', null), 'CHUES'],
-    queryFn: () => fetchCallbacks('overdue', null, undefined, 'CHUES'),
-    retry: false,
-  });
-
-  const enRetard = retards.data?.total ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,6 +58,8 @@ export function HubView({
       </div>
 
       <ol className="grid gap-4 [counter-reset:etape] md:grid-cols-2 xl:grid-cols-4">
+        <EtapeRappels encadrement={encadrement} />
+
         <Etape
           titre="Fiche représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
@@ -114,32 +104,13 @@ export function HubView({
           explication="Chaque prospect est rappelé jusqu’à son adhésion."
           chiffre={
             <Chiffre
-              pending={enAttente.isPending}
-              failed={enAttente.isError}
-              valeur={enAttente.data}
-              legende="pas encore convertis"
+              pending={resteAAppeler.isPending}
+              failed={resteAAppeler.isError}
+              valeur={resteAAppeler.data?.total}
+              legende="à appeler"
             />
           }
           action={<Geste href="/teleconseil/console" label="Appeler un prospect" primary />}
-        />
-
-        <Etape
-          titre={encadrement ? 'Rappels des téléconseillers' : 'À rappeler'}
-          explication={
-            encadrement
-              ? 'Ce que les téléconseillers ont promis de rappeler. Les retards se suivent ici.'
-              : 'Les rappels promis et ceux que le référentiel a reprogrammés.'
-          }
-          chiffre={
-            <Chiffre
-              pending={rappels.isPending}
-              failed={rappels.isError}
-              valeur={rappels.data?.total}
-              legende={encadrement ? 'dus aujourd’hui chez les téléconseillers' : 'dus aujourd’hui'}
-              enRetard={enRetard}
-            />
-          }
-          action={<Geste href="/teleconseil/rappels" label="Voir les rappels" />}
         />
       </ol>
 
@@ -149,6 +120,44 @@ export function HubView({
         representant={null}
       />
     </div>
+  );
+}
+
+/** Mêmes requêtes que l'écran Rappels : les deux projets, les mêmes chiffres. */
+function EtapeRappels({ encadrement }: { encadrement: boolean }) {
+  const rappels = useQuery({
+    queryKey: [...callbackKeys.list('today', null), null, 1],
+    queryFn: () => fetchCallbacks('today', null, undefined, undefined, 1),
+    retry: false,
+  });
+
+  const retards = useQuery({
+    queryKey: [...callbackKeys.list('overdue', null), null, 1],
+    queryFn: () => fetchCallbacks('overdue', null, undefined, undefined, 1),
+    retry: false,
+  });
+
+  const enRetard = retards.data?.total ?? 0;
+
+  return (
+    <Etape
+      titre={encadrement ? 'Rappels des téléconseillers' : 'Rappels promis'}
+      explication={
+        encadrement
+          ? 'Ce que les téléconseillers ont promis de rappeler. Les retards se suivent ici.'
+          : 'Ceux que vous avez promis et ceux que le référentiel a reprogrammés.'
+      }
+      chiffre={
+        <Chiffre
+          pending={rappels.isPending}
+          failed={rappels.isError}
+          valeur={rappels.data?.total}
+          legende={encadrement ? 'dus aujourd’hui chez les téléconseillers' : 'dus aujourd’hui'}
+          enRetard={enRetard}
+        />
+      }
+      action={<Geste href="/teleconseil/rappels" label="Voir les rappels" />}
+    />
   );
 }
 
