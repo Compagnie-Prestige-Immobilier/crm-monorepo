@@ -6,6 +6,7 @@ import { RepresentantsSuiviView } from '@/components/rappels/representants-suivi
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/rappels')({
   beforeLoad: guardPermission('fiches.tenir'),
@@ -29,7 +30,7 @@ function Loading() {
 /** La page `(panel)/grand-public/rappels` de la v1. */
 function RappelsPage() {
   const { user } = Route.useRouteContext();
-  const canFilter = user.role !== 'COMMERCIAL';
+  const canFilter = peut(user, 'portefeuille.voir_tout');
 
   return (
     <Tabs defaultValue="representants">
