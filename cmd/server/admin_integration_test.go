@@ -928,6 +928,39 @@ func TestAdminCreationEtListeDesComptes(t *testing.T) {
 	}
 }
 
+// La connexion compare sans casse, e-mail et identifiant confondus : l'unicité doit suivre.
+func TestAdminIdentifiantsUniquesSansCasse(t *testing.T) {
+	b := adminConnecte(t)
+	suffixe := strings.ReplaceAll(uuid.NewString()[:8], "-", "")
+	ancien, croise := uuid.NewString(), uuid.NewString()
+	b.exec(`INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","updatedAt")
+		VALUES ($1,$2,$3,'x','Compte ancien','COMMERCIAL',now()), ($4,$5,$6,'x','Compte croisé','COMMERCIAL',now())`,
+		ancien, "Ancien."+suffixe+"@CPI.sn", "Ancien."+suffixe, croise, "autre."+suffixe+"@cpi.sn", "Croise."+suffixe+"@cpi.sn")
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" IN ($1,$2)`, ancien, croise) })
+
+	essais := []struct{ nom, email, username, champ string }{
+		{"e-mail", "ancien." + suffixe + "@cpi.sn", "neuf1" + suffixe, "body.email"},
+		{"identifiant", "neuf2" + suffixe + "@cpi.sn", "ancien." + suffixe, "body.username"},
+		{"croisé", "croise." + suffixe + "@cpi.sn", "neuf3" + suffixe, "body.email"},
+	}
+	for _, essai := range essais {
+		statut, body := adminAppel(b, http.MethodPost, "/api/v1/users", map[string]any{
+			"email": essai.email, "username": essai.username, "fullName": "Doublon Casse", "password": "MotDePasseDoublon2026",
+		})
+		if id := texteDe(body["id"]); id != "" {
+			t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, id) })
+		}
+		b.attend(statut, http.StatusConflict, "doublon "+essai.nom, body)
+		erreurs, _ := body["errors"].([]any)
+		if len(erreurs) != 1 || erreurs[0].(map[string]any)["location"] != essai.champ {
+			t.Fatalf("doublon %s : champ %s attendu, reçu %v", essai.nom, essai.champ, body)
+		}
+	}
+
+	statut, body := adminAppel(b, http.MethodPatch, "/api/v1/users/"+ancien, map[string]any{"email": "ancien." + suffixe + "@cpi.sn"})
+	b.attend(statut, http.StatusOK, "le compte ancien passe son e-mail en minuscules", body)
+}
+
 func TestAdminDispositionParEcranEtParCompte(t *testing.T) {
 	b := adminConnecte(t)
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "dashboard_layouts" WHERE "userId" = $1`, b.userID) })
