@@ -400,7 +400,7 @@ func seedGroupesProfessions() []seedGroupeProfession {
 			"Ferrailleur", "Charpentier", "Vitrier",
 		}},
 		{false, []string{
-			"Responsable commercial", "Vendeur en magasin", "Vendeur ambulant", "Commerçant", "Grossiste",
+			"Responsable des ventes", "Vendeur en magasin", "Vendeur ambulant", "Commerçant", "Grossiste",
 			"Détaillant", "Agent immobilier", "Courtier", "Télévendeur", "Chargé de clientèle", "Agent marketing",
 			"Marchandiseur", "Acheteur", "Approvisionneur", "Magasinier", "Gestionnaire de stock",
 			"Agent logistique", "Transitaire", "Déclarant en douane", "Agent de fret", "Gérant de boutique",
@@ -418,7 +418,7 @@ func seedGroupesProfessions() []seedGroupeProfession {
 			"Conducteur de moto-taxi", "Livreur", "Mécanicien automobile", "Mécanicien moto",
 			"Électricien automobile", "Tôlier automobile", "Peintre automobile", "Vulcanisateur",
 			"Laveur de véhicules", "Agent de transport", "Contrôleur de transport", "Marin", "Docker", "Pilote",
-			"Personnel navigant commercial", "Agent aéroportuaire",
+			"Personnel navigant de cabine", "Agent aéroportuaire",
 		}},
 		{false, []string{
 			"Agriculteur", "Maraîcher", "Horticulteur", "Arboriculteur", "Éleveur bovin", "Éleveur ovin",
