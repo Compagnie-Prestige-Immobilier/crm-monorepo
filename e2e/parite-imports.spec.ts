@@ -194,10 +194,9 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
 
     await page.getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(page.getByText(/En pause depuis le/u)).toBeVisible();
+    // La recherche porte sur toutes les fiches : celle d'une campagne en pause n'y est pas.
     await chercher();
-    await expect(
-      console.getByText('Aucun résultat parmi vos fiches restant à appeler.'),
-    ).toBeVisible();
+    await expect(console.getByText('Aucun résultat. Vérifiez le nom ou le numéro.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Reprendre' }).click();
     await expect(page.getByRole('button', { name: 'Mettre en pause' })).toBeVisible();

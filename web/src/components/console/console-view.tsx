@@ -1,21 +1,25 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
-import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
+import {
+  Chrono,
+  copyPhone,
+  Kbd,
+  useGardeSaisie,
+  useFicheDansLUrl,
+} from '@/components/console/console-ui';
 import {
   contactsPourEnvoi,
   ContactsRecommandes,
   type ContactRecommandeLigne,
 } from '@/components/console/contacts-recommandes';
 import { HistoriqueFiche } from '@/components/console/historique-fiche';
-import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { PanneauEcheance } from '@/components/console/panneau-echeance';
@@ -24,19 +28,9 @@ import { useRvSite, type RvSiteConsole } from '@/components/console/rendez-vous-
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
-import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AttemptRefused,
@@ -83,17 +77,12 @@ import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   type ProspectRow,
-  type ProspectStatut,
   type Role,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { cn } from '@/lib/utils';
-import { EnTeteAnnuaire } from '@/components/console/console-annuaire-header';
-import {
-  FilterableTableHead,
-  type FiltreColonne,
-} from '@/components/filters/filterable-table-head';
+import { EnTeteAnnuaire, useConsoleFilters } from '@/components/console/console-annuaire-header';
+import { ListeAnnuaire, ListeSkeleton } from '@/components/console/console-liste';
 
 export type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
@@ -184,17 +173,10 @@ const estInjoignable = (item: MotifAppel): boolean => !item.countsAsReached;
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
   motifsRacine(catalogue).filter((item) => !estInjoignable(item) && item.effect !== 'CLOSE_METHOD');
 
-const nouveauHref = (): string => '/teleconseil/prospects';
-
-const CLASSE_CHOIX = cn(
-  'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
-  'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-);
-
 /**
  * Étape 3 : convertir un prospect. L'écran ouvre sur la recherche, la fiche
- * choisie reçoit l'appel, puis on revient à la liste. `?fiche=<id>` (depuis
- * les rappels) ouvre directement la fiche visée.
+ * choisie reçoit l'appel, puis on revient à la liste. `?fiche=<id>` ouvre la
+ * fiche visée, puis rend la main à la page qui l'a demandée.
  */
 export function ConsoleView({
   projet = null,
@@ -214,9 +196,10 @@ export function ConsoleView({
 }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const ficheDansLUrl = useFicheDansLUrl();
 
   const [ouverte, setOuverte] = useState<Ouverte | null>(null);
-  const [vise, setVise] = useState<ProspectRow | null>(null);
+  const [tenueAilleurs, setTenueAilleurs] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
   const origineInitiale = origineInitialePour(projet);
@@ -225,6 +208,7 @@ export function ConsoleView({
   const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
+  const seulementARappeler = resteAAppeler && cherche === '';
   const consoleFilters = useConsoleFilters();
   const reference = useQuery({
     queryKey: queryKeys.reference,
@@ -245,32 +229,22 @@ export function ConsoleView({
     retry: false,
   });
 
-  const venuDesRappels = fichePendante(demandee, parLien.data);
-  const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
-
   const annuaire = useAnnuaireAQualifier({
     projet,
     cherche,
     origine,
     viewerId,
-    seulementARappeler: resteAAppeler,
+    seulementARappeler,
     page,
-    enabled: pasDeFicheOuverte(consultee, aConfirmer),
-    representantId: consoleFilters.values.representantId,
-    departementId: consoleFilters.values.departementId,
-    banqueId: consoleFilters.values.banqueId,
-    syndicatId: consoleFilters.values.syndicatId,
-    statut: consoleFilters.values.statut,
-    canalProvenanceId: consoleFilters.values.canalProvenanceId,
-    dateFrom: consoleFilters.values.dateFrom,
-    dateTo: consoleFilters.values.dateTo,
+    enabled: ouverte === null && tenueAilleurs === null,
+    ...consoleFilters.values,
   });
 
-  const revenir = useCallback(() => {
+  const revenir = (): void => {
     setOuverte(null);
-    setVise(null);
+    setTenueAilleurs(null);
     setDemandee(null);
-  }, []);
+  };
 
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
@@ -279,31 +253,49 @@ export function ConsoleView({
     }),
     onSuccess: (prise) => {
       setConfirme(null);
-      setVise(null);
-      setDemandee(null);
+      revenir();
+      ficheDansLUrl.marquer(prise.prospect.id);
       setOuverte(prise);
       queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
     },
     onError: (error) => {
+      setDemandee(null);
       toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
-  if (consultee !== null) {
+  const choisir = (row: ProspectRow): void => {
+    setConfirme(null);
+    if (row.enCoursPar != null) setTenueAilleurs(row);
+    else if (!ouvrir.isPending) ouvrir.mutate(row);
+  };
+
+  const lienTraite = useRef(false);
+  useEffect(() => {
+    if (lienTraite.current || parLien.data == null) return;
+    lienTraite.current = true;
+    choisir(parLien.data);
+  });
+
+  if (ouverte !== null) {
     return (
       <Consignation
-        key={consultee.prospect.id}
-        prospect={consultee.prospect}
-        ouverture={consultee.ouverture}
-        projet={consultee.prospect.projet}
+        key={ouverte.prospect.id}
+        prospect={ouverte.prospect}
+        ouverture={ouverte.ouverture}
+        projet={ouverte.prospect.projet}
         role={role}
         canCreateProspect={canCreateProspect}
-        onAbandon={revenir}
+        onAbandon={() => {
+          revenir();
+          ficheDansLUrl.quitter();
+        }}
         onEnregistre={(nom, detailStatut) => {
           const text = texteConfirmationAppel(nom, detailStatut);
           setConfirme(text);
           toast.success(text);
           revenir();
+          ficheDansLUrl.quitter();
           // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
           // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
           queryClient.setQueryData(queryKeys.ouvertureCourante, null);
@@ -314,7 +306,7 @@ export function ConsoleView({
     );
   }
 
-  if (chargementParLien(demandee, parLien.isPending)) return <ListeSkeleton />;
+  if (chargementParLien(demandee, parLien.isPending, ouvrir.isPending)) return <ListeSkeleton />;
 
   return (
     <div className="flex w-full flex-col gap-5">
@@ -326,7 +318,7 @@ export function ConsoleView({
         search={search}
         projet={projet}
         origine={origineAffichee(origineFiltrable, origine)}
-        resteAAppeler={resteAAppeler}
+        resteAAppeler={seulementARappeler}
         total={totalAffiche(annuaire.data)}
         reference={reference.data}
         canaux={canaux.data}
@@ -388,7 +380,7 @@ export function ConsoleView({
         page={page}
         onPage={setPage}
         canCreateProspect={canCreateProspect}
-        seulementARappeler={resteAAppeler}
+        seulementARappeler={seulementARappeler}
         filtreStatut={{
           label: 'Statut',
           placeholder: 'Tous les statuts',
@@ -399,29 +391,51 @@ export function ConsoleView({
             setPage(1);
           },
         }}
-        onChoisir={(row) => {
-          setConfirme(null);
-          setVise(row);
-        }}
+        onChoisir={choisir}
       />
 
-      <ConfirmDialog
-        open={aConfirmer !== null}
-        onOpenChange={(next) => {
-          if (next) return;
-          setVise(null);
-          setDemandee(null);
-        }}
-        title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
-        description={texteEnCours(aConfirmer)}
-        confirmLabel="Ouvrir"
-        confirmVariant="default"
+      <DialogueFicheTenue
+        fiche={tenueAilleurs}
         pending={ouvrir.isPending}
-        onConfirm={() => {
-          if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
+        onAnnuler={() => {
+          revenir();
+          ficheDansLUrl.quitter();
+        }}
+        onOuvrir={(fiche) => {
+          ouvrir.mutate(fiche);
         }}
       />
     </div>
+  );
+}
+
+function DialogueFicheTenue({
+  fiche,
+  pending,
+  onAnnuler,
+  onOuvrir,
+}: {
+  fiche: ProspectRow | null;
+  pending: boolean;
+  onAnnuler: () => void;
+  onOuvrir: (fiche: ProspectRow) => void;
+}) {
+  if (fiche === null) return null;
+  return (
+    <ConfirmDialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onAnnuler();
+      }}
+      title={`Ouvrir la fiche de ${nomDe(fiche)} ?`}
+      description={`${fiche.enCoursPar ?? ''} a cette fiche ouverte en ce moment.`}
+      confirmLabel="Ouvrir"
+      confirmVariant="default"
+      pending={pending}
+      onConfirm={() => {
+        onOuvrir(fiche);
+      }}
+    />
   );
 }
 
@@ -450,9 +464,6 @@ interface Ouverte {
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
-
-const texteEnCours = (row: ProspectRow | null): string | null =>
-  row?.enCoursPar == null ? null : `${row.enCoursPar} a cette fiche ouverte en ce moment.`;
 
 const origineAffichee = (filtrable: boolean, origine: OrigineFiche): OrigineFiche | null =>
   filtrable ? origine : null;
@@ -518,101 +529,6 @@ function useAnnuaireAQualifier(criteres: {
 const origineInitialePour = (projet: Projet | null): OrigineFiche =>
   projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
 
-type ConsoleFilters = {
-  representantId: string | null;
-  departementId: string | null;
-  banqueId: string | null;
-  syndicatId: string | null;
-  statut: string | null;
-  canalProvenanceId: string | null;
-  dateFrom: string | null;
-  dateTo: string | null;
-};
-
-function useConsoleFilters() {
-  const [representantId, setRepresentantId] = useState<string | null>(null);
-  const [departementId, setDepartementId] = useState<string | null>(null);
-  const [banqueId, setBanqueId] = useState<string | null>(null);
-  const [syndicatId, setSyndicatId] = useState<string | null>(null);
-  const [statut, setStatut] = useState<string | null>(null);
-  const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
-  const [dateFrom, setDateFrom] = useState<string | null>(null);
-  const [dateTo, setDateTo] = useState<string | null>(null);
-
-  const clear = useCallback(() => {
-    setRepresentantId(null);
-    setDepartementId(null);
-    setBanqueId(null);
-    setSyndicatId(null);
-    setStatut(null);
-    setCanalProvenanceId(null);
-    setDateFrom(null);
-    setDateTo(null);
-  }, []);
-
-  const remove = useCallback((key: string) => {
-    const setters: Record<string, (v: string | null) => void> = {
-      representantId: setRepresentantId,
-      departementId: setDepartementId,
-      banqueId: setBanqueId,
-      syndicatId: setSyndicatId,
-      statut: setStatut,
-      canalProvenanceId: setCanalProvenanceId,
-      dateFrom: setDateFrom,
-      dateTo: setDateTo,
-    };
-    setters[key]?.(null);
-  }, []);
-
-  const chips = [
-    ...(representantId
-      ? [{ key: 'representantId' as const, field: 'Représentant', value: representantId }]
-      : []),
-    ...(departementId
-      ? [{ key: 'departementId' as const, field: 'Département', value: departementId }]
-      : []),
-    ...(banqueId ? [{ key: 'banqueId' as const, field: 'Banque', value: banqueId }] : []),
-    ...(syndicatId ? [{ key: 'syndicatId' as const, field: 'Syndicat', value: syndicatId }] : []),
-    ...(statut
-      ? [
-          {
-            key: 'statut' as const,
-            field: 'Statut',
-            value: PROSPECT_STATUT_LABELS[statut as ProspectStatut],
-          },
-        ]
-      : []),
-  ];
-
-  const values: ConsoleFilters = {
-    representantId,
-    departementId,
-    banqueId,
-    syndicatId,
-    statut,
-    canalProvenanceId,
-    dateFrom,
-    dateTo,
-  };
-
-  return {
-    values,
-    chips,
-    clear,
-    remove,
-    set: {
-      representantId: setRepresentantId,
-      departementId: setDepartementId,
-      banqueId: setBanqueId,
-      syndicatId: setSyndicatId,
-      statut: setStatut,
-      canalProvenanceId: setCanalProvenanceId,
-      dateFrom: setDateFrom,
-      dateTo: setDateTo,
-    },
-  };
-}
-
 const texteConfirmationAppel = (nom: string, detailStatut?: string): string =>
   detailStatut
     ? `Appel consigné pour ${nom} · Statut : ${detailStatut}`
@@ -627,220 +543,12 @@ export const brouillonDe = (
   ...(conversion === null ? {} : { conversion }),
 });
 
-function fichePendante(
-  demandee: string | null,
-  data: ProspectRow | null | undefined,
-): ProspectRow | null {
-  return demandee === null ? null : (data ?? null);
-}
-
-interface FichesDerivees {
-  aConfirmer: ProspectRow | null;
-  consultee: Ouverte | null;
-}
-
-function deriverFiches(
-  vise: ProspectRow | null,
-  ouverte: Ouverte | null,
-  venuDesRappels: ProspectRow | null,
-): FichesDerivees {
-  return { aConfirmer: vise ?? venuDesRappels, consultee: ouverte };
-}
-
-function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | null): boolean {
-  return consultee === null && aConfirmer === null;
-}
-
-function chargementParLien(demandee: string | null, isPending: boolean): boolean {
-  return demandee !== null && isPending;
+function chargementParLien(demandee: string | null, lecture: boolean, ouverture: boolean): boolean {
+  return demandee !== null && (lecture || ouverture);
 }
 
 function totalAffiche(page: { total: number } | undefined): number | null {
   return page === undefined ? null : page.total;
-}
-
-function texteListeVide(cherche: string, seulementARappeler: boolean): string {
-  if (cherche !== '' && seulementARappeler)
-    return 'Aucun résultat parmi vos fiches restant à appeler. Affichez toutes vos fiches.';
-  if (cherche !== '') return 'Aucun résultat. Vérifiez le nom ou le numéro.';
-  if (seulementARappeler)
-    return 'Rien ne reste à appeler. Affichez toutes vos fiches, ou demandez une campagne à votre superviseur.';
-  return 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.';
-}
-
-/** « Fiches 21 à 40 sur 256 » : la liste entière se parcourt, jamais tronquée en silence. */
-function PiedAnnuaire({
-  page,
-  liste,
-  onPage,
-}: {
-  page: number;
-  liste: { total: number; pageSize: number; pageCount: number };
-  onPage: (page: number) => void;
-}) {
-  const debut = (page - 1) * liste.pageSize + 1;
-  const fin = Math.min(page * liste.pageSize, liste.total);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-[0.875rem] text-muted-foreground">
-      <span className="tabular-nums">
-        Fiches {debut} à {fin} sur {liste.total}
-      </span>
-      <Pages page={page} pageCount={liste.pageCount} onPage={onPage} />
-    </div>
-  );
-}
-
-function ListeAnnuaire({
-  annuaire,
-  cherche,
-  page,
-  onPage,
-  canCreateProspect,
-  seulementARappeler,
-  filtreStatut,
-  onChoisir,
-}: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
-  cherche: string;
-  page: number;
-  onPage: (page: number) => void;
-  canCreateProspect: boolean;
-  seulementARappeler: boolean;
-  filtreStatut: FiltreColonne;
-  onChoisir: (row: ProspectRow) => void;
-}) {
-  if (annuaire.isError) {
-    return (
-      <QueryErrorState
-        error={annuaire.error}
-        fallback="L’annuaire n’a pas pu être lu."
-        onRetry={() => {
-          void annuaire.refetch();
-        }}
-      />
-    );
-  }
-
-  if (annuaire.isPending) return <ListeSkeleton />;
-
-  if (annuaire.data.items.length === 0) {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-[0.9375rem]">{texteListeVide(cherche, seulementARappeler)}</p>
-        {canCreateProspect ? (
-          <Link href={nouveauHref()} className={cn(buttonVariants(), 'self-start')}>
-            Ajouter un prospect
-          </Link>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nom et prénom</TableHead>
-            <TableHead>Projet</TableHead>
-            <TableHead>Numéro</TableHead>
-            <FilterableTableHead label="Statut / Qualification" filtre={filtreStatut} />
-            <TableHead>Dernier appel</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {annuaire.data.items.map((row) => {
-            return (
-              <TableRow key={row.id}>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChoisir(row);
-                    }}
-                    className={CLASSE_CHOIX}
-                  >
-                    <NomProspect row={row} />
-                  </button>
-                  {row.enCoursPar == null ? null : (
-                    <Badge variant="warning">En cours · {row.enCoursPar}</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <ProjetBadge projet={row.projet} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap font-mono text-[0.875rem]">
-                  {formatPhone(row.phoneE164)}
-                </TableCell>
-                <TableCell>
-                  <StatutAnnuaire row={row} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-      <PiedAnnuaire page={page} liste={annuaire.data} onPage={onPage} />
-    </div>
-  );
-}
-
-function variantDuCode(code: string | null): 'success' | 'destructive' | 'warning' | 'info' {
-  if (code === 'METHOD_OBTAINED') return 'success';
-  if (code === 'REFUSED' || code === 'WRONG_NUMBER') return 'destructive';
-  if (code === 'CALLBACK') return 'warning';
-  return 'info';
-}
-
-function variantDuStatut(row: ProspectRow): 'success' | 'destructive' | 'warning' | 'info' {
-  if (row.phase2Status === 'METHOD_OBTAINED') return variantDuCode(row.phase2Status);
-  return row.lastJoignable === false ? 'warning' : 'info';
-}
-
-function StatutAnnuaire({ row }: { row: ProspectRow }) {
-  if (row.lastAttemptAt === null)
-    return <span className="text-[0.8125rem] text-muted-foreground">Non qualifié</span>;
-  const label = row.lastReasonLabel ?? 'Qualifié';
-  const variant = variantDuStatut(row);
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      <Badge variant={variant} className="w-fit">
-        {label}
-      </Badge>
-      {row.lastAttemptAt ? (
-        <span className="text-[0.75rem] text-muted-foreground">
-          {formatDateTime(row.lastAttemptAt)}
-        </span>
-      ) : null}
-      {row.lastComment ? (
-        <span
-          className="max-w-xs truncate text-[0.75rem] text-muted-foreground"
-          title={row.lastComment}
-        >
-          « {row.lastComment} »
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function NomProspect({ row }: { row: ProspectRow }) {
-  return (
-    <>
-      <span className="truncate">
-        {row.nom} {row.prenom}
-      </span>
-      {row.phase2Status === 'PENDING' ? null : (
-        <Badge variant={variantDuCode(row.phase2Status)} className="shrink-0 font-[400]">
-          {PHASE2_STATUS_LABELS[row.phase2Status]}
-        </Badge>
-      )}
-    </>
-  );
 }
 
 /** Le dossier d'adhésion, une fois la personne dite joignable. */
@@ -894,19 +602,14 @@ export function PanneauDossier({
   );
 }
 
-function ListeSkeleton() {
-  return (
-    <div className="flex flex-col gap-2">
-      <Skeleton className="h-14" />
-      <Skeleton className="h-14" />
-      <Skeleton className="h-14" />
-    </div>
-  );
-}
-
 function rattachements(prospect: ProspectRow, projet: Projet): string {
   const parts = [prospect.banqueName, prospect.syndicatSigle, prospect.departementName];
-  if (projet === 'CHUES') parts.push(`Représentant ${prospect.representantName ?? 'aucun'}`);
+  if (projet === 'CHUES')
+    parts.push(
+      prospect.representantName === null
+        ? 'Sans représentant'
+        : `Représentant ${prospect.representantName}`,
+    );
   return parts.filter((part) => part !== null && part !== '').join(' · ');
 }
 
@@ -929,30 +632,52 @@ const LIBELLES_PAS: Readonly<Record<Pas, string>> = {
   note: 'Note',
 };
 
-function parcoursDe(groupe: Groupe | null, avecPrecision: boolean, rappelDemande: boolean): Pas[] {
+function parcoursDe(
+  groupe: Groupe | null,
+  avecPrecision: boolean,
+  rappelDemande: boolean,
+  sansNote: boolean,
+): Pas[] {
   const pas: Pas[] = ['reponse'];
   if (groupe === 'joignable') pas.push('formulaire');
   pas.push('statut');
   if (avecPrecision) pas.push('precision');
   if (rappelDemande) pas.push('echeance');
-  pas.push('note');
+  if (!sansNote) pas.push('note');
   return pas;
 }
 
-/** Les statuts de premier niveau du groupe ouvert. */
-function statutsDuGroupe(catalogue: readonly MotifAppel[], groupe: Groupe | null): MotifAppel[] {
+/** Les statuts du groupe ouvert ; une adhésion ne garde que ceux qui ne la contredisent pas. */
+function statutsDuGroupe(
+  catalogue: readonly MotifAppel[],
+  groupe: Groupe | null,
+  adhesion: boolean,
+): MotifAppel[] {
   if (groupe === null) return [];
   if (groupe === 'injoignable') return motifsRacine(catalogue).filter(estInjoignable);
-  return statutsJoignables(catalogue);
+  const joignables = statutsJoignables(catalogue);
+  const compatibles = joignables.filter((item) => item.effect === 'CLOSE_INTERESTED');
+  return adhesion && compatibles.length > 0 ? compatibles : joignables;
 }
 
-/** Ce que le statut entraîne, dit avant de cliquer. */
+/** Ce que le statut entraîne, dit avant de cliquer ; les autres ferment la fiche. */
 function aideDe(item: MotifAppel, catalogue: readonly MotifAppel[]): string | undefined {
   if (sousMotifsDe(catalogue, item.id).length > 0) return 'Puis une précision';
   if (item.requiresCallback) return 'Puis la date et l’heure';
-  if (item.effect.startsWith('CLOSE_')) return 'Ferme la fiche';
   return undefined;
 }
+
+/** Sans réponse, un motif qui ferme la fiche s'enregistre sur son propre pas. */
+const enregistreSurLeStatut = (
+  groupe: Groupe | null,
+  item: MotifAppel | null,
+  catalogue: readonly MotifAppel[],
+): boolean =>
+  groupe === 'injoignable' &&
+  (item === null ||
+    (!item.requiresComment &&
+      !item.requiresCallback &&
+      sousMotifsDe(catalogue, item.id).length === 0));
 
 export const choixDe = (
   item: MotifAppel,
@@ -1034,24 +759,12 @@ function recapDe(
   if (adhesion) items.push('Accepte de s’enrôler');
   if (statut !== null)
     items.push(precision === null ? statut.label : `${statut.label} › ${precision.label}`);
-  if (callbackAt !== null) items.push(`Rappel le ${formatDateTime(callbackAt)}`);
+  const echeance = statut?.effect === 'CLOSE_APPOINTMENT' ? 'Rendez-vous le' : 'Rappel le';
+  if (callbackAt !== null) items.push(`${echeance} ${formatDateTime(callbackAt)}`);
   return items;
 }
 
-/**
- * La consignation d'un appel, pas à pas : la réponse, le formulaire quand la
- * personne a répondu, le statut, sa précision, l'échéance, puis la note.
- * Chaque pas se quitte par Retour ; le formulaire, la précision et la note se passent.
- */
-export function Consignation({
-  prospect,
-  ouverture,
-  projet,
-  role,
-  canCreateProspect,
-  onAbandon,
-  onEnregistre,
-}: {
+interface ConsignationProps {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
@@ -1059,7 +772,57 @@ export function Consignation({
   canCreateProspect: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string, detailStatut?: string) => void;
-}) {
+}
+
+/** Une fiche convertie ou vendue refuse tout appel : on le dit avant les étapes. */
+export function Consignation(props: ConsignationProps) {
+  if (props.prospect.statut !== 'CONVERTI' && props.prospect.statut !== 'VENDU') {
+    return <ConsignationPasAPas {...props} />;
+  }
+  return <FicheConvertie {...props} />;
+}
+
+function FicheConvertie({ prospect, projet, role, onAbandon }: ConsignationProps) {
+  useShortcuts({
+    Escape: onAbandon,
+    c: () => {
+      copyPhone(prospect.phoneE164);
+    },
+  });
+  return (
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <EnTeteFiche
+        prospect={prospect}
+        nomComplet={nomDe(prospect)}
+        projet={projet}
+        surDossier={false}
+      />
+      <p
+        role="alert"
+        className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.9375rem] font-[600] text-warning"
+      >
+        Fiche {prospect.statut === 'VENDU' ? 'vendue' : 'convertie'} : l’appel ne se consigne plus.
+      </p>
+      <PiedPas suite={null} premier disabled={false} onRetour={onAbandon} onSuite={() => {}} />
+      {role === undefined ? null : <HistoriqueFiche prospect={prospect} role={role} />}
+    </div>
+  );
+}
+
+/**
+ * La consignation d'un appel, pas à pas : la réponse, le formulaire quand la
+ * personne a répondu, le statut, sa précision, l'échéance, puis la note.
+ * Chaque pas se quitte par Retour, le premier par Quitter la fiche.
+ */
+function ConsignationPasAPas({
+  prospect,
+  ouverture,
+  projet,
+  role,
+  canCreateProspect,
+  onAbandon,
+  onEnregistre,
+}: ConsignationProps) {
   const router = useRouter();
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const callbackRef = useRef<HTMLInputElement>(null);
@@ -1103,6 +866,7 @@ export function Consignation({
     ouverture,
     brouillonDe(comment, conversion),
   );
+  const garde = useGardeSaisie(enSaisie(groupe, departChrono));
 
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
@@ -1123,6 +887,7 @@ export function Consignation({
       return pushCallAttempt({ ...newAttemptInput(prospect.id, draft), attemptId });
     },
     onSuccess: () => {
+      garde.liberer();
       onEnregistre(nomComplet, (precision ?? statut)?.label ?? 'Qualifié');
     },
     onError: (error) => {
@@ -1141,10 +906,20 @@ export function Consignation({
 
   const { motif, adhesion, rappelDemande } = qualificationDe(statut, precision, conversion);
   const precisions = precisionsDe(catalogue, statut);
-  const parcours = parcoursDe(groupe, precisions.length > 0, rappelDemande);
-  const pasCourant: Pas = parcours.includes(pas) ? pas : 'note';
+  const sansNote = enregistreSurLeStatut(groupe, statut, catalogue);
+  const parcours = parcoursDe(groupe, precisions.length > 0, rappelDemande, sansNote);
+  const pasCourant = pasAffiche(parcours, pas);
   const rang = parcours.indexOf(pasCourant);
   const rvSite = useRvSite(motif?.code);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pasCourant]);
+
+  const quitter = (): void => {
+    garde.liberer();
+    onAbandon();
+  };
 
   // L'échéance se propose à l'entrée du pas, à l'heure où on y arrive.
   const allerA = useCallback((cible: Pas): void => {
@@ -1193,7 +968,7 @@ export function Consignation({
 
   const precedent = (): void => {
     if (rang <= 0) {
-      onAbandon();
+      quitter();
       return;
     }
     setPas(parcours[rang - 1] ?? 'reponse');
@@ -1225,6 +1000,7 @@ export function Consignation({
     setStatut(choisi);
     setPrecision(null);
     setCallbackAt(null);
+    if (enregistreSurLeStatut(groupe, choisi, catalogue)) return;
     allerA(sousMotifsDe(catalogue, choisi.id).length > 0 ? 'precision' : pasApresMotif(choisi));
   };
 
@@ -1237,12 +1013,12 @@ export function Consignation({
 
   const choisirEcheance = (at: string): void => {
     setCallbackAt(at);
-    setPas('note');
+    if (rvSite.verifier()) setPas('note');
   };
 
   const validerEcheance = (): void => {
     if (callbackAt !== null) {
-      setPas('note');
+      if (rvSite.verifier()) setPas('note');
       return;
     }
     const iso = dakarLocalToIso(freeCallback);
@@ -1257,22 +1033,30 @@ export function Consignation({
     cle: item.cle,
     label: item.label,
     aide:
-      item.cle === 'joignable' ? 'Formulaire, puis ce qu’elle a dit' : 'Pourquoi, puis une note',
+      item.cle === 'joignable' ? 'Formulaire, puis ce qu’elle a dit' : 'Pourquoi, puis enregistrer',
     actif: groupe === item.cle,
     choisir: () => {
       choisirGroupe(item.cle);
     },
   }));
-  const statuts = statutsDuGroupe(catalogue, groupe).map((item) =>
+  const statuts = statutsDuGroupe(catalogue, groupe, adhesion).map((item) =>
     choixDe(item, catalogue, statut?.code === item.code, () => {
       choisirStatut(item);
     }),
   );
-  const precisionsChoix = precisions.map((item) =>
-    choixDe(item, catalogue, precision?.code === item.code, () => {
-      choisirPrecision(item);
-    }),
-  );
+  const precisionsChoix: Choix[] = [
+    ...precisions.map((item) =>
+      choixDe(item, catalogue, precision?.code === item.code, () => {
+        choisirPrecision(item);
+      }),
+    ),
+    {
+      cle: 'sans-precision',
+      label: 'Sans précision',
+      actif: false,
+      choisir: () => choisirPrecision(null),
+    },
+  ];
 
   const slotShortcuts: Record<string, () => void> = {
     ...Object.fromEntries(
@@ -1284,8 +1068,8 @@ export function Consignation({
   const entree: Readonly<Record<Pas, () => void>> = {
     reponse: () => {},
     formulaire: () => setPas('statut'),
-    statut: () => {},
-    precision: () => choisirPrecision(null),
+    statut: sansNote ? enregistrer : () => {},
+    precision: () => {},
     echeance: validerEcheance,
     note: enregistrer,
   };
@@ -1392,17 +1176,19 @@ export function Consignation({
         />
 
         <PiedPas
-          pas={pasCourant}
+          suite={libelleSuite(pasCourant, sansNote)}
           premier={rang === 0}
           disabled={send.isPending}
           onRetour={precedent}
           onSuite={entree[pasCourant]}
         />
       </section>
+      {garde.dialogue}
 
       {role === undefined ? null : <HistoriqueFiche prospect={prospect} role={role} />}
 
       <details
+        className="pointer-coarse:hidden"
         open={helpOpen}
         onToggle={(event) => {
           setHelpOpen(event.currentTarget.open);
@@ -1424,6 +1210,50 @@ export function Consignation({
           ))}
         </dl>
       </details>
+    </div>
+  );
+}
+
+function PasStatut({
+  groupe,
+  statuts,
+  disabled,
+  mention,
+  commentaire,
+}: {
+  groupe: Groupe | null;
+  statuts: readonly Choix[];
+  disabled: boolean;
+  mention: ReactNode;
+  commentaire: ReactNode;
+}) {
+  const joignable = groupe === 'joignable';
+  return (
+    <div className="flex flex-col gap-4">
+      <Palier
+        question={joignable ? 'Qu’a dit la personne ?' : 'Pourquoi n’a-t-elle pas répondu ?'}
+        choix={statuts}
+        raccourcis
+        vide={AUCUN_MOTIF}
+        disabled={disabled}
+      />
+      {mention}
+      {joignable ? null : commentaire}
+    </div>
+  );
+}
+
+/** Le site et le point de rencontre d'un RV site se choisissent avant sa date. */
+function contenuRvSite(
+  rvSite: RvSiteConsole,
+  callbackAt: string | null,
+  onEcheance: (at: string) => void,
+): ReactNode {
+  if (rvSite.champs === null) return null;
+  return (
+    <div className="flex flex-col gap-4">
+      {rvSite.champs}
+      {rvSite.calendrier(callbackAt, onEcheance)}
     </div>
   );
 }
@@ -1490,6 +1320,21 @@ function CorpsPas({
   onComment: (value: string) => void;
   onContacts: (value: ContactRecommandeLigne[]) => void;
 }) {
+  const mention = (
+    <p className="text-[0.8125rem] text-muted-foreground">
+      Un choix sans suite indiquée ferme la fiche.
+    </p>
+  );
+  const commentaire = (
+    <Commentaire
+      value={comment}
+      titre="Commentaire, facultatif"
+      obligatoirePour={commentaireObligatoirePour}
+      inputRef={commentRef}
+      onChange={onComment}
+      onValidate={onValidate}
+    />
+  );
   switch (pas) {
     case 'reponse':
       return (
@@ -1515,25 +1360,26 @@ function CorpsPas({
       );
     case 'statut':
       return (
-        <Palier
-          question={
-            groupe === 'joignable' ? 'Qu’a dit la personne ?' : 'Pourquoi n’a-t-elle pas répondu ?'
-          }
-          choix={statuts}
-          raccourcis
-          vide={AUCUN_MOTIF}
+        <PasStatut
+          groupe={groupe}
+          statuts={statuts}
           disabled={disabled}
+          mention={mention}
+          commentaire={commentaire}
         />
       );
     case 'precision':
       return (
-        <Palier
-          question={questionPrecision}
-          choix={precisions}
-          raccourcis
-          vide={AUCUN_MOTIF}
-          disabled={disabled}
-        />
+        <div className="flex flex-col gap-4">
+          <Palier
+            question={questionPrecision}
+            choix={precisions}
+            raccourcis
+            vide={AUCUN_MOTIF}
+            disabled={disabled}
+          />
+          {mention}
+        </div>
       );
     case 'echeance':
       return (
@@ -1544,7 +1390,7 @@ function CorpsPas({
           choisi={callbackAt}
           surDossier={conversion !== null}
           titre={titre}
-          contenu={rvSite.calendrier(callbackAt, onEcheance)}
+          contenu={contenuRvSite(rvSite, callbackAt, onEcheance)}
           disabled={disabled}
           inputRef={callbackRef}
           onChoisir={onEcheance}
@@ -1555,15 +1401,7 @@ function CorpsPas({
     case 'note':
       return (
         <div className="flex flex-col gap-4">
-          {rvSite.champs}
-          <Commentaire
-            value={comment}
-            titre="Commentaire, facultatif"
-            obligatoirePour={commentaireObligatoirePour}
-            inputRef={commentRef}
-            onChange={onComment}
-            onValidate={onValidate}
-          />
+          {commentaire}
           {projet === 'GRAND_PUBLIC' && (
             <ContactsRecommandes valeurs={contacts} onChange={onContacts} disabled={disabled} />
           )}
@@ -1572,44 +1410,44 @@ function CorpsPas({
   }
 }
 
-const SUITE_PAS: Readonly<Partial<Record<Pas, { libelle: string; passer?: string }>>> = {
-  formulaire: { libelle: 'Continuer', passer: 'Passer le formulaire' },
-  precision: { libelle: 'Sans précision' },
-  echeance: { libelle: 'Continuer' },
-  note: { libelle: 'Enregistrer l’appel' },
+const SUITE_PAS: Readonly<Partial<Record<Pas, string>>> = {
+  formulaire: 'Continuer',
+  echeance: 'Continuer',
+  note: 'Enregistrer l’appel',
 };
 
-/** Retour à chaque pas ; la suite quand le pas ne se tranche pas d'un clic. */
+const pasAffiche = (parcours: readonly Pas[], pas: Pas): Pas =>
+  parcours.includes(pas) ? pas : (parcours.at(-1) ?? 'note');
+
+const enSaisie = (groupe: Groupe | null, departChrono: string | null): boolean =>
+  groupe !== null || departChrono !== null;
+
+const libelleSuite = (pas: Pas, sansNote: boolean): string | null =>
+  sansNote && pas === 'statut' ? 'Enregistrer l’appel' : (SUITE_PAS[pas] ?? null);
+
+/** Retour à chaque pas, Quitter au premier ; la suite quand le pas ne se tranche pas d'un clic. */
 function PiedPas({
-  pas,
+  suite,
   premier,
   disabled,
   onRetour,
   onSuite,
 }: {
-  pas: Pas;
+  suite: string | null;
   premier: boolean;
   disabled: boolean;
   onRetour: () => void;
   onSuite: () => void;
 }) {
-  const suite = SUITE_PAS[pas];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {premier ? null : (
-        <Button variant="outline" disabled={disabled} onClick={onRetour}>
-          Retour
-          <Kbd>Échap</Kbd>
-        </Button>
-      )}
-      {suite?.passer === undefined ? null : (
-        <Button variant="ghost" disabled={disabled} onClick={onSuite}>
-          {suite.passer}
-        </Button>
-      )}
-      {suite === undefined ? null : (
+      <Button variant="outline" disabled={disabled} onClick={onRetour}>
+        {premier ? 'Quitter la fiche' : 'Retour'}
+        <Kbd>Échap</Kbd>
+      </Button>
+      {suite === null ? null : (
         <Button disabled={disabled} onClick={onSuite}>
-          {suite.libelle}
+          {suite}
           <Kbd>Entrée</Kbd>
         </Button>
       )}
@@ -1701,9 +1539,16 @@ function EnTeteFiche({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
         <ProjetBadge projet={projet} />
-        <span className="select-all font-display text-[1.5rem] font-[700] tracking-[-0.02em] tabular-nums">
-          {formatPhone(prospect.phoneE164)}
-        </span>
+        {prospect.phoneE164 === null ? (
+          <span className="text-muted-foreground italic">{formatPhone(null)}</span>
+        ) : (
+          <a
+            href={`tel:${prospect.phoneE164}`}
+            className="rounded-sm font-display text-[1.5rem] font-[700] tracking-[-0.02em] tabular-nums underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {formatPhone(prospect.phoneE164)}
+          </a>
+        )}
         <Button
           variant="outline"
           size="sm"

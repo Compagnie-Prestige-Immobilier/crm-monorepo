@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckCircle2Icon } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { type AdvancedChip } from '@/components/filters/advanced-chips';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import type { Projet } from '@/components/console/console-view';
 import type { OrigineFiche } from '@/lib/data/grand-public';
 import { withRetired } from '@/lib/format';
-import type { ReferenceData } from '@/lib/types';
+import { PROSPECT_STATUT_LABELS, type ProspectStatut, type ReferenceData } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
@@ -306,4 +306,99 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
       />
     </div>
   );
+}
+
+type ConsoleFilters = {
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  statut: string | null;
+  canalProvenanceId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+};
+
+export function useConsoleFilters() {
+  const [representantId, setRepresentantId] = useState<string | null>(null);
+  const [departementId, setDepartementId] = useState<string | null>(null);
+  const [banqueId, setBanqueId] = useState<string | null>(null);
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [statut, setStatut] = useState<string | null>(null);
+  const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+
+  const clear = useCallback(() => {
+    setRepresentantId(null);
+    setDepartementId(null);
+    setBanqueId(null);
+    setSyndicatId(null);
+    setStatut(null);
+    setCanalProvenanceId(null);
+    setDateFrom(null);
+    setDateTo(null);
+  }, []);
+
+  const remove = useCallback((key: string) => {
+    const setters: Record<string, (v: string | null) => void> = {
+      representantId: setRepresentantId,
+      departementId: setDepartementId,
+      banqueId: setBanqueId,
+      syndicatId: setSyndicatId,
+      statut: setStatut,
+      canalProvenanceId: setCanalProvenanceId,
+      dateFrom: setDateFrom,
+      dateTo: setDateTo,
+    };
+    setters[key]?.(null);
+  }, []);
+
+  const chips = [
+    ...(representantId
+      ? [{ key: 'representantId' as const, field: 'Représentant', value: representantId }]
+      : []),
+    ...(departementId
+      ? [{ key: 'departementId' as const, field: 'Département', value: departementId }]
+      : []),
+    ...(banqueId ? [{ key: 'banqueId' as const, field: 'Banque', value: banqueId }] : []),
+    ...(syndicatId ? [{ key: 'syndicatId' as const, field: 'Syndicat', value: syndicatId }] : []),
+    ...(statut
+      ? [
+          {
+            key: 'statut' as const,
+            field: 'Statut',
+            value: PROSPECT_STATUT_LABELS[statut as ProspectStatut],
+          },
+        ]
+      : []),
+  ];
+
+  const values: ConsoleFilters = {
+    representantId,
+    departementId,
+    banqueId,
+    syndicatId,
+    statut,
+    canalProvenanceId,
+    dateFrom,
+    dateTo,
+  };
+
+  return {
+    values,
+    chips,
+    clear,
+    remove,
+    set: {
+      representantId: setRepresentantId,
+      departementId: setDepartementId,
+      banqueId: setBanqueId,
+      syndicatId: setSyndicatId,
+      statut: setStatut,
+      canalProvenanceId: setCanalProvenanceId,
+      dateFrom: setDateFrom,
+      dateTo: setDateTo,
+    },
+  };
 }
