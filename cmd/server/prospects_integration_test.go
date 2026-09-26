@@ -814,7 +814,8 @@ func TestProspectJournalTronqueLeDit(t *testing.T) {
 
 	statut, body := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+id+"/journal", nil, nil)
 	b.attend(statut, http.StatusOK, "journal de la fiche", body)
-	if items, _ := body["items"].([]any); len(items) != 500 || body["tronque"] != true {
+	items, _ := body["items"].([]any)
+	if tronque, _ := body["tronque"].(bool); len(items) != 500 || !tronque {
 		t.Fatalf("journal : %d lignes, tronqué %v ; attendu 500 et true", len(items), body["tronque"])
 	}
 }

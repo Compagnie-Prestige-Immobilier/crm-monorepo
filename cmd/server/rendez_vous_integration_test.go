@@ -222,7 +222,10 @@ func TestRendezVousSiteDernierePlaceDisputee(t *testing.T) {
 	consoles := []*banc{qualificationConnecte(t, "COMMERCIAL"), qualificationConnecte(t, "COMMERCIAL")}
 	corps := make([][]byte, len(consoles))
 	for i, b := range consoles {
-		corps[i], _ = json.Marshal(rvSiteCorps(rvSiteFiche(b), site, point, sept))
+		var err error
+		if corps[i], err = json.Marshal(rvSiteCorps(rvSiteFiche(b), site, point, sept)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	statuts := make([]int, len(consoles))
 	var depart, fin sync.WaitGroup
