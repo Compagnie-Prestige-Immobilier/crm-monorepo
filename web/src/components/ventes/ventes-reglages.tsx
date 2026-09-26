@@ -26,6 +26,7 @@ import {
   createCanalVente,
   createSiteVente,
   formatFcfa,
+  lotsRestants,
   setCanalVenteActive,
   setSiteVenteActive,
   updateSiteVente,
@@ -108,6 +109,9 @@ export function PageReglages({
             >
               {site.nom}
             </strong>
+            <span className="text-[0.875rem] text-muted-foreground tabular-nums">
+              {lotsRestants(site)}
+            </span>
             <Button variant="outline" size="sm" onClick={() => setEdition(site)}>
               <PencilIcon aria-hidden="true" /> Modifier
             </Button>
