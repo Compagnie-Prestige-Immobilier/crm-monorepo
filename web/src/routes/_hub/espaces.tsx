@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
   BadgeIcon,
@@ -28,6 +28,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export const Route = createFileRoute('/_hub/espaces')({
+  beforeLoad: ({ context }) => {
+    const [seul, ...autres] = coquesForRole(context.user).filter((tuile) => tuile.allowed);
+    if (seul !== undefined && autres.length === 0) {
+      throw redirect({ href: coqueHomePath(context.user, seul.entry.id), replace: true });
+    }
+  },
   component: EspacesPage,
   pendingComponent: Loading,
 });
