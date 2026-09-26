@@ -323,7 +323,13 @@ func lireRepresentantImport(cellules map[string]string, numero int, brut any) (a
 	}
 	departement, connu := etat.departements[cleImport(cellules[EnteteRepresentantImport(2)])]
 	if !connu {
-		return nil, refusImport(numero, EnteteRepresentantImport(2), "DEPARTEMENT_UNKNOWN", "Département inconnu. Reprenez exactement un libellé de la liste déroulante.")
+		libelles := make([]string, 0, len(etat.departements))
+		for _, entree := range etat.departements {
+			libelles = append(libelles, entree.libelle)
+		}
+		slices.Sort(libelles)
+		return nil, refusImport(numero, EnteteRepresentantImport(2), "DEPARTEMENT_UNKNOWN",
+			"Département inconnu."+suggestionImport(cellules[EnteteRepresentantImport(2)], libelles)+" Reprenez exactement un libellé de la liste déroulante.")
 	}
 	ief, refus := lireIefImport(cellules[EnteteRepresentantImport(3)], departement, numero, etat)
 	if refus != nil {
@@ -1046,7 +1052,7 @@ func referentielFacultatifImport(brut string, index map[string]string, cle func(
 	identifiant, connu := index[cle(brut)]
 	if !connu {
 		return nil, refusImport(numero, colonne, code,
-			fmt.Sprintf("%s : « %s ». Valeurs admises : %s, ou cellule vide.", sujet, brut, valeursAdmisesImport(libelles)))
+			fmt.Sprintf("%s : « %s ».%s Valeurs admises : %s, ou cellule vide.", sujet, brut, suggestionImport(brut, libelles), valeursAdmisesImport(libelles)))
 	}
 	return &identifiant, nil
 }

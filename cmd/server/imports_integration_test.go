@@ -1165,3 +1165,37 @@ func TestImportNeLaissePasDeFichierTemporaire(t *testing.T) {
 		}
 	}
 }
+
+// Une banque ou une méthode mal saisie propose la valeur la plus proche du
+// référentiel, comparée sans accents : l'utilisateur corrige sans chercher.
+func TestImportProspectsSuggereLaValeurProche(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	b.connecterImport()
+	b.purgerTravauxImport()
+	banque := uuid.NewString()
+	sigle := "BQ" + strings.ToUpper(banque[:4]) + "XY"
+	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "banques" WHERE "id" = $1`, banque) })
+	base := time.Now().UnixNano() % 10_000_000
+
+	classeur := b.modeleProspectsRempli([][]string{
+		{"Ndiaye", "Awa", fmt.Sprintf("+22177%07d", base), "", "BQ" + strings.ToUpper(banque[:4]) + "YX", "", ""},
+		{"Sow", "Binta", fmt.Sprintf("+22176%07d", base), "", sigle, "", "Enrolement sur plase"},
+	})
+	statut, body := b.deposerClasseur("/api/v1/imports/prospects", "prospects.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
+	rapport, _ := b.attendreImportReussi(body["id"].(string))["report"].(map[string]any)
+	erreurs, _ := rapport["errors"].([]any)
+	messages := map[string]string{}
+	for _, brute := range erreurs {
+		erreur := brute.(map[string]any)
+		messages[texteDe(erreur["code"])] = texteDe(erreur["message"])
+	}
+	if !strings.Contains(messages["PROSPECT_IMPORT_BANQUE_INCONNUE"], "Vouliez-vous dire « "+sigle+" » ?") {
+		t.Fatalf("la banque la plus proche doit être proposée : %v", messages)
+	}
+	if !strings.Contains(messages["PROSPECT_IMPORT_METHODE_INCONNUE"], "Vouliez-vous dire « Enrôlement sur place » ?") {
+		t.Fatalf("la méthode la plus proche doit être proposée : %v", messages)
+	}
+}
