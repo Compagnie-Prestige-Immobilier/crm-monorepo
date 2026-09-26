@@ -245,3 +245,34 @@ func resumeWidgets(widgets []any) (demandes []any, lus string) {
 	}
 	return demandes, strings.Join(vus, " ")
 }
+
+// Une amorce proposée à l'autocomplétion que le constructeur ne comprend pas
+// mènerait à un refus : chacune doit donner un calcul, le même outil par groupe.
+func TestConstructeurAmorcesComprises(t *testing.T) {
+	b := bancAssistant(t, "ADMIN")
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/tableaux-de-bord/amorces", nil, nil)
+	b.attend(statut, http.StatusOK, "amorces", body)
+	amorces, _ := body["amorces"].([]any)
+	if len(amorces) < 20 {
+		t.Fatalf("%d amorces", len(amorces))
+	}
+	outilDuGroupe := map[string]string{}
+	for _, brute := range amorces {
+		amorce, _ := brute.(map[string]any)
+		texte, groupe := texteDe(amorce["texte"]), texteDe(amorce["groupe"])
+		reponse := construire(b, texte, nil)
+		outil := texteDe(calculDe(reponse["proposition"])["outil"])
+		if outil == "" {
+			t.Errorf("%q : aucun calcul, %v", texte, reponse["interpretation"])
+			continue
+		}
+		if connu, vu := outilDuGroupe[groupe]; vu && connu != outil {
+			t.Errorf("%q : outil %s, attendu %s", texte, outil, connu)
+		}
+		outilDuGroupe[groupe] = outil
+	}
+	statut, _ = appelJSON(bancAssistant(t, "ACCUEIL"), http.MethodGet, "/api/v1/tableaux-de-bord/amorces", nil, nil)
+	if statut != http.StatusForbidden {
+		t.Fatalf("amorces sans l'assistant : statut %d", statut)
+	}
+}

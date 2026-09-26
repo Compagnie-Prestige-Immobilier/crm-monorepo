@@ -12,13 +12,7 @@ import type {
   DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   fetchCalculs,
@@ -217,21 +211,18 @@ export function BoutonAjouterIndicateur({
 }) {
   const [ouvert, setOuvert] = useState(false);
   return (
-    <Sheet open={ouvert} onOpenChange={setOuvert}>
+    <Dialog open={ouvert} onOpenChange={setOuvert}>
       <Button type="button" onClick={() => setOuvert(true)}>
         <SparklesIcon aria-hidden="true" />
         Ajouter un indicateur
       </Button>
-      <SheetContent
-        side="right"
-        className="w-full max-sm:inset-0 max-sm:border-0 sm:max-w-xl motion-reduce:animate-none"
-      >
-        <SheetHeader className="border-b border-border">
-          <SheetTitle>Ajouter un indicateur</SheetTitle>
-          <SheetDescription>Décrivez le chiffre voulu, en une phrase.</SheetDescription>
-        </SheetHeader>
-        <div className="min-h-0 flex-1">
-          <Suspense fallback={<Skeleton className="m-4 h-32" />}>
+      <DialogContent className="top-[8dvh] translate-y-0 gap-0 p-0 shadow-elev-xl outline-none sm:max-w-2xl sm:rounded-2xl">
+        <DialogTitle className="sr-only">Ajouter un indicateur</DialogTitle>
+        <DialogDescription className="sr-only">
+          Décrivez le chiffre voulu, confirmez, choisissez sa forme.
+        </DialogDescription>
+        <Suspense fallback={<Skeleton className="m-5 h-24" />}>
+          {ouvert ? (
             <Constructeur
               ecran={ecran}
               catalogue={catalogue}
@@ -240,9 +231,9 @@ export function BoutonAjouterIndicateur({
               chargerSource={chargerSource}
               onAjouter={onAjouter}
             />
-          </Suspense>
-        </div>
-      </SheetContent>
-    </Sheet>
+          ) : null}
+        </Suspense>
+      </DialogContent>
+    </Dialog>
   );
 }

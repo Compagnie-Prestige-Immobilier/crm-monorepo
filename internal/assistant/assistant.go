@@ -71,6 +71,7 @@ var Garde = map[string]socle.Permission{
 	"POST " + cheminResume:                socle.PermissionProspectsLire,
 	"POST " + cheminCalculs:               permission,
 	"POST " + cheminConstruire:            socle.PermissionChiffresDisposer,
+	"GET " + cheminAmorces:                permission,
 }
 
 type memoire[V any] struct {
