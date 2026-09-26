@@ -74,9 +74,9 @@ export function CommerciauxTable({
             />
           </TableHead>
           <TableHead>Utilisateur</TableHead>
-          <TableHead>Identifiants</TableHead>
-          <TableHead className="text-right">Prospects</TableHead>
-          <TableHead>Dernière connexion</TableHead>
+          <TableHead className="hidden md:table-cell">Identifiants</TableHead>
+          <TableHead className="hidden md:table-cell text-right">Prospects</TableHead>
+          <TableHead className="hidden md:table-cell">Dernière connexion</TableHead>
           <TableHead>
             <span className="sr-only">Actions</span>
           </TableHead>
@@ -157,20 +157,23 @@ function LigneCompte({
             <Badge variant="secondary">{user.roleLibelle}</Badge>
             {user.isActive ? null : <Badge variant="destructive">Désactivé</Badge>}
           </div>
+          <span className="truncate text-[0.8125rem] md:hidden">{user.email}</span>
           <span className="truncate text-[0.75rem] text-muted-foreground">
             {user.phoneE164 === null ? '–' : formatPhone(user.phoneE164)}
             {personnalise ? ` · base : ${ROLE_LABELS[user.role]}` : null}
           </span>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell">
         <div className="flex min-w-0 flex-col">
           <span className="truncate">{user.email}</span>
           <span className="truncate text-[0.75rem] text-muted-foreground">@{user.username}</span>
         </div>
       </TableCell>
-      <TableCell className="text-right tabular-nums">{formatNumber(user.prospectCount)}</TableCell>
-      <TableCell className="whitespace-nowrap text-[0.8125rem]">
+      <TableCell className="hidden md:table-cell text-right tabular-nums">
+        {formatNumber(user.prospectCount)}
+      </TableCell>
+      <TableCell className="hidden md:table-cell whitespace-nowrap text-[0.8125rem]">
         {user.lastLoginAt === null ? (
           <span className="text-muted-foreground">Jamais connecté</span>
         ) : (
