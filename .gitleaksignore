@@ -7,17 +7,17 @@
 # chemin : une vraie clé ajoutée demain dans ces mêmes fichiers rougirait
 # toujours. Les entrées `apps/` portent sur des arborescences supprimées les 9
 # et 10 septembre 2026, qui ne subsistent que dans l'historique.
-419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-accueil.md:generic-api-key:99
-419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-admin.md:generic-api-key:150
-419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-admin.md:generic-api-key:154
-419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-chues.md:generic-api-key:98
-419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E.md:generic-api-key:130
+2d5a3eb12851e89b1c6e267f1f863b431aa86587:E2E-accueil.md:generic-api-key:99
+2d5a3eb12851e89b1c6e267f1f863b431aa86587:E2E-admin.md:generic-api-key:150
+2d5a3eb12851e89b1c6e267f1f863b431aa86587:E2E-admin.md:generic-api-key:154
+2d5a3eb12851e89b1c6e267f1f863b431aa86587:E2E-chues.md:generic-api-key:98
+2d5a3eb12851e89b1c6e267f1f863b431aa86587:E2E.md:generic-api-key:130
 837440378c4725f4c537eee6e5b9f00b0c4191d5:E2E.md:generic-api-key:132
-65bfe350600684c2181ff9c3ef768b05402d31f8:apps/go/admin_integration_test.go:generic-api-key:279
-65bfe350600684c2181ff9c3ef768b05402d31f8:apps/go/admin_integration_test.go:generic-api-key:753
-65bfe350600684c2181ff9c3ef768b05402d31f8:apps/go/auth_integration_test.go:generic-api-key:183
-65bfe350600684c2181ff9c3ef768b05402d31f8:apps/go/auth_integration_test.go:generic-api-key:187
+a305defe96c45b951c1329baac2a08ff2a06b797:apps/go/admin_integration_test.go:generic-api-key:279
+a305defe96c45b951c1329baac2a08ff2a06b797:apps/go/admin_integration_test.go:generic-api-key:753
+a305defe96c45b951c1329baac2a08ff2a06b797:apps/go/auth_integration_test.go:generic-api-key:183
+a305defe96c45b951c1329baac2a08ff2a06b797:apps/go/auth_integration_test.go:generic-api-key:187
 0734a4b1be8cd0a5113d1ab7bff2c5295453dd70:apps/web/e2e/fixtures.ts:generic-api-key:44
 0375214574df5567129fbfacb0cc5328289ea33c:apps/web/src/app/api/auth/auth-routes.test.ts:generic-api-key:16
-d50281a9647b6963c5444b48cda5253611a7b23d:cmd/server/auth_integration_test.go:generic-api-key:276
-d50281a9647b6963c5444b48cda5253611a7b23d:cmd/server/auth_integration_test.go:generic-api-key:279
+040c1c40fdc48fc80d759e50a46f5c500bc728d9:cmd/server/auth_integration_test.go:generic-api-key:276
+040c1c40fdc48fc80d759e50a46f5c500bc728d9:cmd/server/auth_integration_test.go:generic-api-key:279
