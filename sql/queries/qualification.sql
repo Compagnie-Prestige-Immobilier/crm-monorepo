@@ -332,9 +332,10 @@ INSERT INTO "ouvertures_fiche"
   ("id", "openedById", "representantId", "prospectId", "openedAt", "draft")
 VALUES (@id, @opened_by_id, @representant_id, @prospect_id, @opened_at, @draft);
 
+-- Une ouverture restée ouverte compte : une fiche quittée par le menu n'est pas fermée.
 -- name: BrouillonPrecedent :one
 SELECT "draft" FROM "ouvertures_fiche"
-WHERE "openedById" = @opened_by_id AND "closedAt" IS NOT NULL
+WHERE "openedById" = @opened_by_id AND "draft" IS NOT NULL
   AND "representantId" IS NOT DISTINCT FROM CAST(sqlc.narg('representant_id') AS text)
   AND "prospectId" IS NOT DISTINCT FROM CAST(sqlc.narg('prospect_id') AS text)
 ORDER BY "openedAt" DESC, "id" DESC LIMIT 1;

@@ -12,6 +12,32 @@ import (
 	"github.com/google/uuid"
 )
 
+// Une fiche quittée sans qualifier rouvre avec la saisie en cours.
+func TestOuvertureRepriseDuBrouillonDUneFicheQuittee(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	premiere, seconde := uuid.Must(uuid.NewV7()).String(), uuid.Must(uuid.NewV7()).String()
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "id" IN ($1, $2)`, premiere, seconde)
+	})
+	ouvrir := func(id string) map[string]any {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", map[string]any{
+			"id": id, "prospectId": fiche, "openedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		})
+		b.attend(statut, http.StatusOK, "ouverture", body)
+		return body
+	}
+	ouvrir(premiere)
+	statut, body := qualificationEnvoi(b, http.MethodPut, "/api/v1/ouvertures/"+premiere+"/brouillon",
+		map[string]any{"draft": map[string]any{"note": "rappeler après 17 h"}})
+	b.attend(statut, http.StatusOK, "brouillon", body)
+
+	brouillon, _ := ouvrir(seconde)["draft"].(map[string]any)
+	if brouillon["note"] != "rappeler après 17 h" {
+		t.Fatalf("la saisie de la fiche quittée doit revenir : %v", brouillon)
+	}
+}
+
 // Un poste en avance ne fige pas le dernier appel : on garde le dernier réellement passé.
 func TestTentativeHorlogeEnAvanceNeFigePasLaFiche(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
