@@ -10,13 +10,17 @@ VALUES (@id, @source_prospect_id, @suggested_name, @suggested_phone_e164, @note,
         @suggested_by_id, @resolved_prospect_id, @source_attempt_id, @client_created_at);
 
 -- name: TirerSuggestionsProspect :many
-SELECT s."id", s."suggestedName", s."suggestedPhoneE164"
-FROM "prospect_suggestions" s
-INNER JOIN "prospects" src ON src."id" = s."sourceProspectId"
-WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedProspectId" IS NULL
-  AND src."deletedAt" IS NULL
-  AND NOT EXISTS (SELECT 1 FROM "prospects" p WHERE p."phoneE164" = s."suggestedPhoneE164" AND p."deletedAt" IS NULL)
-ORDER BY s."createdAt" ASC
+SELECT d."id", d."suggestedName", d."suggestedPhoneE164"
+FROM (
+  SELECT DISTINCT ON (s."suggestedPhoneE164") s."id", s."suggestedName", s."suggestedPhoneE164", s."createdAt"
+  FROM "prospect_suggestions" s
+  INNER JOIN "prospects" src ON src."id" = s."sourceProspectId"
+  WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedProspectId" IS NULL
+    AND src."deletedAt" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "prospects" p WHERE p."phoneE164" = s."suggestedPhoneE164" AND p."deletedAt" IS NULL)
+  ORDER BY s."suggestedPhoneE164", s."createdAt", s."id"
+) d
+ORDER BY d."createdAt", d."id"
 LIMIT sqlc.arg('places');
 
 -- name: CompterSuggestionsProspect :one
