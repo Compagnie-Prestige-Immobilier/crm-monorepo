@@ -20,6 +20,8 @@ import (
 const (
 	cheminCalculs    = "/api/v1/tableaux-de-bord/calculs"
 	cheminConstruire = "/api/v1/tableaux-de-bord/{ecran}/construire"
+	cheminAmorces    = "/api/v1/tableaux-de-bord/amorces"
+	amorcesMax       = 300
 	periodeEcran     = "ecran"
 	mesuresMax       = 6
 	alternativesMax  = 3
@@ -685,7 +687,50 @@ func (k *constructeur) mesureDite(o *outil) string {
 	return meilleure
 }
 
+type Amorce struct {
+	Texte  string `json:"texte"`
+	Groupe string `json:"groupe"`
+}
+
+type AmorcesOutput struct {
+	Body struct {
+		Amorces []Amorce `json:"amorces" maxItems:"300"`
+	}
+}
+
+// Chaque amorce se retrouve par la recherche par mots : libellé, libellé par
+// axe, mesure suivie du libellé.
+func (*service) amorces(ctx context.Context, _ *struct{}) (*AmorcesOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	out := &AmorcesOutput{}
+	out.Body.Amorces = []Amorce{}
+	for _, nom := range slices.Sorted(maps.Keys(outils)) {
+		o := outils[nom]
+		if !u.Peut(o.permission) {
+			continue
+		}
+		textes := []string{o.libelle}
+		for _, axe := range axesCalcul(o) {
+			textes = append(textes, o.libelle+" par "+strings.ToLower(libellesAxes[axe]))
+		}
+		for _, mesure := range o.mesures {
+			if !strings.EqualFold(mesure, o.libelle) {
+				textes = append(textes, mesure+" · "+o.libelle)
+			}
+		}
+		for _, texte := range textes {
+			out.Body.Amorces = append(out.Body.Amorces, Amorce{Texte: texte, Groupe: o.libelle})
+		}
+	}
+	out.Body.Amorces = out.Body.Amorces[:min(len(out.Body.Amorces), amorcesMax)]
+	return out, nil
+}
+
 func (s *service) monterTableaux(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "amorcesTableauDeBord", Method: http.MethodGet, Path: cheminAmorces,
+		Summary: "Les demandes que le constructeur sait servir, pour l'autocomplétion.",
+	}, s.amorces)
 	huma.Register(api, huma.Operation{
 		OperationID: "calculerTableauDeBord", Method: http.MethodPost, Path: cheminCalculs,
 		Summary: "Les données des calculs d'un tableau de bord, sans modèle, dans la portée du rôle.",

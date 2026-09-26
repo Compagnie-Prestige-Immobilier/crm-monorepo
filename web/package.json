@@ -55,6 +55,7 @@
     "exceljs": "catalog:",
     "libphonenumber-js": "^1.13.12",
     "lucide-react": "catalog:",
+    "motion": "catalog:",
     "openapi-fetch": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

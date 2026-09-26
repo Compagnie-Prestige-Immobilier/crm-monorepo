@@ -12,6 +12,7 @@ export type Calcul = Schemas['Calcul'];
 export type Proposition = Schemas['Proposition'];
 export type EntreeCatalogueApi = Schemas['EntreeCatalogue'];
 export type ReponseConstructeur = Schemas['ConstruireOutputBody'];
+export type Amorce = Schemas['Amorce'];
 export type DashboardWidget = Schemas['DispositionWidget'] & { id: string };
 
 export const SOURCE_CALCUL = 'calcul';
@@ -167,4 +168,8 @@ export async function construireIndicateur(
         proposition === undefined ? { demande, catalogue } : { demande, catalogue, proposition },
     }),
   );
+}
+
+export async function fetchAmorces(): Promise<Amorce[]> {
+  return unwrap(await getApiClient().GET('/api/v1/tableaux-de-bord/amorces')).amorces;
 }

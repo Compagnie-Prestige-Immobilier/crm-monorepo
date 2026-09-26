@@ -154,18 +154,23 @@ test.describe('parcours 9, le tableau de pilotage', () => {
     const comprendre = constructeur.getByText(/^Je comprends : « (.+?) »/u);
     await expect(comprendre).toBeVisible();
     const titre = /« (.+?) »/u.exec((await comprendre.textContent()) ?? '')?.[1] ?? '';
-    await constructeur.getByRole('button', { name: 'Oui', exact: true }).click();
+    await constructeur.getByRole('button', { name: 'Oui, c’est ça' }).click();
 
     await constructeur
       .getByRole('group', { name: 'Formes possibles' })
       .getByRole('button')
       .first()
       .click();
-    await constructeur.getByRole('button', { name: 'Ajouter au tableau de bord' }).click();
+    await expect(constructeur.getByText('C’est celui-ci ?')).toBeVisible();
+    await constructeur.getByRole('button', { name: 'Oui, l’ajouter' }).click();
     await expect(
       constructeur.getByText(`« ${titre} » est sur le tableau de bord.`, { exact: false }),
     ).toBeVisible();
-    await expect(constructeur.getByLabel('Votre demande')).toBeEditable();
+    await expect(
+      constructeur.getByRole('list', { name: 'Ajoutés pendant cette session' }),
+    ).toContainText(titre);
+    await constructeur.getByRole('button', { name: 'Un autre indicateur' }).click();
+    await expect(constructeur.getByLabel('Votre demande')).toBeFocused();
 
     await page.reload();
     const retirer = page.getByRole('button', { name: `Retirer ${titre}` });

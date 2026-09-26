@@ -1,15 +1,14 @@
 'use client';
 
-import type { ToolCallMessagePartComponent } from '@assistant-ui/react';
 import { useQuery } from '@tanstack/react-query';
 import { CheckIcon } from 'lucide-react';
-import { createContext, use } from 'react';
+import { motion } from 'motion/react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 
 import { renderMark } from '@/components/accueil/tableau-de-bord/grille';
 import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
   mesurerDonnees,
-  type Catalogue,
   type DashboardMarque,
   type DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
@@ -18,34 +17,12 @@ import { marqueTexte } from '@/components/dashboard/chart-visual';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchCalculs, type Proposition } from '@/lib/data/disposition';
-import { cn } from '@/lib/utils';
 
-export type ArgsComprendre = {
-  interpretation: string;
-  proposition?: Proposition;
-  alternatives: Proposition[];
-};
-export type ArgsForme = { proposition: Proposition };
 export type ArgsApercu = { proposition: Proposition; marque: DashboardMarque };
-
-export interface ContexteEtapes {
-  catalogue: Catalogue;
+export interface ChargementDonnees {
   plage: { du: string; au: string };
   cleDonnees: readonly unknown[];
   chargerSource: (source: string) => Promise<DonneesSource | null>;
-  confirmer: (etape: string, proposition: Proposition) => void;
-  ajuster: (etape: string) => void;
-  choisirForme: (etape: string, args: ArgsApercu) => void;
-  ajouter: (etape: string, args: ArgsApercu) => void;
-  recommencer: () => void;
-}
-
-export const ContexteConstructeur = createContext<ContexteEtapes | null>(null);
-
-function useEtapes(): ContexteEtapes {
-  const contexte = use(ContexteConstructeur);
-  if (contexte === null) throw new Error('Étape du constructeur hors de son contexte.');
-  return contexte;
 }
 
 const AUCUNE = 'Aucune donnée pour cet indicateur sur la période.';
@@ -55,28 +32,42 @@ const MULTI_SERIES: readonly DashboardMarque[] = [
   'barres-100',
   'barres-groupees',
 ];
+export const entree = {
+  initial: { opacity: 0, y: 12, scale: 0.98, filter: 'blur(6px)' },
+  animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' },
+  exit: { opacity: 0, y: -8, scale: 0.98, filter: 'blur(6px)', transition: { duration: 0.14 } },
+};
+const cascade = { animate: { transition: { staggerChildren: 0.06 } } };
+const enfant = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 } };
+
+export function useFocus<T extends HTMLElement>(pret = true) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (pret) ref.current?.focus();
+  }, [pret]);
+  return ref;
+}
 
 async function donneesDe(
   proposition: Proposition,
-  etapes: ContexteEtapes,
+  chargement: ChargementDonnees,
 ): Promise<{ donnees?: DonneesSource; erreur?: string }> {
   if (proposition.calcul !== undefined) {
-    const [rendu] = await fetchCalculs([proposition.calcul], etapes.plage);
+    const [rendu] = await fetchCalculs([proposition.calcul], chargement.plage);
     if (rendu?.donnees !== undefined) return { donnees: rendu.donnees };
     return { erreur: rendu?.erreur ?? AUCUNE };
   }
   const donnees =
-    proposition.source === undefined ? null : await etapes.chargerSource(proposition.source);
+    proposition.source === undefined ? null : await chargement.chargerSource(proposition.source);
   return donnees === null ? { erreur: AUCUNE } : { donnees };
 }
 
-function useDonnees(proposition: Proposition) {
-  const etapes = useEtapes();
-  const { du, au } = etapes.plage;
+function useDonnees(proposition: Proposition, chargement: ChargementDonnees) {
+  const { du, au } = chargement.plage;
   const cible = proposition.calcul ?? proposition.source ?? null;
   return useQuery({
-    queryKey: ['tableau-de-bord', 'apercu', cible, du, au, ...etapes.cleDonnees],
-    queryFn: () => donneesDe(proposition, etapes),
+    queryKey: ['tableau-de-bord', 'apercu', cible, du, au, ...chargement.cleDonnees],
+    queryFn: () => donneesDe(proposition, chargement),
   });
 }
 
@@ -88,143 +79,185 @@ function marquesPour(donnees: DonneesSource): DashboardMarque[] {
   return uneSerie ? marques.filter((marque) => !MULTI_SERIES.includes(marque)) : marques;
 }
 
+function Phrase({ texte }: { texte: string }) {
+  return (
+    <motion.p variants={cascade} initial="initial" animate="animate" className="text-[1.0625rem]">
+      {texte.split(' ').map((mot, rang) => (
+        <Fragment key={`${mot}-${String(rang)}`}>
+          <motion.span variants={enfant} className="inline-block">
+            {mot}
+          </motion.span>{' '}
+        </Fragment>
+      ))}
+    </motion.p>
+  );
+}
+
+export function Comprendre({
+  interpretation,
+  proposition,
+  alternatives,
+  onConfirmer,
+  onReformuler,
+}: {
+  interpretation: string;
+  proposition?: Proposition | undefined;
+  alternatives: readonly Proposition[];
+  onConfirmer: (choisie: Proposition) => void;
+  onReformuler: () => void;
+}) {
+  const oui = useFocus<HTMLButtonElement>();
+  return (
+    <div className="flex flex-col gap-5 p-6">
+      <Phrase texte={interpretation} />
+      <motion.div variants={cascade} initial="initial" animate="animate" className="flex gap-2">
+        {proposition === undefined ? null : (
+          <motion.div variants={enfant}>
+            <Button ref={oui} onClick={() => onConfirmer(proposition)}>
+              <CheckIcon aria-hidden="true" />
+              Oui, c’est ça
+            </Button>
+          </motion.div>
+        )}
+        <motion.div variants={enfant}>
+          <Button variant="outline" onClick={onReformuler}>
+            Reformuler
+          </Button>
+        </motion.div>
+      </motion.div>
+      {alternatives.length === 0 ? null : (
+        <div role="group" aria-label="Autres indicateurs proches" className="flex flex-col gap-2">
+          <p className="text-[0.8125rem] text-muted-foreground">Ou peut-être :</p>
+          <motion.div
+            variants={cascade}
+            initial="initial"
+            animate="animate"
+            className="flex flex-wrap gap-2"
+          >
+            {alternatives.map((alternative) => (
+              <motion.button
+                key={alternative.source ?? alternative.titre}
+                variants={enfant}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={() => onConfirmer(alternative)}
+                className="rounded-full border border-border bg-background px-3 py-1.5 text-[0.8125rem] hover:border-primary/40 hover:bg-secondary"
+              >
+                {alternative.titre}
+              </motion.button>
+            ))}
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EtatDonnees({ pending, erreur }: { pending: boolean; erreur: string | undefined }) {
-  if (pending) return <Skeleton className="h-28 w-full rounded-md" />;
+  if (pending) return <Skeleton className="h-40 w-full rounded-md" />;
   return <p className="text-destructive">{erreur ?? AUCUNE}</p>;
 }
 
-export const EtapeComprendre: ToolCallMessagePartComponent<ArgsComprendre> = ({
-  toolCallId,
-  args,
-  result,
-}) => {
-  const etapes = useEtapes();
-  const repondu = result !== undefined;
-  const { proposition, alternatives } = args;
-  return (
-    <div data-riche="" className="flex flex-col gap-3">
-      <p>{args.interpretation}</p>
-      {proposition === undefined ? null : (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            disabled={repondu}
-            onClick={() => etapes.confirmer(toolCallId, proposition)}
-          >
-            {result === proposition.titre ? <CheckIcon aria-hidden="true" /> : null}
-            Oui
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={repondu}
-            onClick={() => etapes.ajuster(toolCallId)}
-          >
-            Ajuster
-          </Button>
-        </div>
-      )}
-      {alternatives.length === 0 ? null : (
-        <div role="group" aria-label="Autres indicateurs proches" className="flex flex-wrap gap-2">
-          {alternatives.map((alternative) => (
-            <button
-              key={alternative.source ?? alternative.titre}
-              type="button"
-              disabled={repondu}
-              aria-pressed={result === alternative.titre}
-              onClick={() => etapes.confirmer(toolCallId, alternative)}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-left text-[0.8125rem] transition-colors hover:border-primary/40 hover:bg-secondary disabled:opacity-60 aria-pressed:border-primary aria-pressed:opacity-100 motion-reduce:transition-none"
-            >
-              {alternative.titre}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const EtapeForme: ToolCallMessagePartComponent<ArgsForme> = ({
-  toolCallId,
-  args,
-  result,
-}) => {
-  const etapes = useEtapes();
-  const { proposition } = args;
-  const { data, isPending } = useDonnees(proposition);
+export function Forme({
+  proposition,
+  chargement,
+  onChoisir,
+}: {
+  proposition: Proposition;
+  chargement: ChargementDonnees;
+  onChoisir: (marque: DashboardMarque) => void;
+}) {
+  const { data, isPending } = useDonnees(proposition, chargement);
   const donnees = data?.donnees;
   return (
-    <div data-riche="" className="flex flex-col gap-3">
-      <p>Comment l’afficher ?</p>
+    <div className="flex flex-col gap-4 p-6">
+      <p className="font-display text-[1.0625rem] font-[600]">
+        Comment afficher « {proposition.titre} » ?
+      </p>
       {donnees === undefined ? (
         <EtatDonnees pending={isPending} erreur={data?.erreur} />
       ) : (
-        <div role="group" aria-label="Formes possibles" className="grid grid-cols-2 gap-2">
+        <motion.div
+          role="group"
+          aria-label="Formes possibles"
+          variants={cascade}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        >
           {marquesPour(donnees).map((marque) => (
-            <button
+            <motion.button
               key={marque}
+              variants={enfant}
+              whileHover={{ y: -3 }}
+              whileTap={{ scale: 0.97 }}
               type="button"
-              disabled={result !== undefined}
-              aria-pressed={result === marque}
               title={marqueTexte(marque).usage}
-              onClick={() => etapes.choisirForme(toolCallId, { proposition, marque })}
-              className="flex flex-col gap-1.5 rounded-lg border border-border bg-background p-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary disabled:opacity-60 aria-pressed:border-primary aria-pressed:opacity-100 focus-visible:outline-2 focus-visible:outline-ring motion-reduce:transition-none"
+              onClick={() => onChoisir(marque)}
+              className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2 text-left hover:border-primary/50 hover:shadow-elev-md focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <div aria-hidden="true" className="pointer-events-none h-28 overflow-hidden">
+              <motion.div
+                layoutId={`forme-${marque}`}
+                aria-hidden="true"
+                className="pointer-events-none h-28 overflow-hidden"
+              >
                 {renderMark(proposition.titre, marque, donnees, undefined, VIDE)}
-              </div>
+              </motion.div>
               <span className="text-[0.8125rem] font-[600]">{marqueTexte(marque).nom}</span>
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );
-};
+}
 
-export const EtapeApercu: ToolCallMessagePartComponent<ArgsApercu> = ({
-  toolCallId,
+export function Apercu({
   args,
-  result,
-}) => {
-  const etapes = useEtapes();
-  const { data, isPending } = useDonnees(args.proposition);
+  chargement,
+  ajout,
+  onAjouter,
+  onAutreForme,
+}: {
+  args: ArgsApercu;
+  chargement: ChargementDonnees;
+  ajout: boolean;
+  onAjouter: () => void;
+  onAutreForme: () => void;
+}) {
+  const { data, isPending } = useDonnees(args.proposition, chargement);
   const donnees = data?.donnees;
-  const repondu = result !== undefined;
+  const oui = useFocus<HTMLButtonElement>(donnees !== undefined);
+  // Nivo mesure son conteneur pendant le morphing, encore à la taille de la vignette.
+  const [pose, setPose] = useState(false);
   return (
-    <div data-riche="" className="flex flex-col gap-3">
-      <ChartCard
-        title={args.proposition.titre}
-        hauteur={args.marque === 'tuile' ? 'compacte' : 'normale'}
-        className={cn('animate-none', repondu && 'opacity-80')}
-      >
-        {donnees === undefined ? (
-          <EtatDonnees pending={isPending} erreur={data?.erreur} />
-        ) : (
-          renderMark(args.proposition.titre, args.marque, donnees, undefined, VIDE)
-        )}
-      </ChartCard>
+    <div className="flex flex-col gap-4 p-6">
+      <p className="font-display text-[1.0625rem] font-[600]">C’est celui-ci ?</p>
+      <motion.div layoutId={`forme-${args.marque}`} onLayoutAnimationComplete={() => setPose(true)}>
+        <ChartCard
+          title={args.proposition.titre}
+          hauteur={args.marque === 'tuile' ? 'compacte' : 'normale'}
+          className="animate-none"
+        >
+          {donnees === undefined ? (
+            <EtatDonnees pending={isPending} erreur={data?.erreur} />
+          ) : (
+            <div key={String(pose)} className="contents">
+              {renderMark(args.proposition.titre, args.marque, donnees, undefined, VIDE)}
+            </div>
+          )}
+        </ChartCard>
+      </motion.div>
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          disabled={repondu || donnees === undefined}
-          onClick={() => etapes.ajouter(toolCallId, args)}
-        >
-          {result === 'ajouter' ? <CheckIcon aria-hidden="true" /> : null}
-          Ajouter au tableau de bord
+        <Button ref={oui} disabled={ajout || donnees === undefined} onClick={onAjouter}>
+          <CheckIcon aria-hidden="true" />
+          Oui, l’ajouter
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={repondu}
-          onClick={() => etapes.ajuster(toolCallId)}
-        >
-          Ajuster
-        </Button>
-        <Button size="sm" variant="ghost" disabled={repondu} onClick={etapes.recommencer}>
-          Recommencer
+        <Button variant="outline" disabled={ajout} onClick={onAutreForme}>
+          Autre forme
         </Button>
       </div>
     </div>
   );
-};
+}
