@@ -158,6 +158,7 @@ export const PERMISSIONS = [
   'fiches.voir_converties',
   'formulaires.administrer',
   'imports.administrer',
+  'kairos.assistant',
   'notifications.administrer',
   'panneau.acceder',
   'parametres.administrer',

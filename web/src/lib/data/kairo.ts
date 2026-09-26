@@ -10,7 +10,10 @@ export type TableauKairo = components['schemas']['TableauKairoOutputBody'];
 export type EtatKairo = components['schemas']['EtatKairo'];
 export type TicketKairo = components['schemas']['TicketKairo'];
 
+export type AssistantKairos = components['schemas']['AssistantKairos'];
+
 export const CLE_KAIRO = ['admin', 'kairo'] as const;
+export const CLE_ASSISTANT_KAIROS = ['kairos'] as const;
 
 export const STATUTS_KAIRO: Record<
   string,
@@ -130,4 +133,12 @@ export async function relancerTicketKairo(
 
 export async function prendreEnMainTicketKairo(id: number): Promise<void> {
   return relancerTicketKairo({ id, action: 'prendre_en_main' });
+}
+
+export async function lireAssistantKairos(): Promise<AssistantKairos> {
+  return unwrap(await getApiClient().GET('/api/v1/kairos'));
+}
+
+export async function afficherAssistantKairos(affiche: boolean): Promise<AssistantKairos> {
+  return unwrap(await getApiClient().PUT('/api/v1/kairos', { body: { affiche } }));
 }

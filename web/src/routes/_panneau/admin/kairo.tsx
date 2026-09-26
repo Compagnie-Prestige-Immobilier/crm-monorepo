@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { BandeauEtat } from '@/components/kairo/bandeau-etat';
 import { CarteReformulation } from '@/components/kairo/carte-reformulation';
 import { CarteTickets, IndicateursKairo } from '@/components/kairo/carte-tickets';
-import { ReglagesKairo } from '@/components/kairo/reglages-kairo';
+import { ReglageAssistantKairos, ReglagesKairo } from '@/components/kairo/reglages-kairo';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -143,6 +143,7 @@ function KairoView() {
         pageSize={pageSize}
         setPageSize={setPageSize}
       />
+      <ReglageAssistantKairos />
       <CarteReformulation reformulation={reformulationAffichee} />
     </div>
   );

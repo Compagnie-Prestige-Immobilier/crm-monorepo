@@ -20,6 +20,7 @@ type definitionPermission struct {
 
 const (
 	domaineAccueil    = "Accueil"
+	domaineAssistant  = "Assistant"
 	domaineBanque     = "Banque & Finance"
 	domaineCampagnes  = "Campagnes"
 	domaineChiffres   = "Chiffres"
@@ -75,6 +76,7 @@ const (
 	PermissionRendezVousExporter       Permission = "rendez_vous.exporter"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
+	PermissionKairosAssistant          Permission = "kairos.assistant"
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
@@ -137,8 +139,9 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionRendezVousSuivre:         {domaineRendezVous, "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele, Accueil}},
 	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Accueil}},
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
-	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", AdminSeul},
-	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
+	PermissionAssistantUtiliser:        {domaineAssistant, "Interroger l'assistant sur les chiffres", AdminSeul},
+	PermissionAssistantToutLire:        {domaineAssistant, "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
+	PermissionKairosAssistant:          {domaineAssistant, "Utiliser l'assistant Kairos", Tous},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},

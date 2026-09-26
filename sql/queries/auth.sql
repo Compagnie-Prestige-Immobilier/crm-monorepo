@@ -26,6 +26,12 @@ WHERE rt."tokenHash" = $1
   AND u."deletedAt" IS NULL
   AND u."isActive";
 
+-- name: UserActifParId :one
+SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."roleId", r."libelle" AS role_libelle
+FROM "users" u
+JOIN "roles" r ON r."id" = u."roleId"
+WHERE u."id" = $1 AND u."deletedAt" IS NULL AND u."isActive";
+
 -- name: RevokeSession :exec
 UPDATE "refresh_tokens" SET "revokedAt" = now() WHERE "tokenHash" = $1 AND "revokedAt" IS NULL;
 

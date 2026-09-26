@@ -45,6 +45,7 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
     'Voir aussi les fiches déjà converties dans les listes et à l’ouverture.',
   'formulaires.administrer': 'Régler les champs du formulaire de conversion.',
   'imports.administrer': 'Importer des fichiers de prospects ou de représentants.',
+  'kairos.assistant': 'Poser des questions à Kairos depuis n’importe quel écran du panneau.',
   'notifications.administrer': 'Envoyer des notifications et régler leur envoi.',
   'panneau.acceder': 'Se connecter au panneau. Sans elle, le compte ne peut rien ouvrir.',
   'parametres.administrer': 'Régler les objectifs et les tableaux de bord par défaut.',

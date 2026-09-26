@@ -1,0 +1,217 @@
+{
+  "application": "CPI GO",
+  "version": "2026-09-26",
+  "ecrans": [
+    { "url": "/teleconseil/rappels", "titre": "Rappels" },
+    {
+      "url": "/teleconseil/prospects",
+      "titre": "Prospects",
+      "filtres": ["search", "statut", "projet"]
+    },
+    { "url": "/teleconseil/prospects/{id}", "titre": "Fiche prospect" },
+    { "url": "/teleconseil/representants", "titre": "Représentants" },
+    { "url": "/teleconseil/campagnes", "titre": "Campagnes d'appels" },
+    { "url": "/accueil/rendez-vous", "titre": "Rendez-vous" },
+    { "url": "/notifications", "titre": "Notifications" },
+    { "url": "/compte", "titre": "Mon compte" }
+  ],
+  "actions": [
+    {
+      "nom": "chercher_prospects",
+      "description": "Cherche des prospects par nom, prénom ou numéro, vingt au plus par page.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/prospects",
+      "parametres": {
+        "search": { "type": "string", "description": "Nom, prénom ou numéro", "requis": false },
+        "statut": {
+          "type": "string",
+          "description": "NOUVEAU, CONTACTE, CONVERTI, PERDU ou VENDU",
+          "requis": false
+        },
+        "projet": { "type": "string", "description": "CHUES ou GRAND_PUBLIC", "requis": false },
+        "mesFiches": {
+          "type": "boolean",
+          "description": "Seulement les fiches de l'utilisateur",
+          "requis": false
+        },
+        "page": { "type": "integer", "description": "Page, à partir de 1", "requis": false },
+        "pageSize": {
+          "type": "integer",
+          "description": "Fiches par page, 20 au plus",
+          "requis": false
+        }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "lire_prospect",
+      "description": "Lit une fiche prospect.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/prospects/{id}",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la fiche", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "journal_prospect",
+      "description": "Ce qui a changé sur une fiche prospect, du plus récent au plus ancien.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/prospects/{id}/journal",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la fiche", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "appels_prospect",
+      "description": "Les appels passés sur une fiche prospect.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/prospects/{id}/call-attempts",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la fiche", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "rendez_vous_prospect",
+      "description": "Le rendez-vous en cours d'une fiche prospect.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/prospects/{id}/rendez-vous",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la fiche", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "lister_rappels",
+      "description": "Les rappels promis : du jour, en retard, de la semaine ou tous.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/phase2/callbacks",
+      "parametres": {
+        "scope": {
+          "type": "string",
+          "description": "today, overdue, week ou all",
+          "requis": false
+        },
+        "projet": { "type": "string", "description": "CHUES ou GRAND_PUBLIC", "requis": false },
+        "page": { "type": "integer", "description": "Page, à partir de 1", "requis": false },
+        "pageSize": {
+          "type": "integer",
+          "description": "Rappels par page, 20 au plus",
+          "requis": false
+        }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "reporter_rappel",
+      "description": "Reporte de quinze minutes un rappel promis par l'utilisateur.",
+      "effet": "ecriture",
+      "appel": "POST /api/v1/phase2/callbacks/{id}/snooze",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant du rappel", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"]
+    },
+    {
+      "nom": "chercher_representants",
+      "description": "Cherche des représentants par nom ou numéro, vingt au plus par page.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/representants",
+      "parametres": {
+        "search": { "type": "string", "description": "Nom ou numéro", "requis": false },
+        "mesFiches": {
+          "type": "boolean",
+          "description": "Seulement les fiches de l'utilisateur",
+          "requis": false
+        },
+        "page": { "type": "integer", "description": "Page, à partir de 1", "requis": false },
+        "pageSize": {
+          "type": "integer",
+          "description": "Fiches par page, 20 au plus",
+          "requis": false
+        }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "lire_representant",
+      "description": "Lit une fiche représentant.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/representants/{id}",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la fiche", "requis": true }
+      },
+      "roles": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "lister_rendez_vous",
+      "description": "Les rendez-vous obtenus au téléphone, pour l'accueil, sur une période.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/rendez-vous",
+      "parametres": {
+        "du": { "type": "string", "description": "Premier jour, AAAA-MM-JJ", "requis": false },
+        "au": {
+          "type": "string",
+          "description": "Dernier jour inclus, AAAA-MM-JJ",
+          "requis": false
+        },
+        "search": { "type": "string", "description": "Nom, prénom ou numéro", "requis": false },
+        "page": { "type": "integer", "description": "Page, à partir de 1", "requis": false },
+        "pageSize": {
+          "type": "integer",
+          "description": "Rendez-vous par page, 20 au plus",
+          "requis": false
+        }
+      },
+      "roles": ["ACCUEIL", "ADMIN", "DIRECTION"]
+    },
+    {
+      "nom": "suivi_campagnes",
+      "description": "L'avancement des campagnes d'appels prospects sur une période.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/supervision/campagnes",
+      "parametres": {
+        "actFrom": { "type": "string", "description": "Premier jour, AAAA-MM-JJ", "requis": false },
+        "actTo": {
+          "type": "string",
+          "description": "Dernier jour inclus, AAAA-MM-JJ",
+          "requis": false
+        },
+        "projet": { "type": "string", "description": "CHUES ou GRAND_PUBLIC", "requis": false }
+      },
+      "roles": ["ADMIN", "DIRECTION", "SUPERVISEUR"]
+    },
+    {
+      "nom": "mes_notifications",
+      "description": "Les notifications reçues par l'utilisateur, vingt au plus par page.",
+      "effet": "lecture",
+      "appel": "GET /api/v1/notifications/mine",
+      "parametres": {
+        "unreadOnly": {
+          "type": "boolean",
+          "description": "Seulement les non lues",
+          "requis": false
+        },
+        "page": { "type": "integer", "description": "Page, à partir de 1", "requis": false },
+        "pageSize": {
+          "type": "integer",
+          "description": "Notifications par page, 20 au plus",
+          "requis": false
+        }
+      }
+    },
+    {
+      "nom": "lire_notification",
+      "description": "Marque une notification de l'utilisateur comme lue.",
+      "effet": "ecriture",
+      "appel": "POST /api/v1/notifications/{id}/read",
+      "parametres": {
+        "id": { "type": "string", "description": "Identifiant de la notification", "requis": true }
+      },
+      "roles": ["*"]
+    }
+  ],
+  "limites": { "ecritures_par_conversation": 5, "ecritures_par_jour": 50 }
+}

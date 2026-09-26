@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
+import { AssistantKairos } from '@/components/kairo/assistant-kairos';
 import { CoqueShell } from '@/components/layout/coque-shell';
 import { DemoBanner } from '@/components/layout/demo-banner';
 import { navTitle } from '@/components/layout/nav-items';
@@ -56,6 +57,7 @@ function Panneau() {
     <CoqueShell>
       <LiveStream />
       {peutTenirUneFiche(user) ? <RappelPopUpIntrusif userId={user.id} /> : null}
+      <AssistantKairos />
       <SidebarShell visiteur={user} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">
