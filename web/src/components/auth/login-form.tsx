@@ -35,7 +35,6 @@ function roleOf(payload: unknown): Role {
 const COOKIE_BASE = 'cpi_base';
 const BASE_PUBLIQUE = 'public';
 const DEMO_ROLES = [
-  'ADMIN',
   'SUPERVISEUR',
   'COMMERCIAL',
   'BANQUE_FINANCE',
@@ -131,8 +130,8 @@ function DemoProfileField({ role, onChange }: { role: Role; onChange: (role: Rol
       <Select
         value={role}
         onValueChange={(value) => {
-          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role))
-            onChange(value as Role);
+          const demoRole = DEMO_ROLES.find((candidat) => candidat === value);
+          if (demoRole !== undefined) onChange(demoRole);
         }}
         items={DEMO_ROLES.map((demoRole) => ({ value: demoRole, label: ROLE_LABELS[demoRole] }))}
       >
@@ -157,7 +156,7 @@ export function LoginForm({ next }: { next?: string | null }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [bases, setBases] = useState<string[] | null>(null);
   const [base, setBase] = useState(baseCourante);
-  const [demoRole, setDemoRole] = useState<Role>('ADMIN');
+  const [demoRole, setDemoRole] = useState<Role>(DEMO_ROLES[0]);
   const [demoSubmitting, setDemoSubmitting] = useState(false);
 
   useEffect(() => {

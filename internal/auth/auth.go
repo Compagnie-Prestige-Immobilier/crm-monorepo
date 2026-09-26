@@ -75,7 +75,6 @@ var demoProfiles = map[string]struct {
 	email string
 	role  db.Role
 }{
-	"ADMIN":            {email: "admin@cpi.sn", role: db.RoleADMIN},
 	"COMMERCIAL":       {email: "fixture.awa@cpi.sn", role: db.RoleCOMMERCIAL},
 	"BANQUE_FINANCE":   {email: "fixture.banque@cpi.sn", role: db.RoleBANQUEFINANCE},
 	"SUPERVISEUR":      {email: "fixture.superviseur@cpi.sn", role: db.RoleSUPERVISEUR},

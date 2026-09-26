@@ -119,6 +119,9 @@ func (s *serviceBases) creer(ctx context.Context, in *BaseCreerInput) (*BasesOut
 	if _, occupe := s.reg.garde(nom); occupe {
 		return nil, socle.Problem(http.StatusConflict, "NOM_PRIS", "Ce nom est déjà utilisé.")
 	}
+	if _, err := motDePasseFixtures(); err != nil {
+		return nil, err
+	}
 
 	baseSQL := prefixeBaseSQL + strings.ReplaceAll(nom, "-", "_")
 	travail, arreter := context.WithTimeout(context.WithoutCancel(ctx), delaiCreationDemo)
@@ -233,6 +236,9 @@ func (s *serviceBases) rafraichirTout(ctx context.Context, _ *struct{}) (*BasesO
 }
 
 func (s *serviceBases) rafraichirUne(ctx context.Context, nom, baseSQL string) error {
+	if _, err := motDePasseFixtures(); err != nil {
+		return err
+	}
 	if pool := s.reg.demonter(nom); pool != nil {
 		pool.Close()
 	}

@@ -205,9 +205,8 @@ func origineAutorisee(r *http.Request, motif string) bool {
 	return u.Host == r.Host && (u.Scheme == "https" || u.Scheme == "http")
 }
 
-// Une base de démonstration n'a pas d'identité propre auprès de ces services :
-// un ADMIN semé dessus ne doit jamais piloter le vrai Kairo, le vrai GLPI, une
-// vraie plateforme d'enrôlement ou l'export intégral de production.
+// Routes qui appellent Kairo, GLPI, les plateformes, SharePoint ou `pg_dump` :
+// ces services lisent l'environnement du processus, pas la base servie.
 var routesInterditesEnDemo = map[string]bool{
 	"GET /api/v1/admin/kairo":                                      true,
 	"POST /api/v1/admin/kairo/pause":                               true,
@@ -218,17 +217,16 @@ var routesInterditesEnDemo = map[string]bool{
 	"POST /api/v1/support/tickets":                                 true,
 	"POST /api/v1/support/tickets/{id}/reprendre":                  true,
 	"POST /api/v1/support/tickets/{id}/rattacher":                  true,
+	"GET /api/v1/support/categories":                               true,
 	"POST /api/v1/enrolement/{projet}/tirage":                      true,
+	"POST /api/v1/webhooks/enrolement/{projet}":                    true,
+	"POST /api/v1/imports/rattraper-feuilles":                      true,
 	"GET /api/v1/bank-inscriptions/{id}/pieces":                    true,
 	"GET /api/v1/bank-inscriptions/{id}/piece":                     true,
 	"GET /api/v1/bank-inscriptions/{id}/pieces.zip":                true,
 	"POST /api/v1/admin/database-dump":                             true,
 }
 
-// Une seule couche pour l'origine, la session et le rôle. Le motif apparié
-// (`METHODE /chemin`) est la clé de `garde` ; le panneau statique n'en a pas.
-// Cookie SameSite=Lax + même origine exigée sur toute écriture : le cookie
-// `__Host-` seul laisse passer un sous-domaine voisin (OWASP CSRF).
 func refusBaseDemo(w http.ResponseWriter, r *http.Request, motif, base string) bool {
 	if base == BasePublique || !routesInterditesEnDemo[motif] {
 		return false
@@ -237,6 +235,8 @@ func refusBaseDemo(w http.ResponseWriter, r *http.Request, motif, base string) b
 	return true
 }
 
+// Origine, session et rôle en une couche, par le motif `METHODE /chemin`. Toute
+// écriture exige la même origine : `__Host-` seul laisse passer un sous-domaine.
 func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions, base string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, motif := mux.Handler(r)
