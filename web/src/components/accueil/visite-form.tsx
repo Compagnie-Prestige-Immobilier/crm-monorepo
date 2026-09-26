@@ -202,7 +202,7 @@ function ChoiceError({ message }: { message: string | undefined }): ReactNode {
   );
 }
 
-export interface VisitePreremplie {
+interface VisitePreremplie {
   visitorName: string;
   phone: string;
   comment: string;
