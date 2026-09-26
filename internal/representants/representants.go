@@ -985,8 +985,12 @@ type RepresentantCallAttemptsOutput struct {
 
 // De la première saisie à la qualification ; nul tant qu'une borne manque, jamais zéro : une fiche
 // seulement consultée tirerait la durée moyenne vers le bas.
-func (s *service) dureesTraitementRepresentant(ctx context.Context, id string) (map[string]int32, error) {
-	rows, err := s.Q.DureesDeTraitement(ctx, &id)
+func (s *service) dureesTraitementRepresentant(ctx context.Context, tentatives []db.ListRepCallAttemptsRow) (map[string]int32, error) {
+	ids := make([]string, len(tentatives))
+	for i := range tentatives {
+		ids[i] = tentatives[i].ID
+	}
+	rows, err := s.Q.DureesDeTraitement(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -1008,7 +1012,7 @@ func (s *service) historiqueAppelsRepresentant(ctx context.Context, in *Represen
 	if err != nil {
 		return nil, err
 	}
-	durees, err := s.dureesTraitementRepresentant(ctx, in.ID)
+	durees, err := s.dureesTraitementRepresentant(ctx, rows)
 	if err != nil {
 		return nil, err
 	}

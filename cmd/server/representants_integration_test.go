@@ -313,6 +313,29 @@ func TestRepresentantSuppressionExigeLaCascadeQuandDesProspectsPendent(t *testin
 	b.attend(statut, http.StatusNotFound, "fiche supprimée", absente)
 }
 
+// Au-delà de 5 000 ouvertures closes, l'appel le plus récent garde sa durée de traitement.
+func TestRepresentantDureeDeTraitementDesAppelsRecents(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	departement := representantDepartementDeTest(b)
+	statut, body := b.connexion(b.email, "motdepasse")
+	b.attend(statut, http.StatusOK, "connexion", body)
+	fiche := representantCreer(b, departement, "Awa Diouf", "77 555 66 78")
+	representantExec(b, `WITH tentatives AS (
+			INSERT INTO "rep_call_attempts" ("id", "representantId", "performedById", "statutQualificationId", "clientCreatedAt")
+			SELECT $1 || '-' || i, $1, $2, $3, now() - make_interval(mins => 5001 - i) FROM generate_series(1, 5001) i
+			RETURNING "id", "clientCreatedAt")
+		INSERT INTO "ouvertures_fiche" ("id", "openedById", "representantId", "openedAt", "firstInputAt", "closedAt", "closingAttemptId", "updatedAt")
+		SELECT 'ouverture-' || "id", $2, $1, "clientCreatedAt" - interval '1 minute', "clientCreatedAt" - interval '30 seconds',
+			"clientCreatedAt", "id", now() FROM tentatives`, fiche["id"], b.userID, qualificationStatutID(b, "REFUSE"))
+
+	statut, historique := representantJSON(b, http.MethodGet, "/api/v1/representants/"+fiche["id"].(string)+"/call-attempts", nil)
+	b.attend(statut, http.StatusOK, "historique des appels", historique)
+	items, _ := historique["items"].([]any)
+	if len(items) == 0 || items[0].(map[string]any)["dureeTraitementSecondes"] != float64(30) {
+		t.Fatalf("l’appel le plus récent garde sa durée de traitement : %v", items[:min(len(items), 1)])
+	}
+}
+
 func TestRepresentantJournalDeFicheEtBasculeDeRelation(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	departement := representantDepartementDeTest(b)
