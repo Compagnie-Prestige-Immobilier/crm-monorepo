@@ -10,6 +10,7 @@ import {
   DatabaseIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
+  GaugeIcon,
   HeadsetIcon,
   HouseIcon,
   LandmarkIcon,
@@ -253,6 +254,13 @@ const SECTIONS: readonly NavSection[] = [
     coque: 'teleconseil',
     title: 'Piloter',
     items: [
+      {
+        href: '/admin/pilotage',
+        label: 'Tableau de pilotage',
+        icon: GaugeIcon,
+        description: 'Ventes, encaissements, objectifs, Banque & Finance et risques',
+        acces: ['DIRECTION'],
+      },
       {
         href: '/teleconseil/tableau-de-bord',
         label: 'Tableau de bord',
@@ -535,6 +543,13 @@ const SECTIONS: readonly NavSection[] = [
     title: 'Au quotidien',
     items: [
       {
+        href: '/admin/pilotage',
+        label: 'Tableau de pilotage',
+        icon: GaugeIcon,
+        description: 'Ventes, encaissements, objectifs, Banque & Finance et risques',
+        acces: 'chiffres.voir_montants',
+      },
+      {
         href: '/admin/commerciaux',
         label: 'Comptes et rôles',
         icon: UsersIcon,
@@ -726,7 +741,7 @@ export function homePathForRole(role: Role): string {
     case 'SUPERVISEUR':
       return '/teleconseil/tableau-de-bord';
     case 'ADMIN':
-      return '/admin/commerciaux';
+      return '/admin/pilotage';
     case 'BANQUE_FINANCE':
       return '/finance';
     default:
