@@ -85,7 +85,7 @@ type ventePreparee struct {
 }
 
 func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput, error) {
-	preparee, err := s.preparer(ctx, &in.Body, nil)
+	preparee, err := s.preparer(ctx, s.Q, &in.Body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -122,26 +122,19 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 }
 
 func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteOutput, error) {
-	id, err := strconv.ParseInt(in.ID, 10, 64)
-	if err != nil {
-		return nil, socle.Problem(http.StatusBadRequest, "VENTES_ID_INVALIDE", "Cette vente est introuvable.")
-	}
-	avant, err := s.Q.VenteParID(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
-	}
+	id, err := parseVenteID(in.ID)
 	if err != nil {
 		return nil, err
 	}
-	preparee, err := s.preparer(ctx, &in.Body, &avant)
-	if err != nil {
-		return nil, err
-	}
-	preparee.Vente.Numero = avant.Numero
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if err := verrouillerVente(ctx, q, id); err != nil {
+		avant, err := venteDuPanneau(ctx, q, id, false)
+		if err != nil {
+			return err
+		}
+		preparee, err := s.preparer(ctx, q, &in.Body, &avant)
+		if err != nil {
 			return err
 		}
 		versements, err := q.TotalVersementsVente(ctx, id)
@@ -194,7 +187,7 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if err := verrouillerVente(ctx, q, id); err != nil {
+		if _, err := venteDuPanneau(ctx, q, id, false); err != nil {
 			return err
 		}
 		rang, err := q.ProchainRangVersement(ctx, id)
@@ -219,12 +212,20 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 	return s.sortie(ctx, id)
 }
 
-func verrouillerVente(ctx context.Context, q *db.Queries, id int64) error {
-	_, err := q.VerrouillerVente(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
+// Verrouille la vente ; celles du classeur ne s'écrivent que par un nouveau dépôt.
+func venteDuPanneau(ctx context.Context, q *db.Queries, id int64, archiveeAdmise bool) (db.Vente, error) {
+	vente, err := q.VenteVerrouillee(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && vente.ArchiveeLe != nil && !archiveeAdmise) {
+		return db.Vente{}, socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
 	}
-	return err
+	if err != nil {
+		return db.Vente{}, err
+	}
+	if vente.Origine == origineImport {
+		return db.Vente{}, socle.Problem(http.StatusConflict, "VENTE_DU_CLASSEUR",
+			"Cette vente vient du classeur : corrigez-la dans le classeur, puis déposez-le à nouveau.")
+	}
+	return vente, nil
 }
 
 func (s *service) archiver(ctx context.Context, in *venteIDInput) (*struct{}, error) {
@@ -232,16 +233,13 @@ func (s *service) archiver(ctx context.Context, in *venteIDInput) (*struct{}, er
 	if err != nil {
 		return nil, err
 	}
-	avant, err := s.Q.VenteParID(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
-	}
-	if err != nil {
-		return nil, err
-	}
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		avant, err := venteDuPanneau(ctx, q, id, false)
+		if err != nil {
+			return err
+		}
 		if err := q.ArchiverVente(ctx, db.ArchiverVenteParams{ID: id, ArchiveeParId: &acteur}); err != nil {
 			return err
 		}
@@ -261,12 +259,11 @@ func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		restaurees, err := q.RestaurerVente(ctx, id)
-		if err != nil {
+		if _, err := venteDuPanneau(ctx, q, id, true); err != nil {
 			return err
 		}
-		if restaurees == 0 {
-			return socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
+		if err := q.RestaurerVente(ctx, id); err != nil {
+			return err
 		}
 		apres, err := q.VenteParID(ctx, id)
 		if err != nil {
@@ -285,23 +282,17 @@ func (s *service) sortie(ctx context.Context, id int64) (*VenteOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	versements, err := s.Q.ListerVersementsVentes(ctx)
+	versements, err := s.Q.ListerVersementsVentes(ctx, []int64{id})
 	if err != nil {
 		return nil, err
 	}
-	parVente := map[int64][]VersementDTO{}
-	for _, versement := range versements {
-		if versement.VenteId == id {
-			parVente[id] = append(parVente[id], VersementDTO{Date: jour(versement.Date), Montant: versement.Montant})
-		}
-	}
-	return &VenteOutput{Body: venteDTO(&vente, parVente[id])}, nil
+	return &VenteOutput{Body: venteDTO(&vente, versementsParVente(versements)[id])}, nil
 }
 
 // `avant` est la vente corrigée, nil à la création : une correction garde le
 // site, le canal et l'échéancier qu'elle avait, même retirés ou incomplets depuis.
-func (s *service) preparer(ctx context.Context, in *venteInput, avant *db.Vente) (ventePreparee, error) {
-	contexte, err := s.contexte(ctx, in, avant)
+func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, avant *db.Vente) (ventePreparee, error) {
+	contexte, err := contexteVente(ctx, q, in, avant)
 	if err != nil {
 		return ventePreparee{}, err
 	}
@@ -309,8 +300,8 @@ func (s *service) preparer(ctx context.Context, in *venteInput, avant *db.Vente)
 	if err != nil {
 		return ventePreparee{}, err
 	}
-	proprietaire, apporteur, cpi := repartitionVente(in, avant, &contexte.site, prix)
-	if !partsCouvertesParLePrix(prix*int64(in.NombreLots), proprietaire, apporteur, cpi) {
+	proprietaire, apporteur, cpi, reprises := repartitionVente(in, avant, &contexte.site, prix)
+	if !reprises && !partsCouvertesParLePrix(prix*int64(in.NombreLots), proprietaire, apporteur, cpi) {
 		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_PARTS_INVALIDES",
 			"Les parts du propriétaire, de l’apporteur et de CPI doivent être positives et ne pas dépasser le prix total.")
 	}
@@ -411,7 +402,7 @@ type venteContexte struct {
 	site                              db.VentesSite
 }
 
-func (s *service) contexte(ctx context.Context, in *venteInput, avant *db.Vente) (venteContexte, error) {
+func contexteVente(ctx context.Context, q *db.Queries, in *venteInput, avant *db.Vente) (venteContexte, error) {
 	client := strings.Join(strings.Fields(strings.ToUpper(strings.TrimSpace(in.Client))), " ")
 	telephone := strings.TrimSpace(in.Telephone)
 	siteNom := strings.ToUpper(strings.TrimSpace(in.Site))
@@ -423,15 +414,15 @@ func (s *service) contexte(ctx context.Context, in *venteInput, avant *db.Vente)
 	if err != nil {
 		return venteContexte{}, socle.Problem(http.StatusBadRequest, "VENTE_DATE_INVALIDE", "La date de souscription est invalide.")
 	}
-	site, err := s.siteEtCanalProposes(ctx, siteNom, canal, avant)
+	site, err := siteEtCanalProposes(ctx, q, siteNom, canal, avant)
 	if err != nil {
 		return venteContexte{}, err
 	}
 	return venteContexte{client: client, telephone: telephone, siteNom: siteNom, canal: canal, date: date, site: site}, nil
 }
 
-func (s *service) siteEtCanalProposes(ctx context.Context, siteNom, canal string, avant *db.Vente) (db.VentesSite, error) {
-	site, err := s.Q.SiteVenteParNom(ctx, siteNom)
+func siteEtCanalProposes(ctx context.Context, q *db.Queries, siteNom, canal string, avant *db.Vente) (db.VentesSite, error) {
+	site, err := q.SiteVenteParNom(ctx, siteNom)
 	siteConserve := avant != nil && avant.Site == siteNom
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !site.Actif && !siteConserve) {
 		return db.VentesSite{}, socle.Problem(http.StatusBadRequest, "VENTE_SITE_INDISPONIBLE", "Ce site n’est plus proposé à la saisie.")
@@ -439,7 +430,7 @@ func (s *service) siteEtCanalProposes(ctx context.Context, siteNom, canal string
 	if err != nil {
 		return db.VentesSite{}, err
 	}
-	canaux, err := s.Q.ListerCanauxVentes(ctx)
+	canaux, err := q.ListerCanauxVentes(ctx)
 	if err != nil {
 		return db.VentesSite{}, err
 	}
@@ -472,16 +463,16 @@ func prixVente(in *venteInput, site *db.VentesSite) (int64, error) {
 	return prix, nil
 }
 
-// Une correction qui ne touche ni site, ni lots, ni prix garde ses parts :
-// la règle du site a pu changer depuis la saisie.
-func repartitionVente(in *venteInput, avant *db.Vente, site *db.VentesSite, prix int64) (proprietaire, apporteur, cpi int64) {
-	total := prix * int64(in.NombreLots)
+// Une correction qui ne touche ni site, ni lots, ni prix reprend ses parts telles quelles,
+// même hors des règles actuelles : la règle du site a pu changer depuis la saisie.
+func repartitionVente(in *venteInput, avant *db.Vente, site *db.VentesSite, prix int64) (proprietaire, apporteur, cpi int64, reprises bool) {
 	if avant != nil && avant.Site == strings.ToUpper(strings.TrimSpace(in.Site)) &&
 		avant.NombreLots == in.NombreLots && avant.PrixUnitaire == prix &&
 		in.PartProprietaire == nil && in.PartApporteur == nil && in.PartCpi == nil {
-		return avant.PartProprietaire, avant.PartApporteur, avant.PartCpi
+		return avant.PartProprietaire, avant.PartApporteur, avant.PartCpi, true
 	}
-	return partsVente(in, site, total)
+	proprietaire, apporteur, cpi = partsVente(in, site, prix*int64(in.NombreLots))
+	return proprietaire, apporteur, cpi, false
 }
 
 func partsVente(in *venteInput, site *db.VentesSite, total int64) (proprietaire, apporteur, cpi int64) {
