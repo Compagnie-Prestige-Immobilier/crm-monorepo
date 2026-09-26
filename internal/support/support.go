@@ -49,6 +49,9 @@ var Garde = map[string]socle.Permission{
 	"POST " + cheminKairoRelance:                  socle.PermissionExploitationAdministrer,
 	"POST " + cheminKairoReparationBaseActiver:    socle.PermissionExploitationAdministrer,
 	"POST " + cheminKairoReparationBaseDesactiver: socle.PermissionExploitationAdministrer,
+	"GET " + cheminAssistantKairos:                socle.PermissionPanneauAcceder,
+	"PUT " + cheminAssistantKairos:                socle.PermissionExploitationAdministrer,
+	"GET " + cheminIdentiteKairos:                 socle.PermissionKairosAssistant,
 }
 
 type service struct {
@@ -85,6 +88,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		Summary: "Les catégories GLPI proposées au demandeur.",
 	}, s.categories)
 	monterKairo(api, s)
+	monterAssistantKairos(api, s)
 }
 
 func Taches(d *socle.Deps) []socle.Tache {

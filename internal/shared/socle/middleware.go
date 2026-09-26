@@ -108,7 +108,7 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		// `frame-ancestors 'self'` et non `'none'` : la visionneuse de pièces
 		// affiche un PDF du panneau dans une iframe du panneau, et le lecteur PDF
 		// de Chrome ouvre lui-même un cadre fils soumis à cette directive.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'self'")
+		w.Header().Set("Content-Security-Policy", politiqueContenu())
 		ctx := context.WithValue(r.Context(), cleRequete{}, id)
 		ctx = context.WithValue(ctx, CleAdresse{}, adresseClient(r, cfg.TrustProxy))
 		securisee := r.TLS != nil || (cfg.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
@@ -137,6 +137,14 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		}()
 		next.ServeHTTP(rw, r)
 	})
+}
+
+// L'assistant Kairos charge son script et converse depuis son instance, hors de l'origine du panneau.
+func politiqueContenu() string {
+	kairos, _ := KairosConfigure()
+	return "default-src 'self'; script-src 'self' " + kairos + "; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+		"frame-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com " + kairos +
+		"; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"
 }
 
 // Le panneau sonde ces routes en boucle, une par minute et par onglet ouvert,
@@ -223,6 +231,7 @@ var routesInterditesEnDemo = map[string]bool{
 	"GET /api/v1/bank-inscriptions/{id}/piece":                     true,
 	"GET /api/v1/bank-inscriptions/{id}/pieces.zip":                true,
 	"POST /api/v1/admin/database-dump":                             true,
+	"GET /api/v1/kairos/identite":                                  true,
 }
 
 // Une seule couche pour l'origine, la session et le rôle. Le motif apparié
@@ -245,8 +254,10 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions, base string
 		}
 		permission, gardee := Garde[motif]
 		publique := gardee && permission == Publique
-		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas d'origine.
-		if !publique && !origineAutorisee(r, motif) {
+		appelKairos := r.Header.Get(enteteSignatureKairos) != ""
+		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas
+		// d'origine, et un appel Kairos non plus, mais il est signé.
+		if !publique && !appelKairos && !origineAutorisee(r, motif) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Origine refusée."))
 			return
 		}
@@ -254,14 +265,9 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions, base string
 			mux.ServeHTTP(w, r)
 			return
 		}
-		jeton := JetonSession(r)
-		if jeton == "" {
-			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "UNAUTHENTICATED", "Connexion requise."))
-			return
-		}
-		u, err := UtilisateurParSession(r.Context(), q, a, jeton)
-		if err != nil {
-			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
+		u, refus := utilisateurDeLaRequete(w, r, q, a, base, appelKairos)
+		if refus != nil {
+			EcrireProblem(w, r, refus)
 			return
 		}
 		if !u.Peut(permission) {
@@ -271,6 +277,26 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions, base string
 		noterAuteur(r.Context(), &u)
 		mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), cleUtilisateur{}, u)))
 	})
+}
+
+func utilisateurDeLaRequete(w http.ResponseWriter, r *http.Request, q *db.Queries, a *Attributions, base string, appelKairos bool) (Utilisateur, *ProblemError) {
+	if appelKairos {
+		u, err := utilisateurKairos(w, r, q, a, base)
+		if err != nil {
+			slog.Warn("appel Kairos refusé", "chemin", r.URL.Path, "err", err)
+			return Utilisateur{}, Problem(http.StatusUnauthorized, "KAIROS_REFUSE", "Appel Kairos refusé.")
+		}
+		return u, nil
+	}
+	jeton := JetonSession(r)
+	if jeton == "" {
+		return Utilisateur{}, Problem(http.StatusUnauthorized, "UNAUTHENTICATED", "Connexion requise.")
+	}
+	u, err := UtilisateurParSession(r.Context(), q, a, jeton)
+	if err != nil {
+		return Utilisateur{}, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous.")
+	}
+	return u, nil
 }
 
 type Limiteur struct {

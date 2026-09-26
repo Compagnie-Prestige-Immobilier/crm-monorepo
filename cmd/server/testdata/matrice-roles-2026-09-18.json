@@ -1,4 +1,23 @@
 {
+  "GET /api/v1/kairos": [
+    "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "PUT /api/v1/kairos": ["ADMIN"],
+  "GET /api/v1/kairos/identite": [
+    "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "GET /api/v1/phase2/rv-site": [
     "ADMIN",
     "CHARGE_CLIENTELE",
