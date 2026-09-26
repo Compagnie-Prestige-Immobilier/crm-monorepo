@@ -42,12 +42,13 @@ import {
   type ProspectRow,
   type UpdateProspectInput,
 } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 const MIN_REASON_LENGTH = 5;
 
 /**
  * Le formulaire porte `''` là où la fiche porte `null`. Comparés tels quels,
- * toute fiche SANS banque — donc toute fiche Grand Public — s'ouvrait déjà « en
+ * toute fiche SANS banque, donc toute fiche Grand Public, s'ouvrait déjà « en
  * bascule », motif obligatoire à l'appui, et plus aucune correction de nom
  * n'était enregistrable.
  */
@@ -274,6 +275,10 @@ export function ProspectEditDialog({
 
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState<string | undefined>(undefined);
+  useRecalage([prospect?.id], () => {
+    setReason('');
+    setReasonError(undefined);
+  });
 
   useEffect(() => {
     if (prospect === null) return;
@@ -334,12 +339,7 @@ export function ProspectEditDialog({
     <Dialog
       open={prospect !== null}
       onOpenChange={(open) => {
-        if (open) {
-          setReason('');
-          setReasonError(undefined);
-          return;
-        }
-        onOpenChange(false);
+        if (!open) onOpenChange(false);
       }}
     >
       <DialogContent className="sm:max-w-xl">

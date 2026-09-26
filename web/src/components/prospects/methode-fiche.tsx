@@ -25,7 +25,7 @@ import {
 const AUCUNE = 'AUCUNE';
 
 const CHOIX: readonly { value: MethodeEncadrement; label: string }[] = [
-  { value: AUCUNE, label: 'Aucun' },
+  { value: AUCUNE, label: 'Aucune' },
   ...ENROLLMENT_METHOD_ORDER.map((method) => ({
     value: method,
     label: ENROLLMENT_METHOD_LABELS[method],

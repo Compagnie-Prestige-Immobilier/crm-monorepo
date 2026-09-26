@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/google/uuid"
@@ -317,6 +318,16 @@ func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
 	return nil
 }
 
+func motDePasseFixtures() (string, error) {
+	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
+	password := seedDefautDev("SEED_FIXTURE_PASSWORD", autoriseDefaut, "ChangeMoi123456")
+	if len(password) < 12 {
+		return "", socle.Problem(http.StatusServiceUnavailable, "SEED_FIXTURE_PASSWORD_MANQUANT",
+			"SEED_FIXTURE_PASSWORD (12 caractères minimum) manque sur le serveur : renseignez-le sur Dokploy pour semer une base de démonstration.")
+	}
+	return password, nil
+}
+
 // Jamais sur la base principale d'une production : elle les voit fermés. Ils ne
 // se suppriment pas, des fiches peuvent les citer.
 func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstration bool) error {
@@ -332,13 +343,9 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstrat
 		slog.Info("seed fixtures", "statut", "aucune sur la base principale", "désactivés", desactives)
 		return nil
 	}
-	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
-	password := seedDefautDev("SEED_FIXTURE_PASSWORD", autoriseDefaut, "ChangeMoi123456")
-	if password == "" {
-		return errors.New("SEED_FIXTURE_PASSWORD est requis hors développement")
-	}
-	if len(password) < 12 {
-		return errors.New("SEED_FIXTURE_PASSWORD doit faire au moins 12 caractères")
+	password, err := motDePasseFixtures()
+	if err != nil {
+		return err
 	}
 	condensat, err := database.HacherMotDePasse(password)
 	if err != nil {

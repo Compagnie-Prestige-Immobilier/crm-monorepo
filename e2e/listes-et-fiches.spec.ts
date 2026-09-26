@@ -145,7 +145,10 @@ test.describe('parcours 7, les listes CHUES', () => {
 
     await page.getByRole('link', { name: new RegExp(`CHUES ${cle}`) }).click();
     await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${prospectChues}$`));
-    await expect(page.getByRole('heading', { level: 2 })).toContainText(`CHUES ${cle}`);
+    await expect(page.getByRole('heading', { name: 'Fiche prospect', level: 1 })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toContainText(
+      `CHUES ${cle}`,
+    );
     await expect(page.getByRole('link', { name: 'Ouvrir la fiche du représentant' })).toBeVisible();
   });
 
@@ -161,6 +164,33 @@ test.describe('parcours 7, les listes CHUES', () => {
     await chercher(page, 'Recherche');
 
     await expect(page.getByRole('link', { name: new RegExp(`GP ${cle}`) })).toHaveCount(0);
+  });
+});
+
+test.describe('parcours 7, modifier un prospect depuis la liste', () => {
+  test.use({ storageState: compteDe('ADMIN').etat });
+
+  test('le motif de bascule saisi pour une fiche ne passe pas à la suivante', async ({ page }) => {
+    await page.goto('/teleconseil/prospects');
+    await chercher(page, 'Recherche');
+    const fenetre = page.getByRole('dialog', { name: 'Modifier le prospect' });
+    const motif = fenetre.getByRole('textbox', { name: /Motif de la bascule/u });
+
+    const basculer = async (nom: string): Promise<void> => {
+      await page.getByRole('button', { name: `Actions pour ${nom}` }).click();
+      await page.getByRole('menuitem', { name: 'Modifier' }).click();
+      await fenetre.getByRole('combobox', { name: /Banque/u }).click();
+      await page.getByRole('option').first().click();
+      await expect(motif).toBeVisible();
+    };
+
+    await basculer(`Aminata CHUES ${cle}`);
+    await motif.fill('Salaire domicilié ailleurs');
+    await fenetre.getByRole('button', { name: 'Annuler' }).click();
+    await expect(fenetre).toBeHidden();
+
+    await basculer(`Ousmane GP ${cle}`);
+    await expect(motif).toHaveValue('');
   });
 });
 
@@ -197,9 +227,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     // Pas à pas : la réponse, le formulaire, le statut, sa précision, la note.
     // Un Retour ne perd pas ce qui a été saisi dans le formulaire.
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
-    // « Aucun » coche par défaut la méthode d'enrôlement : c'est le seul radio actif ici.
+    // « Aucune » coche par défaut la méthode d'enrôlement : c'est le seul radio actif ici.
     await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
-    await expect(page.getByRole('radio', { name: 'Aucun', checked: true })).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Aucune', checked: true })).toBeVisible();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: /^Retour/u }).click();
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();

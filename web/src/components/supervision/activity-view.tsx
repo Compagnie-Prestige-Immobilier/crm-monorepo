@@ -210,10 +210,6 @@ export function ActivityView({ projet }: { projet: Projet | null }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-[0.9375rem] text-muted-foreground">
-        Ce volet mesure les appels et les saisies. La connexion à l’application est suivie dans
-        Comptes. « Confirmés » compte les appels retrouvés dans le journal du téléphone Android.
-      </p>
       {toolbar}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -997,16 +993,8 @@ function TimeField({
   );
 }
 
-function dureeAffichee(secondes: number): string {
-  const minutes = Math.floor(secondes / 60);
-  const reste = Math.round(secondes % 60);
-  if (minutes === 0) return `${formatNumber(reste)} s`;
-  return `${formatNumber(minutes)} min ${String(reste).padStart(2, '0')}`;
-}
-
 function valeurAffichee(colonne: ActivityColumn, valeur: number | null, decimal = false): string {
   if (colonne.taux === true) return formatRateOrNone(valeur);
-  if (colonne.duree === true) return valeur === null ? 'Sans objet' : dureeAffichee(valeur);
   const nombre = valeur ?? 0;
   return decimal ? formatDecimal(nombre) : formatNumber(nombre);
 }

@@ -32,6 +32,8 @@ const (
 	CourrielOuvert = "OUVERT"
 	CourrielEchec  = "ECHEC"
 
+	CourrielEnAttente = "EN_ATTENTE"
+
 	cleReglagesCourriels = "courriels.destinataires"
 	sujetCourriels       = "courriels"
 	courrielsPageMax     = 100
@@ -146,7 +148,7 @@ type CourrielDTO struct {
 	ObjetType      string     `json:"objetType"`
 	ObjetID        string     `json:"objetId"`
 	NomPieceJointe *string    `json:"nomPieceJointe"`
-	Statut         string     `json:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC"`
+	Statut         string     `json:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC,EN_ATTENTE"`
 	Erreur         *string    `json:"erreur"`
 	EnvoyeLe       *time.Time `json:"envoyeLe"`
 	RemisLe        *time.Time `json:"remisLe"`
@@ -167,9 +169,8 @@ func LireReglagesCourriels(ctx context.Context, d *socle.Deps) (ReglagesCourriel
 	return r, nil
 }
 
-// Rien ne sort d'une base de démonstration : les adresses y sont celles de
-// vrais clients, et un écran de démonstration ne doit pas leur écrire. La ligne
-// est écrite quand même, pour qu'on voie à l'écran ce qui serait parti.
+// Rien ne sort d'une base de démonstration, dont les adresses sont celles de vrais
+// clients ; la ligne est écrite pour montrer ce qui serait parti.
 func courrielRetenu(base string) *string {
 	if base == socle.BasePublique {
 		return nil
@@ -196,12 +197,15 @@ func courrielHorsHeures(zone *time.Location) *string {
 	return &detail
 }
 
-// Nil si un courriel peut partir maintenant, sinon la raison de le retenir.
-func CourrielSuspendu(cfg *socle.Config) *string {
+// Raison nil si un courriel peut partir maintenant ; sinon le statut à écrire et la raison.
+func CourrielSuspendu(cfg *socle.Config) (statut string, raison *string) {
 	if raison := courrielRetenu(cfg.Base); raison != nil {
-		return raison
+		return CourrielEchec, raison
 	}
-	return courrielHorsHeures(cfg.TimeZone)
+	if raison := courrielHorsHeures(cfg.TimeZone); raison != nil {
+		return CourrielEnAttente, raison
+	}
+	return "", nil
 }
 
 // L'envoi est tracé même sans destinataire ni transport : le journal doit
@@ -221,7 +225,7 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 		}
 		nomPDF = &c.NomPieceJointe
 	}
-	statut, erreur := CourrielEchec, CourrielSuspendu(d.Cfg)
+	statut, erreur := CourrielSuspendu(d.Cfg)
 	var messageID *string
 	var envoyeLe *time.Time
 	if erreur == nil {
@@ -244,8 +248,7 @@ const (
 	courrielsParRejeu     = 20
 )
 
-// Un refus de Brevo perdait le courriel : le statut passait à ECHEC et personne
-// ne le reprenait. Trois tentatives, puis la ligne reste en échec pour l'alerte.
+// Trois tentatives, puis la ligne reste en échec pour l'alerte d'incident.
 func (s *service) rejouerCourrielsEnEchec(ctx context.Context) error {
 	// Sans cette garde, une nuit épuiserait les trois tentatives d'un courriel
 	// simplement mis en attente, et il ne partirait jamais.
@@ -289,8 +292,7 @@ func (s *service) rejouerCourriel(ctx context.Context, l *db.Courriel) error {
 	})
 }
 
-// Un envoi refusé ne se lisait que dans la colonne `erreur` du journal, écran
-// Exploitation ouvert. C'est ainsi qu'une clé Brevo invalide a pu refuser tous
+// Un refus est journalisé en erreur : sans cela, une clé Brevo invalide refuse tous
 // les courriels d'une journée sans qu'une ligne le dise.
 func expedierCourriel(ctx context.Context, message *MessageBrevo) (statut string, messageID, erreur *string, envoyeLe *time.Time) {
 	if len(message.Destinataires) == 0 {
@@ -394,7 +396,7 @@ func (s *service) courrielsParObjet(ctx context.Context, in *CourrielsObjetInput
 
 type CourrielsJournalInput struct {
 	Type     string `query:"type" enum:"DOSSIER_COMPLET,DOSSIER_ENCAISSE,DOSSIER_REJETE,PROSPECT_ENROLEMENT,IMPORT_LEADS"`
-	Statut   string `query:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC"`
+	Statut   string `query:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC,EN_ATTENTE"`
 	Page     int    `query:"page" minimum:"1" default:"1"`
 	PageSize int    `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
 }
@@ -429,26 +431,32 @@ type CourrielOutput struct {
 	Body CourrielDTO
 }
 
+// Même verrou que le rejeu : une ligne déjà en cours d'envoi n'est pas expédiée une seconde fois.
 func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*CourrielOutput, error) {
-	ligne, err := s.Q.CourrielByID(ctx, in.ID)
+	var ligne db.Courriel
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		var err error
+		if ligne, err = q.CourrielReserverRenvoi(ctx, in.ID); err != nil {
+			return err
+		}
+		statut, erreur := CourrielEchec, courrielRetenu(s.Cfg.Base)
+		var messageID *string
+		var envoyeLe *time.Time
+		if erreur == nil {
+			statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
+				Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
+				Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
+			})
+		}
+		return q.CourrielRenvoye(ctx, db.CourrielRenvoyeParams{
+			ID: ligne.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
+		})
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+		return nil, s.courrielIntrouvableOuEnCours(ctx, in.ID)
 	}
 	if err != nil {
-		return nil, err
-	}
-	statut, erreur := CourrielEchec, courrielRetenu(s.Cfg.Base)
-	var messageID *string
-	var envoyeLe *time.Time
-	if erreur == nil {
-		statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
-			Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
-			Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
-		})
-	}
-	if err := s.Q.CourrielRenvoye(ctx, db.CourrielRenvoyeParams{
-		ID: ligne.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
-	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(sujetCourriels)
@@ -462,6 +470,17 @@ func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*C
 		}
 	}
 	return nil, socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+}
+
+func (s *service) courrielIntrouvableOuEnCours(ctx context.Context, id string) error {
+	_, err := s.Q.CourrielByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+	}
+	if err != nil {
+		return err
+	}
+	return socle.Problem(http.StatusConflict, "COURRIEL_EN_COURS", "Ce courriel est déjà en cours d'envoi. Rechargez le journal dans un instant.")
 }
 
 type ReglagesCourrielsOutput struct {
@@ -573,6 +592,7 @@ func (s *service) evenementBrevo(ctx context.Context, in *EvenementBrevoInput) (
 	}
 	n, err := s.Q.CourrielEvenementBrevo(ctx, db.CourrielEvenementBrevoParams{
 		Statut: statut, Quand: time.Now(), Erreur: in.Body.Event + " " + in.Body.Reason, MessageID: in.Body.MessageID,
+		TentativesMax: tentativesCourrielMax,
 	})
 	if err != nil {
 		return nil, err

@@ -215,9 +215,8 @@ type ListeImportsInput struct {
 	PageSize int    `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
 }
 
-// La limite multipart de huma ne s'applique pas au flux multipart : sans ce
-// `MaxBytesReader`, un envoi de 500 Mo est écrit sur le disque temporaire avant
-// le moindre contrôle.
+// La limite multipart de huma ne couvre pas le flux : sans `MaxBytesReader`, un
+// envoi de 500 Mo est écrit sur le disque avant le moindre contrôle.
 func bornerDepotImport(ctx huma.Context, suite func(huma.Context)) {
 	r, w := humago.Unwrap(ctx)
 	maximum := reglagesImports().maxOctets
@@ -732,8 +731,7 @@ func (s *service) balayerImports(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Un échec avalé laissait `cron_runs.ok` à vrai : tous les imports pouvaient
-	// échouer et l'écran Exploitation restait vert.
+	// Les échecs remontent au cron : avalés, `cron_runs.ok` resterait vrai.
 	var echecs []error
 	for _, id := range candidats {
 		if err := s.courirImport(ctx, id); err != nil {

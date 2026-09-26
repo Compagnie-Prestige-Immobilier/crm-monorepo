@@ -232,12 +232,18 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 	return &ProspectOutput{Body: *item}, nil
 }
 
-// TOUT ce qui pend à la source suit : un parcours resté sur une fiche supprimée
-// fait disparaître la personne des listes de son projet, et un dossier encaissé
-// pointerait vers une fiche qu'aucun écran ne montre plus.
+// TOUT ce qui pend à la source suit : un parcours ou un dossier resté sur la fiche
+// supprimée disparaîtrait des listes et des écrans.
 func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, sourceID, targetID string, preferSource bool) error {
 	disparue := socle.Problem(http.StatusConflict, "MERGE_PROSPECT_GONE",
 		"L’une des deux fiches vient d’être fusionnée ou supprimée. Rechargez la page.")
+	verrouillees, err := q.VerrouillerFichesAFusionner(ctx, []string{sourceID, targetID})
+	if err != nil {
+		return err
+	}
+	if len(verrouillees) < 2 {
+		return disparue
+	}
 	supprimees, err := q.SoftDeleteProspect(ctx, sourceID)
 	if err != nil {
 		return err
@@ -276,9 +282,8 @@ func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, so
 		map[string]any{"targetId": targetID, "preferSource": preferSource})
 }
 
-// `@@unique(prospectId, projet)` interdit le simple déplacement : quand les deux
-// fiches suivent le même projet il faut choisir, et le parcours PORTEUR de la
-// conversion survit toujours.
+// L'unicité (prospectId, projet) interdit le simple déplacement : sur un même projet,
+// le parcours PORTEUR de la conversion survit toujours.
 func prospectDeplacerParcours(ctx context.Context, q *db.Queries, sourceID, targetID string) error {
 	depart, err := q.JourneysAFusionner(ctx, sourceID)
 	if err != nil {
@@ -517,6 +522,36 @@ func (s *service) prospectReglages(ctx context.Context, projet db.Projet) (Prosp
 	return reglages, nil
 }
 
+// Consignation : une réponse vidée part en null, que la requête retire de la fiche ; un champ non déclaré tombe.
+func ChampsLibresRetenus(ctx context.Context, q *db.Queries, projet db.Projet, envoyes map[string]string) ([]byte, error) {
+	if len(envoyes) == 0 {
+		return nil, nil
+	}
+	ligne, err := q.AppSettingParCle(ctx, prospectCleChamps(projet))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	retenus := map[string]*string{}
+	for _, libre := range prospectLireReglages(ligne.Value).Libres {
+		valeur, envoye := envoyes[libre.ID]
+		if !envoye {
+			continue
+		}
+		retenus[libre.ID] = nil
+		if texte := strings.TrimSpace(valeur); texte != "" {
+			tronque := prospectTronquer(texte, prospectReponseMax)
+			retenus[libre.ID] = &tronque
+		}
+	}
+	if len(retenus) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(retenus)
+}
+
 type ProspectProjetInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 }
@@ -659,10 +694,7 @@ type ProspectParametresChues struct {
 	AccuseReceptionCorps     string   `json:"accuseReceptionCorps"`
 	AdhesionObjet            string   `json:"adhesionObjet"`
 	AdhesionCorps            string   `json:"adhesionCorps"`
-	DestinatairesEnrolement  []string `json:"destinatairesEnrolement"`
-	DestinatairesBpe         []string `json:"destinatairesBpe"`
 	DestinatairesSupervision []string `json:"destinatairesSupervision"`
-	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	DestinatairesAdhesion    []string `json:"destinatairesAdhesion"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
 	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
@@ -675,9 +707,8 @@ type ProspectTextesUsine struct {
 	AccuseReceptionCorps string `json:"accuseReceptionCorps"`
 }
 
-// Les deux textes viennent mot pour mot de l'expression de besoins ; les liens,
-// l'adresse et le numéro naissent VIDES : inventer une URL enverrait les
-// prospects nulle part sans que personne ne s'en aperçoive.
+// Textes repris mot pour mot de l'expression de besoins ; liens, adresse et numéro
+// naissent VIDES : une URL inventée enverrait les prospects nulle part.
 var prospectParametresUsine = ProspectParametresChues{
 	MessageWhatsapp: "Bonjour {prenom}, suite à notre échange, voici le lien pour compléter votre demande " +
 		"d’adhésion CPI CHUES : {lien}. Je reste joignable au {telephoneTeleconseiller}. " +
@@ -690,10 +721,7 @@ var prospectParametresUsine = ProspectParametresChues{
 	AdhesionCorps: "Bonjour, {prenomNom} ({telephone}) a adhéré le {date}. " +
 		"Offre : {offre}. Paiement : {paiement}. Montant : {montant}. " +
 		"Conversion enregistrée par {teleconseiller}. CPI.",
-	DestinatairesEnrolement:  []string{},
-	DestinatairesBpe:         []string{},
 	DestinatairesSupervision: []string{},
-	DestinatairesDirection:   []string{},
 	CodificationProvenances:  []string{},
 	DestinatairesAdhesion:    []string{},
 }
@@ -709,25 +737,20 @@ const (
 	prospectCleAdhesionObjet = "adhesionObjet"
 	prospectCleAdhesionCorps = "adhesionCorps"
 	prospectCleAdhesionDest  = "destinatairesAdhesion"
-	prospectCleEnrolement    = "destinatairesEnrolement"
-	prospectCleBpe           = "destinatairesBpe"
 	prospectCleSupervision   = "destinatairesSupervision"
-	prospectCleDirection     = "destinatairesDirection"
 	prospectCleCodification  = "codificationProvenances"
 	prospectPrefixeParametre = "chues."
 )
 
-// Les deux textes que la supervision et la direction écrivent aussi. Tout le
-// reste engage l'entreprise au-delà d'un message : un lien faux détourne des
-// inscriptions, et la liste des destinataires décide qui lit les demandes.
+// Seuls textes que la supervision et la direction écrivent aussi : liens et
+// destinataires engagent l'entreprise au-delà d'un message.
 var prospectTextesPartages = []string{prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps}
 
 var prospectClesParametres = []string{
 	prospectCleLienChues, prospectCleLienGP, prospectCleEmail, prospectCleWhatsapp,
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
 	prospectCleAdhesionObjet, prospectCleAdhesionCorps,
-	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleCodification, prospectCleAdhesionDest,
+	prospectCleSupervision, prospectCleCodification, prospectCleAdhesionDest,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -775,8 +798,7 @@ func (p *ProspectParametresChues) textes() map[string]*string {
 
 func (p *ProspectParametresChues) listes() map[string]*[]string {
 	return map[string]*[]string{
-		prospectCleEnrolement: &p.DestinatairesEnrolement, prospectCleBpe: &p.DestinatairesBpe,
-		prospectCleSupervision: &p.DestinatairesSupervision, prospectCleDirection: &p.DestinatairesDirection,
+		prospectCleSupervision:  &p.DestinatairesSupervision,
 		prospectCleCodification: &p.CodificationProvenances,
 		prospectCleAdhesionDest: &p.DestinatairesAdhesion,
 	}
@@ -852,10 +874,7 @@ type ProspectMajParametresInput struct {
 		AccuseReceptionCorps     *string   `json:"accuseReceptionCorps,omitempty" maxLength:"4000" required:"false"`
 		AdhesionObjet            *string   `json:"adhesionObjet,omitempty" maxLength:"200" required:"false"`
 		AdhesionCorps            *string   `json:"adhesionCorps,omitempty" maxLength:"4000" required:"false"`
-		DestinatairesEnrolement  *[]string `json:"destinatairesEnrolement,omitempty" maxItems:"50" required:"false"`
-		DestinatairesBpe         *[]string `json:"destinatairesBpe,omitempty" maxItems:"50" required:"false"`
 		DestinatairesSupervision *[]string `json:"destinatairesSupervision,omitempty" maxItems:"50" required:"false"`
-		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
 		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
 		DestinatairesAdhesion    *[]string `json:"destinatairesAdhesion,omitempty" maxItems:"50" required:"false"`
 	}
@@ -876,8 +895,7 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		}
 	}
 	listes := map[string]*[]string{
-		prospectCleEnrolement: in.Body.DestinatairesEnrolement, prospectCleBpe: in.Body.DestinatairesBpe,
-		prospectCleSupervision: in.Body.DestinatairesSupervision, prospectCleDirection: in.Body.DestinatairesDirection,
+		prospectCleSupervision:  in.Body.DestinatairesSupervision,
 		prospectCleCodification: in.Body.CodificationProvenances,
 		prospectCleAdhesionDest: in.Body.DestinatairesAdhesion,
 	}

@@ -7,6 +7,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -61,8 +62,8 @@ func exportConditionsDossiers(in *ExportDossiersInput) (*exportPredicat, error) 
 		p.clauses = append(p.clauses, d.colonne+" "+d.operateur+" "+p.valeur(d.valeur)+d.cast)
 	}
 	if in.Projet != "" {
-		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "prospect_journeys" pj WHERE pj."prospectId" = c."prospectId" AND pj."projet" = `+
-			p.valeur(in.Projet)+`::"Projet")`)
+		p.args = append(p.args, in.Projet)
+		p.clauses = append(p.clauses, fmt.Sprintf(FiltreProjetDossier, len(p.args)))
 	}
 	// Créateur ou dernier intervenant : reprendre le dossier d'un collègue compte.
 	if in.AgentId != "" {
@@ -153,7 +154,7 @@ func (s *service) exportDossiers(ctx context.Context, in *ExportDossiersInput) (
 func (s *service) exportClasseurDossiers(ctx context.Context, c *exportClasseur, p *exportPredicat) error {
 	dossiers, err := c.nouvelleFeuille("Dossiers",
 		[]string{
-			"Référence", "Client", ExportEnteteTelephone, "Banque de traitement", "Étape", "Montant",
+			"Référence", exportEnteteClient, ExportEnteteTelephone, "Banque de traitement", "Étape", "Montant",
 			"Motif de rejet", "Détail du rejet", "Créé par", "Dernier agent", exportEnteteCreeLe, "Mis à jour le",
 		},
 		[]float64{22, 28, 18, 24, 22, 18, 26, 34, 24, 24, 20, 20}, nil)
@@ -162,7 +163,7 @@ func (s *service) exportClasseurDossiers(ctx context.Context, c *exportClasseur,
 	}
 	historique, err := c.nouvelleFeuille("Historique",
 		[]string{
-			"Référence", "Client", "Étape source", "Étape cible", "Agent", exportEnteteCommentaire,
+			"Référence", exportEnteteClient, "Étape source", "Étape cible", "Agent", exportEnteteCommentaire,
 			"Montant", "Motif de rejet", "Justification de correction", exportEnteteDate,
 		},
 		[]float64{22, 28, 22, 22, 24, 34, 18, 26, 34, 20}, nil)

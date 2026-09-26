@@ -42,7 +42,7 @@ func (s *service) prospectRequalifier(ctx context.Context, in *ProspectRequalifi
 		if _, err := q.RequalifierJourney(ctx, db.RequalifierJourneyParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID, Projet: projet}); err != nil {
 			return err
 		}
-		remises, err := q.RequalifierProspect(ctx, db.RequalifierProspectParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID})
+		remises, err := q.RequalifierProspect(ctx, db.RequalifierProspectParams{Projet: projet, Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID})
 		if err != nil {
 			return err
 		}

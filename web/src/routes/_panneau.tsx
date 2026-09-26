@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
@@ -11,7 +11,10 @@ import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { LiveStream } from '@/components/live/live-stream';
 import { RappelPopUpIntrusif } from '@/components/rappels/rappel-pop-up-intrusif';
-import { peutTenirUneFiche } from '@/lib/types';
+import { peut, peutTenirUneFiche } from '@/lib/types';
+
+const chargerCoqueAssistant = () => import('@/components/assistant/coque-assistant');
+const CoqueAssistant = lazy(chargerCoqueAssistant);
 
 const PRESENCE_INTERVALLE_MS = 60_000;
 
@@ -19,6 +22,7 @@ export const Route = createFileRoute('/_panneau')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions);
     if (user === null) throw redirect({ to: '/connexion', search: { suite: location.href } });
+    if (peut(user, 'assistant.utiliser')) await chargerCoqueAssistant();
     return { user };
   },
   component: Panneau,
@@ -45,14 +49,17 @@ function Panneau() {
   useEffect(() => {
     if (!peutTenirUneFiche(user)) return;
     const battre = (): void => {
-      void fetch('/api/v1/presence/beat', { method: 'POST', credentials: 'same-origin' });
+      fetch('/api/v1/presence/beat', { method: 'POST', credentials: 'same-origin' }).catch(
+        () => undefined,
+      );
     };
     battre();
     const id = window.setInterval(battre, PRESENCE_INTERVALLE_MS);
     return () => window.clearInterval(id);
   }, [user]);
 
-  return (
+  const assistant = peut(user, 'assistant.utiliser');
+  const coque = (
     <CoqueShell>
       <LiveStream />
       {peutTenirUneFiche(user) ? <RappelPopUpIntrusif userId={user.id} /> : null}
@@ -66,5 +73,11 @@ function Panneau() {
         </main>
       </div>
     </CoqueShell>
+  );
+  if (!assistant) return coque;
+  return (
+    <Suspense fallback={null}>
+      <CoqueAssistant>{coque}</CoqueAssistant>
+    </Suspense>
   );
 }

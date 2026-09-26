@@ -20,7 +20,7 @@ import { deposerClasseurVentes } from '@/lib/data/ventes';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-export function DepotClasseur({ premier }: { premier: boolean }) {
+export function DepotClasseur({ remplace }: { remplace: boolean }) {
   const queryClient = useQueryClient();
   const fichierId = useId();
   const depuisId = useId();
@@ -44,16 +44,16 @@ export function DepotClasseur({ premier }: { premier: boolean }) {
 
   return (
     <Dialog open={ouvert} onOpenChange={setOuvert}>
-      <Button variant={premier ? 'default' : 'outline'} onClick={() => setOuvert(true)}>
+      <Button variant="outline" onClick={() => setOuvert(true)}>
         <UploadIcon aria-hidden="true" />
-        {premier ? 'Importer le tableau des ventes' : 'Remplacer le classeur'}
+        {remplace ? 'Remplacer le classeur' : 'Importer le classeur'}
       </Button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Importer le tableau des ventes</DialogTitle>
           <DialogDescription>
-            Les onglets « Tableau des ventes » et « Échéances mensuelles » sont lus. Le classeur
-            précédent est remplacé.
+            Les onglets « Tableau des ventes » et « Échéances mensuelles » sont lus.
+            {remplace ? ' Le classeur précédent est remplacé.' : ''}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">

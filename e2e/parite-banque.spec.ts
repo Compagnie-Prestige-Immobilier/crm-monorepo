@@ -90,20 +90,18 @@ test.afterAll(async () => {
     `%${NOM_DEMANDE}%`,
     `%${NOM_BANQUE}%`,
   ]);
-  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
   await effacerBanque(banqueId);
+  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
 });
 
 test.describe('parité banque, les écrans du dossier bancaire', () => {
   test.use({ storageState: banquier.etat });
   test.describe.configure({ mode: 'serial' });
 
-  test('« Banque & Finance » mène la banque à sa vue d’ensemble', async ({ page }) => {
+  test('seul espace ouvert, l’écran des espaces mène la banque à sa vue d’ensemble', async ({
+    page,
+  }) => {
     await page.goto('/espaces');
-    const tuile = page.getByRole('link', { name: /^Banque & Finance/u });
-    await expect(tuile).toHaveAttribute('href', '/finance');
-
-    await page.goto('/finance');
     await expect(page).toHaveURL(/\/finance$/u);
     await expect(page.getByRole('heading', { name: 'Vue d’ensemble', level: 1 })).toBeVisible();
     await expect(etatVide(page, 'Accès refusé')).toHaveCount(0);
@@ -141,7 +139,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   }) => {
     await page.goto('/finance/dossiers/nouveau');
     const carte = page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` });
-    await carte.getByRole('button', { name: 'Ouvrir le dossier' }).click();
+    await carte.getByRole('button', { name: 'Créer le dossier' }).click();
     await expect(page.getByText(/^Dossier CHUES-BF-\d{4}-\d{6} ouvert\.$/u)).toBeVisible();
 
     const ouvert = await dossierDInscription(inscriptionAwa);
@@ -166,7 +164,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     // Les plateformes suivent seules leurs inscrits : le dossier prend l'identité
     // de l'inscription, sans fiche au CRM.
     const orpheline = page.getByRole('listitem').filter({ hasText: `Coumba ${NOM_CLIENT}` });
-    await expect(orpheline.getByRole('button', { name: 'Ouvrir le dossier' })).toBeEnabled();
+    await expect(orpheline.getByRole('button', { name: 'Créer le dossier' })).toBeEnabled();
     expect(
       await compter(`SELECT count(*) AS n FROM bank_cases WHERE "inscriptionId" = $1`, [
         inscriptionAwa,
@@ -353,7 +351,7 @@ test.describe('parité banque, les demandes de création de client', () => {
 
   test('le dépôt exige un téléphone, et la banque n’arbitre pas', async ({ page }) => {
     await page.goto('/finance/demandes-clients');
-    const suivi = page.getByRole('heading', { name: /Demandes de création/, level: 1 });
+    const suivi = page.getByRole('heading', { name: 'Clients à créer', level: 1 });
     const valider = page.getByRole('heading', { name: 'Créations de client à valider', level: 1 });
     await expect(suivi).toBeVisible();
     await expect(valider).toHaveCount(0);
@@ -404,7 +402,7 @@ test.describe('parité banque, les demandes de création de client', () => {
     try {
       const arbitre = await siege.newPage();
       await arbitre.goto('/finance/demandes-clients');
-      const titre = { name: 'Demandes de création de client', level: 1 };
+      const titre = { name: 'Clients à créer', level: 1 };
       await expect(arbitre.getByRole('heading', titre)).toBeVisible();
       await arbitre.getByLabel('Recherche').fill(NOM_DEMANDE);
       await carteDemande(arbitre).getByRole('button', { name: 'Refuser' }).click();

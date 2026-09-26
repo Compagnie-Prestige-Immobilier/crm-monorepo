@@ -31,6 +31,11 @@ export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }
 
+/** `compte(2, 'dossier')` : « 2 dossiers » ; 0 et 1 restent au singulier. */
+export function compte(value: number, singulier: string, pluriel = `${singulier}s`): string {
+  return `${formatNumber(value)} ${Math.abs(value) >= 2 ? pluriel : singulier}`;
+}
+
 export function formatDecimal(value: number): string {
   return decimalFormatter.format(value);
 }
@@ -72,6 +77,15 @@ export function formatDateTime(iso: string): string {
 
 export function formatShortDate(iso: string): string {
   return shortDateFormatter.format(new Date(iso));
+}
+
+/** `jour` : minuit du poste au jour calendaire de Dakar (UTC+0 toute l'année), pour date-fns. */
+export function reperesDakar(iso: string): { jour: Date; heure: string } {
+  const at = new Date(iso);
+  return {
+    jour: new Date(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
+    heure: String(at.getUTCHours()).padStart(2, '0'),
+  };
 }
 
 const DEVICE_CALL_LABELS: Record<string, string> = {

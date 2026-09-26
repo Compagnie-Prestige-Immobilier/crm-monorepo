@@ -617,10 +617,8 @@ func banquePlanTransition(cible *EtapeBanque, corps *CorpsTransitionBanque, code
 	return banquePlanOuverture(corps)
 }
 
-// Depuis une étape ouverte, toute étape active se rejoint dans les deux sens :
-// l'ordre du flux guide, il n'enferme pas. Seul le rejet exige une prise en
-// traitement préalable ; l'encaissement et le rejet se confirment par leur
-// montant ou leur motif (banquePlanTransition).
+// Depuis une étape ouverte, toute étape active se rejoint dans les deux sens ;
+// seul le rejet exige une prise en traitement préalable.
 func banqueAtteignable(courante, cible *EtapeBanque) error {
 	if !cible.IsActive {
 		return banqueEtapeInactive(cible)
@@ -1359,9 +1357,8 @@ func (s *service) banqueEcrireApprobation(ctx context.Context, u *socle.Utilisat
 		}); err != nil {
 			return err
 		}
-		// L'arbitrage se gagne par cette écriture CONDITIONNELLE : sur
-		// `status = PENDING`, le second arbitre ne met rien à jour et sa
-		// transaction avorte, ce qui défait le prospect qu'il venait de créer.
+		// Écriture conditionnelle sur `status = PENDING` : le second arbitre ne met rien
+		// à jour et sa transaction avorte, défaisant le prospect qu'il venait de créer.
 		nouveau := prospectID.String()
 		lignes, err := q.ClientRequestApprove(ctx, db.ClientRequestApproveParams{
 			ID: demande.ID, ReviewedById: &u.ID, ReviewedAt: &maintenant, CreatedProspectId: &nouveau,

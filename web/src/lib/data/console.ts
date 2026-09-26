@@ -87,13 +87,21 @@ export async function cancelCallback(
   );
 }
 
-export async function snoozeCallback(id: string): Promise<Callback> {
-  const response = await fetch(`/api/v1/phase2/callbacks/${encodeURIComponent(id)}/snooze`, {
-    method: 'POST',
-    credentials: 'same-origin',
-  });
-  if (!response.ok) throw new Error('Le rappel n’a pas pu être reporté.');
-  return (await response.json()) as Callback;
+export type DureeReport = Exclude<
+  NonNullable<operations['snoozeScheduledCallback']['parameters']['query']>['duree'],
+  '' | undefined
+>;
+
+export async function snoozeCallback(
+  id: string,
+  duree: DureeReport,
+  client: ApiClient = getApiClient(),
+): Promise<Callback> {
+  return unwrap(
+    await client.POST('/api/v1/phase2/callbacks/{id}/snooze', {
+      params: { path: { id }, query: { duree } },
+    }),
+  );
 }
 
 const HOUR_MS = 3_600_000;

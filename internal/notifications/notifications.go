@@ -458,9 +458,8 @@ func (s *service) destinatairesNotification(ctx context.Context, audience, role 
 	})
 }
 
-// L'ORDRE COMPTE : le public est résolu et les lignes de livraison écrites dans
-// la même transaction que l'envoi, AVANT toute remise. Envoyer d'abord et
-// tracer ensuite laisse un redémarrage produire des e-mails que la base ignore.
+// Livraisons écrites dans la transaction de l'envoi, AVANT toute remise : sinon un
+// redémarrage produit des e-mails que la base ignore.
 func (s *service) composerNotification(ctx context.Context, auteur string, in *CreationNotification) (string, error) {
 	maintenant := time.Now()
 	if in.ScheduledFor != nil && !in.ScheduledFor.After(maintenant) {
@@ -708,9 +707,8 @@ func (s *service) detailNotification(ctx context.Context, in *NotificationIDInpu
 	return out, nil
 }
 
-// Le `where` porte le statut attendu : si le tick a démarré l'envoi entre la
-// lecture et l'écriture, l'appelant reçoit un refus au lieu de voir « annulée »
-// une notification déjà partie.
+// Le `where` porte le statut attendu : une notification partie entre la lecture et
+// l'écriture est refusée plutôt que montrée « annulée ».
 func (s *service) annulerNotification(ctx context.Context, in *NotificationIDInput) (*NotificationOutput, error) {
 	maintenant := time.Now()
 	lignes, err := s.Q.CancelNotification(ctx, db.CancelNotificationParams{ID: in.ID, Now: &maintenant})
@@ -781,9 +779,8 @@ type NotificationLectureOutput struct {
 	}
 }
 
-// `readAt` dit ce que l'utilisateur a fait, `status` ce que la plateforme a
-// fait de l'envoi : une livraison FAILED ou en attente de rejeu est horodatée
-// sans changer d'état, faute de quoi son échec ou son rejeu disparaîtrait.
+// `readAt` est l'acte de l'utilisateur, `status` celui de la plateforme : une
+// livraison FAILED ou à rejouer est horodatée sans changer d'état.
 func (s *service) marquerNotificationLue(ctx context.Context, in *NotificationIDInput) (*NotificationLectureOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	maintenant := time.Now()
@@ -864,10 +861,8 @@ type notificationResultatEmail struct {
 	acceptees map[string]bool
 }
 
-// LA PRISE EN CHARGE EST FAITE ICI, ET NON CHEZ L'APPELANT : il n'existe aucun
-// moyen d'expédier sans passer par cette fonction, donc aucun moyen d'envoyer
-// sans détenir le bail. Une notification absente du résultat n'existe pas ;
-// une notification à `false` n'a rien tenté.
+// Le bail se prend ici, seul chemin d'expédition. Absente du résultat : la
+// notification n'existe pas ; à `false` : rien n'a été tenté.
 func (s *service) expedierNotifications(ctx context.Context, ids []string, maintenant time.Time) (map[string]bool, error) {
 	pris := map[string]bool{}
 	if len(ids) == 0 {
@@ -1006,9 +1001,8 @@ func notificationLivraisonsPerdues(expirees []db.NotificationsForDispatchRow, li
 	return perdues, compte
 }
 
-// La notification RESTE `SENDING` tant qu'une livraison attend : c'est le bail
-// qui la fera reprendre. La clôture se décide dans l'écriture, sous le verrou
-// de la ligne, et jamais sur un compteur lu à part.
+// Reste `SENDING` tant qu'une livraison attend, le bail la reprendra ; la clôture
+// se décide sous le verrou de la ligne, jamais sur un compteur lu à part.
 func (s *service) cloreNotifications(ctx context.Context, jeton string, ids []string, statut string, enAttente int, maintenant time.Time) error {
 	fermees, err := s.Q.CloseNotifications(ctx, db.CloseNotificationsParams{
 		Ids: ids, Claim: &jeton, TransportStatus: notificationTexteOuNil(statut), Now: &maintenant,
@@ -1034,9 +1028,8 @@ func (s *service) cloreNotifications(ctx context.Context, jeton string, ids []st
 	return nil
 }
 
-// SANS CLÉ, RIEN N'EST JUGÉ : les téléconseillers restent en file sans marqueur
-// et le bail les fera reprendre. Les autres sont bel et bien tranchés, parce
-// que `joignable` vient de la base et non de la configuration du transport.
+// Sans clé, les téléconseillers restent en file pour le bail ; les autres sont
+// tranchés, `joignable` venant de la base et non du transport.
 func (s *service) brancheEmailNotifications(ctx context.Context, jeton string, ids []string, parID map[string]db.NotificationsForDispatchRow, livraisons []db.PendingDeliveriesRow) notificationResultatEmail {
 	res := notificationResultatEmail{
 		statut: BrevoEnvoye, connu: true,
@@ -1066,9 +1059,8 @@ func (s *service) brancheEmailNotifications(ctx context.Context, jeton string, i
 	return res
 }
 
-// La nature du destinataire se lit AVANT l'état du transport : sans cette
-// lecture, une plateforme sans clé estampillerait « boîte de réception seule »
-// des téléconseillers dont l'e-mail n'existerait plus pour personne.
+// Le destinataire se lit AVANT le transport : sinon une plateforme sans clé marque
+// « boîte de réception seule » des téléconseillers joignables par e-mail.
 func (s *service) ciblesEmailNotifications(ctx context.Context, livraisons []db.PendingDeliveriesRow, joignable map[string]bool) ([]notificationCibleEmail, error) {
 	comptes := notificationDedoublonner(notificationIdentifiantsComptes(livraisons))
 	rows, err := s.Q.EmailTargets(ctx, comptes)
@@ -1091,9 +1083,8 @@ func (s *service) ciblesEmailNotifications(ctx context.Context, livraisons []db.
 	return cibles, nil
 }
 
-// UNE VAGUE, PUIS SON ÉCRITURE, PUIS LA SUIVANTE : ce que Brevo a accepté est
-// acquis en base avant que la suite ne parte, faute de quoi une reprise
-// renverrait le message à des gens qui l'ont déjà reçu.
+// Une vague, son écriture, puis la suivante : ce que Brevo a accepté est acquis en
+// base avant la suite, sinon une reprise renverrait le message.
 func (s *service) envoyerVaguesNotifications(ctx context.Context, transport *brevo, jeton string, ids []string, cibles []notificationCibleEmail, parID map[string]db.NotificationsForDispatchRow, res *notificationResultatEmail) bool {
 	refuse := false
 	for _, vague := range notificationVagues(cibles, parID) {
@@ -1122,9 +1113,8 @@ type notificationLotEmail struct {
 	lignes  []notificationCibleEmail
 }
 
-// LE REGROUPEMENT SE FAIT PAR CONTENU RENDU, jamais par notification : deux
-// rappels qui portent des chiffres différents ne peuvent pas partager un envoi,
-// alors que trois cents comptes rendus identiques tiennent dans un seul.
+// Regroupé par contenu rendu, jamais par notification : deux rappels aux chiffres
+// différents ne partagent pas un envoi, trois cents identiques si.
 func notificationVagues(cibles []notificationCibleEmail, parID map[string]db.NotificationsForDispatchRow) [][]notificationLotEmail {
 	ordre := []string{}
 	groupes := map[string][]notificationCibleEmail{}
@@ -1151,7 +1141,7 @@ func notificationVagues(cibles []notificationCibleEmail, parID map[string]db.Not
 				destinataires = append(destinataires, DestinataireBrevo{Email: ligne.email, Nom: ligne.nom})
 			}
 			lots = append(lots, notificationLotEmail{
-				message: MessageBrevo{Destinataires: destinataires, Sujet: titre, HTML: html, Texte: texte},
+				message: MessageBrevo{Destinataires: destinataires, Sujet: titre, HTML: html, Texte: texte, UneVersionParDestinataire: true},
 				lignes:  tranche,
 			})
 		}
@@ -1215,10 +1205,8 @@ func notificationToutAReessayer(livraisons []db.PendingDeliveriesRow) map[string
 	return verdicts
 }
 
-// L'ACCEPTATION D'ABORD : c'est la seule des trois écritures qu'une
-// interruption ne pardonne pas, puisque son absence fait renvoyer un e-mail
-// déjà remis. `status = PENDING` dans chaque `where` empêche une écriture
-// tardive de ramener en arrière une ligne qu'un autre passage a fait avancer.
+// L'acceptation d'abord, sinon un e-mail remis repart ; `status = PENDING` empêche
+// une écriture tardive de ramener en arrière une ligne déjà avancée.
 func (s *service) ecrireVerdictsNotifications(ctx context.Context, ids []string, courants, cumul map[string]notificationVerdict) {
 	defer func() {
 		for id, v := range courants {
@@ -1270,9 +1258,8 @@ const notificationGabaritEmailHTML = `<div style="font-family:Arial,Helvetica,sa
 	`<p style="font-size:12px;color:#666;margin:0">Message automatique de CPI GO. Ne pas répondre.</p>` +
 	`</div>`
 
-// Le titre et le corps sont saisis par un administrateur : sans échappement,
-// une balise collée ferait de l'e-mail portant notre nom un support
-// d'hameçonnage que le lecteur ne peut pas inspecter.
+// Titre et corps saisis par un administrateur : sans échappement, une balise collée
+// ferait de l'e-mail portant notre nom un support d'hameçonnage.
 func notificationContenuEmail(titre, corps, route string) (html, texte string) {
 	echapper := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&#39;")
 	var manquantes []string

@@ -111,7 +111,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionComptesAdministrer:       {domaineComptes, "Créer, modifier et désactiver les comptes", AdminSeul},
 	PermissionComptesLister:            {domaineComptes, "Lister les comptes", Encadrement},
 	PermissionRolesAdministrer:         {domaineComptes, "Créer les rôles et régler leurs permissions", AdminSeul},
-	PermissionExploitationAdministrer:  {"Exploitation", "Exploitation, journal et purge", AdminSeul},
+	PermissionExploitationAdministrer:  {"Exploitation", "Envois et tâches, journal des actions et suppression des données", AdminSeul},
 	PermissionCourrielsAdministrer:     {"Courriels", "Régler les courriels", AdminSeul},
 	PermissionEnrolementAdministrer:    {"Enrôlement", "Suivre et régler l'enrôlement", AdminSeul},
 	PermissionNotificationsAdministrer: {"Notifications", "Envoyer et régler les notifications", AdminSeul},
@@ -137,7 +137,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionRendezVousSuivre:         {domaineRendezVous, "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele, Accueil}},
 	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Accueil}},
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
-	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", AdminSeul},
+	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},

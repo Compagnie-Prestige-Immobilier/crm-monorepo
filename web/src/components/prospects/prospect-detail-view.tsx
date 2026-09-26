@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
+import { BoutonResume, EncartResume, useResumeFiche } from '@/components/assistant/resume-fiche';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
@@ -68,6 +69,14 @@ export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
   ];
 }
 
+/** La liste des prospects est réservée à l'encadrement ; le téléconseiller retrouve ses fiches dans Mes contacts. */
+function RetourFiche({ user }: { user: SessionUser | null | undefined }) {
+  if (peut(user, 'prospects.superviser')) {
+    return <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>;
+  }
+  return <DetailBackLink href="/teleconseil/mes-contacts">Mes contacts</DetailBackLink>;
+}
+
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
 export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
   const { data: user } = useQuery(meQueryOptions);
@@ -75,11 +84,12 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
   });
+  const resume = useResumeFiche();
 
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
+        <RetourFiche user={user} />
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -89,7 +99,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
+        <RetourFiche user={user} />
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -105,7 +115,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
+      <RetourFiche user={user} />
 
       <FicheEnTete
         nom={`${prospect.prenom} ${prospect.nom}`}
@@ -142,10 +152,17 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             />
             <SuiviRendezVous prospect={prospect} />
             <MarquerVendu prospect={prospect} user={user} />
+            {peut(user, 'prospects.lire') ? (
+              <BoutonResume resume={resume} prospectId={prospect.id} />
+            ) : null}
           </>
         }
         chiffres={chiffresDe(prospect)}
       />
+
+      {resume.data !== undefined && resume.variables === prospect.id ? (
+        <EncartResume resume={resume.data} />
+      ) : null}
 
       <CarteRendezVous prospect={prospect} />
 

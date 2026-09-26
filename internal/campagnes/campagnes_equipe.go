@@ -35,32 +35,36 @@ func (s *service) campagneAjouterTeleconseiller(ctx context.Context, in *Campagn
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_DEJA_DANS_EQUIPE",
 			"Ce téléconseiller fait déjà partie de la campagne.")
 	}
-	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers, false)
-	if err != nil {
-		return nil, err
-	}
-	if len(in.Body.Positions) > 0 && len(mouvements) == 0 {
-		return nil, lotReaffectationVide()
-	}
-	if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.ajout_teleconseiller",
-		map[string]any{"teleconseiller": vers}); err != nil {
+	if err := s.lotAppliquerMouvements(ctx, row, vers, "", "lot_export.ajout_teleconseiller", map[string]any{"teleconseiller": vers},
+		func(q *db.Queries, _ *lotFiltres) ([]lotMouvement, error) {
+			mouvements, err := lotMouvementsVers(ctx, q, row, in.Body.Positions, vers, false)
+			if len(in.Body.Positions) == 0 {
+				return mouvements, err
+			}
+			return lotMouvementsExiges(mouvements, err)
+		}); err != nil {
 		return nil, err
 	}
 	return s.campagneDetail(ctx, &CampagneIDInput{ID: in.ID})
 }
 
-func lotReaffectationVide() error {
-	return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_REAFFECTATION_VIDE",
-		"Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.")
+const codeReaffectationVide = "LOT_EXPORT_REAFFECTATION_VIDE"
+
+func lotMouvementsExiges(mouvements []lotMouvement, err error) ([]lotMouvement, error) {
+	if err == nil && len(mouvements) == 0 {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, codeReaffectationVide,
+			"Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.")
+	}
+	return mouvements, err
 }
 
 // L'ajout ne prend que des fiches non traitées ; la réaffectation choisie par
 // l'encadrement peut aussi confier une fiche traitée, ses appels restant à leur auteur.
-func (s *service) lotMouvementsVers(ctx context.Context, row *db.LotParIdRow, positions []int, vers string, avecTraitees bool) ([]lotMouvement, error) {
+func lotMouvementsVers(ctx context.Context, q *db.Queries, row *db.LotParIdRow, positions []int, vers string, avecTraitees bool) ([]lotMouvement, error) {
 	if len(positions) == 0 {
 		return nil, nil
 	}
-	traitees, err := s.lotPositionsTraitees(ctx, row)
+	traitees, err := lotPositionsTraitees(ctx, q, row)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +74,7 @@ func (s *service) lotMouvementsVers(ctx context.Context, row *db.LotParIdRow, po
 			candidates = append(candidates, lotInt32(position))
 		}
 	}
-	deplacables, err := s.Q.LotPositionsDeplacables(ctx, db.LotPositionsDeplacablesParams{
+	deplacables, err := q.LotPositionsDeplacables(ctx, db.LotPositionsDeplacablesParams{
 		LotId: row.ID, Column2: candidates, AssigneeId: lotPointeurTexte(vers),
 	})
 	if err != nil {

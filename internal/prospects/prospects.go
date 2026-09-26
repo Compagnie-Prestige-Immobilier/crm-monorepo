@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -139,10 +140,10 @@ func prospectTypeEnum[T ~string](v string) *T {
 }
 
 func prospectTronquer(texte string, maximum int) string {
-	if len(texte) <= maximum {
+	if utf8.RuneCountInString(texte) <= maximum {
 		return texte
 	}
-	return strings.ToValidUTF8(texte[:maximum], "")
+	return string([]rune(texte)[:maximum])
 }
 
 type ProspectJourney struct {
@@ -654,7 +655,8 @@ type ProspectCallAttempt struct {
 
 type ProspectCallAttemptsOutput struct {
 	Body struct {
-		Items []ProspectCallAttempt `json:"items"`
+		Items   []ProspectCallAttempt `json:"items"`
+		Tronque bool                  `json:"tronque" doc:"Plus de 500 lignes : seules les 500 plus récentes sont rendues."`
 	}
 }
 
@@ -676,6 +678,7 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 		return nil, err
 	}
 	out := &ProspectCallAttemptsOutput{}
+	lignes, out.Body.Tronque = prospectHistoriqueBorne(lignes)
 	out.Body.Items = make([]ProspectCallAttempt, 0, len(lignes))
 	for i := range lignes {
 		l := &lignes[i]
@@ -792,10 +795,8 @@ type ProspectConflictExisting struct {
 	CreatedAt             string  `json:"createdAt,omitempty"`
 }
 
-// 409 nommant la fiche existante ET son propriétaire : sans le nom, la même
-// saisie est rejouée indéfiniment. La lecture est GLOBALE parce que l'index
-// unique partiel l'est ; l'identité civile d'une fiche d'autrui ne sort pas,
-// sinon ce 409 devient un annuaire interrogeable numéro par numéro.
+// Lecture GLOBALE comme l'index unique : le 409 nomme la fiche et son propriétaire,
+// jamais l'identité civile d'une fiche d'autrui (sinon, un annuaire par numéro).
 func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisateur, phoneE164 string, saufID *string) error {
 	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: &phoneE164, SaufID: saufID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -911,10 +912,6 @@ func (s *service) prospectAvantCreation(ctx context.Context, u *socle.Utilisateu
 		return "", "", err
 	}
 	return phoneE164, id, s.prospectRepresentantUtilisable(ctx, corps.RepresentantID)
-}
-
-func ChampsLibresRetenus(ctx context.Context, d *socle.Deps, projet db.Projet, envoyes map[string]string) ([]byte, error) {
-	return (&service{Deps: d}).prospectLibresRetenus(ctx, projet, envoyes)
 }
 
 // Les reponses aux champs ajoutes, filtrees sur les champs declares pour le
@@ -1130,8 +1127,7 @@ var prospectTransitions = map[db.ProspectStatut][]db.ProspectStatut{
 }
 
 // `CONVERTI` porte une conversion signée et datée : on n'y entre que par la
-// confirmation dédiée, sinon un simple PATCH y menait depuis n'importe quel
-// état, sans consentement et sans auteur.
+// confirmation dédiée.
 func prospectStatutModifiable(u *socle.Utilisateur, courant db.ProspectStatut, demande *string) error {
 	if demande == nil || *demande == string(courant) || u.Peut(socle.PermissionFichesForcerTransition) {
 		return nil
@@ -1255,8 +1251,7 @@ type prospectWhatsappSaisi struct {
 	numeroFourni bool
 }
 
-// NE LÈVE JAMAIS : des fiches portent un numéro WhatsApp saisi bien avant que le
-// statut n'existe. Le statut se déduit alors du numéro, et AUTRE_NUMERO sans
+// NE LÈVE JAMAIS : sans statut, il se déduit du numéro saisi ; AUTRE_NUMERO sans
 // numéro retombe sur AUCUN pour tenir le CHECK de la table.
 func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant, phoneE164 *string) (statut *db.WhatsappStatus, numero *string) {
 	if saisi.statut == nil && !saisi.numeroFourni {
@@ -1340,9 +1335,8 @@ type ProspectFusionInput struct {
 	}
 }
 
-// La source est supprimée dans la MÊME transaction que la mise à jour de la
-// cible : entre les deux, les deux fiches partageraient le même numéro vivant et
-// l'index unique partiel refuserait l'écriture.
+// Source supprimée dans la MÊME transaction que la cible : sinon deux fiches
+// vivantes partageraient le numéro et l'index unique refuserait l'écriture.
 func (s *service) prospectFusionner(ctx context.Context, in *ProspectFusionInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	corps := in.Body
@@ -1426,7 +1420,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 		err := q.ReaffecterProspects(ctx, db.ReaffecterProspectsParams{
 			RepresentantID: corps.RepresentantID, CommercialID: corps.CommercialID, Ids: ids,
 		})
-		apres := map[string]any{"prospectIds": ids, "representantId": corps.RepresentantID, "commercialId": corps.CommercialID}
+		apres := map[string]any{"nombre": len(ids), "representantId": corps.RepresentantID, "commercialId": corps.CommercialID}
 		for i := 0; err == nil && i < len(ids); i++ {
 			err = database.Auditer(ctx, q, u.ID, "prospect.reassign", prospectEntite, ids[i], nil, apres)
 		}

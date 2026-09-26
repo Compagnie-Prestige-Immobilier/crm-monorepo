@@ -3,8 +3,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -138,4 +143,172 @@ func TestRendezVousSiteSurCreneauOuvert(t *testing.T) {
 	if body["rendezVous"] != nil {
 		t.Fatalf("aucun rendez-vous attendu : %v", body)
 	}
+}
+
+// Le dimanche de 7 h à 8 h, une visite par heure ; les réglages d'avant reviennent à la fin du test.
+func rvSiteUneVisiteLeDimanche(t *testing.T) (site, point string) {
+	t.Helper()
+	admin := qualificationConnecte(t, "ADMIN")
+	var avant *string
+	_ = admin.pool.QueryRow(admin.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'rv_site.reglages'`).Scan(&avant)
+	t.Cleanup(func() {
+		_, _ = admin.pool.Exec(admin.ctx, `DELETE FROM "app_settings" WHERE "key" = 'rv_site.reglages'`)
+		if avant != nil {
+			_, _ = admin.pool.Exec(admin.ctx, `INSERT INTO "app_settings" ("key", "value", "updatedAt") VALUES ('rv_site.reglages', $1, now())`, *avant)
+		}
+	})
+	reglages := map[string]any{"jours": []int{7}, "heureDebut": 7, "heureFin": 8, "horizonJours": 60, "maxVisites": 1}
+	statut, body := qualificationEnvoi(admin, http.MethodPut, "/api/v1/rv-site/reglages", reglages)
+	admin.attend(statut, http.StatusOK, "réglages enregistrés", body)
+	if err := admin.pool.QueryRow(admin.ctx, `SELECT (SELECT "id" FROM "ventes_sites" WHERE "actif" LIMIT 1),
+		(SELECT "id" FROM "points_rencontre" WHERE "isActive" LIMIT 1)`).Scan(&site, &point); err != nil {
+		t.Fatal(err)
+	}
+	return site, point
+}
+
+func rvSiteCorps(fiche, site, point string, quand time.Time) map[string]any {
+	return qualificationCorpsTentative(fiche, map[string]any{
+		"reasonCode": "RV_SITE", "callbackAt": quand.Format(time.RFC3339), "siteId": site, "pointRencontreId": point,
+	})
+}
+
+func rvSiteFiche(b *banc) string {
+	b.t.Helper()
+	fiche := qualificationProspect(b)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	return fiche
+}
+
+// Un rappel supplanté libère sa place ; un rappel annulé la garde, comme la date à l'accueil.
+func TestRendezVousSitePlaceTenueParLeDernierRappel(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	b := qualificationConnecte(t, "COMMERCIAL")
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	huit := sept.Add(time.Hour)
+	premiere, seconde := rvSiteFiche(b), rvSiteFiche(b)
+
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(premiere, site, point, huit))
+	b.attend(statut, http.StatusOK, "RV site à 8 h", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(premiere, site, point, sept))
+	b.attend(statut, http.StatusOK, "RV site déplacé à 7 h", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappelEnAttente(b, premiere)+"/cancel", nil)
+	b.attend(statut, http.StatusOK, "rappel du RV site annulé", body)
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/rv-site", nil)
+	b.attend(statut, http.StatusOK, "créneaux RV site", body)
+	reservations, _ := body["reservations"].([]any)
+	pris := map[string]float64{}
+	for _, r := range reservations {
+		ligne, _ := r.(map[string]any)
+		quand, _ := ligne["quand"].(string)
+		pris[quand], _ = ligne["nombre"].(float64)
+	}
+	if pris[sept.Format(time.RFC3339)] != 1 || pris[huit.Format(time.RFC3339)] != 0 {
+		t.Fatalf("réservations : %v, attendu une à 7 h et aucune à 8 h", pris)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(seconde, site, point, sept))
+	b.attend(statut, http.StatusConflict, "7 h tenu par le rappel annulé", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(seconde, site, point, huit))
+	b.attend(statut, http.StatusOK, "8 h libéré par le rappel supplanté", body)
+}
+
+// Deux téléconseillers visent la dernière place au même instant : un seul l'obtient.
+func TestRendezVousSiteDernierePlaceDisputee(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	consoles := []*banc{qualificationConnecte(t, "COMMERCIAL"), qualificationConnecte(t, "COMMERCIAL")}
+	corps := make([][]byte, len(consoles))
+	for i, b := range consoles {
+		var err error
+		if corps[i], err = json.Marshal(rvSiteCorps(rvSiteFiche(b), site, point, sept)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	statuts := make([]int, len(consoles))
+	var depart, fin sync.WaitGroup
+	depart.Add(1)
+	for i, b := range consoles {
+		fin.Add(1)
+		go func() {
+			defer fin.Done()
+			req, _ := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+"/api/v1/phase2/call-attempts", bytes.NewReader(corps[i]))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", b.ts.URL)
+			depart.Wait()
+			if resp, err := b.client.Do(req); err == nil {
+				statuts[i] = resp.StatusCode
+				_ = resp.Body.Close()
+			}
+		}()
+	}
+	depart.Done()
+	fin.Wait()
+	slices.Sort(statuts)
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusConflict {
+		t.Fatalf("statuts %v, attendu un 200 et un 409", statuts)
+	}
+}
+
+// « Khady Kane » et « Kane Khady » trouvent la même fiche, dans les prospects comme dans les rendez-vous.
+func TestRechercheNomPrenomDansLesDeuxOrdres(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	direction := qualificationConnecte(t, "DIRECTION")
+	fiche := qualificationProspect(b)
+	qualificationExec(b, `UPDATE "prospects" SET "nom" = 'Kane', "prenom" = 'Khady' WHERE "id" = $1`, fiche)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}))
+	b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
+
+	for _, liste := range []string{"/api/v1/prospects?pageSize=100&search=", "/api/v1/rendez-vous?pageSize=200&search="} {
+		for _, terme := range []string{"Khady Kane", "kane khady"} {
+			statut, body := qualificationEnvoi(direction, http.MethodGet, liste+url.QueryEscape(terme), nil)
+			direction.attend(statut, http.StatusOK, liste+terme, body)
+			items, _ := body["items"].([]any)
+			trouvee := slices.ContainsFunc(items, func(item any) bool {
+				ligne, _ := item.(map[string]any)
+				return ligne["id"] == fiche || ligne["prospectId"] == fiche
+			})
+			if !trouvee {
+				t.Fatalf("%s%q doit trouver la fiche : %d résultat(s)", liste, terme, len(items))
+			}
+		}
+	}
+}
+
+// Le dimanche de 7 h à 8 h, une place par heure : 7 h prise, 8 h libre, rien les autres jours.
+func TestRendezVousSitePlacesRestantesParCreneau(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	b := qualificationConnecte(t, "COMMERCIAL")
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(rvSiteFiche(b), site, point, sept))
+	b.attend(statut, http.StatusOK, "RV site à 7 h", body)
+
+	chemin := "/api/v1/phase2/rv-site/creneaux?du=" + sept.AddDate(0, 0, -4).Format(time.DateOnly) + "&au=" + sept.Format(time.DateOnly)
+	statut, body = qualificationEnvoi(b, http.MethodGet, chemin, nil)
+	b.attend(statut, http.StatusOK, "créneaux de la semaine", body)
+	creneaux, _ := body["creneaux"].([]any)
+	attendus := []string{
+		sept.Format(time.RFC3339) + " 1 1 0",
+		sept.Add(time.Hour).Format(time.RFC3339) + " 1 0 1",
+	}
+	lus := make([]string, 0, len(creneaux))
+	for _, c := range creneaux {
+		creneau, _ := c.(map[string]any)
+		lus = append(lus, fmt.Sprintf("%v %v %v %v", creneau["quand"], creneau["capacite"], creneau["reserves"], creneau["restantes"]))
+	}
+	if !slices.Equal(lus, attendus) {
+		t.Fatalf("créneaux %v, attendu %v", lus, attendus)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/rv-site/creneaux?du=2026-01-01&au=2026-02-02", nil)
+	b.attend(statut, http.StatusBadRequest, "plus de 31 jours", body)
 }

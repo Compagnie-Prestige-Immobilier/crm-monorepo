@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"testing"
@@ -133,8 +134,31 @@ func TestRendezVousVenuesEtClasseur(t *testing.T) {
 	teleconseiller.attend(statut, http.StatusForbidden, "classeur sans la permission", body)
 }
 
+func rappelEnAttente(b *banc, fiche string) string {
+	b.t.Helper()
+	var id string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "id" FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, fiche).Scan(&id); err != nil {
+		b.t.Fatal(err)
+	}
+	return id
+}
+
+func dateDuRendezVous(b *banc, fiche string) time.Time {
+	b.t.Helper()
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/rendez-vous", nil)
+	b.attend(statut, http.StatusOK, "rendez-vous de la fiche", body)
+	rdv, _ := body["rendezVous"].(map[string]any)
+	quand, _ := rdv["quand"].(string)
+	lue, err := time.Parse(time.RFC3339, quand)
+	if err != nil {
+		b.t.Fatalf("la fiche doit rendre la date de son rendez-vous : %v", body)
+	}
+	return lue
+}
+
 // La date affichée au comptoir est celle du rappel qui tient encore, pas celle
-// d'un rappel supplanté par un rendez-vous plus proche.
+// d'un rappel supplanté ; annuler le rappel ne l'efface pas.
 func TestRendezVousDateEstCelleDuDernierRappel(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	fiche := qualificationProspect(b)
@@ -151,18 +175,32 @@ func TestRendezVousDateEstCelleDuDernierRappel(t *testing.T) {
 		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": proche.Format(time.RFC3339)}))
 	b.attend(statut, http.StatusOK, "RV CPI à J+5 consigné", body)
 
-	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/rendez-vous", nil)
-	b.attend(statut, http.StatusOK, "rendez-vous de la fiche", body)
-	rdv, _ := body["rendezVous"].(map[string]any)
-	if rdv == nil {
-		t.Fatalf("la fiche en RV CPI doit rendre un rendez-vous : %v", body)
-	}
-	lue, err := time.Parse(time.RFC3339, rdv["quand"].(string))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lue.Sub(proche).Abs() > time.Minute {
+	if lue := dateDuRendezVous(b, fiche); lue.Sub(proche).Abs() > time.Minute {
 		t.Fatalf("date rendue %v, attendue le RV CPI du %v, pas le rappel supplanté du %v", lue, proche, loin)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappelEnAttente(b, fiche)+"/cancel", nil)
+	b.attend(statut, http.StatusOK, "rappel du rendez-vous annulé", body)
+	if lue := dateDuRendezVous(b, fiche); lue.Sub(proche).Abs() > time.Minute {
+		t.Fatalf("date rendue %v après annulation du rappel, attendue %v", lue, proche)
+	}
+}
+
+// Un RDV téléphonique se décale comme un rappel ; un rendez-vous physique non.
+func TestRendezVousTelephoniqueSeReporte(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	for motif, attendu := range map[string]int{"RDV_TELEPHONIQUE": http.StatusOK, "RV_CPI": http.StatusConflict} {
+		fiche := qualificationProspect(b)
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": motif, "callbackAt": quand}))
+		b.attend(statut, http.StatusOK, motif+" consigné", body)
+		statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappelEnAttente(b, fiche)+"/snooze", nil)
+		b.attend(statut, attendu, "report du "+motif, body)
 	}
 }
 
@@ -217,4 +255,43 @@ func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
 	if !contientFiche(body, fiche) {
 		t.Fatal("le nouveau rendez-vous doit revenir dans le filtre « à confirmer »")
 	}
+}
+
+// « Rappeler dans 1 h », « 2 h » ou « demain matin » ; sans durée, toujours 15 minutes.
+func TestReportRappelDurees(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	fiches := map[string]string{}
+	for _, motif := range []string{"CALLBACK", "RV_CPI"} {
+		fiche := qualificationProspect(b)
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": motif, "callbackAt": quand}))
+		b.attend(statut, http.StatusOK, motif+" consigné", body)
+		fiches[motif] = "/api/v1/phase2/callbacks/" + rappelEnAttente(b, fiche) + "/snooze"
+	}
+	zone, err := time.LoadLocation("Africa/Dakar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := time.Now().In(zone)
+	demain := time.Date(local.Year(), local.Month(), local.Day()+1, 8, 30, 0, 0, zone)
+	for duree, attendu := range map[string]time.Time{
+		"?duree=1h": time.Now().Add(time.Hour), "?duree=2h": time.Now().Add(2 * time.Hour),
+		"?duree=demain": demain, "": time.Now().Add(15 * time.Minute),
+	} {
+		statut, body := qualificationEnvoi(b, http.MethodPost, fiches["CALLBACK"]+duree, nil)
+		b.attend(statut, http.StatusOK, "report "+duree, body)
+		lu, _ := time.Parse(time.RFC3339, fmt.Sprint(body["scheduledAt"]))
+		if lu.Sub(attendu).Abs() > 5*time.Second {
+			t.Fatalf("report %q : %v, attendu %v", duree, lu, attendu)
+		}
+	}
+	statut, body := qualificationEnvoi(b, http.MethodPost, fiches["CALLBACK"]+"?duree=3h", nil)
+	b.attend(statut, http.StatusUnprocessableEntity, "durée hors liste", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, fiches["RV_CPI"]+"?duree=demain", nil)
+	b.attend(statut, http.StatusConflict, "un rendez-vous physique ne se reporte pas", body)
 }

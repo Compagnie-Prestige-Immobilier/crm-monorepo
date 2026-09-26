@@ -346,14 +346,14 @@ func ouvrirBase(ctx context.Context, url string) (*pgxpool.Pool, error) {
 }
 
 // Une injection SQL sur une connexion superutilisateur donne COPY PROGRAM et
-// DROP : la procédure de rétrogradation est dans infra/dokploy/README.md.
+// DROP : la bascule vers un rôle applicatif est dans infra/dokploy/README.md.
 func signalerSuperutilisateur(ctx context.Context, pool *pgxpool.Pool) {
 	if socle.Env("NODE_ENV", "") == nodeEnvDevelopment {
 		return
 	}
 	var super bool
 	if err := pool.QueryRow(ctx, `SELECT rolsuper FROM pg_roles WHERE rolname = current_user`).Scan(&super); err == nil && super {
-		slog.Warn("la connexion applicative est superutilisateur Postgres : rétrograder le rôle (audit B53)")
+		slog.Warn("la connexion applicative est superutilisateur Postgres : basculer sur le rôle applicatif crm_app (infra/dokploy/README.md)")
 	}
 }
 

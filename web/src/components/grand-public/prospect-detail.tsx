@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PencilIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
@@ -131,9 +131,22 @@ function SectionParrainage({ prospectId }: { prospectId: string }) {
           </span>
         </Ligne>
       )}
+      {data.suivi.recommandes > 0 && (
+        <Ligne label="Suivi du parrainage">
+          <span className="tabular-nums">
+            {compte(data.suivi.recommandes, 'numéro recommandé', 'numéros recommandés')},{' '}
+            {compte(data.suivi.fiches, 'fiche créée', 'fiches créées')},{' '}
+            {compte(data.suivi.convertis, 'converti', 'convertis')},{' '}
+            {compte(data.suivi.vendus, 'vendu', 'vendus')}
+          </span>
+        </Ligne>
+      )}
     </>
   );
 }
+
+const compte = (n: number, un: string, plusieurs: string): string =>
+  `${n} ${n > 1 ? plusieurs : un}`;
 
 function formatAnciennete(mois: number): string {
   if (mois < 12) return `${String(mois)} mois`;
@@ -231,6 +244,7 @@ function ModifierLaFiche({
   onEnregistre: (prospect: ProspectRow) => void;
 }) {
   const [ouverte, setOuverte] = useState(false);
+  const prenomRef = useRef<HTMLInputElement>(null);
   if (!canEdit) return null;
 
   return (
@@ -245,7 +259,10 @@ function ModifierLaFiche({
         Modifier
       </Button>
       <Dialog open={ouverte} onOpenChange={setOuverte}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent
+          initialFocus={prenomRef}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"
+        >
           <DialogHeader>
             <DialogTitle>
               Modifier {prospect.prenom} {prospect.nom}
@@ -259,6 +276,7 @@ function ModifierLaFiche({
             <GrandPublicProspectForm
               embedded
               initial={prospect}
+              prenomRef={prenomRef}
               onSaved={(saved) => {
                 onEnregistre(saved);
                 setOuverte(false);

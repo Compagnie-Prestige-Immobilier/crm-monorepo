@@ -2,11 +2,12 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useState } from 'react';
 
 import { buildBankAdvancedChips } from '@/components/bank/bank-advanced-chips';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
+import { BoutonFiltres, classeRepliable } from '@/components/filters/bouton-filtres';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
@@ -120,6 +121,7 @@ export function BankFiltersBar({
   const { filters, setFilters, resetFilters } = useBankFilters();
   const minId = useId();
   const maxId = useId();
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
 
   const stages = useQuery({
     queryKey: queryKeys.bankStages(true),
@@ -195,6 +197,7 @@ export function BankFiltersBar({
     agents: agentOptions,
     reasons: reasonOptions,
   });
+  const repliable = classeRepliable(filtresOuverts);
 
   return (
     <section
@@ -211,19 +214,29 @@ export function BankFiltersBar({
         }}
       />
 
-      {/* ─── Filtrage simple ────────────────────────────────────────────── */}
+      <BoutonFiltres
+        ouverts={filtresOuverts}
+        actifs={activeCount}
+        className="self-start"
+        onBasculer={() => {
+          setFiltresOuverts(!filtresOuverts);
+        }}
+      />
+
       <div className="flex flex-wrap items-end gap-3">
-        <FilterCombobox
-          label="Projet"
-          placeholder="Tous les projets"
-          options={PROJET_OPTIONS}
-          value={filters.projet ?? 'TOUS'}
-          onChange={(value) => {
-            const nextProjet: Projet | null =
-              value === 'CHUES' || value === 'GRAND_PUBLIC' ? value : null;
-            setFilters({ projet: nextProjet });
-          }}
-        />
+        <div className={repliable}>
+          <FilterCombobox
+            label="Projet"
+            placeholder="Tous les projets"
+            options={PROJET_OPTIONS}
+            value={filters.projet ?? 'TOUS'}
+            onChange={(value) => {
+              const nextProjet: Projet | null =
+                value === 'CHUES' || value === 'GRAND_PUBLIC' ? value : null;
+              setFilters({ projet: nextProjet });
+            }}
+          />
+        </div>
 
         <SearchField
           value={searchDraft}
@@ -234,126 +247,129 @@ export function BankFiltersBar({
         {/* L'étape est la question posée à chaque session, celle que les vues
             rapides écrivent aussi. Sous 1024 px des cartes remplacent le
             tableau : elle revient alors même là où l'en-tête la porte. */}
-        <div
-          className={cn(
-            'flex min-w-[13rem] flex-1 flex-col gap-1.5',
-            colonnesFiltrables && 'lg:hidden',
-          )}
-        >
-          <FilterCombobox
-            label="Étape"
-            placeholder="Toutes les étapes"
-            options={stageComboOptions(stages.data)}
-            value={filters.stageId}
-            onChange={(value) => {
-              setFilters({ stageId: value, stageType: null });
+        <div className={repliable}>
+          <div
+            className={cn(
+              'flex min-w-[13rem] flex-1 flex-col gap-1.5',
+              colonnesFiltrables && 'lg:hidden',
+            )}
+          >
+            <FilterCombobox
+              label="Étape"
+              placeholder="Toutes les étapes"
+              options={stageComboOptions(stages.data)}
+              value={filters.stageId}
+              onChange={(value) => {
+                setFilters({ stageId: value, stageType: null });
+              }}
+            />
+          </div>
+
+          <DatePicker
+            id="bank-cases-date-from"
+            label="Créé à partir du"
+            value={filters.dateFrom}
+            max={filters.dateTo}
+            onChange={(dateFrom) => {
+              setFilters({ dateFrom });
+            }}
+          />
+          <DatePicker
+            id="bank-cases-date-to"
+            label="Jusqu’au"
+            value={filters.dateTo}
+            min={filters.dateFrom}
+            onChange={(dateTo) => {
+              setFilters({ dateTo });
             }}
           />
         </div>
-
-        <DatePicker
-          id="bank-cases-date-from"
-          label="Créé à partir du"
-          value={filters.dateFrom}
-          max={filters.dateTo}
-          onChange={(dateFrom) => {
-            setFilters({ dateFrom });
-          }}
-        />
-        <DatePicker
-          id="bank-cases-date-to"
-          label="Jusqu’au"
-          value={filters.dateTo}
-          min={filters.dateFrom}
-          onChange={(dateTo) => {
-            setFilters({ dateTo });
-          }}
-        />
       </div>
 
-      {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
-      <AdvancedPanel
-        module="dossiers"
-        chips={chips}
-        onRemove={removeAdvanced}
-        onClearAll={clearAdvanced}
-        actions={
-          activeCount > 0 ? (
-            <>
-              <Badge variant="secondary">
-                {activeCount} filtre{activeCount > 1 ? 's' : ''}
-              </Badge>
-              <Button variant="ghost" onClick={resetFilters}>
-                <RotateCcwIcon aria-hidden="true" />
-                Tout effacer
-              </Button>
-            </>
-          ) : null
-        }
-      >
-        <>
-          <div className={cn('contents', colonnesFiltrables && 'lg:hidden')}>
+      <div className={repliable}>
+        <AdvancedPanel
+          module="dossiers"
+          chips={chips}
+          onRemove={removeAdvanced}
+          onClearAll={clearAdvanced}
+          actions={
+            activeCount > 0 ? (
+              <>
+                <Badge variant="secondary">
+                  {activeCount} filtre{activeCount > 1 ? 's' : ''}
+                </Badge>
+                <Button variant="ghost" onClick={resetFilters}>
+                  <RotateCcwIcon aria-hidden="true" />
+                  Tout effacer
+                </Button>
+              </>
+            ) : null
+          }
+        >
+          <>
+            <div className={cn('contents', colonnesFiltrables && 'lg:hidden')}>
+              <FilterCombobox
+                label="Banque de traitement"
+                placeholder="Toutes les banques"
+                options={banqueOptions}
+                value={filters.banqueId}
+                onChange={(value) => {
+                  setFilters({ banqueId: value });
+                }}
+              />
+            </div>
             <FilterCombobox
-              label="Banque de traitement"
-              placeholder="Toutes les banques"
-              options={banqueOptions}
-              value={filters.banqueId}
+              label="Agent"
+              placeholder="Tous les agents"
+              options={agentOptions}
+              value={filters.agentId}
               onChange={(value) => {
-                setFilters({ banqueId: value });
+                setFilters({ agentId: value });
               }}
             />
-          </div>
-          <FilterCombobox
-            label="Agent"
-            placeholder="Tous les agents"
-            options={agentOptions}
-            value={filters.agentId}
-            onChange={(value) => {
-              setFilters({ agentId: value });
-            }}
-          />
-          <FilterCombobox
-            label="Motif de rejet"
-            placeholder="Tous les motifs"
-            options={reasonOptions}
-            value={filters.rejectionReasonId}
-            onChange={(value) => {
-              setFilters({ rejectionReasonId: value });
-            }}
-          />
+            <FilterCombobox
+              label="Motif de rejet"
+              placeholder="Tous les motifs"
+              options={reasonOptions}
+              value={filters.rejectionReasonId}
+              onChange={(value) => {
+                setFilters({ rejectionReasonId: value });
+              }}
+            />
 
-          {/* Bornes de montant : `inputMode="numeric"` et non `type="number"`.
+            {/* Bornes de montant : `inputMode="numeric"` et non `type="number"`.
               Un champ numérique HTML transforme la valeur en `number` côté DOM,
               ce qui réintroduit exactement la perte de précision que le contrat
               évite en exposant les montants en chaîne. */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={minId}>Montant minimum (FCFA)</Label>
-            <Input
-              id={minId}
-              inputMode="numeric"
-              autoComplete="off"
-              value={moneyFieldValue(filters.amountMin)}
-              placeholder="0"
-              onChange={(event) => {
-                setFilters({ amountMin: parseMoneyInput(event.target.value) });
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={maxId}>Montant maximum (FCFA)</Label>
-            <Input
-              id={maxId}
-              inputMode="numeric"
-              autoComplete="off"
-              value={moneyFieldValue(filters.amountMax)}
-              placeholder="Sans limite"
-              onChange={(event) => {
-                setFilters({ amountMax: parseMoneyInput(event.target.value) });
-              }}
-            />
-          </div>
-        </>
-      </AdvancedPanel>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={minId}>Montant minimum (FCFA)</Label>
+              <Input
+                id={minId}
+                inputMode="numeric"
+                autoComplete="off"
+                value={moneyFieldValue(filters.amountMin)}
+                placeholder="0"
+                onChange={(event) => {
+                  setFilters({ amountMin: parseMoneyInput(event.target.value) });
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={maxId}>Montant maximum (FCFA)</Label>
+              <Input
+                id={maxId}
+                inputMode="numeric"
+                autoComplete="off"
+                value={moneyFieldValue(filters.amountMax)}
+                placeholder="Sans limite"
+                onChange={(event) => {
+                  setFilters({ amountMax: parseMoneyInput(event.target.value) });
+                }}
+              />
+            </div>
+          </>
+        </AdvancedPanel>
+      </div>
     </section>
   );
 }

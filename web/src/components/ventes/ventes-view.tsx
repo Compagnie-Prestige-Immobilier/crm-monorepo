@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DepotClasseur } from '@/components/ventes/depot-classeur';
+import { EcheancesEnRetardView } from '@/components/ventes/echeances-en-retard';
+import { SommesDues } from '@/components/ventes/sommes-dues';
 import { VenteDetailDialog } from '@/components/ventes/vente-detail-dialog';
 import { VenteParcours } from '@/components/ventes/vente-parcours';
 import { TeleconseillerDetailDialog } from '@/components/ventes/teleconseiller-detail-dialog';
@@ -45,6 +47,7 @@ import { queryKeys } from '@/lib/query-keys';
 export const VUES_VENTES = [
   'ventes',
   'echeances',
+  'retards',
   'sites',
   'teleconseillers',
   'nouvelle',
@@ -171,6 +174,7 @@ function VentesLoaded({
           )}
         </PageSimple>
       ) : null}
+      {vue === 'retards' ? <EcheancesEnRetardView /> : null}
       {vue === 'teleconseillers' ? (
         <PageSimple vide={parTeleconseiller.length === 0}>
           <TableParTeleconseiller lignes={parTeleconseiller} onOuvrir={setTeleconseillerOuvert} />
@@ -181,6 +185,7 @@ function VentesLoaded({
       {PAGES_TABLEAU.has(vue) ? (
         <PageVentes
           data={data}
+          sites={sites}
           onAjouter={ajouter}
           onEdit={modifier}
           onDetail={voirDetail}
@@ -248,12 +253,14 @@ const chercher = (ventes: readonly Vente[], texte: string): Vente[] => {
 
 const PageVentes = memo(function PageVentes({
   data,
+  sites,
   onAjouter,
   onEdit,
   onDetail,
   onArchive,
 }: {
   data: VentesData;
+  sites: readonly SiteVente[];
   onAjouter: () => void;
   onEdit: (vente: Vente) => void;
   onDetail: (vente: Vente) => void;
@@ -273,7 +280,7 @@ const PageVentes = memo(function PageVentes({
             <Button size="lg" onClick={onAjouter}>
               <PlusIcon aria-hidden="true" /> Nouvelle vente
             </Button>
-            <DepotClasseur premier={false} />
+            <DepotClasseur remplace={classeur !== null} />
           </div>
         }
       />
@@ -296,10 +303,17 @@ const PageVentes = memo(function PageVentes({
             onChange={(e) => setRecherche(e.target.value)}
           />
         </div>
+        <SommesDues sites={sites} />
         <Button size="lg" onClick={onAjouter}>
           <PlusIcon aria-hidden="true" /> Nouvelle vente
         </Button>
       </div>
+      {data.tronque ? (
+        <p className="rounded-md bg-warning-surface p-3 text-warning">
+          Seules les ventes les plus récentes sont affichées : les plus anciennes manquent à la
+          recherche et aux totaux.
+        </p>
+      ) : null}
       {visibles.length === 0 ? (
         <p className="p-6 text-center text-muted-foreground">
           Aucun client ne correspond à cette recherche.
@@ -330,7 +344,7 @@ const PageVentes = memo(function PageVentes({
               <DownloadIcon aria-hidden="true" /> Télécharger le classeur
             </Button>
           )}
-          <DepotClasseur premier={false} />
+          <DepotClasseur remplace={classeur !== null} />
         </div>
       </div>
     </div>

@@ -282,7 +282,7 @@ export function ClientRequestDialog({
                 </span>
               </Label>
               {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-                  pas le texte de l'item — ici, l'identifiant de la banque. */}
+                  pas le texte de l'item, ici, l'identifiant de la banque. */}
               <Select
                 items={(banques.data ?? []).map((item) => ({
                   value: item.id,

@@ -39,6 +39,8 @@ type MessageBrevo struct {
 	HTML          string
 	Texte         string
 	PieceJointe   *PieceJointeBrevo
+	// Annonces seulement : chaque destinataire ne lit que sa propre adresse.
+	UneVersionParDestinataire bool
 }
 
 type PieceJointeBrevo struct {
@@ -103,9 +105,6 @@ type corpsBrevo struct {
 	MessageVersions []versionBrevo      `json:"messageVersions,omitempty"`
 }
 
-// Une version par destinataire : sans elle, Brevo place tous les `to` d'un
-// même appel dans l'en-tête reçu par chacun, et chaque destinataire lit les
-// adresses des autres.
 type versionBrevo struct {
 	To []map[string]string `json:"to"`
 }
@@ -198,26 +197,14 @@ func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []tra
 
 func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
 	sort := trancheBrevo{destinataires: tranche}
-	adresses := brevoAdresses(tranche)
 	charge := corpsBrevo{
 		Sender:      map[string]string{"email": b.expediteur, notificationCleNom: b.nom},
-		To:          adresses,
 		Cc:          brevoAdresses(message.Copies),
 		Subject:     message.Sujet,
 		HTMLContent: message.HTML,
 		TextContent: message.Texte,
 	}
-	// Avec un seul destinataire, `to` suffit et Brevo rend `messageId`. Au-delà,
-	// `messageVersions` évite que chaque destinataire lise les adresses des autres,
-	// mais Brevo rend alors `messageIds` (voir la lecture de la réponse plus bas).
-	if len(adresses) > 1 {
-		versions := make([]versionBrevo, len(adresses))
-		for i, adresse := range adresses {
-			versions[i] = versionBrevo{To: []map[string]string{adresse}}
-		}
-		charge.To = adresses[:1]
-		charge.MessageVersions = versions
-	}
+	charge.To, charge.MessageVersions = brevoDestinataires(message, brevoAdresses(tranche))
 	if message.PieceJointe != nil {
 		charge.Attachment = []map[string]string{{
 			"name": message.PieceJointe.Nom, "content": base64.StdEncoding.EncodeToString(message.PieceJointe.Contenu),
@@ -261,6 +248,18 @@ func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranc
 	sort.transitoire = reponse.StatusCode == http.StatusTooManyRequests ||
 		reponse.StatusCode >= http.StatusInternalServerError
 	return sort
+}
+
+// Une copie serait reçue une fois par version : les versions l'excluent.
+func brevoDestinataires(message *MessageBrevo, adresses []map[string]string) (to []map[string]string, versions []versionBrevo) {
+	if !message.UneVersionParDestinataire || len(message.Copies) > 0 || len(adresses) < 2 {
+		return adresses, nil
+	}
+	versions = make([]versionBrevo, len(adresses))
+	for i, adresse := range adresses {
+		versions[i] = versionBrevo{To: []map[string]string{adresse}}
+	}
+	return adresses[:1], versions
 }
 
 func brevoErreurReseau(sort trancheBrevo, err error) trancheBrevo {

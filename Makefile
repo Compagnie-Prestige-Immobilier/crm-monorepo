@@ -2,17 +2,22 @@ DB ?= postgres://localhost:5432/cpi_v2_dev?sslmode=disable
 export DATABASE_URL ?= $(DB)
 export TEST_DATABASE_URL ?= $(DB)
 export LOG_FORMAT ?= text
+export E2E_DB ?= postgres://localhost:5432/cpi_e2e?sslmode=disable
+export E2E_DB_DEMO ?= postgres://localhost:5432/cpi_e2e_demo?sslmode=disable
+export E2E_URL ?= http://localhost:4890
 SQLC = go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 LINT = go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
-.PHONY: setup db gen dev build test lint e2e
+.PHONY: setup db gen dev build test lint e2e e2e-reset
 
 setup: db gen ## base locale, dépendances, code généré, en une commande
 	pnpm --dir web install
 
 db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sème référentiels, comptes et 60 jours de données de développement
-	@case "$(DB)" in \
-	  postgres://localhost*|postgres://127.0.0.1*|postgresql://localhost*|postgresql://127.0.0.1*) ;; \
+	@hote=$$(printf '%s' "$(DB)" | sed -E 's#^postgres(ql)?://##; s#[/?].*##; s#.*@##; s#:[0-9]*$$##'); \
+	case "$(DB)" in *[?\&]host=*|*[?\&]hostaddr=*) hote= ;; postgres://*|postgresql://*) ;; *) hote= ;; esac; \
+	case "$$hote" in \
+	  localhost|127.0.0.1) ;; \
 	  *) echo "DB doit pointer vers localhost ou 127.0.0.1 : $(DB)" >&2; exit 1 ;; \
 	esac
 	@psql "$(DB)" -Atc 'select 1' >/dev/null 2>&1 || { \
@@ -20,11 +25,8 @@ db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sèm
 	SEED_ADMIN_EMAIL=$${SEED_ADMIN_EMAIL:-admin@cpi.sn} SEED_ADMIN_USERNAME=$${SEED_ADMIN_USERNAME:-admin} \
 	NODE_ENV=development SEED_ADMIN_PASSWORD=$${SEED_ADMIN_PASSWORD:-admin-local-2026} go run ./cmd/server -seed
 
-gen: ## sqlc, document OpenAPI, types du panneau
-	@mkdir -p web/dist && touch web/dist/index.html
-	$(SQLC) generate
-	go run ./cmd/server -openapi > openapi.json
-	pnpm --dir web gen
+gen: ## sqlc, document OpenAPI, types et routes du panneau
+	tools/dev/gen.sh
 
 dev: db ## base créée et semée si besoin, .env chargé, API sur :4000 et Vite sur :5173
 	@set -a; [ -f .env ] && . ./.env; set +a; \
@@ -39,8 +41,12 @@ build: gen ## panneau embarqué + binaire ./cpi-go, avec la bascule de rôle du 
 test: ## tests d'intégration contre TEST_DATABASE_URL
 	go test -tags integration -count=1 ./...
 
-e2e: build ## parcours Playwright contre le binaire et la base locale
-	pnpm --dir e2e test
+e2e-reset: ## recrée E2E_DB et E2E_DB_DEMO : schéma, migrations, fixtures et démonstration
+	tools/dev/e2e-reset.sh
+
+e2e: build e2e-reset ## parcours Playwright sur des bases neuves, jamais celle du développement ; ARGS= pour cibler
+	DATABASE_URL=$(E2E_DB) DATABASE_URL_DEMO=$(E2E_DB_DEMO) PUBLIC_WEB_URL=$(E2E_URL) \
+	  SEED_FIXTURE_PASSWORD=$${SEED_FIXTURE_PASSWORD:-fixtures-e2e-2026} pnpm --dir e2e test $(ARGS)
 
 lint: ## golangci-lint, requêtes vérifiées contre la base, lint du panneau
 	$(LINT) run ./...

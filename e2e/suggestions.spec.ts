@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { avecBase, compteDe } from './comptes';
+import { apiDe, creerProspect, purger } from './donnees-listes';
 import {
   appelEnregistre,
   effacerFiches,
@@ -160,5 +163,52 @@ test.describe('parcours 8 en 390 px', () => {
     await sansDebordementHorizontal(page);
 
     expect(await lireStatutSuggestion(propose.phoneE164)).toBe('APPELE');
+  });
+});
+
+test.describe('parcours 8, parrains Grand Public', () => {
+  test.use({ storageState: compteDe('SUPERVISEUR').etat });
+
+  const nom = `Parrain ${marque()}`;
+  const fiches: string[] = [];
+
+  test.beforeAll(async () => {
+    const api = await apiDe('COMMERCIAL', '198.51.100.96');
+    const telephoneFilleul = numeroUnique();
+    for (const [nomFiche, phone] of [
+      [nom, numeroUnique()],
+      [`Filleul ${marque()}`, telephoneFilleul],
+    ] as const) {
+      fiches.push(
+        await creerProspect(api, { nom: nomFiche, prenom: 'Awa', phone, projet: 'GRAND_PUBLIC' }),
+      );
+    }
+    const appel = await api.post('/api/v1/phase2/call-attempts', {
+      data: {
+        id: randomUUID(),
+        prospectId: fiches[0],
+        reasonCode: 'INTERESSE',
+        clientCreatedAt: new Date().toISOString(),
+        contactsRecommandes: [{ phone: telephoneFilleul }, { phone: numeroUnique() }],
+      },
+    });
+    expect(appel.status(), await appel.text()).toBe(200);
+    await api.dispose();
+  });
+
+  test.afterAll(async () => {
+    await purger({ prospects: fiches });
+  });
+
+  test('l’encadrement classe les parrains et retrouve le suivi sur la fiche', async ({ page }) => {
+    await page.goto(SUGGESTIONS);
+    const classement = page.getByRole('row').filter({ hasText: nom });
+    await expect(classement.getByRole('cell')).toHaveText([/Parrain/u, '2', '1', '0', '0']);
+
+    await classement.getByRole('link', { name: new RegExp(nom, 'u') }).click();
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${fiches[0] ?? ''}$`, 'u'));
+    await expect(
+      page.getByText('2 numéros recommandés, 1 fiche créée, 0 converti, 0 vendu'),
+    ).toBeVisible();
   });
 });

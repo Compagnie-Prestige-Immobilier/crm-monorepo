@@ -1,8 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoaderIcon, PencilIcon, PlusIcon, PowerIcon, PowerOffIcon, RadioIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { LoaderIcon, PencilIcon, PlusIcon, PowerIcon, PowerOffIcon } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -53,13 +53,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { stageBadgeVariant } from '@/lib/types';
 
-/** Version de charge utile du parc en place. Un motif au-dessus n'y descend pas. */
-const DEPLOYED_PAYLOAD_VERSION = 1;
-
 const REASONS_KEY = [...queryKeys.referentielsRoot, 'issues-appel'] as const;
-
-const onFieldPhones = (reason: CallOutcomeReason): boolean =>
-  reason.minPayloadVersion <= DEPLOYED_PAYLOAD_VERSION;
 
 const estRacine = (reason: CallOutcomeReason): boolean => reason.parentId == null;
 
@@ -94,8 +88,6 @@ export function CallOutcomeReasonsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <ParcNotice />
-
       <div className="flex items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
           Issues proposées au téléconseiller à la fin d’un appel.
@@ -131,7 +123,7 @@ export function CallOutcomeReasonsView() {
               <TableHead>Effet sur le prospect</TableHead>
               <TableHead>Couleur</TableHead>
               <TableHead>Saisie exigée</TableHead>
-              <TableHead>Sur les téléphones</TableHead>
+              <TableHead>État</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -176,26 +168,9 @@ export function CallOutcomeReasonsView() {
   );
 }
 
-/**
- * La contrainte de parc est affichée en clair et en permanence : la cacher
- * derrière une case à cocher ferait créer des motifs qu'aucun appareil ne
- * recevra, sans que personne ne comprenne pourquoi ils n'apparaissent pas.
- */
-function ParcNotice() {
-  return (
-    <div className="flex items-start gap-3 rounded-md border border-accent-border/30 bg-warning-surface px-4 py-3 text-[0.875rem]">
-      <RadioIcon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-      <div className="flex flex-col gap-1.5">
-        <p className="font-medium">Un motif ajouté ici ne descend pas sur les téléphones.</p>
-        <p className="text-muted-foreground">
-          L’application de terrain valide chaque saisie contre une liste figée à sa compilation. Un
-          code qu’elle ignore bloque l’appel dans «&nbsp;à corriger&nbsp;» sans jamais atteindre le
-          serveur. Les motifs créés depuis ce panneau n’apparaîtront aux téléconseillers qu’après la
-          mise à jour de l’application et le renouvellement du parc.
-        </p>
-      </div>
-    </div>
-  );
+function EtatMotif({ actif }: { actif: boolean }) {
+  if (actif) return <Badge variant="success">En service</Badge>;
+  return <Badge variant="secondary">Retiré des listes</Badge>;
 }
 
 function ReasonRow({ reason, onEdit }: { reason: CallOutcomeReason; onEdit: () => void }) {
@@ -242,13 +217,7 @@ function ReasonRow({ reason, onEdit }: { reason: CallOutcomeReason; onEdit: () =
         {required.length === 0 ? 'Rien' : required.join(', ')}
       </TableCell>
       <TableCell>
-        {(() => {
-          if (!reason.isActive) return <Badge variant="secondary">Retiré des listes</Badge>;
-          return (() => {
-            if (onFieldPhones(reason)) return <Badge variant="success">Oui</Badge>;
-            return <Badge variant="warning">Après mise à jour de l’application</Badge>;
-          })();
-        })()}
+        <EtatMotif actif={reason.isActive} />
       </TableCell>
       <TableCell className="text-right">
         <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
@@ -322,6 +291,17 @@ const colorLabel = (color: string): string =>
 const isKnownColor = (color: string | null): color is CallOutcomeColor =>
   color !== null && (CALL_OUTCOME_COLORS as readonly string[]).includes(color);
 
+/** « Ne répond pas » propose NE_REPOND_PAS : le code suit le libellé tant qu'on ne l'a pas touché. */
+const codeDepuis = (libelle: string): string =>
+  libelle
+    .normalize('NFD')
+    .replaceAll(/\p{M}/gu, '')
+    .toUpperCase()
+    .replaceAll(/[^A-Z0-9]+/gu, '_')
+    .replace(/^[^A-Z]+/u, '')
+    .replace(/_+$/u, '')
+    .slice(0, 40);
+
 const isLocked = (reason: CallOutcomeReason | undefined): boolean => reason?.isSystem ?? false;
 
 function errorMessage(error?: { message?: string }): string | undefined {
@@ -352,8 +332,11 @@ function ReasonFormDialog({
     },
   );
 
+  const codeSaisi = useRef(false);
+
   useEffect(() => {
     if (!open) return;
+    codeSaisi.current = false;
     reset(
       reason === undefined
         ? EMPTY
@@ -408,11 +391,7 @@ function ReasonFormDialog({
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey });
       void queryClient.invalidateQueries({ queryKey: queryKeys.referentielsRoot });
-      toast.success(
-        isEdit
-          ? `${saved.label} enregistré.`
-          : `${saved.label} ajouté. Il atteindra les téléphones après la mise à jour de l’application.`,
-      );
+      toast.success(isEdit ? `${saved.label} enregistré.` : `${saved.label} ajouté.`);
       onOpenChange(false);
     },
     onError: (error) => {
@@ -427,7 +406,7 @@ function ReasonFormDialog({
           <DialogTitle>{isEdit ? 'Modifier le motif' : 'Nouveau motif d’issue'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Le code et l’effet ne changent pas : les appels déjà remontés les référencent.'
+              ? 'Le code et l’effet ne changent pas : les appels déjà enregistrés les utilisent.'
               : 'Le code est définitif. L’effet décide de ce que devient le prospect après l’appel.'}
           </DialogDescription>
         </DialogHeader>
@@ -441,18 +420,38 @@ function ReasonFormDialog({
             })(event);
           }}
         >
+          <Field label="Libellé" required error={errorMessage(formState.errors.label)}>
+            {(props) => (
+              <Input
+                {...props}
+                placeholder="Ne répond pas"
+                {...register('label', {
+                  required: 'Le libellé est obligatoire.',
+                  onChange: (event: { target: { value: string } }) => {
+                    if (!isEdit && !codeSaisi.current) {
+                      setValue('code', codeDepuis(event.target.value));
+                    }
+                  },
+                })}
+              />
+            )}
+          </Field>
+
           {isEdit ? null : (
             <Field
               label="Code"
               required
-              description="Majuscules, chiffres et tirets bas. Définitif."
+              description="Proposé depuis le libellé."
               error={errorMessage(formState.errors.code)}
             >
               {(props) => (
                 <Input
                   {...props}
-                  placeholder="NRP"
+                  placeholder="NE_REPOND_PAS"
                   {...register('code', {
+                    onChange: () => {
+                      codeSaisi.current = true;
+                    },
                     required: 'Le code est obligatoire.',
                     pattern: {
                       value: /^[A-Za-z][A-Za-z0-9_]*$/u,
@@ -463,16 +462,6 @@ function ReasonFormDialog({
               )}
             </Field>
           )}
-
-          <Field label="Libellé" required error={errorMessage(formState.errors.label)}>
-            {(props) => (
-              <Input
-                {...props}
-                placeholder="Ne répond pas"
-                {...register('label', { required: 'Le libellé est obligatoire.' })}
-              />
-            )}
-          </Field>
 
           {isEdit ? null : (
             <Field
@@ -547,18 +536,14 @@ function ReasonFormDialog({
             />
             {locked ? (
               <p className="text-[0.75rem] text-muted-foreground">
-                Motif système : ces règles sont compilées dans l’application de terrain et ne se
-                changent pas ici.
+                Motif système : ces règles ne se changent pas.
               </p>
             ) : null}
           </fieldset>
 
           {/* L'API n'accepte pas de retirer une couleur : « Aucune » laisse en
               place celle déjà enregistrée. */}
-          <Field
-            label="Couleur"
-            description="Rôle du design system, repris par l’application de terrain."
-          >
+          <Field label="Couleur de la pastille">
             {(props) => (
               <Select
                 items={COLOR_ITEMS}
@@ -606,13 +591,6 @@ function ReasonFormDialog({
               />
             )}
           </Field>
-
-          {isEdit ? null : (
-            <p className="rounded-md border border-accent-border/30 bg-warning-surface px-3 py-2.5 text-[0.8125rem]">
-              Ce motif s’ajoutera au panneau seulement. Les téléphones en service continueront de ne
-              proposer que les six motifs d’origine jusqu’à la mise à jour de l’application.
-            </p>
-          )}
 
           <DialogFooter>
             <Button

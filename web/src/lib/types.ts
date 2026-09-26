@@ -111,7 +111,7 @@ export type Projet = Schemas['Prospect']['projet'];
  * L'API classe sur `journeys.some({ projet, statut })` : une fiche entrée par
  * CHUES puis convertie en Grand Public reste « Nouveau » en premier niveau,
  * alors qu'elle remonte dans une liste filtrée sur « Converti ». Sans parcours
- * pour ce projet — fiche d'avant les parcours — le champ de premier niveau est
+ * pour ce projet, fiche d'avant les parcours, le champ de premier niveau est
  * la seule réponse disponible.
  */
 export function statutForProjet(prospect: ProspectRow, projet: Projet | null): ProspectStatut {
@@ -299,10 +299,10 @@ export const BDD_SEGMENTS = [
 ] as const satisfies readonly BddSegment[];
 
 export const SEGMENT_LABELS: Record<BddSegment, string> = {
-  BDD1: 'BDD1 : CHUES / CBAO',
-  BDD2: 'BDD2 : CHUES / autre banque',
-  BDD3: 'BDD3 : autre syndicat / CBAO',
-  BDD4: 'BDD4 : autre syndicat / autre banque',
+  BDD1: 'CHUES, CBAO',
+  BDD2: 'CHUES, autre banque',
+  BDD3: 'Autre syndicat, CBAO',
+  BDD4: 'Autre syndicat, autre banque',
 };
 
 export const PHASE2_STATUSES = [

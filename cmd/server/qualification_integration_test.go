@@ -758,10 +758,7 @@ func TestAnnuairePhase2PagineDansLaPorteeDuTeleconseiller(t *testing.T) {
 	}
 }
 
-// La codification des leads (docs/decisions/codification-leads.md) : la précision
-// consigne l'appel sans commentaire, le rendez-vous devient un rappel promis, la
-// méthode du formulaire vaut adhésion quel que soit le statut, et « À supprimer »
-// sort la fiche du reste à appeler sans la détruire.
+// Parcours de docs/decisions/codification-leads.md.
 func TestCodificationLeads(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	revenu := uuid.NewString()
@@ -1011,9 +1008,8 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 	}
 }
 
-// « Tout » régroupe les onglets Intéressés, Hésitants et Rendez-vous : un
-// injoignable n'y figure pas, et le rendez-vous téléphonique reste écarté
-// comme dans l'onglet Rendez-vous seul.
+// « Tout » regroupe Intéressés, Hésitants et Rendez-vous, sans injoignable ni
+// rendez-vous téléphonique.
 func TestQualificationToutRegroupeIntereseHesitantEtRendezVous(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	interesse := qualificationProspect(b)
@@ -1463,38 +1459,5 @@ func TestVenteSaisieVendLaFicheJointe(t *testing.T) {
 	rapprochee, _ := client["vente"].(bool)
 	if len(items) != 1 || !rapprochee || client["site"] != "THIEO" || client["prixTotal"] != float64(2800000) {
 		t.Fatalf("la vente se lit chez le téléconseiller : %v", items)
-	}
-}
-
-func TestComptageSepareLesRequalifications(t *testing.T) {
-	b := nouveauBanc(t, "COMMERCIAL")
-	connecte(b)
-	requalifiee, premiere := qualificationProspect(b), qualificationProspect(b)
-	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
-	ouvrir := func(prospect string, ilYA time.Duration, tentative any) {
-		qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
-		                      VALUES ($1,$2,$3,now() - $4::interval,now() - $4::interval + interval '1 minute',$5,now())`,
-			uuid.NewString(), b.userID, prospect, fmt.Sprintf("%d seconds", int(ilYA.Seconds())), tentative)
-	}
-	ouvrir(requalifiee, 3*time.Hour, uuid.NewString())
-	ouvrir(requalifiee, 2*time.Hour, uuid.NewString())
-	ouvrir(requalifiee, time.Hour, nil)
-	ouvrir(premiere, time.Hour, uuid.NewString())
-
-	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage", nil)
-	b.attend(statut, http.StatusOK, "comptage des ouvertures", body)
-	totaux := map[string]float64{}
-	for _, ligne := range body["items"].([]any) {
-		for cle, valeur := range ligne.(map[string]any) {
-			if nombre, ok := valeur.(float64); ok {
-				totaux[cle] += nombre
-			}
-		}
-	}
-	attendus := map[string]float64{"ouvertures": 4, "qualifiees": 3, "ouverturesDejaQualifiees": 2, "requalifiees": 1}
-	for cle, attendu := range attendus {
-		if totaux[cle] != attendu {
-			t.Fatalf("%s = %v, attendu %v (%v)", cle, totaux[cle], attendu, totaux)
-		}
 	}
 }

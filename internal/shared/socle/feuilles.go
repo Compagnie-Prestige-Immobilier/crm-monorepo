@@ -22,9 +22,7 @@ var (
 	plieurAccentsFeuille   = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 )
 
-// Abréviations à trois lettres, sans accent. Juin et juillet ne se distinguent
-// qu'à la quatrième lettre : leurs deux entrées à quatre lettres sont
-// vérifiées avant celle à trois qui les confondrait.
+// Juin et juillet ne se distinguent qu'à la quatrième lettre.
 var abreviationsMoisFeuille = []struct {
 	prefixe string
 	mois    time.Month
@@ -36,7 +34,6 @@ var abreviationsMoisFeuille = []struct {
 	{"mar", time.March},
 	{"avr", time.April},
 	{"mai", time.May},
-	{"jui", time.July},
 	{"aou", time.August},
 	{"sep", time.September},
 	{"oct", time.October},
@@ -44,10 +41,8 @@ var abreviationsMoisFeuille = []struct {
 	{"dec", time.December},
 }
 
-// « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 12 sept », « Leads 1er oct 2026 » : le
-// jour de l'onglet, à minuit UTC. Sans année, celle de `maintenant`, reculée
-// d'un an si la date tombe dans le futur (l'onglet ne porte pas l'année).
-// Faux sans date lisible.
+// « Leads 12 sept », « Leads 1er oct 2026 » : le jour de l'onglet, à minuit UTC.
+// Sans année, celle qui place la date à moins de six mois dans le futur.
 func DateDuNomDeFeuille(nom string, maintenant time.Time) (time.Time, bool) {
 	plat, _, err := transform.String(plieurAccentsFeuille, strings.ToLower(strings.TrimSpace(nom)))
 	if err != nil {
@@ -74,14 +69,15 @@ func DateDuNomDeFeuille(nom string, maintenant time.Time) (time.Time, bool) {
 	if date.Day() != jour || date.Month() != mois {
 		return time.Time{}, false
 	}
-	if !avecAnnee && date.After(maintenant) {
+	if avecAnnee && date.After(maintenant.AddDate(0, 0, 1)) {
+		return time.Time{}, false
+	}
+	if !avecAnnee && date.After(maintenant.AddDate(0, 6, 0)) {
 		date = date.AddDate(-1, 0, 0)
 	}
 	return date, true
 }
 
-// « septembre » se reconnaît à « sept », « juin » et « juillet » à leurs
-// abréviations propres.
 func moisDuPrefixe(brut string) time.Month {
 	for _, a := range abreviationsMoisFeuille {
 		if strings.HasPrefix(brut, a.prefixe) {

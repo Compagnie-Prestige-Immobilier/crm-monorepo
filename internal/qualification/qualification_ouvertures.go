@@ -61,14 +61,18 @@ type QualificationRappelDTO struct {
 	AssignedToName string  `json:"assignedToName"`
 	// Le statut qui a promis le rappel : « RV téléphonique », « RV CPI »…
 	ReasonLabel *string `json:"reasonLabel"`
-	Overdue     bool    `json:"overdue"`
+	ReasonCode  *string `json:"reasonCode"`
+	// Fiche en rendez-vous : seul le RDV téléphonique se reporte ou s'annule depuis Rappels.
+	RendezVous bool `json:"rendezVous"`
+	Overdue    bool `json:"overdue"`
 }
 
 type qualificationRappelLigne struct {
 	ID, ProspectID, Prenom, Nom, Projet, AssigneID, AssigneNom string
 	Phone                                                      *string
 	Comment                                                    *string
-	Motif                                                      *string
+	Motif, MotifCode                                           *string
+	RendezVous                                                 bool
 	Quand                                                      time.Time
 }
 
@@ -78,7 +82,7 @@ func qualificationRappelDTO(l *qualificationRappelLigne, maintenant time.Time) Q
 		ProspectName: strings.TrimSpace(l.Prenom + " " + l.Nom), PhoneE164: l.Phone,
 		Projet:      l.Projet,
 		ScheduledAt: qualificationISO(l.Quand), Comment: l.Comment, AssignedToID: l.AssigneID,
-		ReasonLabel:    l.Motif,
+		ReasonLabel: l.Motif, ReasonCode: l.MotifCode, RendezVous: l.RendezVous,
 		AssignedToName: l.AssigneNom, Overdue: l.Quand.Before(maintenant),
 	}
 }
@@ -173,7 +177,7 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
 			ID: r.ID, ProspectID: r.ProspectId, Prenom: r.Prenom, Nom: r.Nom, Phone: r.PhoneE164,
-			Projet: string(r.Projet), Comment: r.Comment, Motif: r.ReasonLabel,
+			Projet: string(r.Projet), Comment: r.Comment, Motif: r.ReasonLabel, MotifCode: r.ReasonCode, RendezVous: r.RendezVous,
 			AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
 		}, maintenant))
 	}
@@ -188,59 +192,100 @@ type QualificationRappelOutput struct {
 	Body QualificationRappelDTO
 }
 
-const qualificationReportRappel = 15 * time.Minute
+type QualificationReportInput struct {
+	ID    string `path:"id" format:"uuid"`
+	Duree string `query:"duree" enum:",15min,1h,2h,demain" doc:"Absente : 15 minutes. « demain » : le lendemain à 8 h 30, heure de Dakar."`
+}
 
-func (s *service) qualificationReporterRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
-	u := socle.UtilisateurCourant(ctx)
-	row, err := s.Q.RappelParId(ctx, in.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "CALLBACK_NOT_FOUND", "Rappel introuvable.")
+var qualificationReports = map[string]time.Duration{"": 15 * time.Minute, "15min": 15 * time.Minute, "1h": time.Hour, "2h": 2 * time.Hour}
+
+func qualificationReportA(duree string, maintenant time.Time, zone *time.Location) time.Time {
+	if ecart, ok := qualificationReports[duree]; ok {
+		return maintenant.Add(ecart).UTC()
 	}
+	local := maintenant.In(zone)
+	return time.Date(local.Year(), local.Month(), local.Day()+1, 8, 30, 0, 0, zone).UTC()
+}
+
+func (s *service) qualificationRappelAMoi(ctx context.Context, u *socle.Utilisateur, id string) (db.RappelParIdRow, error) {
+	row, err := s.Q.RappelParId(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return row, socle.Problem(http.StatusNotFound, "CALLBACK_NOT_FOUND", "Rappel introuvable.")
+	}
+	if err != nil {
+		return row, err
+	}
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
+		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
+	}
+	return row, nil
+}
+
+func qualificationRappelSortie(row *db.RappelParIdRow) *QualificationRappelOutput {
+	return &QualificationRappelOutput{Body: qualificationRappelDTO(&qualificationRappelLigne{
+		ID: row.ID, ProspectID: row.ProspectId, Prenom: row.Prenom, Nom: row.Nom, Phone: row.PhoneE164,
+		Projet: string(row.Projet), Comment: row.Comment, Motif: row.ReasonLabel, MotifCode: row.ReasonCode,
+		RendezVous: row.RendezVous, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
+	}, time.Now().UTC())}
+}
+
+func (s *service) qualificationReporterRappel(ctx context.Context, in *QualificationReportInput) (*QualificationRappelOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	row, err := s.qualificationRappelAMoi(ctx, &u, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
-		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
-	}
-	if row.RendezVous && row.Status == db.ScheduledCallbackStatusPENDING {
+	if row.RendezVousNonReportable && row.Status == db.ScheduledCallbackStatusPENDING {
 		return nil, socle.Problem(http.StatusConflict, "RENDEZ_VOUS_NON_REPORTABLE",
-			"Un rendez-vous ne se décale pas de 15 minutes : changez sa date en requalifiant la fiche.")
+			"Un rendez-vous ne se reporte pas d'ici : changez sa date en requalifiant la fiche.")
 	}
-	maintenant := time.Now().UTC()
 	if row.Status == db.ScheduledCallbackStatusPENDING {
-		row.ScheduledAt = maintenant.Add(qualificationReportRappel)
+		row.ScheduledAt = qualificationReportA(in.Duree, time.Now(), s.Cfg.TimeZone)
 		if err := s.Q.ReporterRappel(ctx, db.ReporterRappelParams{ID: row.ID, ScheduledAt: row.ScheduledAt}); err != nil {
 			return nil, err
 		}
 	}
-	return &QualificationRappelOutput{Body: qualificationRappelDTO(&qualificationRappelLigne{
-		ID: row.ID, ProspectID: row.ProspectId, Prenom: row.Prenom, Nom: row.Nom, Phone: row.PhoneE164,
-		Projet: string(row.Projet), Comment: row.Comment, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
-	}, maintenant)}, nil
+	return qualificationRappelSortie(&row), nil
 }
 
 func (s *service) qualificationAnnulerRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	maintenant := time.Now().UTC()
-	row, err := s.Q.RappelParId(ctx, in.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "CALLBACK_NOT_FOUND", "Rappel introuvable.")
-	}
+	row, err := s.qualificationRappelAMoi(ctx, &u, in.ID)
 	if err != nil {
 		return nil, err
-	}
-	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
-		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
 	}
 	if row.Status == db.ScheduledCallbackStatusPENDING {
 		if err := s.Q.AnnulerRappel(ctx, in.ID); err != nil {
 			return nil, err
 		}
 	}
-	return &QualificationRappelOutput{Body: qualificationRappelDTO(&qualificationRappelLigne{
-		ID: row.ID, ProspectID: row.ProspectId, Prenom: row.Prenom, Nom: row.Nom, Phone: row.PhoneE164,
-		Projet: string(row.Projet), Comment: row.Comment, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
-	}, maintenant)}, nil
+	return qualificationRappelSortie(&row), nil
+}
+
+// Rejouer « Rétablir » sur un rappel déjà en attente ne change rien.
+func (s *service) qualificationRetablirRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	row, err := s.qualificationRappelAMoi(ctx, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if row.Status == db.ScheduledCallbackStatusPENDING {
+		return qualificationRappelSortie(&row), nil
+	}
+	n, err := s.Q.RetablirRappel(ctx, in.ID)
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" {
+		return nil, socle.Problem(http.StatusConflict, "RAPPEL_DEJA_PROMIS",
+			"Un autre rappel est déjà promis pour cette fiche : celui-ci ne peut pas être rétabli.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, socle.Problem(http.StatusConflict, "RAPPEL_NON_RETABLISSABLE",
+			"Ce rappel a été tenu, remplacé ou sa fiche supprimée : il ne peut pas être rétabli.")
+	}
+	return qualificationRappelSortie(&row), nil
 }
 
 type QualificationOuvertureFicheDTO struct {
@@ -521,9 +566,15 @@ type QualificationComptageJourDTO struct {
 
 type QualificationComptageOutput struct {
 	Body struct {
-		Items []QualificationComptageJourDTO `json:"items"`
+		Items   []QualificationComptageJourDTO `json:"items"`
+		Tronque bool                           `json:"tronque" doc:"Plus de 3 000 lignes : seules les plus récentes sont rendues."`
 	}
 }
+
+const (
+	comptageLignesMax  = 3000
+	comptagePeriodeMax = 366 * 24 * time.Hour
+)
 
 // Un téléconseiller ne lit que son propre compte.
 func (s *service) qualificationComptage(ctx context.Context, in *QualificationComptageInput) (*QualificationComptageOutput, error) {
@@ -537,26 +588,37 @@ func (s *service) qualificationComptage(ctx context.Context, in *QualificationCo
 		p.OpenedByID = &borne
 	}
 	var err error
-	if in.From != "" {
-		if p.Depuis, err = qualificationBorneJour(in.From, false, s.Cfg.TimeZone); err != nil {
-			return nil, err
-		}
-	}
-	if in.To != "" {
-		if p.Jusqua, err = qualificationBorneJour(in.To, true, s.Cfg.TimeZone); err != nil {
-			return nil, err
-		}
+	if p.Depuis, p.Jusqua, err = qualificationPeriodeComptage(in.From, in.To, s.Cfg.TimeZone); err != nil {
+		return nil, err
 	}
 	rows, err := s.Q.ComptageOuvertures(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	out := &QualificationComptageOutput{}
+	out.Body.Tronque = len(rows) > comptageLignesMax
+	rows = rows[:min(len(rows), comptageLignesMax)]
 	out.Body.Items = make([]QualificationComptageJourDTO, 0, len(rows))
 	for i := range rows {
 		out.Body.Items = append(out.Body.Items, qualificationComptageDTO(&rows[i]))
 	}
 	return out, nil
+}
+
+func qualificationPeriodeComptage(du, au string, zone *time.Location) (depuis, jusqua *time.Time, err error) {
+	if du == "" || au == "" {
+		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_REQUISE", "Indiquez le premier et le dernier jour de la période.")
+	}
+	if depuis, err = qualificationBorneJour(du, false, zone); err != nil {
+		return nil, nil, err
+	}
+	if jusqua, err = qualificationBorneJour(au, true, zone); err != nil {
+		return nil, nil, err
+	}
+	if jusqua.Before(*depuis) || jusqua.Sub(*depuis) > comptagePeriodeMax {
+		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_INVALIDE", "La période va d'un jour à un an, le premier jour avant le dernier.")
+	}
+	return depuis, jusqua, nil
 }
 
 func qualificationComptageDTO(r *db.ComptageOuverturesRow) QualificationComptageJourDTO {
@@ -578,6 +640,7 @@ type QualificationSuggestionDTO struct {
 	ID                          string  `json:"id" format:"uuid"`
 	SourceRepresentantID        string  `json:"sourceRepresentantId" format:"uuid"`
 	SourceRepresentantShortCode string  `json:"sourceRepresentantShortCode"`
+	SourceRepresentantName      string  `json:"sourceRepresentantName"`
 	SuggestedName               *string `json:"suggestedName"`
 	SuggestedPhoneE164          string  `json:"suggestedPhoneE164"`
 	Note                        *string `json:"note"`
@@ -595,6 +658,7 @@ func qualificationSuggestionDTO(row *db.ListerSuggestionsRow) QualificationSugge
 	return QualificationSuggestionDTO{
 		ID: row.ID, SourceRepresentantID: row.SourceRepresentantId,
 		SourceRepresentantShortCode: qualificationCodeCourt(row.SourceRepresentantId),
+		SourceRepresentantName:      row.SourceRepresentantName,
 		SuggestedName:               row.SuggestedName, SuggestedPhoneE164: row.SuggestedPhoneE164,
 		Note: row.Note, Status: string(row.Status), SuggestedByID: row.SuggestedById,
 		SuggestedByName: row.SuggestedByName, ResolvedRepresentantID: row.ResolvedRepresentantId,
