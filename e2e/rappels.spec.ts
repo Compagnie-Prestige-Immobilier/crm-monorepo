@@ -170,6 +170,39 @@ test.describe('parcours 6, rappels promis', () => {
   });
 });
 
+test.describe('parcours 6, rappel en retard reporté', () => {
+  test('« Rappeler dans 1 h » repousse l’échéance d’une heure à partir de maintenant', async ({
+    page,
+  }) => {
+    const fiche = await semer('Report');
+    await promettreUnRappel(page, fiche);
+    await avecBase(async (client) => {
+      await client.query(
+        `UPDATE scheduled_callbacks SET "scheduledAt" = now() - interval '30 minutes'
+          WHERE "prospectId" = $1`,
+        [fiche.id],
+      );
+    });
+
+    await ouvrirRappelsProspects(page);
+    const ligne = ligneRappel(page, fiche.phoneE164);
+    await expect(ligne).toBeVisible();
+    const avant = Date.now();
+    await ligne.getByRole('button', { name: 'Rappeler dans' }).click();
+    await page.getByRole('menuitem', { name: '1 h', exact: true }).click();
+    await expect(page.getByText('Rappel reporté d’une heure.')).toBeVisible();
+    await expect(ligne).toHaveCount(0);
+
+    const reporte = await lireRappel(fiche.id);
+    expect(reporte.status).toBe('PENDING');
+    const ecart = reporte.scheduledAt.getTime() - avant;
+    expect(ecart).toBeGreaterThan(59 * 60_000);
+    expect(ecart).toBeLessThan(62 * 60_000);
+    // Reporté à aujourd'hui, il repousserait la carte du parcours en 390 px hors de l'écran.
+    await effacerFiches([fiche.phoneE164]);
+  });
+});
+
 test.describe('parcours 6 en 390 px', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
