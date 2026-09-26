@@ -26,11 +26,6 @@ Chaque étape est IDEMPOTENTE : elle cherche l'existant avant de créer.
 Toute erreur est signalée et INTERROMPT l'étape. La version précédente affichait
 « ✓ » quoi qu'il arrive ; un script qui ment sur son résultat est pire qu'un
 script qui plante.
-
-POURQUOI PAS docker-compose.prod.yml
-    Il lance Caddy sur les ports 80 et 443, qui appartiennent déjà à Traefik sur
-    un hôte Dokploy. La forme native, un service Postgres et une application
-    construite depuis le Dockerfile, rend à Traefik le domaine et le TLS.
 """
 
 from __future__ import annotations
@@ -111,16 +106,8 @@ IMPORTS_VOLUME = "cpi-go-imports"
 # ─────────────────────────────────────────────────────────────────────────────
 # Sauvegarde nocturne de la base
 #
-# CE QUI NE MARCHAIT PAS
-#     infra/docker/backup.sh fait exactement le bon travail, mais il n'est câblé
-#     que dans docker-compose.prod.yml, et ce compose ne peut PAS tourner ici :
-#     son Caddy réclame les ports 80 et 443, déjà tenus par le Traefik de
-#     Dokploy. Le seul fichier qui définissait une sauvegarde était donc le seul
-#     qui ne s'exécutait jamais sur l'hôte de production. Il reste valable pour
-#     un VPS nu, sans Dokploy, et pour rien d'autre.
-#
 # CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI
-#     Une troisième application lançant backup.sh, avec un volume monté sur le
+#     Une troisième application lançant un script de dump, avec un volume monté sur le
 #     modèle des APK. Le volume vivrait dans /var/lib/docker/volumes, sur le
 #     MÊME disque et le MÊME hôte que celui de Postgres. C'est un volume
 #     distinct, donc il survit à un `docker volume rm pgdata` malheureux, mais
