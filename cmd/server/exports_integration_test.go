@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"cpi-go/internal/exports"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -402,4 +403,69 @@ func TestExportModeleProspectsListesDeroulantes(t *testing.T) {
 	if aide := exportCellule(t, f, "Instructions", "B2"); aide != "Oui" {
 		t.Fatalf("Instructions : la colonne Nom est obligatoire, lu %q", aide)
 	}
+}
+
+func exportVente(b *banc, site, client, date string, prix, acompte int64, archivee bool) int64 {
+	b.t.Helper()
+	var id int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "representant", "archiveeLe")
+		VALUES ('SAISIE', 0, 'CPI', $1::date, $2, '77 000 00 55', $3, 1, '1416', '', $4::bigint, $4, $5::bigint, $4 - $5,
+		$4 / 2, $4 / 20, $4 - $4 / 2 - $4 / 20, 'Awa Ndiaye', CASE WHEN $6::boolean THEN now() END) RETURNING "id"`,
+		date, client, site, prix, acompte, archivee).Scan(&id); err != nil {
+		b.t.Fatal(err)
+	}
+	return id
+}
+
+// Deux ventes du site dans la période, une avant, une archivée, une sur un autre site.
+func TestExportSommesDuesParSite(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	suffixe := strings.ToUpper(b.userID[:8])
+	site, autre, client := "SITE DU "+suffixe, "AUTRE SITE "+suffixe, "CLIENT DU "+suffixe
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "client" LIKE $1`, client+"%") })
+	premiere := exportVente(b, site, client+" A", "2026-09-05", 1000000, 100000, false)
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 1, '2026-09-10', 200000)`, premiere)
+	b.exec(`UPDATE "ventes" SET "reliquat" = 700000 WHERE "id" = $1`, premiere)
+	exportVente(b, site, client+" B", "2026-09-20", 2000000, 0, false)
+	exportVente(b, site, client+" AVANT", "2026-08-31", 1000000, 0, false)
+	exportVente(b, site, client+" ARCHIVEE", "2026-09-06", 1000000, 0, true)
+	exportVente(b, autre, client+" AUTRE", "2026-09-07", 1000000, 0, false)
+
+	chemin := "/api/v1/export/ventes-sommes-dues.xlsx?du=2026-09-01&au=2026-09-30"
+	statut, disposition, f := b.classeur(chemin + "&site=" + url.QueryEscape(strings.ToLower(site)))
+	b.attend(statut, http.StatusOK, "sommes dues d'un site", nil)
+	exportAttendFichier(t, disposition, "sommes-dues-cpi-2026-09-01-2026-09-30")
+	lignes, err := f.GetRows("Sommes dues", excelize.Options{RawCellValue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attendues := [][]string{
+		{site, "0", "46270", client + " A", "1", "1416", "1000000", "500000", "50000", "Awa Ndiaye", "450000", "300000", "700000"},
+		{site, "0", "46285", client + " B", "1", "1416", "2000000", "1000000", "100000", "Awa Ndiaye", "900000", "0", "2000000"},
+		{"Sous-total " + site, "", "", "", "", "", "3000000", "1500000", "150000", "", "1350000", "300000", "2700000"},
+		{"Total", "", "", "", "", "", "3000000", "1500000", "150000", "", "1350000", "300000", "2700000"},
+	}
+	if len(lignes) != len(attendues)+1 || lignes[0][9] != "Représentant" {
+		t.Fatalf("en-tête et quatre lignes attendus : %v", lignes)
+	}
+	for i, attendue := range attendues {
+		if strings.Join(lignes[i+1], "|") != strings.Join(attendue, "|") {
+			t.Fatalf("ligne %d : %v, attendu %v", i+2, lignes[i+1], attendue)
+		}
+	}
+
+	statut, _, f = b.classeur(chemin)
+	b.attend(statut, http.StatusOK, "sommes dues de tous les sites", nil)
+	for _, sousTotal := range []string{"Sous-total " + site, "Sous-total " + autre} {
+		exportChercherLigne(t, f, "Sommes dues", sousTotal)
+	}
+	statut, _, _ = b.classeur("/api/v1/export/ventes-sommes-dues.xlsx?du=2026-09-30&au=2026-09-01")
+	b.attend(statut, http.StatusBadRequest, "période à l'envers", nil)
+	superviseur := nouveauBanc(t, "SUPERVISEUR")
+	connecte(superviseur)
+	statut, _, _ = superviseur.classeur(chemin)
+	superviseur.attend(statut, http.StatusForbidden, "sans ventes.lire", nil)
 }

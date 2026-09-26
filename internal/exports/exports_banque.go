@@ -154,7 +154,7 @@ func (s *service) exportDossiers(ctx context.Context, in *ExportDossiersInput) (
 func (s *service) exportClasseurDossiers(ctx context.Context, c *exportClasseur, p *exportPredicat) error {
 	dossiers, err := c.nouvelleFeuille("Dossiers",
 		[]string{
-			"Référence", "Client", ExportEnteteTelephone, "Banque de traitement", "Étape", "Montant",
+			"Référence", exportEnteteClient, ExportEnteteTelephone, "Banque de traitement", "Étape", "Montant",
 			"Motif de rejet", "Détail du rejet", "Créé par", "Dernier agent", exportEnteteCreeLe, "Mis à jour le",
 		},
 		[]float64{22, 28, 18, 24, 22, 18, 26, 34, 24, 24, 20, 20}, nil)
@@ -163,7 +163,7 @@ func (s *service) exportClasseurDossiers(ctx context.Context, c *exportClasseur,
 	}
 	historique, err := c.nouvelleFeuille("Historique",
 		[]string{
-			"Référence", "Client", "Étape source", "Étape cible", "Agent", exportEnteteCommentaire,
+			"Référence", exportEnteteClient, "Étape source", "Étape cible", "Agent", exportEnteteCommentaire,
 			"Montant", "Motif de rejet", "Justification de correction", exportEnteteDate,
 		},
 		[]float64{22, 28, 22, 22, 24, 34, 18, 26, 34, 20}, nil)
