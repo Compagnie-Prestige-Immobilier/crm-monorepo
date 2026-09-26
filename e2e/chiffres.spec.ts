@@ -13,6 +13,7 @@ import {
 
 const cle = suffixe();
 const SUPERVISEUR = compteDe('SUPERVISEUR');
+const ADMIN = compteDe('ADMIN');
 
 let veilleur: CompteCree | null = null;
 
@@ -25,7 +26,9 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await avecBase(async (client) => {
-    await client.query('DELETE FROM dashboard_layouts WHERE "userId" = $1', [SUPERVISEUR.id]);
+    await client.query('DELETE FROM dashboard_layouts WHERE "userId" = ANY($1)', [
+      [SUPERVISEUR.id, ADMIN.id],
+    ]);
   });
   await purger({
     comptes: veilleur === null ? [] : [veilleur.id],
@@ -75,14 +78,13 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
     const premier = (await blocs.first().getAttribute('aria-label')) ?? '';
     const retire = premier.replace('À propos de ', '');
 
-    await page.getByRole('button', { name: 'Organiser les graphiques' }).click();
     await page.getByRole('button', { name: `Retirer ${retire}` }).click();
-    await page.getByRole('button', { name: 'Descendre', exact: false }).first().click();
-    await page.getByRole('button', { name: 'Enregistrer' }).click();
-    await expect(page.getByRole('button', { name: 'Organiser les graphiques' })).toBeVisible();
+    await page.getByRole('button', { name: 'Annuler' }).click();
+    await expect.poll(async () => (await widgetsDe(SUPERVISEUR.id)).length).toBe(avant);
+    await page.getByRole('button', { name: `Retirer ${retire}` }).click();
+    await expect.poll(async () => (await widgetsDe(SUPERVISEUR.id)).length).toBe(avant - 1);
 
     const sources = await widgetsDe(SUPERVISEUR.id);
-    expect(sources.length, 'la disposition enregistrée doit perdre un bloc').toBe(avant - 1);
 
     await page.reload();
     await expect(blocs.first()).toBeVisible();
@@ -127,6 +129,52 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
     await reporterRappelIntrusif(page);
     await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
     await expect(blocsDe(page).first()).toBeVisible();
+  });
+});
+
+test.describe('parcours 9, le tableau de pilotage', () => {
+  test.use({ storageState: ADMIN.etat });
+
+  test('l’administrateur arrive sur le pilotage, qui s’ouvre sur les ventes', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/admin\/pilotage$/u);
+    await expect(page.getByRole('button', { name: 'À propos de Ventes du mois' })).toBeVisible();
+    await expect(page.getByText(/représentant/iu)).toHaveCount(0);
+  });
+
+  test('le constructeur ajoute un indicateur qui tient au rechargement, sans IA', async ({
+    page,
+  }) => {
+    await page.goto('/admin/pilotage');
+    await page.getByRole('button', { name: 'Ajouter un indicateur' }).click();
+    const constructeur = page.getByRole('dialog', { name: 'Ajouter un indicateur' });
+    await constructeur.getByLabel('Votre demande').fill('taux de joignabilité');
+    await constructeur.getByLabel('Votre demande').press('Enter');
+
+    const comprendre = constructeur.getByText(/^Je comprends : « (.+?) »/u);
+    await expect(comprendre).toBeVisible();
+    const titre = /« (.+?) »/u.exec((await comprendre.textContent()) ?? '')?.[1] ?? '';
+    await constructeur.getByRole('button', { name: 'Oui', exact: true }).click();
+
+    await constructeur
+      .getByRole('group', { name: 'Formes possibles' })
+      .getByRole('button')
+      .first()
+      .click();
+    await constructeur.getByRole('button', { name: 'Ajouter au tableau de bord' }).click();
+    await expect(
+      constructeur.getByText(`« ${titre} » est sur le tableau de bord.`, { exact: false }),
+    ).toBeVisible();
+    await expect(constructeur.getByLabel('Votre demande')).toBeEditable();
+
+    await page.reload();
+    const retirer = page.getByRole('button', { name: `Retirer ${titre}` });
+    await expect(retirer).toBeVisible();
+    await retirer.click();
+    await expect(page.getByText(`« ${titre} » retiré du tableau de bord.`)).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'À propos de Ventes du mois' })).toBeVisible();
+    await expect(retirer).toHaveCount(0);
   });
 });
 

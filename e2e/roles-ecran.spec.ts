@@ -108,9 +108,10 @@ test.describe('parcours utilisateurs et rôles', () => {
 const BARRES = [
   {
     role: 'ADMIN',
-    arrivee: /\/admin\/commerciaux$/u,
+    arrivee: /\/admin\/pilotage$/u,
     groupes: ['Au quotidien', 'Réglages'],
     liens: [
+      'Tableau de pilotage',
       'Comptes et rôles',
       'Importer un classeur',
       'Journal des actions',
@@ -128,6 +129,7 @@ const BARRES = [
     arrivee: /\/teleconseil\/tableau-de-bord$/u,
     groupes: ['Piloter', 'Appeler'],
     liens: [
+      'Tableau de pilotage',
       'Tableau de bord',
       'Campagnes d’appels',
       'Intéressés, hésitants et RDV',
