@@ -836,13 +836,8 @@ func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut st
 	return id
 }
 
-// Quatre fiches : CHUES jamais appelée, CHUES injoignable, CHUES injoignable
-// puis close par un faux numéro, Grand Public jamais appelée. Sans projet, la
-// campagne prend CHUES et Grand Public ensemble, mais seulement ce qui n'a
-// jamais été appelé ; « injoignables » ne garde que la deuxième. Une fiche
-// distribuée ne se retire plus : recréer la campagne ne la donne pas à un
-// second téléconseiller. Un superviseur coché compte pour autant qu'un
-// téléconseiller.
+// Sans projet, une campagne prend CHUES et Grand Public jamais appelés ; « injoignables » ne garde que
+// l'injoignable encore ouverte, et une fiche distribuée ne part pas à un second téléconseiller.
 func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	feuille := "Feuille " + uuid.NewString()
@@ -910,11 +905,8 @@ func (b *bancCampagne) dansLeLot(lotID, prospectID string) bool {
 	return b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, prospectID) == 1
 }
 
-// Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
-// l'onglet du jour se repartit entre eux. Le selecteur de campagne groupe les
-// releves par onglet et ne peut rendre qu'un identifiant, le plus recent : le
-// 16 septembre 2026, l'onglet « Leads 13 sept » annoncait 93 fiches et la
-// creation repondait « Aucune fiche ne correspond aux criteres ».
+// Un classeur relevé plusieurs fois répartit l'onglet du jour entre plusieurs travaux d'import :
+// la campagne le tire par son nom d'onglet, pas par le seul identifiant le plus récent.
 func TestCampagneOngletReparitiEntrePlusieursReleves(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	feuille := "Leads 13 sept " + uuid.NewString()
@@ -947,11 +939,7 @@ func TestCampagneOngletReparitiEntrePlusieursReleves(t *testing.T) {
 	}
 }
 
-// B06 : un parrainage Grand Public (prospect_suggestions) doit ouvrir une
-// campagne CONTACTS_RECOMMANDES sur des fiches prospects, pas représentants.
-// Avant correction, lotSurRepresentants traitait toute cible autre que
-// PROSPECTS comme des représentants : refus LOT_EXPORT_FILTRES_REQUIS, puis
-// écriture de l'identifiant de prospect dans representantId.
+// Un parrainage Grand Public ouvre une campagne CONTACTS_RECOMMANDES sur des fiches prospects, pas représentants.
 func TestCampagneParrainageGrandPublic(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	source := b.prospect("Feuille "+uuid.NewString(), "GRAND_PUBLIC", nil, "NOUVEAU")
