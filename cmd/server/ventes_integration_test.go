@@ -794,3 +794,83 @@ func ventesImportees(reponse map[string]any) []map[string]any {
 	}
 	return importees
 }
+
+// Stock de trois lots : une saisie et une correction simultanées ne le dépassent pas.
+func TestVenteStockDuSite(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	suffixe := strings.ToUpper(b.userID[:8])
+	reglage := map[string]any{
+		"nom": "SITE STOCK " + suffixe, "ordre": 99, "totalLots": 3, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 0, "partApporteurMode": "AUCUNE", "partApporteurValeur": 0,
+	}
+	statut, site := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", reglage, nil)
+	b.attend(statut, http.StatusOK, "site avec stock", site)
+	nom, siteID := fmt.Sprint(site["nom"]), fmt.Sprint(site["id"])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "site" = $1`, nom)
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, siteID)
+	})
+	if site["lotsVendus"] != float64(0) || site["lotsRestants"] != float64(3) {
+		t.Fatalf("site neuf : %v vendus, %v restants", site["lotsVendus"], site["lotsRestants"])
+	}
+	vente := func(client string, lots int) map[string]any {
+		corps := venteComptant(client + " " + suffixe)
+		corps["site"], corps["nombreLots"] = nom, lots
+		return corps
+	}
+	statut, premiere := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT A", 1), nil)
+	b.attend(statut, http.StatusCreated, "premier lot", premiere)
+	cheminA := fmt.Sprintf("/api/v1/ventes/%v", premiere["id"])
+
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil,
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT B", 2), nil)
+			return statut
+		},
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A", 2), nil)
+			return statut
+		})
+	if (statuts[0] == http.StatusConflict) == (statuts[1] == http.StatusConflict) {
+		t.Fatalf("une seule des deux écritures tient dans le stock : %v", statuts)
+	}
+	vendus := venteCompteTest(t, b, `SELECT COALESCE(sum("nombreLots"), 0)::int FROM "ventes" WHERE "site" = $1`, nom)
+	if lu := stockDuSite(t, b, siteID); vendus != 3 || lu["lotsVendus"] != float64(3) || lu["lotsRestants"] != float64(0) {
+		t.Fatalf("trois lots vendus attendus : %d en base, %v", vendus, lu)
+	}
+
+	statut, refus := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT C", 1), nil)
+	b.attend(statut, http.StatusConflict, "stock épuisé", refus)
+	if refus["code"] != "VENTE_STOCK_EPUISE" {
+		t.Fatalf("code %v", refus["code"])
+	}
+	reglage["totalLots"] = 1
+	statut, site = appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+siteID, reglage, nil)
+	b.attend(statut, http.StatusOK, "stock abaissé", site)
+	if site["lotsRestants"] != float64(-2) {
+		t.Fatalf("stock dépassé de deux lots : %v", site["lotsRestants"])
+	}
+	lotsA := venteCompteTest(t, b, `SELECT "nombreLots" FROM "ventes" WHERE "id" = $1`, premiere["id"])
+	statut, corrigee := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A CORRIGE", lotsA), nil)
+	b.attend(statut, http.StatusOK, "correction sans lot de plus sur un stock dépassé", corrigee)
+	statut, _ = appelJSON(b, http.MethodDelete, cheminA, nil, nil)
+	b.attend(statut, http.StatusNoContent, "archivage", nil)
+	if lu := stockDuSite(t, b, siteID); lu["lotsVendus"] != float64(3-lotsA) {
+		t.Fatalf("une vente archivée ne compte plus : %v", lu)
+	}
+}
+
+func stockDuSite(t *testing.T, b *banc, id string) map[string]any {
+	t.Helper()
+	statut, configuration := appelJSON(b, http.MethodGet, "/api/v1/ventes/configuration", nil, nil)
+	b.attend(statut, http.StatusOK, "configuration", configuration)
+	for _, s := range configuration["sites"].([]any) {
+		if site := s.(map[string]any); site["id"] == id {
+			return site
+		}
+	}
+	t.Fatalf("site %s absent de la configuration", id)
+	return nil
+}
