@@ -82,15 +82,18 @@ de Dokploy, et l'un des deux ne monterait pas.
 Une seule application, `cpi-go` (`Dockerfile` à la racine, port 4000), sert
 l'API et le panneau sur `go.cpi-chues.com` et `go-admin.cpi-chues.com`.
 
-Une seconde base (démo, client) se crée sur le conteneur Postgres existant,
-puis se déclare dans l'environnement Dokploy de `cpi-go` par
-`DATABASE_URL_<NOM>` ; la page de connexion la propose derrière `Ctrl+Shift+D` :
+Une base de démonstration se crée depuis le panneau, **Administration → Bases
+de démonstration** (`POST /api/v1/admin/bases`, trois au plus) : le binaire crée
+`cpi_demo_<nom>`, y pose le schéma et les migrations, puis la sème sous son nom
+avec les comptes de démonstration, sans l'administrateur de production
+(`SEED_ADMIN_*`). La page de connexion la propose derrière `Ctrl+Shift+D`.
 
-```bash
-docker exec -i <postgres> psql -U crm -d crm -c 'CREATE DATABASE crm_demo'
-docker exec -i <postgres> psql -U crm -d crm_demo -v ON_ERROR_STOP=1 -q < sql/schema.sql
-docker exec -e DATABASE_URL=postgresql://crm:<mdp>@<postgres>:5432/crm_demo <cpi-go> /cpi-go -seed
-```
+Prérequis dans l'environnement Dokploy de `cpi-go` : `SEED_FIXTURE_PASSWORD`,
+12 caractères au minimum (`deploy.py configure` le pose s'il manque), et le
+droit `CREATEDB` du rôle de `DATABASE_URL`. Ne pas lancer `/cpi-go -seed` avec
+`DATABASE_URL` sur une base de démonstration : elle serait semée comme base
+principale, compte administrateur de production compris et sans comptes de
+démonstration.
 
 ## Pourquoi pas `docker-compose.prod.yml`
 
