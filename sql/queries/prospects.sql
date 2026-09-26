@@ -605,7 +605,7 @@ JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 LEFT JOIN "ouvertures_fiche" ou ON ou."closingAttemptId" = a."id" AND ou."firstInputAt" IS NOT NULL
 WHERE a."prospectId" = $1
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: AppSettingParCle :one
 SELECT "key", "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;
@@ -630,7 +630,7 @@ LEFT JOIN "users" t ON t."id" = a."after"->>'teleconseillerId'
 WHERE (a."entity" = 'prospect' AND a."entityId" = @prospect_id::text)
    OR (a."entity" IN ('lot_export', 'scheduled_callback') AND a."after"->>'prospectId' = @prospect_id::text)
 ORDER BY a."at" DESC, a."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: SupprimerAppSetting :execrows
 DELETE FROM "app_settings" WHERE "key" = $1;
@@ -718,7 +718,7 @@ FROM "segment_changes" c
 JOIN "users" u ON u."id" = c."changedById"
 WHERE c."prospectId" = $1
 ORDER BY c."changedAt" DESC, c."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: BanqueSigleSegment :one
 SELECT "shortName" FROM "banques" WHERE "id" = $1;

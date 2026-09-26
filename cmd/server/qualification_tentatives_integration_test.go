@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"testing"
@@ -153,6 +154,44 @@ func TestTentativeVideUnChampLibre(t *testing.T) {
 		}
 		if lue != valeur || present != (valeur != "") || inconnu {
 			t.Fatalf("après « %s », le champ vaut %q (présent : %v, clé inconnue gardée : %v)", valeur, lue, present, inconnu)
+		}
+	}
+}
+
+func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	requalifiee, premiere := qualificationProspect(b), qualificationProspect(b)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
+	ouvrir := func(prospect string, ilYA time.Duration, tentative any) {
+		qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
+		                      VALUES ($1,$2,$3,now() - $4::interval,now() - $4::interval + interval '1 minute',$5,now())`,
+			uuid.NewString(), b.userID, prospect, fmt.Sprintf("%d seconds", int(ilYA.Seconds())), tentative)
+	}
+	ouvrir(requalifiee, 3*time.Hour, uuid.NewString())
+	ouvrir(requalifiee, 2*time.Hour, uuid.NewString())
+	ouvrir(requalifiee, time.Hour, nil)
+	ouvrir(premiere, time.Hour, uuid.NewString())
+
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage", nil)
+	b.attend(statut, http.StatusBadRequest, "comptage sans période", body)
+	jour := time.Now().UTC()
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage?from="+jour.AddDate(-2, 0, 0).Format(time.DateOnly)+"&to="+jour.Format(time.DateOnly), nil)
+	b.attend(statut, http.StatusBadRequest, "comptage sur plus d'un an", body)
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage?from="+jour.AddDate(0, 0, -1).Format(time.DateOnly)+"&to="+jour.Format(time.DateOnly), nil)
+	b.attend(statut, http.StatusOK, "comptage des ouvertures", body)
+	totaux := map[string]float64{}
+	for _, ligne := range body["items"].([]any) {
+		for cle, valeur := range ligne.(map[string]any) {
+			if nombre, ok := valeur.(float64); ok {
+				totaux[cle] += nombre
+			}
+		}
+	}
+	attendus := map[string]float64{"ouvertures": 4, "qualifiees": 3, "ouverturesDejaQualifiees": 2, "requalifiees": 1}
+	for cle, attendu := range attendus {
+		if totaux[cle] != attendu {
+			t.Fatalf("%s = %v, attendu %v (%v)", cle, totaux[cle], attendu, totaux)
 		}
 	}
 }

@@ -521,9 +521,15 @@ type QualificationComptageJourDTO struct {
 
 type QualificationComptageOutput struct {
 	Body struct {
-		Items []QualificationComptageJourDTO `json:"items"`
+		Items   []QualificationComptageJourDTO `json:"items"`
+		Tronque bool                           `json:"tronque" doc:"Plus de 3 000 lignes : seules les plus récentes sont rendues."`
 	}
 }
+
+const (
+	comptageLignesMax  = 3000
+	comptagePeriodeMax = 366 * 24 * time.Hour
+)
 
 // Un téléconseiller ne lit que son propre compte.
 func (s *service) qualificationComptage(ctx context.Context, in *QualificationComptageInput) (*QualificationComptageOutput, error) {
@@ -537,26 +543,37 @@ func (s *service) qualificationComptage(ctx context.Context, in *QualificationCo
 		p.OpenedByID = &borne
 	}
 	var err error
-	if in.From != "" {
-		if p.Depuis, err = qualificationBorneJour(in.From, false, s.Cfg.TimeZone); err != nil {
-			return nil, err
-		}
-	}
-	if in.To != "" {
-		if p.Jusqua, err = qualificationBorneJour(in.To, true, s.Cfg.TimeZone); err != nil {
-			return nil, err
-		}
+	if p.Depuis, p.Jusqua, err = qualificationPeriodeComptage(in.From, in.To, s.Cfg.TimeZone); err != nil {
+		return nil, err
 	}
 	rows, err := s.Q.ComptageOuvertures(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	out := &QualificationComptageOutput{}
+	out.Body.Tronque = len(rows) > comptageLignesMax
+	rows = rows[:min(len(rows), comptageLignesMax)]
 	out.Body.Items = make([]QualificationComptageJourDTO, 0, len(rows))
 	for i := range rows {
 		out.Body.Items = append(out.Body.Items, qualificationComptageDTO(&rows[i]))
 	}
 	return out, nil
+}
+
+func qualificationPeriodeComptage(du, au string, zone *time.Location) (depuis, jusqua *time.Time, err error) {
+	if du == "" || au == "" {
+		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_REQUISE", "Indiquez le premier et le dernier jour de la période.")
+	}
+	if depuis, err = qualificationBorneJour(du, false, zone); err != nil {
+		return nil, nil, err
+	}
+	if jusqua, err = qualificationBorneJour(au, true, zone); err != nil {
+		return nil, nil, err
+	}
+	if jusqua.Before(*depuis) || jusqua.Sub(*depuis) > comptagePeriodeMax {
+		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_INVALIDE", "La période va d'un jour à un an, le premier jour avant le dernier.")
+	}
+	return depuis, jusqua, nil
 }
 
 func qualificationComptageDTO(r *db.ComptageOuverturesRow) QualificationComptageJourDTO {
