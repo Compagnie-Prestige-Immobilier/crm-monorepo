@@ -24,14 +24,13 @@ import { useState, type ReactNode } from 'react';
 
 import { CarteWidget } from '@/components/accueil/tableau-de-bord/carte-widget';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  SOURCES,
   appliquerPresentation,
   donneesVides,
-  type Catalogue,
+  type CatalogueEntree,
   type DashboardMarque,
   type DashboardTaille,
-  type DispositionPresentation,
   type DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
 import {
@@ -60,7 +59,7 @@ import {
 } from '@/components/dashboard/visites-charts';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { useChartTheme } from '@/lib/chart-theme';
-import type { DashboardWidget } from '@/lib/data/visites-dashboard';
+import type { DashboardWidget } from '@/lib/data/disposition';
 
 type Presentation = DashboardWidget['presentation'];
 type DonneeDe<F extends DonneesSource['forme']> = Extract<DonneesSource, { forme: F }>['donnee'];
@@ -248,21 +247,14 @@ function marqueSerie(
   return rendu({ items, presentation, titre, onSelect });
 }
 
-function libelleSource(catalogue: Catalogue, source: string): string {
-  return catalogue[source]?.label ?? source;
-}
-
-function renderMark(
-  source: string,
+export function renderMark(
+  titre: string,
   marque: DashboardMarque | undefined,
   donnees: DonneesSource,
   presentation: Presentation,
-  catalogue: Catalogue = SOURCES,
   messageVide = 'Aucune visite sur la période.',
   ouvrir?: (id: string) => void,
 ): ReactNode {
-  const titre = libelleSource(catalogue, source);
-
   if (donnees.forme === 'equipe') return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
   if (donnees.forme === 'scalaire') return marqueScalaire(donnees.donnee, marque, titre);
   if (donneesVides(donnees)) return <EmptyChart message={messageVide} />;
@@ -319,30 +311,58 @@ function announcements(titreDe: (id: string) => string): Announcements {
   };
 }
 
+function ContenuCarte({
+  entree,
+  widget,
+  donnees,
+  erreur,
+  messageVide,
+}: {
+  entree: CatalogueEntree;
+  widget: DashboardWidget;
+  donnees: DonneesSource | undefined;
+  erreur: string | undefined;
+  messageVide: string;
+}) {
+  const router = useRouter();
+  const lien = entree.lien;
+  if (erreur !== undefined)
+    return <p className="py-4 text-[0.875rem] text-destructive">{erreur}</p>;
+  if (donnees === undefined) return <Skeleton className="h-full min-h-16 w-full rounded-md" />;
+  return renderMark(
+    entree.label,
+    widget.marque,
+    donnees,
+    widget.presentation,
+    messageVide,
+    lien === undefined
+      ? undefined
+      : (id) => {
+          router.push(lien(id));
+        },
+  );
+}
+
 export function WidgetGrid({
   widgets,
+  entrees,
   donnees,
-  editing,
-  catalogue = SOURCES,
+  erreurs,
+  editable,
   messageVide = 'Aucune visite sur la période.',
   onReorder,
   onRemove,
-  onMove,
-  onChangeMarque,
   onChangeTaille,
-  onChangePresentation,
 }: {
   widgets: readonly DashboardWidget[];
+  entrees: Map<string, CatalogueEntree>;
   donnees: Map<string, DonneesSource>;
-  editing: boolean;
-  catalogue?: Catalogue;
+  erreurs: Map<string, string>;
+  editable: boolean;
   messageVide?: string;
   onReorder: (fromId: string, toId: string) => void;
   onRemove: (id: string) => void;
-  onMove: (id: string, direction: -1 | 1) => void;
-  onChangeMarque: (id: string, marque: DashboardMarque) => void;
   onChangeTaille: (id: string, taille: DashboardTaille | undefined) => void;
-  onChangePresentation: (id: string, presentation: DispositionPresentation) => void;
 }) {
   // Souris et tactile séparés : un PointerSensor unique capte le `pointerdown`
   // du doigt avant tout `touchstart` et le glissement partirait au premier pixel
@@ -353,18 +373,8 @@ export function WidgetGrid({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const titreDe = (id: string): string => {
-    const widget = widgets.find((w) => w.id === id);
-    if (widget === undefined) return '';
-    return catalogue[widget.source]?.label ?? widget.source;
-  };
-
+  const titreDe = (id: string): string => entrees.get(id)?.label ?? '';
   const [activeId, setActiveId] = useState<string | null>(null);
-  const router = useRouter();
-
-  const handleDragStart = (event: DragStartEvent): void => {
-    setActiveId(String(event.active.id));
-  };
 
   const handleDragEnd = (event: DragEndEvent): void => {
     setActiveId(null);
@@ -373,75 +383,58 @@ export function WidgetGrid({
     onReorder(String(active.id), String(over.id));
   };
 
-  const cards = widgets.map((widget, index) => {
-    const source = donnees.get(widget.id);
-    const lien = catalogue[widget.source]?.lien;
+  const cards = widgets.map((widget) => {
+    const entree = entrees.get(widget.id) ?? {
+      label: widget.titre ?? widget.source,
+      forme: 'scalaire',
+    };
+    const donnee = donnees.get(widget.id);
     return (
       <CarteWidget
         key={widget.id}
         widget={widget}
-        donnees={source}
-        editing={editing}
-        catalogue={catalogue}
-        peutMonter={index > 0}
-        peutDescendre={index < widgets.length - 1}
+        entree={entree}
+        donnees={donnee}
+        editable={editable}
         onRemove={() => {
           onRemove(widget.id);
-        }}
-        onMoveUp={() => {
-          onMove(widget.id, -1);
-        }}
-        onMoveDown={() => {
-          onMove(widget.id, 1);
-        }}
-        onChangeMarque={(marque) => {
-          onChangeMarque(widget.id, marque);
         }}
         onChangeTaille={(taille) => {
           onChangeTaille(widget.id, taille);
         }}
-        onChangePresentation={(presentation) => {
-          onChangePresentation(widget.id, presentation);
-        }}
       >
-        {source === undefined
-          ? null
-          : renderMark(
-              widget.source,
-              widget.marque,
-              source,
-              widget.presentation,
-              catalogue,
-              messageVide,
-              lien === undefined
-                ? undefined
-                : (id) => {
-                    router.push(lien(id));
-                  },
-            )}
+        <ContenuCarte
+          entree={entree}
+          widget={widget}
+          donnees={donnee}
+          erreur={erreurs.get(widget.id)}
+          messageVide={messageVide}
+        />
       </CarteWidget>
     );
   });
 
-  if (!editing) {
-    return <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
-  }
+  const grille = (
+    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
+  );
+  if (!editable) return grille;
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       accessibility={{ announcements: announcements(titreDe), screenReaderInstructions }}
-      onDragStart={handleDragStart}
+      onDragStart={(event: DragStartEvent) => {
+        setActiveId(String(event.active.id));
+      }}
       onDragEnd={handleDragEnd}
       onDragCancel={() => {
         setActiveId(null);
       }}
     >
       <SortableContext items={widgets.map((widget) => widget.id)} strategy={rectSortingStrategy}>
-        <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
+        {grille}
       </SortableContext>
-      {/* L'aperçu reste statique pendant le déplacement d'une carte. */}
       <DragOverlay>
         {activeId === null ? null : (
           <Card className="animate-rise p-4 shadow-elev-xl">

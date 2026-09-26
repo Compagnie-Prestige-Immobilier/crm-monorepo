@@ -37,7 +37,7 @@ export function ChartCard({
 
   return (
     <Card className={cn('h-full animate-rise', className)}>
-      <CardHeader className={actions === undefined ? undefined : 'flex-row items-start gap-3'}>
+      <CardHeader>
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-1.5">
             {title}
@@ -45,7 +45,11 @@ export function ChartCard({
           </CardTitle>
           {description !== undefined ? <CardDescription>{description}</CardDescription> : null}
         </div>
-        {actions}
+        {actions === undefined ? null : (
+          <div data-slot="card-action" className="col-start-2 row-span-2 row-start-1 -mt-1.5">
+            {actions}
+          </div>
+        )}
       </CardHeader>
       <div
         ref={chartRegion}

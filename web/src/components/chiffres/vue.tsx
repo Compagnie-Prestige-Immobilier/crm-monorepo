@@ -8,25 +8,22 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
-import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
 import { QuestionsEpinglees } from '@/components/assistant/questions';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
-import { marqueRecommandee } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
   plageDeFiltres,
   periodeAffichee,
   SelecteurPeriode,
 } from '@/components/accueil/tableau-de-bord/selecteur-periode';
+import type { CatalogueEntree, DonneesSource } from '@/components/accueil/tableau-de-bord/sources';
 import {
-  mesurerDonnees,
-  type DashboardMarque,
-  type DashboardSource,
-  type DonneesSource,
-} from '@/components/accueil/tableau-de-bord/sources';
-import { TiroirWidgets } from '@/components/accueil/tableau-de-bord/tiroir-widgets';
+  BoutonAjouterIndicateur,
+  cartesDu,
+  useTableauDeBord,
+} from '@/components/accueil/tableau-de-bord/tableau';
 import { chiffresFiltersAdapter, type ChiffresFilters } from '@/components/chiffres/filtres';
 import { BoutonExportExcel } from '@/components/dashboard/bouton-export-excel';
 import {
@@ -68,11 +65,7 @@ import {
 import { fetchLotsExport } from '@/lib/data/lots-export';
 import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import {
-  fetchDisposition,
   resetDisposition,
-  saveDefaultDisposition,
-  saveDisposition,
-  serializeDisposition,
   type DashboardEcran,
   type DashboardWidget,
   type Disposition,
@@ -82,7 +75,6 @@ import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
-import { avecTransition } from '@/lib/transition-de-vue';
 import { peut } from '@/lib/types';
 
 /** Une requête par jeu, et seulement pour les jeux qu'une carte posée réclame. */
@@ -116,22 +108,15 @@ const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] =
   perimetre.lotId,
 ];
 
-/**
- * Le tiroir a besoin d'une donnée pour conseiller une forme, mais l'ouvrir ne
- * doit pas déclencher six requêtes lourdes : en composition on charge tout, en
- * lecture seulement ce que les cartes posées réclament.
- */
+/** Une requête par jeu, et seulement pour les jeux qu'une carte posée réclame. */
 function jeuxACharger(
   catalogue: Record<string, SourceChiffre>,
   widgets: readonly DashboardWidget[],
-  editing: boolean,
 ): Jeu[] {
-  const sources = editing
-    ? Object.values(catalogue)
-    : widgets.flatMap((widget) => {
-        const source = catalogue[widget.source];
-        return source === undefined ? [] : [source];
-      });
+  const sources = widgets.flatMap((widget) => {
+    const source = catalogue[widget.source];
+    return source === undefined ? [] : [source];
+  });
   return [...new Set(sources.map((source) => source.jeu))];
 }
 
@@ -182,16 +167,6 @@ function etatDesJeux(
   };
 }
 
-/** Le brouillon d'édition prime sur l'écran sauvegardé, sinon rien n'est composé. */
-function resolveWidgets(
-  brouillon: DashboardWidget[] | null,
-  disposition: Disposition | undefined,
-  catalogue: Record<string, SourceChiffre>,
-): DashboardWidget[] {
-  const source = brouillon ?? disposition?.widgets ?? [];
-  return source.filter((widget) => catalogue[widget.source] !== undefined);
-}
-
 function buildDonneesParSource(
   catalogue: Record<string, SourceChiffre>,
   jeux: Jeux,
@@ -204,27 +179,15 @@ function buildDonneesParSource(
   return donnees;
 }
 
-function buildDonneesParWidget(
-  widgets: readonly DashboardWidget[],
-  donneesParSource: Map<string, DonneesSource>,
-): Map<string, DonneesSource> {
-  const donnees = new Map<string, DonneesSource>();
-  for (const widget of widgets) {
-    const donnee = donneesParSource.get(widget.source);
-    if (donnee !== undefined) donnees.set(widget.id, donnee);
-  }
-  return donnees;
-}
-
 /** Le classeur suit l'écran : ses blocs sont les cartes posées, dans leur ordre. */
 function blocsDesWidgets(
   widgets: readonly DashboardWidget[],
-  catalogue: Record<string, SourceChiffre>,
+  entrees: Map<string, CatalogueEntree>,
   donneesParWidget: Map<string, DonneesSource>,
 ): BlocTableauDeBord[] {
   const blocs: BlocTableauDeBord[] = [];
   for (const widget of widgets) {
-    const entree = catalogue[widget.source];
+    const entree = entrees.get(widget.id);
     const donnee = donneesParWidget.get(widget.id);
     if (entree === undefined || donnee === undefined) continue;
     blocs.push({
@@ -273,11 +236,6 @@ function classeurDesChiffres(input: {
 
 function equipeDe(jeux: Jeux): readonly { id: string; fullName: string }[] {
   return jeux.activite?.teleconseillers ?? [];
-}
-
-function isDirty(brouillon: DashboardWidget[] | null, snapshot: string): boolean {
-  if (brouillon === null) return false;
-  return JSON.stringify(serializeDisposition(brouillon)) !== snapshot;
 }
 
 /**
@@ -380,33 +338,8 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
     lotId: filters.campagne,
   };
 
-  const dispositionQuery = useQuery({
-    queryKey: queryKeys.disposition(ecran),
-    queryFn: () => fetchDisposition(ecran),
-  });
-
-  const [brouillon, setBrouillon] = useState<DashboardWidget[] | null>(null);
-  const editing = brouillon !== null;
-  const [snapshot, setSnapshot] = useState('');
-  const pausedByEditionRef = useRef(false);
-
-  const saveMutation = useMutation({
-    mutationFn: (widgets: DashboardWidget[]) =>
-      saveDisposition(ecran, widgets, dispositionQuery.data?.preset, undefined),
-    onSuccess: async () => {
-      setBrouillon(null);
-      if (pausedByEditionRef.current) {
-        live.togglePause();
-        pausedByEditionRef.current = false;
-      }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.disposition(ecran) });
-    },
-  });
-
-  const setDefaultMutation = useMutation({
-    mutationFn: (widgets: DashboardWidget[]) =>
-      saveDefaultDisposition(ecran, widgets, dispositionQuery.data?.preset, undefined),
-  });
+  const tableau = useTableauDeBord(ecran, plage);
+  const dispositionQuery = tableau.dispositionQuery;
 
   const resetMutation = useMutation({
     mutationFn: () => resetDisposition(ecran),
@@ -415,9 +348,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
     },
   });
 
-  const widgets = resolveWidgets(brouillon, dispositionQuery.data, catalogue);
-  const aCharger = jeuxACharger(catalogue, widgets, editing);
-
+  const aCharger = jeuxACharger(catalogue, tableau.widgets);
   const resultats = useQueries({
     queries: aCharger.map((jeu) => ({
       queryKey: clefDeJeu(jeu, perimetre),
@@ -434,54 +365,19 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
   const hasData = dispositionQuery.data !== undefined && toutCharge;
 
   const donneesParSource = buildDonneesParSource(catalogue, jeux);
-  const donneesParWidget = buildDonneesParWidget(widgets, donneesParSource);
-
-  const enterEdition = (): void => {
-    if (dispositionQuery.data === undefined) return;
-    const copie = dispositionQuery.data.widgets.map((widget) => ({ ...widget }));
-    setSnapshot(JSON.stringify(serializeDisposition(copie)));
-    setBrouillon(copie);
-    if (!live.paused) {
-      live.togglePause();
-      pausedByEditionRef.current = true;
-    }
-  };
-
-  const cancelEdition = (): void => {
-    setBrouillon(null);
-    if (pausedByEditionRef.current) {
-      live.togglePause();
-      pausedByEditionRef.current = false;
-    }
-  };
-
-  const dirty = isDirty(brouillon, snapshot);
-  const placees = new Set(widgets.map((widget) => widget.source));
+  const cartes = cartesDu(tableau, catalogue, donneesParSource);
   const equipe = equipeDe(jeux);
+  const peutDisposer = peut(user, 'chiffres.disposer');
 
-  function handleAddWidget(source: DashboardSource, marqueChoisie?: DashboardMarque): void {
-    const donneesSource = donneesParSource.get(source);
-    const forme = catalogue[source]?.forme;
-    const marque =
-      marqueChoisie ??
-      (donneesSource === undefined || forme === undefined
-        ? undefined
-        : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
-    avecTransition(() => {
-      setBrouillon((current) => [
-        ...(current ?? []),
-        { id: `${source}-${String(Date.now())}`, source, marque },
-      ]);
+  const chargerSource = async (cle: string): Promise<DonneesSource | null> => {
+    const source = catalogue[cle];
+    if (source === undefined) return null;
+    const donnee = await queryClient.fetchQuery({
+      queryKey: clefDeJeu(source.jeu, perimetre),
+      queryFn: () => CHARGEURS[source.jeu](perimetre),
     });
-  }
-
-  function handleSave(): void {
-    if (brouillon !== null) saveMutation.mutate(brouillon);
-  }
-
-  function handleSetDefault(): void {
-    if (brouillon !== null) setDefaultMutation.mutate(brouillon);
-  }
+    return source.extraire({ [source.jeu]: donnee });
+  };
 
   function preparerClasseur(): ClasseurTableauDeBord {
     return classeurDesChiffres({
@@ -490,7 +386,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
       plage,
       equipe,
       teleconseiller: filters.teleconseiller,
-      blocs: blocsDesWidgets(widgets, catalogue, donneesParWidget),
+      blocs: blocsDesWidgets(cartes.widgets, cartes.entrees, cartes.donnees),
     });
   }
 
@@ -508,25 +404,25 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
         live={live}
         enErreur={enErreur}
         dataUpdatedAt={dataUpdatedAt}
-        editing={editing}
-        placees={placees}
-        donneesParSource={donneesParSource}
-        catalogue={catalogue}
-        onAddWidget={handleAddWidget}
         dispositionSource={dispositionQuery.data?.source}
         onReset={() => {
           resetMutation.mutate();
         }}
         resetPending={resetMutation.isPending}
-        dirty={dirty}
-        savePending={saveMutation.isPending}
-        isAdmin={peut(user, 'parametres.administrer')}
-        onEnter={enterEdition}
-        onSave={handleSave}
-        onCancel={cancelEdition}
-        onSetDefault={handleSetDefault}
+        constructeur={
+          peutDisposer ? (
+            <BoutonAjouterIndicateur
+              ecran={ecran}
+              catalogue={catalogue}
+              plage={plage}
+              cleDonnees={[projet, filters.teleconseiller, filters.campagne]}
+              chargerSource={chargerSource}
+              onAjouter={tableau.ajouter}
+            />
+          ) : null
+        }
         onPreparerClasseur={preparerClasseur}
-        exportPret={hasData && widgets.length > 0}
+        exportPret={hasData && cartes.widgets.length > 0}
       />
 
       {peut(user, 'assistant.utiliser') ? <QuestionsEpinglees /> : null}
@@ -557,11 +453,11 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
         )
           return <ChiffresSkeleton />;
 
-        if (widgets.length === 0)
+        if (cartes.widgets.length === 0)
           return (
             <Card>
               <CardContent className="py-10 text-center text-[0.9375rem] text-muted-foreground">
-                Cet écran est vide. Ouvrez « Organiser les graphiques » pour y poser vos chiffres.
+                Aucun indicateur ici. Ajoutez-en un avec « Ajouter un indicateur ».
               </CardContent>
             </Card>
           );
@@ -569,43 +465,17 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
         return (
           <div aria-busy={isRefetching}>
             <WidgetGrid
-              widgets={widgets}
-              donnees={donneesParWidget}
-              editing={editing}
-              catalogue={catalogue}
+              widgets={cartes.widgets}
+              entrees={cartes.entrees}
+              donnees={cartes.donnees}
+              erreurs={cartes.erreurs}
+              editable={peutDisposer}
               messageVide="Rien sur la période."
-              onReorder={(fromId, toId) => {
-                setBrouillon((current) => deplacer(current, fromId, toId));
-              }}
+              onReorder={tableau.deplacer}
               onRemove={(id) => {
-                avecTransition(() => {
-                  setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
-                });
+                tableau.retirer(id, cartes.entrees.get(id)?.label ?? '');
               }}
-              onMove={(id, direction) => {
-                avecTransition(() => {
-                  setBrouillon((current) => decaler(current, id, direction));
-                });
-              }}
-              onChangeMarque={(id, marque) => {
-                setBrouillon(
-                  (current) => current?.map((w) => (w.id === id ? { ...w, marque } : w)) ?? current,
-                );
-              }}
-              onChangeTaille={(id, taille) => {
-                avecTransition(() => {
-                  setBrouillon(
-                    (current) =>
-                      current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
-                  );
-                });
-              }}
-              onChangePresentation={(id, presentation) => {
-                setBrouillon(
-                  (current) =>
-                    current?.map((w) => (w.id === id ? { ...w, presentation } : w)) ?? current,
-                );
-              }}
+              onChangeTaille={tableau.redimensionner}
             />
           </div>
         );
@@ -624,21 +494,10 @@ function ChiffresToolbar({
   live,
   enErreur,
   dataUpdatedAt,
-  editing,
-  placees,
-  donneesParSource,
-  catalogue,
-  onAddWidget,
   dispositionSource,
   onReset,
   resetPending,
-  dirty,
-  savePending,
-  isAdmin,
-  onEnter,
-  onSave,
-  onCancel,
-  onSetDefault,
+  constructeur,
   onPreparerClasseur,
   exportPret,
 }: {
@@ -651,21 +510,10 @@ function ChiffresToolbar({
   live: ReturnType<typeof useLive>;
   enErreur: boolean;
   dataUpdatedAt: number;
-  editing: boolean;
-  placees: Set<string>;
-  donneesParSource: Map<string, DonneesSource>;
-  catalogue: Record<string, SourceChiffre>;
-  onAddWidget: (source: DashboardSource, marque?: DashboardMarque) => void;
   dispositionSource: Disposition['source'] | undefined;
   onReset: () => void;
   resetPending: boolean;
-  dirty: boolean;
-  savePending: boolean;
-  isAdmin: boolean;
-  onEnter: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onSetDefault: () => void;
+  constructeur: ReactNode;
   onPreparerClasseur: () => ClasseurTableauDeBord;
   exportPret: boolean;
 }) {
@@ -733,68 +581,16 @@ function ChiffresToolbar({
           updatedAt={dataUpdatedAt === 0 ? null : dataUpdatedAt}
           onTogglePause={live.togglePause}
         />
-        {editing ? (
-          <TiroirWidgets
-            placees={placees}
-            donnees={donneesParSource}
-            catalogue={catalogue}
-            onAdd={onAddWidget}
-          />
-        ) : (
-          <>
-            {dispositionSource === 'utilisateur' ? (
-              <Button type="button" variant="ghost" disabled={resetPending} onClick={onReset}>
-                Revenir à l’écran par défaut
-              </Button>
-            ) : null}
-            <BoutonExportExcel preparer={onPreparerClasseur} disabled={!exportPret} />
-          </>
-        )}
-        <BarreEdition
-          editing={editing}
-          dirty={dirty}
-          pending={savePending}
-          isAdmin={isAdmin}
-          onEnter={onEnter}
-          onSave={onSave}
-          onCancel={onCancel}
-          onSetDefault={onSetDefault}
-        />
+        {dispositionSource === 'utilisateur' ? (
+          <Button type="button" variant="ghost" disabled={resetPending} onClick={onReset}>
+            Revenir à l’écran par défaut
+          </Button>
+        ) : null}
+        <BoutonExportExcel preparer={onPreparerClasseur} disabled={!exportPret} />
+        {constructeur}
       </div>
     </div>
   );
-}
-
-function deplacer(
-  current: DashboardWidget[] | null,
-  fromId: string,
-  toId: string,
-): DashboardWidget[] | null {
-  if (current === null) return current;
-  const fromIndex = current.findIndex((w) => w.id === fromId);
-  const toIndex = current.findIndex((w) => w.id === toId);
-  if (fromIndex === -1 || toIndex === -1) return current;
-  const next = [...current];
-  const [moved] = next.splice(fromIndex, 1);
-  if (moved === undefined) return current;
-  next.splice(toIndex, 0, moved);
-  return next;
-}
-
-function decaler(
-  current: DashboardWidget[] | null,
-  id: string,
-  direction: -1 | 1,
-): DashboardWidget[] | null {
-  if (current === null) return current;
-  const index = current.findIndex((w) => w.id === id);
-  const target = index + direction;
-  if (index === -1 || target < 0 || target >= current.length) return current;
-  const next = [...current];
-  const [moved] = next.splice(index, 1);
-  if (moved === undefined) return current;
-  next.splice(target, 0, moved);
-  return next;
 }
 
 export function ChiffresSkeleton() {

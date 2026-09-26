@@ -148,7 +148,7 @@ function croisement(
  * les écrans ; celui-ci n'en sert qu'un, d'où le `satisfies` plutôt qu'un
  * `Record` exhaustif.
  */
-export const SOURCES = {
+const SOURCES = {
   'total-visites': {
     label: 'Total des visites',
     forme: 'scalaire',
@@ -510,43 +510,4 @@ export function appliquerPresentation(
   const reste = trie.slice(seuil);
   const autres = reste.reduce((somme, item) => somme + item.value, 0);
   return [...tete, { id: '__autres__', label: 'Autres', value: autres }];
-}
-
-/**
- * Ce que chaque marque honore réellement. Une commande de présentation qui
- * n'agit sur rien est un interrupteur inerte : c'est ce tableau qui décide,
- * marque par marque, quelles commandes le mode composition affiche.
- */
-export interface ReglagesHonores {
-  palette: boolean;
-  valeurs: boolean;
-  legende: boolean;
-}
-
-const REGLAGES_HONORES: Record<DashboardMarque, ReglagesHonores> = {
-  'barres-verticales': { palette: true, valeurs: true, legende: false },
-  'barres-horizontales': { palette: true, valeurs: true, legende: false },
-  'barres-empilees': { palette: true, valeurs: true, legende: true },
-  'barres-100': { palette: true, valeurs: true, legende: true },
-  'barres-groupees': { palette: true, valeurs: true, legende: true },
-  courbe: { palette: true, valeurs: true, legende: false },
-  aire: { palette: true, valeurs: true, legende: false },
-  escalier: { palette: true, valeurs: true, legende: false },
-  anneau: { palette: true, valeurs: false, legende: true },
-  camembert: { palette: true, valeurs: false, legende: true },
-  'aire-polaire': { palette: true, valeurs: false, legende: true },
-  radar: { palette: true, valeurs: false, legende: false },
-  nuage: { palette: true, valeurs: false, legende: false },
-  bulles: { palette: true, valeurs: false, legende: false },
-  mixte: { palette: true, valeurs: true, legende: true },
-  jauge: { palette: true, valeurs: false, legende: false },
-  'carte-de-chaleur': { palette: false, valeurs: false, legende: false },
-  tableau: { palette: false, valeurs: false, legende: false },
-  tuile: { palette: false, valeurs: false, legende: false },
-  'tuile-courbe': { palette: true, valeurs: false, legende: false },
-};
-
-export function reglagesHonores(marque: DashboardMarque | undefined): ReglagesHonores {
-  if (marque === undefined) return { palette: false, valeurs: false, legende: false };
-  return REGLAGES_HONORES[marque];
 }

@@ -58,6 +58,8 @@ export const queryKeys = {
   visiteReferentielUsage: ['visites', 'referentiels', 'usage'] as const,
   visitesStats: (du: string, au: string) => ['visites', 'stats', du, au] as const,
   disposition: (ecran: string) => ['tableau-de-bord', 'disposition', ecran] as const,
+  calculsTableau: (cles: readonly string[], du: string, au: string) =>
+    ['tableau-de-bord', 'calculs', cles, du, au] as const,
   visitesImport: (id: string) => ['visites', 'import', id] as const,
   visitesImportRevue: (id: string, page: number) =>
     ['visites', 'import', id, 'revue', page] as const,
