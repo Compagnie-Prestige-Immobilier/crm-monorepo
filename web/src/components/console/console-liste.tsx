@@ -12,7 +12,7 @@ import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { ListeEnCartes } from '@/components/ui/liste-en-cartes';
+import { ListeCartes } from '@/components/ui/liste-cartes';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -111,39 +111,42 @@ export function ListeAnnuaire({
 
   return (
     <div className="flex flex-col gap-3">
-      <ListeEnCartes
+      <div className="hidden md:block">
+        <TableauAnnuaire
+          lignes={annuaire.data.items}
+          filtreStatut={filtreStatut}
+          onChoisir={onChoisir}
+        />
+      </div>
+      <ListeCartes
         libelle="Fiches"
-        cartes={annuaire.data.items.map((row) => ({
-          cle: row.id,
-          titre: (
-            <>
-              <NomProspect row={row} />
-              <ProjetBadge projet={row.projet} />
-            </>
-          ),
-          telephone: row.phoneE164,
-          statut: <StatutAnnuaire row={row} />,
-          details: <EnCoursPar row={row} />,
-          action: (
-            <Button
-              variant="outline"
-              className="w-full"
-              aria-label={`Ouvrir la fiche de ${row.nom} ${row.prenom}`}
-              onClick={() => {
-                onChoisir(row);
-              }}
-            >
-              Ouvrir la fiche
-            </Button>
-          ),
-        }))}
-        tableau={
-          <TableauAnnuaire
-            lignes={annuaire.data.items}
-            filtreStatut={filtreStatut}
-            onChoisir={onChoisir}
-          />
-        }
+        items={annuaire.data.items}
+        cle={(row) => row.id}
+        titre={(row) => (
+          <span className="flex flex-wrap items-center gap-2">
+            <NomProspect row={row} />
+            <ProjetBadge projet={row.projet} />
+          </span>
+        )}
+        sousTitre={(row) => (
+          <>
+            <StatutAnnuaire row={row} />
+            <EnCoursPar row={row} />
+          </>
+        )}
+        numero={(row) => row.phoneE164}
+        action={(row) => (
+          <Button
+            variant="outline"
+            className="w-full"
+            aria-label={`Ouvrir la fiche de ${row.nom} ${row.prenom}`}
+            onClick={() => {
+              onChoisir(row);
+            }}
+          >
+            Ouvrir la fiche
+          </Button>
+        )}
       />
       <PiedAnnuaire page={page} liste={annuaire.data} onPage={onPage} />
     </div>
