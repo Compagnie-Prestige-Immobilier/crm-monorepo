@@ -12,6 +12,7 @@ import { useRef, useState } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
+import { QuestionsEpinglees } from '@/components/assistant/questions';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
 import { marqueRecommandee } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
@@ -527,6 +528,8 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
         onPreparerClasseur={preparerClasseur}
         exportPret={hasData && widgets.length > 0}
       />
+
+      {peut(user, 'assistant.utiliser') ? <QuestionsEpinglees /> : null}
 
       {/* « Comparer à » n'agit que sur le registre des visites : ici il serait inerte. */}
       <div className={classeRepliable(filtresOuverts)}>

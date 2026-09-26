@@ -2,6 +2,8 @@ import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-
 import { useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
+import { BulleAssistant } from '@/components/assistant/bulle-assistant';
+import { FournisseurAssistant } from '@/components/assistant/conversation';
 import { EcranErreurPleinePage } from '@/components/etats-router';
 import { CoqueShell } from '@/components/layout/coque-shell';
 import { DemoBanner } from '@/components/layout/demo-banner';
@@ -11,7 +13,7 @@ import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { LiveStream } from '@/components/live/live-stream';
 import { RappelPopUpIntrusif } from '@/components/rappels/rappel-pop-up-intrusif';
-import { peutTenirUneFiche } from '@/lib/types';
+import { peut, peutTenirUneFiche } from '@/lib/types';
 
 const PRESENCE_INTERVALLE_MS = 60_000;
 
@@ -54,7 +56,8 @@ function Panneau() {
     return () => window.clearInterval(id);
   }, [user]);
 
-  return (
+  const assistant = peut(user, 'assistant.utiliser');
+  const coque = (
     <CoqueShell>
       <LiveStream />
       {peutTenirUneFiche(user) ? <RappelPopUpIntrusif userId={user.id} /> : null}
@@ -67,6 +70,8 @@ function Panneau() {
           <Outlet />
         </main>
       </div>
+      {assistant ? <BulleAssistant /> : null}
     </CoqueShell>
   );
+  return assistant ? <FournisseurAssistant>{coque}</FournisseurAssistant> : coque;
 }
