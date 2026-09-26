@@ -18,6 +18,7 @@ import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { ProspectEditDialog } from '@/components/prospects/prospect-edit-dialog';
 import { ProspectMergeDialog } from '@/components/prospects/prospect-merge-dialog';
 import { ProspectReassignDialog } from '@/components/prospects/prospect-reassign-dialog';
+import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -58,7 +59,6 @@ import {
   PROSPECT_SORT_FIELDS,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
-  SEGMENT_LABELS,
   statutForProjet,
   type FilterOption,
   type Paginated,
@@ -86,7 +86,7 @@ const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
 
 const SEGMENT_OPTIONS: FilterOption[] = BDD_SEGMENTS.map((segment) => ({
   value: segment,
-  label: SEGMENT_LABELS[segment],
+  label: SEGMENT_LISIBLE[segment],
 }));
 
 const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
@@ -243,6 +243,12 @@ function deleteSummary(deleting: ProspectRow | null): string | null {
 }
 
 type Regroupement = 'aucun' | 'projet' | 'statut';
+
+const REGROUPEMENTS: Record<Regroupement, string> = {
+  aucun: 'Ne pas regrouper',
+  projet: 'Regrouper par projet',
+  statut: 'Regrouper par statut',
+};
 
 interface GroupeProspects {
   cle: string;
@@ -415,6 +421,7 @@ export function ProspectsTable({
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
         <Select
+          items={REGROUPEMENTS}
           value={regroupement}
           onValueChange={(value) => {
             setRegroupement(value as Regroupement);
@@ -425,9 +432,11 @@ export function ProspectsTable({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="aucun">Ne pas regrouper</SelectItem>
-            <SelectItem value="projet">Regrouper par projet</SelectItem>
-            <SelectItem value="statut">Regrouper par statut</SelectItem>
+            {Object.entries(REGROUPEMENTS).map(([valeur, libelle]) => (
+              <SelectItem key={valeur} value={valeur}>
+                {libelle}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -462,6 +471,7 @@ export function ProspectsTable({
               regroupement={regroupement}
               groupesFermes={groupesFermes}
               campaignScoped={campaignScoped}
+              avecPeriode={filters.dateFrom !== null || filters.dateTo !== null}
               colSpan={columns.length}
               onToggle={basculerGroupe}
             />
@@ -546,6 +556,7 @@ function CorpsProspects({
   regroupement,
   groupesFermes,
   campaignScoped,
+  avecPeriode,
   colSpan,
   onToggle,
 }: {
@@ -554,11 +565,21 @@ function CorpsProspects({
   regroupement: Regroupement;
   groupesFermes: ReadonlySet<string>;
   campaignScoped: boolean;
+  avecPeriode: boolean;
   colSpan: number;
   onToggle: (cle: string) => void;
 }) {
-  if (lignes.length === 0)
-    return <ProspectsTableEmptyRow campaignScoped={campaignScoped} colSpan={colSpan} />;
+  if (lignes.length === 0) {
+    const conseil = avecPeriode
+      ? 'Élargissez la période ou retirez un critère.'
+      : 'Retirez un critère pour élargir la liste.';
+    return (
+      <ProspectsTableEmptyRow
+        conseil={campaignScoped ? 'Vos campagnes n’en contiennent aucun.' : conseil}
+        colSpan={colSpan}
+      />
+    );
+  }
   if (regroupement === 'aucun') return <LignesProspects lignes={lignes} />;
   return groupes.map((groupe) => (
     <GroupeProspectsRows
@@ -621,24 +642,14 @@ function GroupeProspectsRows({
   );
 }
 
-function ProspectsTableEmptyRow({
-  campaignScoped,
-  colSpan,
-}: {
-  campaignScoped: boolean;
-  colSpan: number;
-}) {
+function ProspectsTableEmptyRow({ conseil, colSpan }: { conseil: string; colSpan: number }) {
   return (
     <TableRow className="hover:bg-transparent">
       <TableCell colSpan={colSpan} className="py-16">
         <div className="flex flex-col items-center gap-2 text-center">
           <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           <p className="font-[600]">Aucun prospect ne correspond à ces filtres.</p>
-          <p className="text-[0.8125rem] text-muted-foreground">
-            {campaignScoped
-              ? 'Vos campagnes n’en contiennent aucun.'
-              : 'Élargissez la période ou retirez un critère.'}
-          </p>
+          <p className="text-[0.8125rem] text-muted-foreground">{conseil}</p>
         </div>
       </TableCell>
     </TableRow>
