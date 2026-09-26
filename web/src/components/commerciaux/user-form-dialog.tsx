@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -109,9 +109,12 @@ export function UserFormDialog({
   });
   const roleId = useWatch({ control, name: 'roleId' });
   const erreurs = formState.errors;
+  const identifiantSaisi = useRef(false);
 
   useEffect(() => {
-    if (open) reset(valeursDuCompte(user));
+    if (!open) return;
+    identifiantSaisi.current = false;
+    reset(valeursDuCompte(user));
   }, [open, user, reset]);
 
   const mutation = useMutation({
@@ -156,13 +159,23 @@ export function UserFormDialog({
           </Field>
           <Field label="Adresse e-mail" required error={erreurs.email?.message}>
             {(props) => (
-              <Input {...props} type="email" autoComplete="email" {...register('email')} />
+              <Input
+                {...props}
+                type="email"
+                autoComplete="email"
+                {...register('email', {
+                  onChange: (event: { target: { value: string } }) => {
+                    if (user !== undefined || identifiantSaisi.current) return;
+                    setValue('username', event.target.value.split('@')[0] ?? '');
+                  },
+                })}
+              />
             )}
           </Field>
           <Field
             label="Identifiant"
             required
-            description="Utilisé pour la connexion, avec l’e-mail."
+            description="Proposé depuis l’e-mail. Sert à la connexion, comme l’e-mail."
             error={erreurs.username?.message}
           >
             {(props) => (
@@ -170,7 +183,11 @@ export function UserFormDialog({
                 {...props}
                 autoCapitalize="none"
                 spellCheck={false}
-                {...register('username')}
+                {...register('username', {
+                  onChange: () => {
+                    identifiantSaisi.current = true;
+                  },
+                })}
               />
             )}
           </Field>

@@ -146,7 +146,7 @@ export function BandeauEtat(props: {
             <StatutVeille etat={etat} simulation={simulation} />
           </div>
           <p className="text-sm text-muted-foreground">
-            Supervision autonome et résolution continue des tickets d’assistance.
+            Suivi et correction des tickets d’assistance.
           </p>
         </div>
 
@@ -179,12 +179,12 @@ export function BandeauEtat(props: {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Cadence opérationnelle
+                Surveillance des tickets
               </span>
               {etat.jevActif ? (
                 <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
                   <ShieldCheckIcon className="size-3 text-primary" aria-hidden="true" />
-                  Triage JEV actif
+                  Tri automatique actif
                 </Badge>
               ) : null}
             </div>
@@ -198,7 +198,7 @@ export function BandeauEtat(props: {
 
           <div className="flex flex-col gap-2 sm:border-l sm:border-border/60 sm:pl-6">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Agents autonomes engagés
+              Agents en service
             </span>
             <BadgesAgents agents={etat.agents} />
           </div>

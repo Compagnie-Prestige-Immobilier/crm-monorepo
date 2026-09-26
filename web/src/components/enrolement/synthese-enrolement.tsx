@@ -32,10 +32,10 @@ const PROJETS: readonly { projet: Projet; nom: string }[] = ONGLETS_ENROLEMENT.m
 /** Un compteur à zéro ne dit pas la même chose selon que la plateforme est muette ou jamais lue. */
 function enAttente(reglages: EnrolementReglages): string | null {
   if (!reglages.configuree) {
-    return 'Plateforme non configurée. Renseignez son adresse et son jeton pour lancer un tirage.';
+    return 'Plateforme non configurée. Adresse et jeton se règlent sur le serveur : prévenez l’équipe technique.';
   }
   if (reglages.dernierTirage === null) {
-    return 'Aucun tirage effectué. Les chiffres ci-dessous restent vides tant que rien n’a été lu.';
+    return 'Aucune lecture effectuée. Les chiffres ci-dessous restent vides tant que rien n’a été lu.';
   }
   return null;
 }
@@ -57,7 +57,7 @@ function Sante({ nom, reglages }: { nom: string; reglages: EnrolementReglages | 
         ) : (
           <ul className="flex flex-col gap-1 text-[0.875rem]">
             <li className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Dernier tirage</span>
+              <span className="text-muted-foreground">Dernière lecture</span>
               <span>{formatDateTime(tirage.termineLe)}</span>
             </li>
             <li className="flex justify-between gap-4">
@@ -194,6 +194,12 @@ export function SyntheseEnrolement() {
 
   return (
     <div className="flex flex-col gap-6 pt-2">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {PROJETS.map((entree, index) => (
+          <Sante key={entree.projet} nom={entree.nom} reglages={reglages[index]?.data} />
+        ))}
+      </div>
+
       <CourbeEnrolement
         titre="Inscriptions par jour"
         series={PROJETS.map((entree, index) => ({
@@ -209,12 +215,6 @@ export function SyntheseEnrolement() {
             titre={`Avancement · ${entree.nom}`}
             entonnoir={donnees[index]?.entonnoir}
           />
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {PROJETS.map((entree, index) => (
-          <Sante key={entree.projet} nom={entree.nom} reglages={reglages[index]?.data} />
         ))}
       </div>
 

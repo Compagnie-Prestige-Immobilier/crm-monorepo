@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoaderIcon } from 'lucide-react';
+import { LoaderIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -12,13 +12,26 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   fetchJournalParametres,
   fetchParametresChues,
   updateParametresChues,
-  type ParametresChues,
 } from '@/lib/data/parametres-chues';
 import { formatDateTime } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
@@ -35,7 +48,7 @@ const LIBELLES: Record<string, string> = {
   adhesionObjet: 'Avis d’adhésion, objet',
   adhesionCorps: 'Avis d’adhésion, corps',
   destinatairesAdhesion: 'Avis d’adhésion, destinataires',
-  destinatairesSupervision: 'Superviseurs',
+  destinatairesSupervision: 'Demande déposée, adresses en copie',
   codificationProvenances: 'Règles de provenance',
 };
 
@@ -51,53 +64,26 @@ const INFOS: Record<string, string> = {
     'Le numéro WhatsApp donné aux prospects dans l’accusé de réception, par {whatsappChues}.',
   messageWhatsapp:
     'Le message prérempli quand un téléconseiller ouvre WhatsApp depuis une fiche ou la console.',
-  accuseReceptionObjet:
-    'L’objet du courriel envoyé au prospect qui dépose une demande par le formulaire public.',
-  accuseReceptionCorps:
-    'Le corps de ce courriel d’accusé de réception, envoyé à l’adresse saisie dans le formulaire.',
-  destinatairesSupervision: 'Reçoit une copie de chaque demande déposée, pour les superviseurs.',
-  codificationProvenances:
-    'Traduit la colonne de provenance d’un classeur importé en canal et projet. Une campagne absente d’ici fait refuser ses lignes.',
 };
 
-const LISTES = ['destinatairesSupervision', 'destinatairesAdhesion'] as const;
-
 const CODIFICATION = 'codificationProvenances';
+const VARIABLES_WHATSAPP = ['prenom', 'lien', 'teleconseiller', 'telephoneTeleconseiller'];
+/** Le serveur refuse plus de cent règles. */
+const PROVENANCES_MAX = 100;
 
-/** Les mots que chaque texte accepte : ceux que le code remplace à l'envoi. */
-const TEXTES: {
-  cle: 'messageWhatsapp' | 'accuseReceptionObjet' | 'accuseReceptionCorps';
-  variables: readonly string[];
-  lignes: number;
-}[] = [
-  {
-    cle: 'messageWhatsapp',
-    variables: ['prenom', 'lien', 'teleconseiller', 'telephoneTeleconseiller'],
-    lignes: 4,
-  },
-  { cle: 'accuseReceptionObjet', variables: ['prenomNom', 'date'], lignes: 1 },
-  {
-    cle: 'accuseReceptionCorps',
-    variables: ['prenomNom', 'date', 'informations', 'telephone', 'emailChues', 'whatsappChues'],
-    lignes: 6,
-  },
+const PROJETS = [
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
 ];
 
-/** Une adresse par ligne : c'est ainsi qu'on les copie depuis un annuaire. */
-const enLignes = (adresses: readonly string[]): string => adresses.join('\n');
-const enListe = (saisie: string): string[] =>
-  saisie
-    .split(/[\n,;]/)
-    .map((part) => part.trim())
-    .filter((part) => part !== '');
+type Regle = { motif: string; canal: string; projet: string };
 
-// Une règle porte des virgules et des points-virgules dans ses libellés : seul le
-// retour à la ligne la sépare de la suivante.
-const enRegles = (saisie: string): string[] =>
-  saisie
-    .split('\n')
-    .map((ligne) => ligne.trim())
-    .filter((ligne) => ligne !== '');
+/** Le serveur lit « motif | canal | projet » : le tableau garde ce format stocké. */
+const enRegle = (ligne: string): Regle => {
+  const [motif = '', canal = '', projet = 'CHUES'] = ligne.split('|').map((part) => part.trim());
+  return { motif, canal, projet };
+};
+const enLigne = (regle: Regle): string => `${regle.motif} | ${regle.canal} | ${regle.projet}`;
 
 export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolean }) {
   const queryClient = useQueryClient();
@@ -105,7 +91,8 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     queryKey: queryKeys.parametresChues,
     queryFn: () => fetchParametresChues(),
   });
-  const [brouillon, setBrouillon] = useState<Partial<Record<string, string>>>({});
+  const [brouillon, setBrouillon] = useState<Partial<Record<CleTexte, string>>>({});
+  const [regles, setRegles] = useState<Regle[] | null>(null);
 
   const enregistrement = useMutation({
     mutationFn: (corps: Record<string, unknown>) => updateParametresChues(corps),
@@ -113,6 +100,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
       queryClient.setQueryData(queryKeys.parametresChues, suivants);
       void queryClient.invalidateQueries({ queryKey: queryKeys.parametresChuesJournal });
       setBrouillon({});
+      setRegles(null);
       toast.success('Paramètres enregistrés.');
     },
     onError: (erreur) => {
@@ -133,84 +121,48 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     );
 
   const lus = parametres.data;
-  const valeur = (cle: CleTexte): string => {
-    const saisi = brouillon[cle];
-    if (saisi !== undefined) return saisi;
-    const stockee = lus[cle];
-    return Array.isArray(stockee) ? enLignes(stockee) : stockee;
-  };
-  const saisir = (cle: string, texte: string) => {
+  const valeur = (cle: CleTexte): string => brouillon[cle] ?? lus[cle];
+  const saisir = (cle: CleTexte, texte: string) => {
     setBrouillon((courant) => ({ ...courant, [cle]: texte }));
   };
-  const modifie = Object.keys(brouillon).length > 0;
+  const reglesAffichees = regles ?? lus.codificationProvenances.map(enRegle);
+  const modifie = Object.keys(brouillon).length > 0 || regles !== null;
 
   const envoyer = () => {
-    const corps: Record<string, unknown> = {};
-    for (const [cle, texte] of Object.entries(brouillon)) {
-      if (texte === undefined) continue;
-      if (cle === CODIFICATION) {
-        corps[cle] = enRegles(texte);
-        continue;
-      }
-      corps[cle] = (LISTES as readonly string[]).includes(cle) ? enListe(texte) : texte;
+    const corps: Record<string, unknown> = { ...brouillon };
+    if (regles !== null) {
+      corps[CODIFICATION] = regles
+        .filter((regle) => regle.motif.trim() !== '' || regle.canal.trim() !== '')
+        .map(enLigne);
     }
     enregistrement.mutate(corps);
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-h2 font-[800] tracking-[-0.03em]">Paramètres</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Réglages communs à CHUES et Grand Public.
-          </p>
-        </div>
-        <Link href="/admin/referentiels" className={buttonVariants({ variant: 'outline' })}>
-          Listes de référence
-        </Link>
-      </div>
+      <EnTete peutToutRegler={peutToutRegler} />
       {peutToutRegler ? <CartePlateformes valeur={valeur} saisir={saisir} /> : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Messages envoyés aux prospects</CardTitle>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Les mots entre accolades sont remplacés à l’envoi : un clic les pose dans le texte.
-          </p>
+          <CardTitle>Message WhatsApp</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {TEXTES.map((texte) => (
-            <ChampTexteVariables
-              key={texte.cle}
-              label={LIBELLES[texte.cle] ?? texte.cle}
-              info={INFOS[texte.cle]}
-              valeur={valeur(texte.cle)}
-              usine={lus.textesUsine[texte.cle]}
-              variables={texte.variables}
-              lignes={texte.lignes}
-              onChange={(saisie) => {
-                saisir(texte.cle, saisie);
-              }}
-            />
-          ))}
-          {(['adhesionObjet', 'adhesionCorps'] as const).map((cle) => (
-            <Field key={cle} label={LIBELLES[cle] ?? cle}>
-              {(props) => (
-                <Textarea
-                  {...props}
-                  rows={cle === 'adhesionObjet' ? 1 : 6}
-                  value={valeur(cle)}
-                  onChange={(event) => saisir(cle, event.target.value)}
-                />
-              )}
-            </Field>
-          ))}
+        <CardContent>
+          <ChampTexteVariables
+            label="Texte du message"
+            info={INFOS.messageWhatsapp}
+            valeur={valeur('messageWhatsapp')}
+            usine={lus.textesUsine.messageWhatsapp}
+            variables={VARIABLES_WHATSAPP}
+            lignes={4}
+            onChange={(saisie) => {
+              saisir('messageWhatsapp', saisie);
+            }}
+          />
         </CardContent>
       </Card>
 
-      {peutToutRegler ? <CarteDestinataires valeur={valeur} saisir={saisir} /> : null}
-      {peutToutRegler ? <CarteCodification valeur={valeur} saisir={saisir} /> : null}
+      {peutToutRegler ? <CarteProvenances regles={reglesAffichees} onChange={setRegles} /> : null}
 
       <div className="flex items-center justify-end gap-3">
         {enregistrement.isError ? (
@@ -231,12 +183,40 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
-type CleTexte = Exclude<keyof ParametresChues, 'textesUsine'>;
+type CleTexte =
+  | 'plateformeChuesUrl'
+  | 'plateformeGrandPublicUrl'
+  | 'emailChues'
+  | 'whatsappChuesE164'
+  | 'messageWhatsapp';
 
 type ChampsProps = {
   valeur: (cle: CleTexte) => string;
-  saisir: (cle: string, texte: string) => void;
+  saisir: (cle: CleTexte, texte: string) => void;
 };
+
+function EnTete({ peutToutRegler }: { peutToutRegler: boolean }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="font-display text-h2 font-[800] tracking-[-0.03em]">Paramètres</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Réglages communs à CHUES et Grand Public.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {peutToutRegler ? (
+          <Link href="/admin/courriels" className={buttonVariants({ variant: 'outline' })}>
+            Courriels et messages
+          </Link>
+        ) : null}
+        <Link href="/admin/referentiels" className={buttonVariants({ variant: 'outline' })}>
+          Listes de référence
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function CartePlateformes({ valeur, saisir }: ChampsProps) {
   return (
@@ -275,67 +255,122 @@ function CartePlateformes({ valeur, saisir }: ChampsProps) {
   );
 }
 
-function CarteDestinataires({ valeur, saisir }: ChampsProps) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Destinataires en copie</CardTitle>
-        <p className="mt-1 text-[0.875rem] text-muted-foreground">
-          Une adresse par ligne. Ces comptes reçoivent une copie des demandes déposées.
-        </p>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
-        {LISTES.map((cle) => (
-          <Field key={cle} label={LIBELLES[cle] ?? cle} info={INFOS[cle]}>
-            {(props) => (
-              <Textarea
-                {...props}
-                rows={4}
-                value={valeur(cle)}
-                onChange={(event) => {
-                  saisir(cle, event.target.value);
-                }}
-              />
-            )}
-          </Field>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CarteCodification({ valeur, saisir }: ChampsProps) {
+function CarteProvenances({
+  regles,
+  onChange,
+}: {
+  regles: Regle[];
+  onChange: (regles: Regle[]) => void;
+}) {
+  const modifier = (index: number, partiel: Partial<Regle>) => {
+    onChange(regles.map((regle, i) => (i === index ? { ...regle, ...partiel } : regle)));
+  };
   return (
     <Card>
       <CardHeader>
         <CardTitle>Provenances des classeurs importés</CardTitle>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
-          Une règle par ligne : motif, canal, projet, séparés par une barre verticale. Le motif est
-          cherché dans la colonne de provenance du classeur. Ajoutez une ligne quand une campagne
-          nouvelle apparaît, sinon l’import refuse ses lignes.
+          Le motif est cherché dans la colonne de provenance du classeur. Une campagne sans règle
+          fait refuser ses lignes à l’import.
         </p>
       </CardHeader>
-      <CardContent>
-        <Field label={LIBELLES[CODIFICATION] ?? CODIFICATION} info={INFOS[CODIFICATION]}>
-          {(props) => (
-            <Textarea
-              {...props}
-              rows={6}
-              spellCheck={false}
-              placeholder="Meta CPI GRAND PUBLIC | Meta (Facebook et Instagram) | GRAND_PUBLIC"
-              value={valeur(CODIFICATION)}
-              onChange={(event) => {
-                saisir(CODIFICATION, event.target.value);
-              }}
-            />
-          )}
-        </Field>
+      <CardContent className="flex flex-col gap-3">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Motif</TableHead>
+              <TableHead>Canal</TableHead>
+              <TableHead>Projet</TableHead>
+              <TableHead>
+                <span className="sr-only">Retirer</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {regles.map((regle, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Input
+                    className="min-w-44"
+                    aria-label={`Motif de la règle ${String(index + 1)}`}
+                    spellCheck={false}
+                    value={regle.motif}
+                    placeholder="Meta CPI GRAND PUBLIC"
+                    onChange={(event) => {
+                      modifier(index, { motif: event.target.value });
+                    }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    className="min-w-44"
+                    aria-label={`Canal de la règle ${String(index + 1)}`}
+                    value={regle.canal}
+                    placeholder="Meta (Facebook et Instagram)"
+                    onChange={(event) => {
+                      modifier(index, { canal: event.target.value });
+                    }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Select
+                    items={PROJETS}
+                    value={regle.projet}
+                    onValueChange={(projet) => {
+                      if (projet !== null) modifier(index, { projet });
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label={`Projet de la règle ${String(index + 1)}`}
+                      className="w-40"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJETS.map((projet) => (
+                        <SelectItem key={projet.value} value={projet.value}>
+                          {projet.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Retirer la règle ${String(index + 1)}`}
+                    onClick={() => {
+                      onChange(regles.filter((_, i) => i !== index));
+                    }}
+                  >
+                    <Trash2Icon className="size-4" aria-hidden="true" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={regles.length >= PROVENANCES_MAX}
+            onClick={() => {
+              onChange([...regles, { motif: '', canal: '', projet: 'CHUES' }]);
+            }}
+          >
+            <PlusIcon className="size-4" aria-hidden="true" />
+            Ajouter une règle
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/** EB-29 : qui a changé quoi, et ce que la valeur disait avant. */
+/** Qui a changé quoi, et ce que la valeur disait avant. */
 function JournalDesParametres() {
   const journal = useQuery({
     queryKey: queryKeys.parametresChuesJournal,

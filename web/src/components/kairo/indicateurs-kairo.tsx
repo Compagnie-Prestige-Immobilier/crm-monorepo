@@ -56,7 +56,7 @@ function genererStats(
       accent: enCours > 0 ? 'text-primary' : 'text-foreground',
     },
     {
-      titre: 'PR proposées',
+      titre: 'Corrections proposées',
       valeur: String(pr),
       detail: `${String(pr)} à relire`,
       accent: pr > 0 ? 'text-success' : 'text-foreground',
@@ -70,13 +70,13 @@ function genererStats(
     {
       titre: 'Taux de succès',
       valeur: libelleTaux(pr, termines),
-      detail: `${String(pr)} PR sur ${String(termines)} terminé${termines > 1 ? 's' : ''}`,
+      detail: `${String(pr)} corrections sur ${String(termines)} tickets terminés`,
       accent: 'text-foreground',
     },
     {
-      titre: 'Délai moyen (MTTR)',
+      titre: 'Délai moyen de correction',
       valeur: mttr > 0 ? formatDuree(mttr) : '–',
-      detail: 'Temps moyen avant PR',
+      detail: 'Du signalement à la correction proposée',
       accent: 'text-foreground',
     },
   ];
