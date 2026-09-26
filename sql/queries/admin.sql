@@ -42,8 +42,8 @@ WHERE "id" = $1 AND "deletedAt" IS NULL;
 
 -- name: UserIdentifierTaken :one
 SELECT "email", "username" FROM "users"
-WHERE (sqlc.narg('email')::text IS NOT NULL AND "email" = sqlc.narg('email')::text)
-   OR (sqlc.narg('username')::text IS NOT NULL AND "username" = sqlc.narg('username')::text)
+WHERE lower("email") IN (lower(sqlc.narg('email')::text), lower(sqlc.narg('username')::text))
+   OR lower("username") IN (lower(sqlc.narg('email')::text), lower(sqlc.narg('username')::text))
 ORDER BY "createdAt", "id"
 LIMIT 1;
 

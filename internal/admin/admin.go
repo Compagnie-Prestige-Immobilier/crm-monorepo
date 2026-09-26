@@ -301,7 +301,7 @@ func (s *service) identifiantsLibres(ctx context.Context, email, username *strin
 		return err
 	}
 	champ, message := "body.username", "Ce nom d’utilisateur est déjà utilisé."
-	if email != nil && clash.Email == *email {
+	if email != nil && (strings.EqualFold(clash.Email, *email) || strings.EqualFold(clash.Username, *email)) {
 		champ, message = "body.email", "Cette adresse e-mail est déjà utilisée."
 	}
 	return &socle.ProblemError{
@@ -415,7 +415,7 @@ func adminSurvit(ctx context.Context, q *db.Queries, existant *db.UserRoleForUpd
 }
 
 func identifiantChange(suivant *string, courant string) *string {
-	if suivant == nil || *suivant == courant {
+	if suivant == nil || strings.EqualFold(*suivant, courant) {
 		return nil
 	}
 	return suivant
