@@ -200,9 +200,7 @@ export function PanneauAssistant() {
         <CardContent className="flex flex-col gap-4 p-5">
           <p className="flex items-start gap-2 text-[0.8125rem] text-muted-foreground">
             <SparklesIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-            Posez une question sur les chiffres de la base. Le modèle sert à comprendre la question
-            et à écrire la lecture ; les chiffres et la réponse viennent du serveur, et aucune
-            donnée ne lui est transmise.
+            Posez une question sur les chiffres de la base.
           </p>
           <Textarea
             value={question}
