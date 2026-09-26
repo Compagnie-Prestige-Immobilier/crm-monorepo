@@ -192,7 +192,20 @@ type QualificationRappelOutput struct {
 	Body QualificationRappelDTO
 }
 
-const qualificationReportRappel = 15 * time.Minute
+type QualificationReportInput struct {
+	ID    string `path:"id" format:"uuid"`
+	Duree string `query:"duree" enum:",15min,1h,2h,demain" doc:"Absente : 15 minutes. « demain » : le lendemain à 8 h 30, heure de Dakar."`
+}
+
+var qualificationReports = map[string]time.Duration{"": 15 * time.Minute, "15min": 15 * time.Minute, "1h": time.Hour, "2h": 2 * time.Hour}
+
+func qualificationReportA(duree string, maintenant time.Time, zone *time.Location) time.Time {
+	if ecart, ok := qualificationReports[duree]; ok {
+		return maintenant.Add(ecart).UTC()
+	}
+	local := maintenant.In(zone)
+	return time.Date(local.Year(), local.Month(), local.Day()+1, 8, 30, 0, 0, zone).UTC()
+}
 
 func (s *service) qualificationRappelAMoi(ctx context.Context, u *socle.Utilisateur, id string) (db.RappelParIdRow, error) {
 	row, err := s.Q.RappelParId(ctx, id)
@@ -216,7 +229,7 @@ func qualificationRappelSortie(row *db.RappelParIdRow) *QualificationRappelOutpu
 	}, time.Now().UTC())}
 }
 
-func (s *service) qualificationReporterRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
+func (s *service) qualificationReporterRappel(ctx context.Context, in *QualificationReportInput) (*QualificationRappelOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	row, err := s.qualificationRappelAMoi(ctx, &u, in.ID)
 	if err != nil {
@@ -224,10 +237,10 @@ func (s *service) qualificationReporterRappel(ctx context.Context, in *Qualifica
 	}
 	if row.RendezVousNonReportable && row.Status == db.ScheduledCallbackStatusPENDING {
 		return nil, socle.Problem(http.StatusConflict, "RENDEZ_VOUS_NON_REPORTABLE",
-			"Un rendez-vous ne se décale pas de 15 minutes : changez sa date en requalifiant la fiche.")
+			"Un rendez-vous ne se reporte pas d'ici : changez sa date en requalifiant la fiche.")
 	}
 	if row.Status == db.ScheduledCallbackStatusPENDING {
-		row.ScheduledAt = time.Now().UTC().Add(qualificationReportRappel)
+		row.ScheduledAt = qualificationReportA(in.Duree, time.Now(), s.Cfg.TimeZone)
 		if err := s.Q.ReporterRappel(ctx, db.ReporterRappelParams{ID: row.ID, ScheduledAt: row.ScheduledAt}); err != nil {
 			return nil, err
 		}
