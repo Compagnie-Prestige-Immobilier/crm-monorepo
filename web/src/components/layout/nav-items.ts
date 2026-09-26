@@ -462,7 +462,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Nouvelle vente',
         icon: PlusCircleIcon,
         description: 'Enregistrer une vente pas à pas',
-        acces: 'ventes.lire',
+        acces: 'ventes.gerer',
       },
       {
         href: '/ventes',
@@ -497,7 +497,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Sites et canaux',
         icon: SettingsIcon,
         description: 'Prix, lots et canaux proposés à la saisie',
-        acces: 'ventes.lire',
+        acces: 'ventes.gerer',
         secondary: true,
       },
     ],
