@@ -1151,7 +1151,7 @@ func notificationVagues(cibles []notificationCibleEmail, parID map[string]db.Not
 				destinataires = append(destinataires, DestinataireBrevo{Email: ligne.email, Nom: ligne.nom})
 			}
 			lots = append(lots, notificationLotEmail{
-				message: MessageBrevo{Destinataires: destinataires, Sujet: titre, HTML: html, Texte: texte},
+				message: MessageBrevo{Destinataires: destinataires, Sujet: titre, HTML: html, Texte: texte, UneVersionParDestinataire: true},
 				lignes:  tranche,
 			})
 		}
