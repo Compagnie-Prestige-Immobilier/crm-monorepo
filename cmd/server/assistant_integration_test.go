@@ -347,8 +347,8 @@ func TestAssistantJeuEvaluation(t *testing.T) {
 	if err := json.Unmarshal([]byte(messages[0]), &entree); err != nil {
 		t.Fatal(err)
 	}
-	if len(entree.Outils) != 10 {
-		t.Fatalf("la direction doit disposer des dix outils, reçus %v", entree.Outils)
+	if len(entree.Outils) != 12 {
+		t.Fatalf("la direction doit disposer des douze outils, reçus %v", entree.Outils)
 	}
 }
 
@@ -404,7 +404,7 @@ func TestAssistantOutilHorsDuRole(t *testing.T) {
 		proposes = append(proposes, nom)
 	}
 	slices.Sort(proposes)
-	attendus := []string{"appels", "appels_representants", "campagnes", "conversions_par_canal", "dossiers_bancaires", "prevision_conversions", "rappels"}
+	attendus := []string{"appels", "appels_representants", "campagnes", "conversions_par_canal", "dossiers_bancaires", "objectifs", "prevision_conversions", "rappels"}
 	if !slices.Equal(proposes, attendus) {
 		t.Fatalf("outils proposés à la supervision : %v, attendus %v", proposes, attendus)
 	}

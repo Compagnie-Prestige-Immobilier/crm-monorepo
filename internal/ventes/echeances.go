@@ -65,22 +65,35 @@ func monterEcheances(api huma.API, s *service) {
 	}, s.echeancesEnRetard)
 }
 
+// Les échéances en retard au jour de `maintenant` à `zone` ; `tronque` dit que
+// seules les plus anciennes ventes à crédit ont été examinées.
+func EcheancesEnRetard(ctx context.Context, q *db.Queries, maintenant time.Time, zone *time.Location) (lignes []EcheanceEnRetardDTO, tronque bool, err error) {
+	ventes, err := q.EcheancesVentesACredit(ctx, db.EcheancesVentesACreditParams{Apres: 0, Taille: plafondVentes + 1})
+	if err != nil {
+		return nil, false, err
+	}
+	tronque = len(ventes) > plafondVentes
+	ventes = ventes[:min(len(ventes), plafondVentes)]
+	local := maintenant.In(zone)
+	aujourdhui := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	lignes = []EcheanceEnRetardDTO{}
+	for i := range ventes {
+		if ligne, enRetard := retardVente(&ventes[i], aujourdhui); enRetard {
+			lignes = append(lignes, ligne)
+		}
+	}
+	return lignes, tronque, nil
+}
+
 func (s *service) echeancesEnRetard(ctx context.Context, in *EcheancesEnRetardInput) (*EcheancesEnRetardOutput, error) {
-	ventes, err := s.Q.EcheancesVentesACredit(ctx, db.EcheancesVentesACreditParams{Apres: 0, Taille: plafondVentes + 1})
+	lignes, tronque, err := EcheancesEnRetard(ctx, s.Q, time.Now(), s.Cfg.TimeZone)
 	if err != nil {
 		return nil, err
 	}
 	out := &EcheancesEnRetardOutput{}
-	out.Body.Tronque = len(ventes) > plafondVentes
-	ventes = ventes[:min(len(ventes), plafondVentes)]
-	local := time.Now().In(s.Cfg.TimeZone)
-	aujourdhui := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
-	lignes := []EcheanceEnRetardDTO{}
-	for i := range ventes {
-		if ligne, enRetard := retardVente(&ventes[i], aujourdhui); enRetard {
-			ligne.TelephoneE164 = database.TelephoneOptionnel(&ventes[i].Telephone, s.Cfg.PhoneRegion)
-			lignes = append(lignes, ligne)
-		}
+	out.Body.Tronque = tronque
+	for i := range lignes {
+		lignes[i].TelephoneE164 = database.TelephoneOptionnel(&lignes[i].Telephone, s.Cfg.PhoneRegion)
 	}
 	sort.Slice(lignes, func(i, j int) bool {
 		if lignes[i].JoursRetard != lignes[j].JoursRetard {

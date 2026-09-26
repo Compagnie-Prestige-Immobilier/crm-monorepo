@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"cpi-go/db"
 	"math"
 	"time"
 
@@ -32,7 +33,7 @@ type ObjectifsOutput struct{ Body Campaigne2026Objectifs }
 func (s *service) suiveObjectifs2026(ctx context.Context, _ *struct{}) (*ObjectifsOutput, error) {
 	cle := s.Cfg.Base + ":supervision/objectifs:" + porteeDeCache(ctx)
 	corps, err := avecCache(cle, ttlAnalyses, func() (Campaigne2026Objectifs, error) {
-		return s.lireObjectifs2026(ctx)
+		return Objectifs2026(ctx, s.Q, s.Cfg.TimeZone)
 	})
 	if err != nil {
 		return nil, err
@@ -40,21 +41,21 @@ func (s *service) suiveObjectifs2026(ctx context.Context, _ *struct{}) (*Objecti
 	return &ObjectifsOutput{Body: corps}, nil
 }
 
-func (s *service) lireObjectifs2026(ctx context.Context) (Campaigne2026Objectifs, error) {
+func Objectifs2026(ctx context.Context, q *db.Queries, zone *time.Location) (Campaigne2026Objectifs, error) {
 	debut, _ := time.Parse("2006-01-02", "2026-09-10")
-	maintenant := time.Now().In(s.Cfg.TimeZone)
+	maintenant := time.Now().In(zone)
 
 	joursTotaux := 105
 	joursEcoules := int(math.Max(1, math.Min(float64(joursTotaux), maintenant.Sub(debut).Hours()/24)))
 	tauxTemps := math.Round((float64(joursEcoules)/float64(joursTotaux)*100)*10) / 10
 
-	chuesTotal, err := s.Q.StockRepresentants(ctx)
+	chuesTotal, err := q.StockRepresentants(ctx)
 	if err != nil {
 		return Campaigne2026Objectifs{}, err
 	}
 	realisedChues := int(chuesTotal.Total)
 
-	marketingQual, err := s.Q.QualiteMarketing(ctx)
+	marketingQual, err := q.QualiteMarketing(ctx)
 	if err != nil {
 		return Campaigne2026Objectifs{}, err
 	}
