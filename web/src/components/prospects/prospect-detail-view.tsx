@@ -143,9 +143,6 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
               </Link>
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
-            {peut(user, 'prospects.lire') ? (
-              <BoutonResume resume={resume} prospectId={prospect.id} />
-            ) : null}
             <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
             <AffecterFiche
               cible="prospect"
@@ -155,6 +152,9 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             />
             <SuiviRendezVous prospect={prospect} />
             <MarquerVendu prospect={prospect} user={user} />
+            {peut(user, 'prospects.lire') ? (
+              <BoutonResume resume={resume} prospectId={prospect.id} />
+            ) : null}
           </>
         }
         chiffres={chiffresDe(prospect)}

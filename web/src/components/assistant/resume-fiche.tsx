@@ -24,6 +24,7 @@ export function BoutonResume({
   return (
     <Button
       variant="outline"
+      className="max-sm:col-span-2"
       disabled={resume.isPending}
       aria-busy={resume.isPending}
       onClick={() => {
