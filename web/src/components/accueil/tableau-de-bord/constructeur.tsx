@@ -149,14 +149,20 @@ export default function Constructeur({
   plage,
   cleDonnees,
   chargerSource,
+  depart,
   onAjouter,
 }: ChargementDonnees & {
   ecran: DashboardEcran;
   catalogue: Catalogue;
+  depart?: Proposition | undefined;
   onAjouter: (widget: Omit<DashboardWidget, 'id'>) => Promise<unknown>;
 }) {
-  const [etape, setEtape] = useState<Etape>({ nom: 'saisie', initiale: '' });
-  const [proposition, setProposition] = useState<Proposition | undefined>();
+  const [etape, setEtape] = useState<Etape>(
+    depart === undefined
+      ? { nom: 'saisie', initiale: '' }
+      : { nom: 'forme', demande: depart.titre, proposition: depart },
+  );
+  const [proposition, setProposition] = useState<Proposition | undefined>(depart);
   const [ajoutes, setAjoutes] = useState<string[]>([]);
   const [erreur, setErreur] = useState<string | undefined>();
   const [ajout, setAjout] = useState(false);

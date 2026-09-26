@@ -21,6 +21,8 @@ import {
 import type { CatalogueEntree, DonneesSource } from '@/components/accueil/tableau-de-bord/sources';
 import {
   BoutonAjouterIndicateur,
+  editionDe,
+  type Edition,
   cartesDu,
   useTableauDeBord,
 } from '@/components/accueil/tableau-de-bord/tableau';
@@ -339,6 +341,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
   };
 
   const tableau = useTableauDeBord(ecran, plage);
+  const [edition, setEdition] = useState<Edition | null>(null);
   const dispositionQuery = tableau.dispositionQuery;
 
   const resetMutation = useMutation({
@@ -418,6 +421,9 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
               cleDonnees={[projet, filters.teleconseiller, filters.campagne]}
               chargerSource={chargerSource}
               onAjouter={tableau.ajouter}
+              edition={edition}
+              onRemplacer={tableau.remplacer}
+              onFinEdition={() => setEdition(null)}
             />
           ) : null
         }
@@ -472,6 +478,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
               editable={peutDisposer}
               messageVide="Rien sur la période."
               onReorder={tableau.deplacer}
+              onModifier={(id) => setEdition(editionDe(tableau, cartes, id))}
               onRemove={(id) => {
                 tableau.retirer(id, cartes.entrees.get(id)?.label ?? '');
               }}

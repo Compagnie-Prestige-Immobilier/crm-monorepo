@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheetIcon } from 'lucide-react';
+import { useState } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
@@ -21,6 +22,8 @@ import {
 } from '@/components/accueil/tableau-de-bord/sources';
 import {
   BoutonAjouterIndicateur,
+  editionDe,
+  type Edition,
   cartesDu,
   useTableauDeBord,
 } from '@/components/accueil/tableau-de-bord/tableau';
@@ -209,6 +212,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   });
 
   const tableau = useTableauDeBord('visites', plage);
+  const [edition, setEdition] = useState<Edition | null>(null);
   const dispositionQuery = tableau.dispositionQuery;
 
   const resetMutation = useMutation({
@@ -272,6 +276,9 @@ export function DashboardVisitesView({ role }: { role: Role }) {
               cleDonnees={[]}
               chargerSource={(source) => Promise.resolve(donneesParSource.get(source) ?? null)}
               onAjouter={tableau.ajouter}
+              edition={edition}
+              onRemplacer={tableau.remplacer}
+              onFinEdition={() => setEdition(null)}
             />
           ) : null}
         </div>
@@ -317,6 +324,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
               erreurs={cartes.erreurs}
               editable={peutDisposer}
               onReorder={tableau.deplacer}
+              onModifier={(id) => setEdition(editionDe(tableau, cartes, id))}
               onRemove={(id) => {
                 tableau.retirer(id, cartes.entrees.get(id)?.label ?? '');
               }}

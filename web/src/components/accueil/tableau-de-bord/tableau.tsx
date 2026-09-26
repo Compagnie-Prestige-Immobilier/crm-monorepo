@@ -23,6 +23,7 @@ import {
   type DashboardEcran,
   type DashboardWidget,
   type Disposition,
+  type Proposition,
 } from '@/lib/data/disposition';
 import { apiErrorText, toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
@@ -118,7 +119,25 @@ export function useTableauDeBord(ecran: DashboardEcran, plage: Plage) {
   const ajouter = (widget: NouveauWidget): Promise<Disposition> =>
     enregistrer.mutateAsync([...widgets, { ...widget, id: `nouveau-${String(widgets.length)}` }]);
 
-  return { dispositionQuery, widgets, calculsQuery, deplacer, redimensionner, retirer, ajouter };
+  const remplacer = (id: string, widget: NouveauWidget): Promise<Disposition> =>
+    enregistrer.mutateAsync(
+      widgets.map((ancien) =>
+        ancien.id === id
+          ? { ...widget, id, ...(ancien.taille === undefined ? {} : { taille: ancien.taille }) }
+          : ancien,
+      ),
+    );
+
+  return {
+    dispositionQuery,
+    widgets,
+    calculsQuery,
+    deplacer,
+    redimensionner,
+    retirer,
+    ajouter,
+    remplacer,
+  };
 }
 
 type Tableau = ReturnType<typeof useTableauDeBord>;
@@ -194,6 +213,19 @@ export function cartesDu(
   return cartes;
 }
 
+export interface Edition {
+  id: string;
+  proposition: Proposition;
+}
+
+export function editionDe(tableau: Tableau, cartes: Cartes, id: string): Edition | null {
+  const widget = tableau.widgets.find((w) => w.id === id);
+  if (widget === undefined) return null;
+  const titre = cartes.entrees.get(id)?.label ?? widget.titre ?? '';
+  const cible = widget.calcul === undefined ? { source: widget.source } : { calcul: widget.calcul };
+  return { id, proposition: { ...cible, titre } };
+}
+
 export function BoutonAjouterIndicateur({
   ecran,
   catalogue,
@@ -201,6 +233,9 @@ export function BoutonAjouterIndicateur({
   cleDonnees,
   chargerSource,
   onAjouter,
+  edition,
+  onRemplacer,
+  onFinEdition,
 }: {
   ecran: DashboardEcran;
   catalogue: Catalogue;
@@ -208,16 +243,34 @@ export function BoutonAjouterIndicateur({
   cleDonnees: readonly unknown[];
   chargerSource: (source: string) => Promise<DonneesSource | null>;
   onAjouter: (widget: NouveauWidget) => Promise<unknown>;
+  edition: Edition | null;
+  onRemplacer: (id: string, widget: NouveauWidget) => Promise<unknown>;
+  onFinEdition: () => void;
 }) {
-  const [ouvert, setOuvert] = useState(false);
+  const [ouvertPourAjout, setOuvert] = useState(false);
+  const ouvert = ouvertPourAjout || edition !== null;
+  const changerOuverture = (suivant: boolean) => {
+    setOuvert(suivant);
+    if (!suivant) onFinEdition();
+  };
+  // Après un remplacement, la fenêtre reste ouverte pour enchaîner un ajout.
+  const confirmer = async (widget: NouveauWidget) => {
+    if (edition === null) return onAjouter(widget);
+    const fait = await onRemplacer(edition.id, widget);
+    setOuvert(true);
+    onFinEdition();
+    return fait;
+  };
   return (
-    <Dialog open={ouvert} onOpenChange={setOuvert}>
+    <Dialog open={ouvert} onOpenChange={changerOuverture}>
       <Button type="button" onClick={() => setOuvert(true)}>
         <SparklesIcon aria-hidden="true" />
         Ajouter un indicateur
       </Button>
       <DialogContent className="top-[8dvh] translate-y-0 gap-0 p-0 shadow-elev-xl outline-none sm:max-w-2xl sm:rounded-2xl">
-        <DialogTitle className="sr-only">Ajouter un indicateur</DialogTitle>
+        <DialogTitle className="sr-only">
+          {edition === null ? 'Ajouter un indicateur' : 'Modifier un indicateur'}
+        </DialogTitle>
         <DialogDescription className="sr-only">
           Décrivez le chiffre voulu, confirmez, choisissez sa forme.
         </DialogDescription>
@@ -229,7 +282,8 @@ export function BoutonAjouterIndicateur({
               plage={plage}
               cleDonnees={cleDonnees}
               chargerSource={chargerSource}
-              onAjouter={onAjouter}
+              depart={edition?.proposition}
+              onAjouter={confirmer}
             />
           ) : null}
         </Suspense>
