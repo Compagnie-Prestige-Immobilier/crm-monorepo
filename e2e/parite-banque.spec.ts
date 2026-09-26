@@ -90,8 +90,8 @@ test.afterAll(async () => {
     `%${NOM_DEMANDE}%`,
     `%${NOM_BANQUE}%`,
   ]);
-  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
   await effacerBanque(banqueId);
+  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
 });
 
 test.describe('parité banque, les écrans du dossier bancaire', () => {
