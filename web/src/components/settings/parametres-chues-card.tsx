@@ -291,6 +291,7 @@ function CarteProvenances({
               <TableRow key={index}>
                 <TableCell>
                   <Input
+                    className="min-w-44"
                     aria-label={`Motif de la règle ${String(index + 1)}`}
                     spellCheck={false}
                     value={regle.motif}
@@ -302,6 +303,7 @@ function CarteProvenances({
                 </TableCell>
                 <TableCell>
                   <Input
+                    className="min-w-44"
                     aria-label={`Canal de la règle ${String(index + 1)}`}
                     value={regle.canal}
                     placeholder="Meta (Facebook et Instagram)"
