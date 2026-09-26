@@ -27,7 +27,7 @@ func (s *service) campagneFiches(ctx context.Context, in *CampagneFichesInput) (
 	if err != nil {
 		return nil, err
 	}
-	traitees, err := s.lotPositionsTraitees(ctx, row)
+	traitees, err := lotPositionsTraitees(ctx, s.Q, row)
 	if err != nil {
 		return nil, err
 	}

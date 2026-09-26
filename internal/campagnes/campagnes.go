@@ -370,8 +370,8 @@ func (s *service) lotEquipe(ctx context.Context, ids []string) ([]lotTeleconseil
 
 // Au retrait, seuls les membres encore téléconseillers reprennent des fiches :
 // un compte dont le rôle a changé ne bloque pas la sortie d'un autre.
-func (s *service) lotEquipeRestante(ctx context.Context, ids []string) ([]lotTeleconseiller, error) {
-	rows, err := s.Q.Teleconseillers(ctx, ids)
+func lotEquipeRestante(ctx context.Context, q *db.Queries, ids []string) ([]lotTeleconseiller, error) {
+	rows, err := q.Teleconseillers(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func (s *service) lotRetraitPossible(ctx context.Context, lotID, teleconseillerI
 	}
 	restants := slices.DeleteFunc(slices.Clone(lotLireFiltres(row.Filters).Distribution.TeleconseillerIds),
 		func(membre string) bool { return membre == teleconseillerID })
-	_, err = s.lotEquipeRestante(ctx, restants)
+	_, err = lotEquipeRestante(ctx, s.Q, restants)
 	return err
 }
 
@@ -684,9 +684,8 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	return lotID.String(), tx.Commit(ctx)
 }
 
-// Un représentant est CHUES par construction ; un lot de prospects sans projet
-// tire CHUES et Grand Public ensemble. Un CONTACTS_RECOMMANDES sans filtre
-// « prospects » est une recommandation de représentant, donc CHUES aussi.
+// Représentants et recommandations de représentants (CONTACTS_RECOMMANDES sans filtre « prospects ») sont CHUES ;
+// un lot de prospects sans projet tire CHUES et Grand Public ensemble.
 func projetDuLot(body *CampagneCreationBody) *db.Projet {
 	if body.Prospects == nil {
 		projet := db.Projet("CHUES")
@@ -740,9 +739,8 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 	})
 }
 
-// EB-19 : un contact recommandé devient une fiche au LANCEMENT de la campagne.
-// Le numéro porte un index unique partiel : sans ce dédoublonnage, deux
-// suggestions du même numéro feraient échouer la transaction entière.
+// Un contact recommandé devient une fiche au LANCEMENT de la campagne ; le numéro porte un index
+// unique partiel, d'où un seul numéro par place et l'écart de ceux déjà connus.
 func (*service) lotOuvrirContactsRecommandes(ctx context.Context, q *db.Queries, createurID string,
 	f *lotFiltres, places int,
 ) ([]string, error) {
@@ -1216,15 +1214,15 @@ func (s *service) lotLignesPerformance(ctx context.Context, row *db.LotParIdRow)
 
 // Sur la POSITION et non sur la fiche : la même personne peut figurer dans deux
 // campagnes, et c'est cette ligne-ci qui est traitée ou non.
-func (s *service) lotPositionsTraitees(ctx context.Context, row *db.LotParIdRow) (map[int32]bool, error) {
+func lotPositionsTraitees(ctx context.Context, q *db.Queries, row *db.LotParIdRow) (map[int32]bool, error) {
 	var positions []int32
 	var err error
 	if lotSurRepresentants(string(row.Cible), row.Projet) {
-		positions, err = s.Q.LotPositionsAppeleesRepresentants(ctx, db.LotPositionsAppeleesRepresentantsParams{
+		positions, err = q.LotPositionsAppeleesRepresentants(ctx, db.LotPositionsAppeleesRepresentantsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
 	} else {
-		positions, err = s.Q.LotPositionsAppeleesProspects(ctx, db.LotPositionsAppeleesProspectsParams{
+		positions, err = q.LotPositionsAppeleesProspects(ctx, db.LotPositionsAppeleesProspectsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
 	}
@@ -1252,15 +1250,10 @@ func (s *service) campagneReaffecter(ctx context.Context, in *CampagneReaffecter
 	if _, err := s.lotEquipe(ctx, []string{vers}); err != nil {
 		return nil, err
 	}
-	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers, true)
-	if err != nil {
-		return nil, err
-	}
-	if len(mouvements) == 0 {
-		return nil, lotReaffectationVide()
-	}
-	if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.reaffectation",
-		map[string]any{lotCleVers: vers}); err != nil {
+	if err := s.lotAppliquerMouvements(ctx, row, vers, "", "lot_export.reaffectation", map[string]any{lotCleVers: vers},
+		func(q *db.Queries, _ *lotFiltres) ([]lotMouvement, error) {
+			return lotMouvementsExiges(lotMouvementsVers(ctx, q, row, in.Body.Positions, vers, true))
+		}); err != nil {
 		return nil, err
 	}
 	return s.campagneDetail(ctx, &CampagneIDInput{ID: in.ID})
@@ -1273,26 +1266,30 @@ type CampagneRetraitInput struct {
 	}
 }
 
-// Le retiré rend ses fiches non traitées, redistribuées au reste de l'équipe
-// selon les objectifs en vigueur.
 func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput) (*CampagneDetailOutput, error) {
 	row, err := s.lot(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	filtres := lotLireFiltres(row.Filters)
-	restants := slices.DeleteFunc(slices.Clone(filtres.Distribution.TeleconseillerIds),
-		func(membre string) bool { return membre == in.Body.TeleconseillerID })
-	if len(restants) == 0 {
-		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
-			"Une campagne garde au moins un téléconseiller.")
+	retire := in.Body.TeleconseillerID
+	if err := s.lotAppliquerMouvements(ctx, row, "", retire, "lot_export.retrait", map[string]any{"teleconseillerId": retire},
+		func(q *db.Queries, filtres *lotFiltres) ([]lotMouvement, error) {
+			return lotReprises(ctx, q, row, filtres, retire)
+		}); err != nil {
+		return nil, err
 	}
-	traitees, err := s.lotPositionsTraitees(ctx, row)
+	return s.campagneDetail(ctx, &CampagneIDInput{ID: in.ID})
+}
+
+// Le retiré rend ses fiches non traitées, redistribuées au reste de l'équipe
+// selon les objectifs en vigueur.
+func lotReprises(ctx context.Context, q *db.Queries, row *db.LotParIdRow, filtres *lotFiltres, retire string) ([]lotMouvement, error) {
+	traitees, err := lotPositionsTraitees(ctx, q, row)
 	if err != nil {
 		return nil, err
 	}
-	detenues, err := s.Q.LotPositionsDunAgent(ctx, db.LotPositionsDunAgentParams{
-		LotId: in.ID, AssigneeId: lotPointeurTexte(in.Body.TeleconseillerID),
+	detenues, err := q.LotPositionsDunAgent(ctx, db.LotPositionsDunAgentParams{
+		LotId: row.ID, AssigneeId: lotPointeurTexte(retire),
 	})
 	if err != nil {
 		return nil, err
@@ -1303,7 +1300,7 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 			arendre = append(arendre, position)
 		}
 	}
-	equipe, err := s.lotEquipeRestante(ctx, restants)
+	equipe, err := lotEquipeRestante(ctx, q, filtres.Distribution.TeleconseillerIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1318,16 +1315,11 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 		}
 		parRepreneur[reprises[index].assigneeID] = append(parRepreneur[reprises[index].assigneeID], position)
 	}
-	retire := in.Body.TeleconseillerID
 	lotMouvements := make([]lotMouvement, 0, len(parRepreneur))
 	for _, vers := range slices.Sorted(maps.Keys(parRepreneur)) {
 		lotMouvements = append(lotMouvements, lotMouvement{de: retire, vers: vers, positions: parRepreneur[vers]})
 	}
-	if err := s.lotAppliquerMouvements(ctx, row, lotMouvements, "", retire, "lot_export.retrait",
-		map[string]any{"teleconseillerId": retire}); err != nil {
-		return nil, err
-	}
-	return s.campagneDetail(ctx, &CampagneIDInput{ID: in.ID})
+	return lotMouvements, nil
 }
 
 type lotMouvement struct {
@@ -1336,10 +1328,10 @@ type lotMouvement struct {
 	positions []int32
 }
 
-// Le déplacement des positions, sa trace et la nouvelle équipe dans une seule
-// transaction : une trace écrite hors du geste survivrait à un geste annulé.
-func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRow, lotMouvements []lotMouvement,
-	entrant, sortant, action string, details map[string]any,
+// Le déplacement des positions, sa trace et la nouvelle équipe dans une seule transaction ;
+// `calculer` lit les positions sous le verrou de l'équipe, jamais avant.
+func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRow, entrant, sortant, action string,
+	details map[string]any, calculer func(q *db.Queries, filtres *lotFiltres) ([]lotMouvement, error),
 ) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -1347,16 +1339,25 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.Q.WithTx(tx)
-	if err := s.lotRecomposerEquipe(ctx, q, row.ID, entrant, sortant); err != nil {
+	filtres, err := s.lotRecomposerEquipe(ctx, q, row.ID, entrant, sortant)
+	if err != nil {
+		return err
+	}
+	lotMouvements, err := calculer(q, filtres)
+	if err != nil {
 		return err
 	}
 	auteur := socle.UtilisateurCourant(ctx).ID
 	fiches := 0
 	for _, m := range lotMouvements {
-		if err := q.DeplacerPositions(ctx, db.DeplacerPositionsParams{
-			LotId: row.ID, Column2: m.positions, AssigneeId: lotPointeurTexte(m.vers),
-		}); err != nil {
+		deplacees, err := q.DeplacerPositions(ctx, db.DeplacerPositionsParams{
+			LotID: row.ID, Positions: m.positions, De: lotPointeurTexte(m.de), Vers: lotPointeurTexte(m.vers),
+		})
+		if err != nil {
 			return err
+		}
+		if len(deplacees) == 0 {
+			continue
 		}
 		id, err := uuid.NewV7()
 		if err != nil {
@@ -1364,11 +1365,11 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 		}
 		if err := q.InsertReaffectation(ctx, db.InsertReaffectationParams{
 			ID: id.String(), LotId: row.ID, FromAssigneeId: lotPointeurTexte(m.de), ToAssigneeId: m.vers,
-			Fiches: lotInt32(len(m.positions)), Positions: m.positions, PerformedById: auteur,
+			Fiches: lotInt32(len(deplacees)), Positions: deplacees, PerformedById: auteur,
 		}); err != nil {
 			return err
 		}
-		fiches += len(m.positions)
+		fiches += len(deplacees)
 	}
 	details["fiches"] = fiches
 	if err := database.Auditer(ctx, q, auteur, action, "lot_export", row.ID, nil, details); err != nil {

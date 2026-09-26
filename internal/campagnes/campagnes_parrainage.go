@@ -10,8 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// EB-19, variante prospects : un parrainage Grand Public devient une fiche au
-// LANCEMENT de la campagne, comme une recommandation de représentant.
+// Un parrainage Grand Public devient une fiche au LANCEMENT de la campagne, comme une recommandation de représentant.
 func (*service) lotOuvrirContactsRecommandesProspects(ctx context.Context, q *db.Queries, createurID string, places int) ([]string, error) {
 	suggestions, err := q.TirerSuggestionsProspect(ctx, lotInt32(places))
 	if err != nil {

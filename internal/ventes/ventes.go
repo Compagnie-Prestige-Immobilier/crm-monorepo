@@ -49,7 +49,10 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/ventes/canaux/{id}/active": gestionnaires,
 }
 
-const codeIllisible = "VENTES_CLASSEUR_ILLISIBLE"
+const (
+	codeIllisible = "VENTES_CLASSEUR_ILLISIBLE"
+	origineImport = "IMPORT"
+)
 
 func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
@@ -165,9 +168,12 @@ type VentesOutput struct {
 	Body struct {
 		Classeur          *ClasseurDTO                `json:"classeur"`
 		Ventes            []VenteDTO                  `json:"ventes"`
+		Tronque           bool                        `json:"tronque" doc:"Vrai si seules les ventes les plus récentes sont renvoyées."`
 		ParTeleconseiller []VenteParTeleconseillerDTO `json:"parTeleconseiller"`
 	}
 }
+
+const plafondVentes = 5000
 
 type DepotInput struct {
 	Depuis  string `query:"depuis" format:"date"`
@@ -201,18 +207,21 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 			ImporteLe: classeur.ImporteLe.UTC().Format(time.RFC3339), ImportePar: classeur.ImportePar,
 		}
 	}
-	ventes, err := s.Q.ListerVentes(ctx)
+	ventes, err := s.Q.ListerVentes(ctx, plafondVentes+1)
 	if err != nil {
 		return nil, err
 	}
-	versements, err := s.Q.ListerVersementsVentes(ctx)
+	out.Body.Tronque = len(ventes) > plafondVentes
+	ventes = ventes[:min(len(ventes), plafondVentes)]
+	ids := make([]int64, len(ventes))
+	for i := range ventes {
+		ids[i] = ventes[i].ID
+	}
+	versements, err := s.Q.ListerVersementsVentes(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	parVente := map[int64][]VersementDTO{}
-	for _, v := range versements {
-		parVente[v.VenteId] = append(parVente[v.VenteId], VersementDTO{Date: jour(v.Date), Montant: v.Montant})
-	}
+	parVente := versementsParVente(versements)
 	telephones, parLigne := telephonesNormalises(ventes, s.Cfg.PhoneRegion)
 	prospects, err := s.prospectsParTelephones(ctx, telephones)
 	if err != nil {
@@ -228,6 +237,14 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 	}
 	out.Body.ParTeleconseiller = agregerParTeleconseiller(out.Body.Ventes)
 	return out, nil
+}
+
+func versementsParVente(versements []db.VentesVersement) map[int64][]VersementDTO {
+	parVente := map[int64][]VersementDTO{}
+	for _, v := range versements {
+		parVente[v.VenteId] = append(parVente[v.VenteId], VersementDTO{Date: jour(v.Date), Montant: v.Montant})
+	}
+	return parVente
 }
 
 // Le téléphone est la seule clé commune au classeur et aux fiches : une
@@ -399,19 +416,14 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 	return s.lister(ctx, nil)
 }
 
-// Le dernier classeur déposé remplace les ventes importées avant lui, sauf
-// celles qui portent un versement ou un archivage saisis hors classeur : les
-// effacer perdrait une écriture financière sans que rien ne la retienne.
 func remplacerClasseur(ctx context.Context, q *db.Queries, classeur *db.InsererClasseurVentesParams, lues []venteLue, telephones []string) error {
-	nonRemplacables, err := q.VentesImporteesNonRemplacables(ctx)
-	if err != nil {
+	if err := q.VerrouNumerotationVentes(ctx); err != nil {
 		return err
 	}
-	if nonRemplacables > 0 {
-		return socle.Problem(http.StatusConflict, "VENTES_IMPORT_NON_REMPLACABLES",
-			"Des ventes importées portent un versement ou un archivage saisis hors classeur. Elles doivent être traitées avant un nouveau dépôt.")
+	if err := refuserSiVersementsPerdus(ctx, q, lues); err != nil {
+		return err
 	}
-	err = q.SupprimerVentesImportees(ctx)
+	remplacees, err := supprimerVentesImportees(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -428,7 +440,46 @@ func remplacerClasseur(ctx context.Context, q *db.Queries, classeur *db.InsererC
 		return err
 	}
 	return database.Auditer(ctx, q, classeur.ImporteParId, "vente.importer", "vente_classeur", classeur.ID,
-		map[string]any{"ventesRemplacees": true}, map[string]any{"fichier": classeur.NomFichier, "ventes": len(lues)})
+		map[string]any{"ventes": remplacees}, map[string]any{"fichier": classeur.NomFichier, "ventes": len(lues)})
+}
+
+func refuserSiVersementsPerdus(ctx context.Context, q *db.Queries, lues []venteLue) error {
+	var dansLeClasseur db.VentesAuxVersementsAbsentsDuClasseurParams
+	for i := range lues {
+		for _, versement := range lues[i].versements {
+			dansLeClasseur.Numeros = append(dansLeClasseur.Numeros, lues[i].ligne.Numero)
+			dansLeClasseur.Dates = append(dansLeClasseur.Dates, dateSQL(versement.date))
+			dansLeClasseur.Montants = append(dansLeClasseur.Montants, versement.montant)
+		}
+	}
+	numeros, err := q.VentesAuxVersementsAbsentsDuClasseur(ctx, dansLeClasseur)
+	if err != nil || len(numeros) == 0 {
+		return err
+	}
+	liste := make([]string, len(numeros))
+	for i, numero := range numeros {
+		liste[i] = strconv.Itoa(int(numero))
+	}
+	return socle.Problem(http.StatusConflict, "VENTES_VERSEMENTS_HORS_CLASSEUR", fmt.Sprintf(
+		"Des versements saisis dans le panneau manquent à ce classeur, ventes n° %s : reportez-les dans l’onglet « Échéances », puis déposez-le à nouveau.",
+		strings.Join(liste, ", ")))
+}
+
+func supprimerVentesImportees(ctx context.Context, q *db.Queries) ([]VenteDTO, error) {
+	versements, err := q.SupprimerVersementsVentesImportees(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ventes, err := q.SupprimerVentesImportees(ctx)
+	if err != nil {
+		return nil, err
+	}
+	parVente := versementsParVente(versements)
+	remplacees := make([]VenteDTO, len(ventes))
+	for i := range ventes {
+		remplacees[i] = venteDTO(&ventes[i], parVente[ventes[i].ID])
+	}
+	return remplacees, nil
 }
 
 func telephonesDesVentesLues(lues []venteLue, region string) []string {
@@ -451,7 +502,7 @@ func insererVentes(ctx context.Context, q *db.Queries, classeurID string, lues [
 	for i := range lues {
 		v := &lues[i]
 		v.ligne.ClasseurId = &classeurID
-		v.ligne.Origine = "IMPORT"
+		v.ligne.Origine = origineImport
 		venteID, err := q.InsererVente(ctx, v.ligne)
 		if err != nil {
 			return err
@@ -639,12 +690,20 @@ func montantIllisible(ligne []string, col map[string]int) (string, bool) {
 
 // « 1 500 000 » saisi en texte serait lu zéro : mieux vaut refuser le dépôt.
 func montantLisible(texte string) bool {
-	texte = strings.TrimSpace(texte)
-	if texte == "" {
+	if montantVide(texte) {
 		return true
 	}
-	_, err := strconv.ParseFloat(texte, 64)
+	_, err := strconv.ParseFloat(strings.TrimSpace(texte), 64)
 	return err == nil
+}
+
+// Le classeur écrit « - » ou « #N/A » là où il n'y a rien à compter.
+func montantVide(texte string) bool {
+	switch strings.TrimSpace(texte) {
+	case "", "-", "#N/A":
+		return true
+	}
+	return false
 }
 
 func montantRefuse(ou, valeur string) error {
@@ -664,7 +723,7 @@ func lireVersements(lignes [][]string) (map[int32][]versementLu, error) {
 		}
 		for i := 3; i+1 < len(ligne); i += 2 {
 			date, ok := dateExcel(ligne[i])
-			if !ok {
+			if !ok || montantVide(ligne[i+1]) {
 				continue
 			}
 			if !montantLisible(ligne[i+1]) {
