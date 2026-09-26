@@ -38,6 +38,7 @@ var Garde = map[string]socle.Permission{
 	"PUT /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"POST /api/v1/phase2/callbacks/{id}/cancel":            socle.PermissionQualificationRappels,
 	"POST /api/v1/phase2/callbacks/{id}/snooze":            socle.PermissionQualificationRappels,
+	"POST /api/v1/phase2/callbacks/{id}/retablir":          socle.PermissionQualificationRappels,
 	"POST /api/v1/ouvertures":                              socle.PermissionFichesTenir,
 	"GET /api/v1/ouvertures/courante":                      socle.PermissionFichesTenir,
 	"PUT /api/v1/ouvertures/{id}/brouillon":                socle.PermissionFichesTenir,
@@ -61,6 +62,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("listScheduledCallbacks", http.MethodGet, "/api/v1/phase2/callbacks"), s.qualificationListerRappels)
 	huma.Register(api, qualificationRoute("cancelScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/cancel"), s.qualificationAnnulerRappel)
 	huma.Register(api, qualificationRoute("snoozeScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/snooze"), s.qualificationReporterRappel)
+	huma.Register(api, qualificationRoute("retablirScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/retablir"), s.qualificationRetablirRappel)
 	huma.Register(api, qualificationRoute("ouvrirFiche", http.MethodPost, "/api/v1/ouvertures"), s.qualificationOuvrirFiche)
 	huma.Register(api, qualificationRoute("ouvertureCourante", http.MethodGet, "/api/v1/ouvertures/courante"), s.qualificationOuvertureCourante)
 	huma.Register(api, qualificationRoute("enregistrerBrouillonOuverture", http.MethodPut, "/api/v1/ouvertures/{id}/brouillon"), s.qualificationEnregistrerBrouillon)
