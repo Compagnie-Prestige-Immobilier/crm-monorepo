@@ -804,12 +804,7 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
 }
 
-// B08 : un onglet d'octobre à décembre doit toujours corriger l'inversion
-// jour/mois. Avant correction, seules les quatre premières lettres du mois
-// étaient comparées au préfixe complet de l'abréviation : « oct », « nov » et
-// « déc » ne faisaient plus reconnaître l'onglet, qui perdait sa date pivot.
-// L'onglet porte l'an dernier : le jour de l'onglet doit rester dans le passé
-// pour que la correction s'applique, comme au dépôt réel d'un classeur.
+// « oct », « nov » et « déc » font reconnaître l'onglet, qui corrige alors l'inversion jour/mois.
 func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -835,6 +830,45 @@ func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
 	b.attendRapportTest(travail, "total=1 created=1 updated=0 skipped=0 errors=0 warnings=1", map[string]float64{
 		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1,
 	})
+}
+
+// Un onglet sans année relevé avant le jour qu'il annonce garde l'année courante.
+func TestImportLeadsOngletSansAnneeGardeLAnneeCourante(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	maintenant := time.Now().UTC()
+	annee := maintenant.Year()
+	demain := maintenant.AddDate(0, 0, 1)
+	anneeOctobre := annee
+	if time.Date(annee, time.October, 1, 0, 0, 0, 0, time.UTC).After(maintenant.AddDate(0, 6, 0)) {
+		anneeOctobre--
+	}
+	base := time.Now().UnixNano() % 10_000_000
+	tels := []string{fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22177%07d", (base+1)%10_000_000)}
+	nomClasseur := fmt.Sprintf("Leads sans année %d.xlsx", base)
+	b.nettoyerLeadsTest(tels, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	onglets := []ongletLeadsBrutTest{
+		{nom: fmt.Sprintf("Leads %d %s", demain.Day(), socle.MoisEnLettres[demain.Month()-1]), lignes: [][]any{
+			{"", "Aminata Diop", "", "Payé", tels[0], canalMetaChuesTest, ""},
+		}},
+		{nom: "Leads 1 oct", lignes: [][]any{
+			{"", "Moussa Ndiaye", "", "Payé", tels[1], canalMetaChuesTest, ""},
+		}},
+	}
+
+	b.releverLeadsTest(classeurLeadsBrut(t, entete, onglets), nomClasseur)
+	attendus := []time.Time{
+		time.Date(annee, demain.Month(), demain.Day(), 0, 0, 0, 0, time.UTC),
+		time.Date(anneeOctobre, time.October, 1, 0, 0, 0, 0, time.UTC),
+	}
+	for i, telephone := range tels {
+		if lue := b.ficheLeadTest(telephone).creeLe.UTC(); !lue.Equal(attendus[i]) {
+			t.Fatalf("onglet « %s » : %v, attendu %v", onglets[i].nom, lue, attendus[i])
+		}
+	}
 }
 
 // « projet | canal | créée le | note », lisible d'un coup dans l'échec.
