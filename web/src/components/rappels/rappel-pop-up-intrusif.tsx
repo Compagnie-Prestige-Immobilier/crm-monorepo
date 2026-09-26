@@ -11,6 +11,7 @@ import {
   XCircleIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -320,6 +321,7 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
   const projet = undefined;
   const racine = '/teleconseil';
   const queryClient = useQueryClient();
+  const ficheOuverte = useSearchParams().get('fiche') !== null;
 
   // Un rappel reporté change d'heure : c'est une nouvelle échéance, à signaler à son tour.
   const echeance = (callback: Rappel) => `${callback.id}@${callback.scheduledAt}`;
@@ -386,7 +388,7 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
     jouerSonnerieRappel();
   }, [activeCallback]);
 
-  if (activeCallback === null) return null;
+  if (activeCallback === null || ficheOuverte) return null;
 
   const annulerRappel = (id: string) => {
     cancelMutation.mutate(id, { onSuccess: masquerRappelsEnAttente });
