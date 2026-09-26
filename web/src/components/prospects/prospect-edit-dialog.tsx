@@ -48,7 +48,7 @@ const MIN_REASON_LENGTH = 5;
 
 /**
  * Le formulaire porte `''` là où la fiche porte `null`. Comparés tels quels,
- * toute fiche SANS banque — donc toute fiche Grand Public — s'ouvrait déjà « en
+ * toute fiche SANS banque, donc toute fiche Grand Public, s'ouvrait déjà « en
  * bascule », motif obligatoire à l'appui, et plus aucune correction de nom
  * n'était enregistrable.
  */

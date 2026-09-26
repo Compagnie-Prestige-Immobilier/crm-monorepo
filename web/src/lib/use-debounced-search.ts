@@ -8,7 +8,7 @@ import { SEARCH_DEBOUNCE_MS } from '@/lib/use-debounced-value';
  * Champ de recherche temporisé, aligné sur une valeur publiée ailleurs (l'URL).
  *
  * Seule une FRAPPE programme une publication. Une valeur qui change de
- * l'extérieur — « Tout effacer », un retour arrière — annule le report en
+ * l'extérieur, « Tout effacer », un retour arrière, annule le report en
  * cours : sinon celui-ci republiait l'ancienne recherche par-dessus la remise
  * à zéro, puis la re-vidait 350 ms plus tard.
  */

@@ -1,7 +1,7 @@
 import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
 
 // Hors de `hub-view.tsx` : un module « use client » n'expose au serveur que des
-// références client, et la page en tirait `{...undefined}` — donc des filtres
+// références client, et la page en tirait `{...undefined}`, donc des filtres
 // sans `search`, et un écran d'ouverture en erreur.
 
 /** Les représentants dont la relation n'a pas encore été tranchée. */

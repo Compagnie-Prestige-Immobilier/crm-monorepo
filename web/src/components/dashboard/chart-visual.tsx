@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * `--cpi-t` va de 0 à 1 et pilote toutes les formes : hauteur, largeur, longueur
- * de trait tracée, échelle. `@property` est obligatoire — sans type déclaré, une
+ * de trait tracée, échelle. `@property` est obligatoire : sans type déclaré, une
  * variable CSS n'est pas interpolée, elle saute d'un coup à sa valeur finale.
  */
 const CSS_APERCU = `

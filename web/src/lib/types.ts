@@ -111,7 +111,7 @@ export type Projet = Schemas['Prospect']['projet'];
  * L'API classe sur `journeys.some({ projet, statut })` : une fiche entrée par
  * CHUES puis convertie en Grand Public reste « Nouveau » en premier niveau,
  * alors qu'elle remonte dans une liste filtrée sur « Converti ». Sans parcours
- * pour ce projet — fiche d'avant les parcours — le champ de premier niveau est
+ * pour ce projet, fiche d'avant les parcours, le champ de premier niveau est
  * la seule réponse disponible.
  */
 export function statutForProjet(prospect: ProspectRow, projet: Projet | null): ProspectStatut {

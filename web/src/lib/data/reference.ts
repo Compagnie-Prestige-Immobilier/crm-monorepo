@@ -24,7 +24,7 @@ import type {
  * COMMERCIAL n'avait alors ni banque ni syndicat dans ses listes déroulantes, en
  * permanence et sans un message, et enregistrait des fiches sans segment.
  *
- * Un refus de rôle rend donc une liste vide — c'est ce que ce rôle est censé
+ * Un refus de rôle rend donc une liste vide, c'est ce que ce rôle est censé
  * voir. Toute autre panne continue de remonter.
  */
 interface CompteFiltre {
