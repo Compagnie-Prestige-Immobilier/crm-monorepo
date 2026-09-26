@@ -44,8 +44,8 @@ type InscriptionsAOuvrirInput struct {
 
 type InscriptionsAOuvrirOutput struct {
 	Body struct {
-		Items     []InscriptionAOuvrir `json:"items"`
-		Truncated bool                 `json:"truncated" doc:"Plus de 2000 inscriptions à ouvrir : seules les plus récentes sont listées."`
+		Items   []InscriptionAOuvrir `json:"items"`
+		Tronque bool                 `json:"tronque" doc:"Plus de 2000 inscriptions à ouvrir : seules les plus récentes sont listées."`
 	}
 }
 
@@ -69,7 +69,7 @@ func (s *service) inscriptionsAOuvrir(ctx context.Context, in *InscriptionsAOuvr
 	}
 	out := &InscriptionsAOuvrirOutput{}
 	if len(lignes) > inscriptionsCompletesMax {
-		lignes, out.Body.Truncated = lignes[:inscriptionsCompletesMax], true
+		lignes, out.Body.Tronque = lignes[:inscriptionsCompletesMax], true
 	}
 	out.Body.Items = make([]InscriptionAOuvrir, 0, len(lignes))
 	for i := range lignes {
