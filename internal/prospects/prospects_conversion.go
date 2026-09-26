@@ -524,6 +524,36 @@ func (s *service) prospectReglages(ctx context.Context, projet db.Projet) (Prosp
 	return reglages, nil
 }
 
+// Consignation : une réponse vidée part en null, que la requête retire de la fiche ; un champ non déclaré tombe.
+func ChampsLibresRetenus(ctx context.Context, q *db.Queries, projet db.Projet, envoyes map[string]string) ([]byte, error) {
+	if len(envoyes) == 0 {
+		return nil, nil
+	}
+	ligne, err := q.AppSettingParCle(ctx, prospectCleChamps(projet))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	retenus := map[string]*string{}
+	for _, libre := range prospectLireReglages(ligne.Value).Libres {
+		valeur, envoye := envoyes[libre.ID]
+		if !envoye {
+			continue
+		}
+		retenus[libre.ID] = nil
+		if texte := strings.TrimSpace(valeur); texte != "" {
+			tronque := prospectTronquer(texte, prospectReponseMax)
+			retenus[libre.ID] = &tronque
+		}
+	}
+	if len(retenus) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(retenus)
+}
+
 type ProspectProjetInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 }

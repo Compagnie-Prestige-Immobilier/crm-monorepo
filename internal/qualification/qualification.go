@@ -1217,7 +1217,7 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	if err != nil {
 		return db.CorrigerProspectParTentativeRow{}, err
 	}
-	libres, err := prospects.ChampsLibresRetenus(ctx, s.Deps, courant.Projet, b.ChampsLibres)
+	libres, err := prospects.ChampsLibresRetenus(ctx, q, courant.Projet, b.ChampsLibres)
 	if err != nil {
 		return db.CorrigerProspectParTentativeRow{}, err
 	}

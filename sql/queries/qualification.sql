@@ -169,7 +169,7 @@ UPDATE "prospects" SET
   "whatsappStatus" = COALESCE(CAST(sqlc.narg('whatsapp_status') AS text)::"WhatsappStatus", "whatsappStatus"),
   "whatsappE164" = CASE WHEN @maj_whatsapp_e164::bool THEN sqlc.narg('whatsapp_e164') ELSE "whatsappE164" END,
   "champsLibres" = CASE WHEN @maj_champs_libres::bool
-    THEN COALESCE("champsLibres", '{}'::jsonb) || sqlc.narg('champs_libres')::jsonb
+    THEN jsonb_strip_nulls(COALESCE("champsLibres", '{}'::jsonb) || sqlc.narg('champs_libres')::jsonb)
     ELSE "champsLibres" END,
   "lastReasonId" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_reason_id') ELSE "lastReasonId" END,
   "lastCallAt" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_at') ELSE "lastCallAt" END,
