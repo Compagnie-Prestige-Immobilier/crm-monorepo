@@ -57,7 +57,7 @@ export function BulleAssistant() {
 
   return (
     <AssistantModalPrimitive.Root open={ouverte} onOpenChange={changer}>
-      <AssistantModalPrimitive.Anchor className="fixed right-4 bottom-20 z-40 size-14 md:right-6 md:bottom-6">
+      <AssistantModalPrimitive.Anchor className="fixed right-4 bottom-20 z-40 size-14 md:right-6">
         <AssistantModalPrimitive.Trigger asChild>
           <button
             type="button"
