@@ -462,8 +462,8 @@ func TestCampagneRetraitRendToutesLesFiches(t *testing.T) {
 	}
 }
 
-// Le test tient le verrou pendant que les appels partent : ils s'y empilent tous,
-// puis s'exécutent à sa libération, ce qui rend la course reproductible.
+// Le test tient le verrou et lance les appels un à un, chacun une fois le précédent bloqué :
+// ils passent à la libération dans l'ordre donné, ce qui rend la course reproductible.
 func sousVerrou(b *banc, verrou string, arguments []any, appels ...func() int) []int {
 	b.t.Helper()
 	tx, err := b.pool.Begin(b.ctx)
@@ -474,18 +474,16 @@ func sousVerrou(b *banc, verrou string, arguments []any, appels ...func() int) [
 	if _, err := tx.Exec(b.ctx, verrou, arguments...); err != nil {
 		b.t.Fatal(err)
 	}
+	var detenteur int
+	if err := tx.QueryRow(b.ctx, `SELECT pg_backend_pid()`).Scan(&detenteur); err != nil {
+		b.t.Fatal(err)
+	}
 	statuts := make([]int, len(appels))
 	var attente sync.WaitGroup
+	empiles := 0
 	for i, appel := range appels {
 		attente.Go(func() { statuts[i] = appel() })
-	}
-	empiles := 0
-	for essai := 0; essai < 200 && empiles < len(appels); essai++ {
-		time.Sleep(25 * time.Millisecond)
-		if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM pg_stat_activity
-			WHERE wait_event_type = 'Lock' AND datname = current_database()`).Scan(&empiles); err != nil {
-			b.t.Fatal(err)
-		}
+		empiles = attendreBloques(b, detenteur, i+1)
 	}
 	if err := tx.Commit(b.ctx); err != nil {
 		b.t.Fatal(err)
@@ -495,6 +493,22 @@ func sousVerrou(b *banc, verrou string, arguments []any, appels ...func() int) [
 		b.t.Fatalf("%d appel(s) sur %d ont attendu le verrou (statuts %v)", empiles, len(appels), statuts)
 	}
 	return statuts
+}
+
+// Seules comptent les sessions bloquées, directement ou en file, par la transaction du test.
+func attendreBloques(b *banc, detenteur, attendus int) int {
+	bloques := 0
+	for essai := 0; essai < 200 && bloques < attendus; essai++ {
+		time.Sleep(25 * time.Millisecond)
+		if err := b.pool.QueryRow(b.ctx, `WITH RECURSIVE bloques AS (
+				SELECT pid FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))
+				UNION
+				SELECT a.pid FROM pg_stat_activity a INNER JOIN bloques ON bloques.pid = ANY(pg_blocking_pids(a.pid)))
+			SELECT count(*)::int FROM bloques`, detenteur).Scan(&bloques); err != nil {
+			b.t.Fatal(err)
+		}
+	}
+	return bloques
 }
 
 func TestCampagnesSimultaneesSansFicheCommune(t *testing.T) {
@@ -580,6 +594,54 @@ func TestReaffectationsConcurrentesGardentLEquipe(t *testing.T) {
 	slices.Sort(attendue)
 	if !slices.Equal(equipe, attendue) {
 		t.Fatalf("équipe finale %v, attendue %v", equipe, attendue)
+	}
+}
+
+// Deux pistes vers le même numéro ne prennent qu'une place : la campagne tire autant de numéros distincts que de places.
+func TestCampagneContactsRecommandesUnNumeroParPlace(t *testing.T) {
+	b := nouveauBancCampagne(t, 1)
+	numero := rand.IntN(9_000_000)
+	for rang, telephone := range []string{fmt.Sprintf("+2217%08d", numero+10), fmt.Sprintf("+2217%08d", numero+10), fmt.Sprintf("+2217%08d", numero+11)} {
+		tentative := uuid.NewString()
+		b.exec(`INSERT INTO "rep_call_attempts" ("id", "representantId", "performedById", "statutQualificationId", "clientCreatedAt")
+			VALUES ($1, $2, $3, $4, now())`, tentative, b.fiches[0], b.userID, qualificationStatutID(b.banc, "REFUSE"))
+		b.exec(`INSERT INTO "representant_suggestions" ("id", "sourceRepresentantId", "suggestedPhoneE164", "suggestedById",
+			"sourceAttemptId", "clientCreatedAt", "createdAt") VALUES ($1, $2, $3, $4, $5, now(), now() + make_interval(secs => $6))`,
+			uuid.NewString(), b.fiches[0], telephone, b.userID, tentative, rang)
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+		"name": "Campagne recommandés", "cible": "CONTACTS_RECOMMANDES", "representants": map[string]any{"departementId": b.departement},
+		"distribution": map[string]any{"teleconseillerIds": []string{b.agentA}, "fichesParJour": 2, "jours": 1},
+	})
+	b.attend(statut, http.StatusCreated, "campagne de contacts recommandés", body)
+	b.lotID, _ = body["id"].(string)
+	t.Cleanup(func() { b.exec(`DELETE FROM "lots_export" WHERE "id" = $1`, b.lotID) })
+	if n := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1`, b.lotID); n != 2 {
+		t.Fatalf("deux numéros distincts pour deux places : %d fiche(s)", n)
+	}
+}
+
+// Une fiche confiée à A juste avant son retrait repart avec les autres : A ne garde rien hors de l'équipe.
+func TestReaffectationVersXPendantRetraitDeX(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+	aConfier := b.positionsDe(b.agentB)[:1]
+	statuts := sousVerrou(b.banc, `SELECT 1 FROM "lots_export" WHERE "id" = $1 FOR UPDATE`, []any{b.lotID},
+		func() int {
+			statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation",
+				map[string]any{"positions": aConfier, "versTeleconseillerId": b.agentA})
+			return statut
+		},
+		func() int {
+			statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
+				map[string]any{"teleconseillerId": b.agentA})
+			return statut
+		})
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusOK {
+		t.Fatalf("réaffectation puis retrait aboutissent : %v", statuts)
+	}
+	if gardees, reprises := b.positionsDe(b.agentA), b.positionsDe(b.agentB); len(gardees) != 0 || len(reprises) != 10 {
+		t.Fatalf("A sort sans fiche, B les reprend toutes : A %v, B %v", gardees, reprises)
 	}
 }
 
