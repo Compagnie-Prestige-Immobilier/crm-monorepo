@@ -46,7 +46,8 @@ type ProspectSegmentChange struct {
 
 type ProspectSegmentHistoryOutput struct {
 	Body struct {
-		Items []ProspectSegmentChange `json:"items"`
+		Items   []ProspectSegmentChange `json:"items"`
+		Tronque bool                    `json:"tronque" doc:"Plus de 500 lignes : seules les 500 plus récentes sont rendues."`
 	}
 }
 
@@ -196,6 +197,7 @@ func (s *service) prospectHistoriqueSegment(ctx context.Context, in *ProspectIDI
 		return nil, err
 	}
 	out := &ProspectSegmentHistoryOutput{}
+	lignes, out.Body.Tronque = prospectHistoriqueBorne(lignes)
 	out.Body.Items = make([]ProspectSegmentChange, 0, len(lignes))
 	for i := range lignes {
 		l := &lignes[i]

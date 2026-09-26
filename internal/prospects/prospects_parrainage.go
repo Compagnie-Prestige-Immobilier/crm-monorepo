@@ -11,9 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Route à part, jamais jointe à la fiche principale : la liste paginée et la
-// lecture d'une fiche n'ont pas besoin de ces deux requêtes supplémentaires,
-// et prospects.go est déjà au plafond de lignes.
+// Route à part : la liste et la lecture d'une fiche n'ont pas besoin de ces deux requêtes.
 const prospectCheminParrainage = prospectCheminID + "/parrainage"
 
 var GardeParrainage = map[string]socle.Permission{

@@ -95,9 +95,8 @@ func nettoyerProspects(b *banc, userIDs ...string) {
 	})
 }
 
-// Le formulaire public n'exige que ce que l'administrateur a réglé : le
-// catalogue d'usine rend obligatoires la banque, le syndicat et le revenu, que
-// ce dépôt de test ne peuple pas. Le réglage précédent est remis en place.
+// Le catalogue d'usine exige banque, syndicat et revenu, que ce banc ne peuple pas ;
+// le réglage précédent revient à la fin du test.
 func reglagesPublicsSansObligation(b *banc) {
 	b.t.Helper()
 	cle := "conversion.champs.CHUES"
@@ -309,6 +308,9 @@ func TestProspectRequalificationParLEncadrement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	statut, body = appelJSON(superviseur, http.MethodPut, "/api/v1/prospects/"+id+"/methode", map[string]any{"methode": "PLATFORM"}, nil)
+	superviseur.attend(statut, http.StatusOK, "méthode du projet principal", body)
+
 	chemin := "/api/v1/prospects/" + id + "/requalifier"
 	corps := map[string]any{"projet": "GRAND_PUBLIC", "statut": "NOUVEAU"}
 	statut, body = appelJSON(b, http.MethodPost, chemin, corps, nil)
@@ -316,14 +318,27 @@ func TestProspectRequalificationParLEncadrement(t *testing.T) {
 	statut, body = appelJSON(superviseur, http.MethodPost, chemin, corps, nil)
 	superviseur.attend(statut, http.StatusOK, "requalification par le superviseur", body)
 
-	var etat, consent string
+	var etat, consent, phase2 string
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT "statut"::text, "consent"::text FROM "prospect_journeys" WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`,
-		id).Scan(&etat, &consent); err != nil {
+		`SELECT "statut"::text, "consent"::text, "phase2Status"::text FROM "prospect_journeys" WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`,
+		id).Scan(&etat, &consent, &phase2); err != nil {
 		t.Fatal(err)
 	}
-	if etat != "NOUVEAU" || consent != "NON_DEMANDE" {
-		t.Fatalf("la fiche doit revenir à traiter : %s, %s", etat, consent)
+	if etat != "NOUVEAU" || consent != "NON_DEMANDE" || phase2 != "PENDING" {
+		t.Fatalf("le parcours doit revenir à traiter : %s, %s, %s", etat, consent, phase2)
+	}
+	var remise *time.Time
+	var methode *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "remiseATraiterAt", "phase2Status"::text, "enrollmentMethod"::text FROM "prospects" WHERE "id" = $1`,
+		id).Scan(&remise, &phase2, &methode); err != nil {
+		t.Fatal(err)
+	}
+	if remise == nil {
+		t.Fatal("la fiche doit revenir dans le reste à appeler")
+	}
+	if phase2 != "METHOD_OBTAINED" || methode == nil || *methode != "PLATFORM" {
+		t.Fatalf("le projet principal garde sa méthode : %s, %v", phase2, methode)
 	}
 }
 
@@ -423,13 +438,14 @@ func TestProspectReaffectationEstAuditee(t *testing.T) {
 	if proprietaire != destinataire.userID {
 		t.Fatalf("le propriétaire doit avoir changé : %s", proprietaire)
 	}
-	var traces int
+	var traces, sansListe int
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT count(DISTINCT "entityId") FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces); err != nil {
+		`SELECT count(DISTINCT "entityId"), count(*) FILTER (WHERE NOT "after" ? 'prospectIds' AND "after"->>'nombre' = '2')
+		 FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces, &sansListe); err != nil {
 		t.Fatal(err)
 	}
-	if traces != 2 {
-		t.Fatalf("chaque fiche réaffectée doit laisser sa trace : %d", traces)
+	if traces != 2 || sansListe != 2 {
+		t.Fatalf("chaque fiche réaffectée laisse une trace sans la liste du lot : %d traces, %d sans liste", traces, sansListe)
 	}
 }
 
@@ -684,7 +700,8 @@ func attendreFusionsBloquees(b *banc, nombre int) {
 	for range 100 {
 		var bloquees int
 		if err := b.pool.QueryRow(b.ctx,
-			`SELECT count(*) FROM pg_stat_activity WHERE "wait_event_type" = 'Lock' AND "query" LIKE '%SET "deletedAt" = now()%'`).Scan(&bloquees); err != nil {
+			`SELECT count(*) FROM pg_stat_activity
+			 WHERE "datname" = current_database() AND "wait_event_type" = 'Lock' AND "query" LIKE '%VerrouillerFichesAFusionner%'`).Scan(&bloquees); err != nil {
 			b.t.Fatal(err)
 		}
 		if bloquees >= nombre {
@@ -748,8 +765,62 @@ func TestFusionDeuxRappelsEnAttente(t *testing.T) {
 	}
 }
 
-// Audit B21 : sans le contrôle de `prospectStatutModifiable` à la création,
-// une fiche pouvait naître directement CONVERTI, sans offre ni conversion signée.
+// Deux fusions croisées attendent les mêmes verrous : la seconde trouve sa cible absorbée au lieu d'un interblocage.
+func TestFusionCroiseeSansInterblocage(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	premiere := creerProspect(b, "Kane", numeroDeCourse(5))["id"].(string)
+	seconde := creerProspect(b, "Kane", numeroDeCourse(6))["id"].(string)
+
+	verrou, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = verrou.Rollback(b.ctx) }()
+	if _, err := verrou.Exec(b.ctx, `SELECT 1 FROM "prospects" WHERE "id" = ANY($1) FOR UPDATE`, []string{premiere, seconde}); err != nil {
+		t.Fatal(err)
+	}
+	statuts := make(chan int, 2)
+	for i, sens := range [][2]string{{premiere, seconde}, {seconde, premiere}} {
+		corps, err := json.Marshal(map[string]any{"sourceId": sens[0], "targetId": sens[1]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		go fusionnerEnArrierePlan(b, corps, statuts)
+		attendreFusionsBloquees(b, i+1)
+	}
+	if err := verrou.Rollback(b.ctx); err != nil {
+		t.Fatal(err)
+	}
+	premier, second := <-statuts, <-statuts
+	if premier+second != http.StatusOK+http.StatusConflict || premier*second != http.StatusOK*http.StatusConflict {
+		t.Fatalf("une fusion aboutit, l'autre trouve sa fiche absorbée : %d, %d", premier, second)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "id" = ANY($1) AND "deletedAt" IS NULL`,
+		[]string{premiere, seconde}); n != 1 {
+		t.Fatalf("une seule des deux fiches doit survivre : %d", n)
+	}
+}
+
+// Au-delà de 500 lignes, le journal de la fiche rend les plus récentes et dit qu'il est tronqué.
+func TestProspectJournalTronqueLeDit(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	id := creerProspect(b, "Diallo", numeroDeCourse(7))["id"].(string)
+	qualificationExec(b, `INSERT INTO "audit_logs" ("id","userId","action","entity","entityId","after")
+		SELECT gen_random_uuid()::text, $1, 'prospect.update', 'prospect', $2, '{}'::jsonb FROM generate_series(1, 501)`, b.userID, id)
+
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+id+"/journal", nil, nil)
+	b.attend(statut, http.StatusOK, "journal de la fiche", body)
+	items, _ := body["items"].([]any)
+	if tronque, _ := body["tronque"].(bool); len(items) != 500 || !tronque {
+		t.Fatalf("journal : %d lignes, tronqué %v ; attendu 500 et true", len(items), body["tronque"])
+	}
+}
+
+// Une fiche ne naît pas CONVERTI sans offre ni conversion signée.
 func TestProspectCreationRefuseConverti(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)
@@ -771,9 +842,7 @@ func TestProspectCreationRefuseConverti(t *testing.T) {
 	}
 }
 
-// Audit B22 : sans la garde de `ConvertirJourney`, une conversion Grand Public
-// rejouée sur une fiche déjà vendue redevenait CONVERTI et écrasait l'auteur et
-// le montant de la conversion signée.
+// Une conversion Grand Public rejouée sur une fiche vendue n'écrase pas la conversion signée.
 func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)
@@ -832,10 +901,7 @@ func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
 	}
 }
 
-// Audit B23 : la troncature par octets coupait un caractère accentué en deux,
-// et Postgres refusait la chaîne invalide (22021) sans notifier la supervision.
-// Le numéro et les noms sont choisis pour que l'octet 500 tombe au milieu d'un
-// `é`, comme relevé par l'audit.
+// Un long message accentué se tronque en caractères : la notification garde 500 caractères valides.
 func TestFormulairePublicMessageAccentuePrevientLaSupervision(t *testing.T) {
 	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
 	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
@@ -867,7 +933,43 @@ func TestFormulairePublicMessageAccentuePrevientLaSupervision(t *testing.T) {
 	if notifs != 1 {
 		t.Fatalf("la supervision doit recevoir une notification : %d", notifs)
 	}
-	if !utf8.ValidString(corpsNotif) {
-		t.Fatal("le corps tronqué doit rester un UTF-8 valide")
+	if !utf8.ValidString(corpsNotif) || utf8.RuneCountInString(corpsNotif) != 500 {
+		t.Fatalf("le corps tronqué doit garder 500 caractères valides : %d", utf8.RuneCountInString(corpsNotif))
+	}
+}
+
+// Une demande publique sur une fiche venue d'ailleurs garde sa provenance, et
+// l'accusé au visiteur entre au journal des courriels, qu'il parte ou attende l'heure ouvrable.
+func TestFormulairePublicSurFicheExistante(t *testing.T) {
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	reglagesPublicsSansObligation(b)
+	telephone := numeroDeCourse(89)
+	id := creerProspect(b, "Ndiaye", telephone)["id"].(string)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetId" = $1`, id)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "notifications" WHERE "route" = $1`, "/chues/prospects/"+id)
+	})
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "origin" = 'BANQUE' WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	email := "visiteur-" + id[:8] + "@exemple.sn"
+	demande := map[string]any{"nom": "Ndiaye", "prenom": "Awa", "phone": telephone, "email": email}
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), demande,
+		map[string]string{"X-Forwarded-For": "10.0.0.5"})
+	b.attend(statut, http.StatusCreated, "demande publique sur une fiche BANQUE", body)
+
+	var origine string
+	var accuses int
+	if err := b.pool.QueryRow(b.ctx, `SELECT "origin", (SELECT count(*) FROM "courriels" WHERE "objetId" = $1 AND $2 = ANY ("destinataires"))
+		FROM "prospects" WHERE "id" = $1`, id, email).Scan(&origine, &accuses); err != nil {
+		t.Fatal(err)
+	}
+	if origine != "BANQUE" || accuses != 1 {
+		t.Fatalf("provenance %q, accusés journalisés %d : attendu BANQUE et un accusé", origine, accuses)
 	}
 }
