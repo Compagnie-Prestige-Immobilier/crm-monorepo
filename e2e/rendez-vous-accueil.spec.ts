@@ -145,3 +145,108 @@ test.describe('rendez-vous au comptoir', () => {
     await expect(onglet).toHaveCount(0);
   });
 });
+
+test.describe('rendez-vous site pris en console', () => {
+  test.use({ storageState: compteDe('COMMERCIAL').etat });
+
+  const demain = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const heure = (quand: string): string => new Date(quand).toISOString().slice(11, 16);
+  let complet = '';
+  let libre = '';
+  let reglagesAvant: unknown = null;
+  const prospects: string[] = [];
+  const nom = `Visiteur ${suffixe()}`;
+
+  test.beforeAll(async () => {
+    const admin = await apiDe('ADMIN', '198.51.100.94');
+    reglagesAvant = await (await admin.get('/api/v1/rv-site/reglages')).json();
+    const pose = await admin.put('/api/v1/rv-site/reglages', {
+      data: {
+        jours: [1, 2, 3, 4, 5, 6, 7],
+        heureDebut: 9,
+        heureFin: 20,
+        horizonJours: 60,
+        maxVisites: 2,
+      },
+    });
+    expect(pose.status(), 'réglages RV site').toBe(200);
+    await admin.dispose();
+
+    const [choix = { site: '', point: '' }] = await lire<{ site: string; point: string }>(
+      `SELECT (SELECT "id" FROM "ventes_sites" WHERE "actif" ORDER BY "ordre" LIMIT 1) AS site,
+              (SELECT "id" FROM "points_rencontre" WHERE "isActive" ORDER BY "position" LIMIT 1) AS point`,
+    );
+    const api = await apiDe('COMMERCIAL', '198.51.100.95');
+    // Deux heures encore vides : une base de travail peut déjà porter des visites demain.
+    const { creneaux } = (await (
+      await api.get(`/api/v1/phase2/rv-site/creneaux?du=${demain}&au=${demain}`)
+    ).json()) as { creneaux: { quand: string; restantes: number | null }[] };
+    [complet = '', libre = ''] = creneaux.filter((c) => c.restantes === 2).map((c) => c.quand);
+    expect(libre, 'deux heures libres demain').not.toBe('');
+    for (const rang of [1, 2, 3]) {
+      const id = await creerProspect(api, {
+        nom: `${nom} ${String(rang)}`,
+        prenom: 'Awa',
+        phone: `+22177${String(4_900_000 + Math.floor(Math.random() * 90_000))}`,
+        projet: 'GRAND_PUBLIC',
+      });
+      prospects.push(id);
+      if (rang === 3) continue;
+      const appel = await api.post('/api/v1/phase2/call-attempts', {
+        data: {
+          id: randomUUID(),
+          prospectId: id,
+          reasonCode: 'RV_SITE',
+          callbackAt: complet,
+          siteId: choix.site,
+          pointRencontreId: choix.point,
+          clientCreatedAt: new Date().toISOString(),
+        },
+      });
+      expect(appel.status(), await appel.text()).toBe(200);
+    }
+    await api.dispose();
+  });
+
+  test.afterAll(async () => {
+    const admin = await apiDe('ADMIN', '198.51.100.94');
+    await admin.put('/api/v1/rv-site/reglages', { data: reglagesAvant });
+    await admin.dispose();
+    await purger({ prospects });
+  });
+
+  test('chaque créneau dit ses places restantes, un créneau complet ne se choisit pas', async ({
+    page,
+  }) => {
+    await page.goto('/teleconseil/console');
+    await page.getByLabel('Quel prospect avez-vous appelé ?').fill(`${nom} 3`);
+    await page.getByRole('button', { name: new RegExp(`${nom} 3`, 'u') }).click();
+    await page
+      .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
+      .getByRole('button', { name: /Oui, elle a répondu/u })
+      .click();
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page
+      .getByRole('group', { name: 'Qu’a dit la personne ?' })
+      .getByRole('button', { name: /Rendez-vous/u })
+      .click();
+    await page.getByRole('button', { name: /RV site/u }).click();
+
+    if (demain.slice(0, 7) !== new Date().toISOString().slice(0, 7)) {
+      await page.getByRole('button', { name: 'Mois suivant' }).click();
+    }
+    const jour = new Intl.DateTimeFormat('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(`${demain}T00:00:00.000Z`));
+    await page.getByRole('button', { name: jour, exact: true }).click();
+
+    await expect(page.getByRole('button', { name: `${heure(complet)} Complet` })).toBeDisabled();
+    const creneauLibre = page.getByRole('button', { name: `${heure(libre)} 2 places` });
+    await expect(creneauLibre).toBeEnabled();
+    await creneauLibre.click();
+    await expect(creneauLibre).toHaveAttribute('aria-pressed', 'true');
+  });
+});

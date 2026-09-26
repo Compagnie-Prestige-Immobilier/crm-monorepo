@@ -165,7 +165,6 @@ export function useRvSite(code: string | undefined) {
     return (
       <CalendrierRvSite
         reglages={choix.data.reglages}
-        reservations={choix.data.reservations}
         choisi={choisi}
         now={ouverture}
         onChoisir={onChoisir}
