@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/nouveau')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: NouveauGrandPublicPage,
   pendingComponent: Loading,
 });
