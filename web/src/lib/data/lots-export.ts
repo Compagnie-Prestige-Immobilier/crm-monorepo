@@ -1,10 +1,11 @@
 import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
-import { format, getISOWeek, parseISO } from 'date-fns';
+import { format, getISOWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
+import { reperesDakar } from '@/lib/format';
 import type { Paginated, Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
@@ -32,8 +33,8 @@ export const TELECONSEIL_CAMPAGNES_PATH = '/teleconseil/campagnes';
 
 /** La semaine et le mois se tapent tels quels dans la recherche des campagnes. */
 export function periodeCampagne(iso: string): string {
-  const date = parseISO(iso);
-  return `Semaine ${getISOWeek(date)}, ${format(date, 'MMMM yyyy', { locale: fr })}`;
+  const { jour } = reperesDakar(iso);
+  return `Semaine ${getISOWeek(jour)}, ${format(jour, 'MMMM yyyy', { locale: fr })}`;
 }
 
 export function campagnesPath(_projet?: Projet | null): string {
