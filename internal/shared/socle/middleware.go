@@ -83,7 +83,7 @@ func EcrireProblem(w http.ResponseWriter, r *http.Request, p *ProblemError) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(p.Status)
 	if err := json.NewEncoder(w).Encode(p); err != nil {
-		_ = json.NewEncoder(w).Encode(Problem(http.StatusInternalServerError, "INTERNAL_ERROR", "Une erreur interne est survenue."))
+		_, _ = w.Write([]byte(`{"status":500,"code":"INTERNAL_ERROR","message":"Une erreur interne est survenue."}`))
 	}
 }
 
