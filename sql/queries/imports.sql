@@ -171,10 +171,8 @@ WHERE lower("email") = ANY(@emails::text[]) AND "deletedAt" IS NULL;
 -- name: ImportProspectsGrandPublicEcrits :many
 SELECT "id" FROM "prospects" WHERE "id" = ANY(@ids::text[]);
 
--- La dernière ligne lue l'emporte : canal, note du classeur, marque plateforme.
--- Nom, prénom et courriel ne se posent que s'ils manquent ; projet, date de
--- création et historique d'appels ne bougent pas. Zéro ligne : la fiche était
--- déjà telle que le classeur la dit.
+-- Canal, note et marque plateforme suivent la dernière ligne ; nom, prénom et courriel
+-- ne comblent qu'un manque. Zéro ligne : la fiche était déjà à jour.
 -- name: ImportMettreAJourProspectGrandPublic :execrows
 UPDATE "prospects" SET
   "canalProvenanceId" = COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),

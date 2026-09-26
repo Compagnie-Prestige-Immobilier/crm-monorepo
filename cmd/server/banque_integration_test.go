@@ -3,16 +3,20 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
+	"cpi-go/db"
 	"cpi-go/internal/banque"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -75,9 +79,8 @@ func banqueLigne(b *banc, requete string, args ...any) string {
 	return id
 }
 
-// Les index partiels du schéma n'admettent qu'une seule étape initiale, une
-// seule CASHED et une seule REJECTED dans TOUTE la base : le seed v2 les porte
-// déjà, on les emprunte et on ne crée que ce qui manque.
+// Une seule étape initiale, CASHED et REJECTED dans toute la base (index partiels) :
+// on emprunte celles du seed et on ne crée que ce qui manque.
 func (s *socleBanque) etape(filtre, code, genre string, position int, initiale bool) string {
 	s.t.Helper()
 	id := banqueLigne(s.banc, `SELECT COALESCE((SELECT "id" FROM "bank_case_stages"
@@ -427,6 +430,67 @@ func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 	}
 }
 
+func TestBanqueEncaissementCorrigeCompteUneFoisParAgent(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	id, rev := s.ouvrirDossier()
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev, "amountXof": "800000"})
+	s.attend(statut, http.StatusCreated, "premier encaissement", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/corrections",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev + 1, "reason": "Montant faux"})
+	s.attend(statut, http.StatusCreated, "correction vers l'étude", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev + 2, "amountXof": "500000"})
+	s.attend(statut, http.StatusCreated, "second encaissement", body)
+
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/analytics?banqueId="+s.banqueID, nil)
+	s.attend(statut, http.StatusOK, "indicateurs", body)
+	agents, _ := body["byAgent"].([]any)
+	for _, brut := range agents {
+		agent := brut.(map[string]any)
+		if agent["agentId"] == s.userID && (agent["cashed"] != float64(1) || agent["amountXof"] != "500000") {
+			t.Fatalf("un encaissement corrigé compte une fois, au dernier montant : %v", agent)
+		}
+	}
+	if len(agents) == 0 {
+		t.Fatal("l'agent qui a encaissé doit figurer dans les indicateurs")
+	}
+}
+
+// Des ouvertures simultanées d'une même inscription butent sur son unicité, pas sur la référence.
+func TestBanqueOuverturesSimultaneesDUneInscription(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	var attente sync.WaitGroup
+	depart := make(chan struct{})
+	codes := make([]string, 8)
+	statuts := make([]int, len(codes))
+	for i := range codes {
+		attente.Add(1)
+		go func() {
+			defer attente.Done()
+			<-depart
+			statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases", map[string]any{"inscriptionId": s.inscriptionID})
+			statuts[i], codes[i] = statut, texteDe(body["code"])
+		}()
+	}
+	close(depart)
+	attente.Wait()
+	ouverts := 0
+	for i, statut := range statuts {
+		switch {
+		case statut == http.StatusCreated:
+			ouverts++
+		case statut != http.StatusConflict || codes[i] != "BANK_CASE_INSCRIPTION_ALREADY_OPEN":
+			t.Fatalf("ouverture %d : %d %s, attendu 409 BANK_CASE_INSCRIPTION_ALREADY_OPEN", i, statut, codes[i])
+		}
+	}
+	if ouverts != 1 {
+		t.Fatalf("un seul dossier par inscription : %d ouverts", ouverts)
+	}
+}
+
 func TestBanqueRechercheInsensibleAuxAccents(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
@@ -456,12 +520,18 @@ func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
 		banqueExec(s.banc, `DELETE FROM "client_creation_requests" WHERE "banqueId" = $1`, s.banqueID)
 	})
 
-	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", map[string]any{
+	nouvelle := map[string]any{
 		"nom": "Sow", "prenom": "Fatou", "banqueId": s.banqueID,
 		"phone": fmt.Sprintf("77%07d", uuid.New().ID()%10000000),
-	})
+	}
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", nouvelle)
 	s.attend(statut, http.StatusCreated, "dépôt de la demande", body)
 	demande := body["id"].(string)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", nouvelle)
+	s.attend(statut, http.StatusConflict, "second dépôt par le même agent", body)
+	if !strings.Contains(fmt.Sprint(body), demande) {
+		t.Fatalf("le 409 rend au demandeur l'identifiant de sa demande : %v", body)
+	}
 
 	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/client-requests/"+demande, nil)
 	s.attend(statut, http.StatusOK, "lecture de sa propre demande", body)
@@ -480,6 +550,11 @@ func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
 	autre.attend(statut, http.StatusNotFound, "demande déposée par une autre banque", body)
 	if body["code"] != "CLIENT_REQUEST_NOT_FOUND" {
 		t.Fatalf("code : %v", body["code"])
+	}
+	statut, body = banqueJSON(autre, http.MethodPost, "/api/v1/client-requests", nouvelle)
+	autre.attend(statut, http.StatusConflict, "même numéro déposé par une autre banque", body)
+	if strings.Contains(fmt.Sprint(body), demande) {
+		t.Fatalf("le 409 ne révèle pas la demande d'un autre portefeuille : %v", body)
 	}
 
 	arbitre := nouveauBanc(t, "ADMIN")
@@ -680,6 +755,20 @@ func TestBanqueCourrielRenvoyeEtWebhookBrevo(t *testing.T) {
 	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "id" = $1 AND "statut" = 'REMIS' AND "remisLe" IS NOT NULL`, courrielID); n != 1 {
 		t.Fatal("l'événement delivered doit marquer le courriel remis")
 	}
+
+	rebond := map[string]any{"event": "hard_bounce", "message-id": messageID}
+	if statut = s.appelSansOrigine(http.MethodPost, "/api/v1/webhooks/brevo?secret=secret-de-test", rebond); statut/100 != 2 {
+		t.Fatalf("webhook hard_bounce : %d", statut)
+	}
+	aRejouer, err := db.New(s.pool).CourrielsARejouer(s.ctx, db.CourrielsARejouerParams{TentativesMax: 3, Prendre: 100_000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range aRejouer {
+		if aRejouer[i].ID == courrielID {
+			t.Fatal("un rebond définitif ne se rejoue pas")
+		}
+	}
 }
 
 func (s *socleBanque) appelSansOrigine(method, chemin string, corps map[string]any) int {
@@ -738,11 +827,24 @@ func TestBanqueEncaissementSignaleLeTeleconseiller(t *testing.T) {
 		AND "sujet" LIKE '[CPI GRAND PUBLIC]%'`, idSansFiche); n != 1 {
 		t.Fatalf("un dossier sans fiche au CRM doit tracer son courriel Grand Public, %d trouvés", n)
 	}
+
+	var reference string
+	if err := s.pool.QueryRow(s.ctx, `SELECT "reference" FROM "bank_cases" WHERE "id" = $1`, idSansFiche).Scan(&reference); err != nil {
+		t.Fatal(err)
+	}
+	statut, _, classeur := s.classeur("/api/v1/export/bank-cases.xlsx?projet=GRAND_PUBLIC&banqueId=" + s.banqueID)
+	s.attend(statut, http.StatusOK, "export Grand Public des dossiers", nil)
+	lignes, err := classeur.GetRows("Dossiers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lignes) != 2 || lignes[1][0] != reference {
+		t.Fatalf("l'export Grand Public doit compter le dossier sans fiche %s : %v", reference, lignes)
+	}
 }
 
-// B09 : la liste « à ouvrir » et l'ouverture partagent désormais le même
-// prédicat (pièces acceptées, sans exiger de date de décision) ; une
-// inscription Grand Public proposée doit donc s'ouvrir sans détour.
+// La liste « à ouvrir » et l'ouverture partagent le même prédicat : une inscription
+// Grand Public proposée s'ouvre.
 func TestBanqueInscriptionProposeeEstOuvrable(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
@@ -761,9 +863,8 @@ func TestBanqueInscriptionProposeeEstOuvrable(t *testing.T) {
 	s.attend(statut, http.StatusCreated, "ouverture d’une inscription proposée à l’ouverture", body)
 }
 
-// B10 : vider le miroir des inscriptions ne doit pas couper le lien d'un
-// dossier bancaire, et la suppression unitaire d'une inscription liée refuse
-// au lieu de laisser `bank_cases.inscriptionId` retomber à NULL.
+// Vider le miroir des inscriptions garde le lien d'un dossier, et supprimer une
+// inscription liée est refusé plutôt que de remettre `inscriptionId` à NULL.
 func TestEnrolementPurgeGardeLeDossier(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()
@@ -787,9 +888,8 @@ func TestEnrolementPurgeGardeLeDossier(t *testing.T) {
 	}
 }
 
-// B91 : le schéma accepte un motif de trois espaces (minLength satisfait),
-// mais une fois nettoyé il ne reste rien à consigner : la correction doit le
-// refuser, pas l'écrire tel quel dans l'audit.
+// Un motif de trois espaces passe le schéma mais, nettoyé, ne dit rien : la
+// correction le refuse.
 func TestBanqueMotifVideRefuse(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()
@@ -809,4 +909,71 @@ func TestBanqueMotifVideRefuse(t *testing.T) {
 	if transitions != 1 {
 		t.Fatalf("un motif refusé ne doit rien écrire au-delà de la transition d’ouverture : %d transitions", transitions)
 	}
+}
+
+func TestBanqueInscriptionsAOuvrirSignalentLeurPlafond(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
+		("id","projet","identifiantDistant","nom","prenom","statutDistant","decideeLe","chargeUtile","dernierTirageAt","updatedAt")
+		SELECT gen_random_uuid()::text,'CHUES','test-' || $1 || '-' || n,'Sy','Awa','validated',now(),'{}',now(),now()
+		FROM generate_series(1, 2001) n`, s.banqueID)
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
+	items, _ := body["items"].([]any)
+	if tronquee, _ := body["truncated"].(bool); len(items) != 2000 || !tronquee {
+		t.Fatalf("2000 inscriptions et le plafond signalé attendus : %d, truncated=%v", len(items), body["truncated"])
+	}
+}
+
+// Plateforme locale : l'archive CHUES est relue à chaque pièce, une pièce Grand Public
+// sans Content-Length au-delà du plafond est refusée plutôt que servie tronquée.
+func TestBanquePiecesDUnePlateformeLocale(t *testing.T) {
+	var archives atomic.Int32
+	var zippee bytes.Buffer
+	zipper := zip.NewWriter(&zippee)
+	fichier, _ := zipper.Create("cni.pdf")
+	_, _ = fichier.Write([]byte("%PDF-1.4 cni"))
+	_ = zipper.Close()
+	var plateforme *httptest.Server
+	plateforme = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/dossiers/42/archive":
+			archives.Add(1)
+			_, _ = w.Write(zippee.Bytes())
+		case strings.HasSuffix(r.URL.Path, "/docs"):
+			_, _ = fmt.Fprintf(w, `{"data":[{"docId":"lourde","label":"Lourde","status":"accepte","fileUrl":%q}]}`, plateforme.URL+"/fichiers/lourde?signature=secrete")
+		case r.URL.Path == "/fichiers/lourde":
+			bloc := make([]byte, 1<<20)
+			for range 65 {
+				_, _ = w.Write(bloc)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(plateforme.Close)
+	for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
+		t.Setenv("PLATEFORME_"+projet+"_URL", plateforme.URL)
+		t.Setenv("PLATEFORME_"+projet+"_TOKEN", "jeton-de-test")
+	}
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	chues := s.inscriptionDistante("CHUES", "validated", `{"dossier":{"id":42}}`)
+
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/pieces", nil)
+	s.attend(statut, http.StatusOK, "pièces CHUES d'une plateforme locale", body)
+	for range 2 {
+		statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/piece?code=cni.pdf", nil)
+		s.attend(statut, http.StatusOK, "pièce CHUES", nil)
+	}
+	statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/pieces.zip", nil)
+	s.attend(statut, http.StatusOK, "archive CHUES relayée", nil)
+	if n := archives.Load(); n != 4 {
+		t.Fatalf("l'archive se relit à chaque appel, sans cache : %d lectures au lieu de 4", n)
+	}
+
+	grandPublic := s.inscriptionDistante("GRAND_PUBLIC", "etape-2", `{}`)
+	statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+grandPublic+"/piece?code=lourde", nil)
+	s.attend(statut, http.StatusNotFound, "pièce de plus de 64 Mo sans Content-Length", nil)
 }

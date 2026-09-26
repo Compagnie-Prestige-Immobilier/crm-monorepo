@@ -93,9 +93,8 @@ ON CONFLICT (key) DO UPDATE
 RETURNING "updatedAt";
 
 -- name: QualiteBaseRepresentants :one
--- La base est eprouvee des qu'un appel a eu lieu : avant cela une fiche ne dit
--- rien de sa valeur. « Joint » se lit sur l'effet du statut du referentiel,
--- « productif » sur les prospects que le representant a reellement apportes.
+-- Éprouvée dès le premier appel. « Joint » se lit sur l'effet du statut, « productif »
+-- sur les prospects que le représentant a réellement apportés.
 SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE r."lastCallAt" IS NOT NULL)::int AS eprouves,
@@ -182,9 +181,8 @@ GROUP BY c."id", c."code", c."label", c."position"
 ORDER BY prospects DESC, c."position";
 
 -- name: ProspectsParMotifDAppel :many
--- Le motif que le teleconseiller a choisi au dernier appel, tel qu'il est
--- defini dans les listes de reference. Une fiche jamais appelee n'a pas de
--- motif : elle n'a pas encore ete eprouvee.
+-- Le motif du dernier appel, tel que défini dans les listes de référence ; une fiche
+-- jamais appelée n'en a pas.
 SELECT
   COALESCE(r."label", CASE WHEN EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
     THEN 'Jamais appelé' ELSE 'Pas encore distribué' END)::text AS label,

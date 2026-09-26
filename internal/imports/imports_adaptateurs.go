@@ -28,7 +28,7 @@ var adaptateursImport = map[db.ImportKind]adaptateurImport{
 	db.ImportKindPROSPECTS: {
 		maxLignes: 150_000, colonnes: colonnesProspectsImport,
 		feuilles: &dispositionFeuilleImport{
-			ligneEntete: 1, premiereDonnee: 2, repliFeuillesRemplies: true,
+			ligneEntete: 1, premiereDonnee: 2, repliFeuillesRemplies: true, exemples: exports.ExemplesProspects(),
 		},
 		preparer: preparerProspectsImport, lire: lireProspectImport, ecrire: ecrireProspectsImport,
 	},
@@ -79,9 +79,8 @@ func cleImport(valeur string) string {
 	return sortie.String()
 }
 
-// Sigles : seules la casse et les espaces s'effacent. « BNDE » et « B.N.D.E. »
-// peuvent désigner deux entrées distinctes, et le couple banque/syndicat EST le
-// segment BDD.
+// Seules la casse et les espaces s'effacent : « BNDE » et « B.N.D.E. » peuvent être
+// deux entrées distinctes, et le couple banque/syndicat EST le segment BDD.
 func cleReferentielImport(valeur string) string {
 	return strings.ToUpper(espacesRepetesImport.ReplaceAllString(strings.TrimSpace(valeur), " "))
 }
@@ -897,9 +896,8 @@ func indexerLibellesImport(index map[string]string, identifiant string, libelles
 	}
 }
 
-// AUCUNE colonne n'est exigée : un lead Messenger ne donne qu'un nom, et une
-// cellule vide est une information qu'on n'a pas encore. Seule une valeur
-// écrite mais inexploitable refuse la ligne.
+// AUCUNE colonne n'est exigée (un lead Messenger ne donne qu'un nom) : seule une
+// valeur écrite mais inexploitable refuse la ligne.
 func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (any, *erreurLigneImport) {
 	etat := brut.(*etatGrandPublicImport)
 	nom, prenom, telephone, refus := identiteGrandPublicImport(cellules, numero, etat)
@@ -1153,9 +1151,8 @@ func cleDoublonGrandPublicImport(ligne *ligneGrandPublicImport) string {
 	return telephone + "|" + *ligne.feuille
 }
 
-// Une ligne sans identité et une adresse déjà prise se signalent sans s'écrire ;
-// un numéro connu se met à jour, le reste se crée. Un numéro repris plus loin
-// dans la même tranche remplace sa première ligne : la dernière fait foi.
+// Sans identité ou adresse déjà prise : signalée, non écrite. Numéro connu : mis à
+// jour. Un numéro repris plus loin dans la tranche : la dernière ligne fait foi.
 func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
 	dejaEmail map[string]map[db.Projet]bool, etat *etatGrandPublicImport,
 ) triGrandPublicImport {
@@ -1246,9 +1243,8 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 	return telephones, emails, nil
 }
 
-// Deux fiches peuvent partager une adresse, une par projet : écraser la carte
-// laissait repasser la ligne du projet lu en premier, et le relevé horaire des
-// leads recréait la même personne à chaque passage.
+// Deux fiches peuvent partager une adresse, une par projet : les projets se
+// cumulent, sinon le relevé horaire recrée la même personne à chaque passage.
 func cumulerProjetsPortesImport(connus map[string]map[db.Projet]bool, email string, portes map[db.Projet]bool) {
 	cumul, deja := connus[email]
 	if !deja {
@@ -1288,8 +1284,7 @@ func doublonEmailGrandPublicImport(ligne *ligneGrandPublicImport, etat *etatGran
 	return nil
 }
 
-// Les fiches créées ici portent un identifiant que NOUS tenons : le relire par
-// téléphone laisserait de côté celles qui n'en ont pas. Une fiche que l'insert
+// Relu par l'identifiant que nous tenons, pas par téléphone : une fiche que l'insert
 // n'a pas écrite (numéro pris entre-temps) se signale au lieu de disparaître.
 func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,
 	nouvelles []ligneGrandPublicImport,
@@ -1375,9 +1370,8 @@ func mettreAJourGrandPublicImport(ctx context.Context, q *db.Queries, c contexte
 	return misAJour, inchangees, nil
 }
 
-// Une fiche connue garde son projet : le classeur recodifie parfois le même
-// numéro d'un onglet à l'autre, et chaque relevé la sortait de sa campagne.
-// Canal et note du classeur suivent la dernière ligne lue.
+// Une fiche connue garde son projet, que le classeur recodifie parfois d'un onglet
+// à l'autre ; canal et note suivent la dernière ligne lue.
 func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,
 	ligne *ligneGrandPublicImport, connue connuImport,
 ) (bool, error) {
