@@ -45,9 +45,8 @@ func representantExec(b *banc, sql string, args ...any) {
 	}
 }
 
-// Un département et sa région, plus le ménage de tout ce que les tests
-// accrochent dessus. À appeler APRÈS les comptes : le ménage se joue en ordre
-// inverse, et un compte se supprime seulement une fois ses fiches parties.
+// À appeler APRÈS les comptes : le ménage se joue en ordre inverse, et un compte ne se supprime
+// qu'une fois ses fiches parties.
 func representantDepartementDeTest(b *banc) string {
 	b.t.Helper()
 	region, departement := uuid.NewString(), uuid.NewString()

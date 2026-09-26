@@ -57,9 +57,8 @@ const (
 	codeColonnes      = "VISITE_IMPORT_COLONNES_DECALEES"
 )
 
-// L'aller-retour Excel du registre : la directrice exporte, corrige dans le
-// classeur, redépose. `N° REGISTRE` vide = création ; renseigné et inconnu =
-// ligne REFUSÉE, jamais repliée sur une création.
+// Aller-retour Excel du registre : `N° REGISTRE` vide = création ; renseigné et inconnu = ligne
+// REFUSÉE, jamais repliée sur une création.
 var enTetesRegistre = []struct {
 	cle, entete string
 	obligatoire bool

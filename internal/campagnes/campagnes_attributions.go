@@ -20,9 +20,8 @@ type CampagneImport struct {
 	Appelees          int    `json:"appelees" doc:"Fiches de l'import déjà appelées au moins une fois."`
 }
 
-// Le marketing nomme ses onglets « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 11
-// sept 2026 » ou « Leads 13 sept » : seule la date compte, et elle doit se lire
-// pareil partout. Un onglet sans date lisible garde son nom.
+// « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 11 sept 2026 », « Leads 13 sept » : seule la date compte et
+// se lit pareil partout ; un onglet sans date lisible garde son nom.
 func libelleFeuilleImport(feuille string) string {
 	nom := strings.TrimSpace(feuille)
 	date, ok := socle.DateDuNomDeFeuille(nom, time.Now())

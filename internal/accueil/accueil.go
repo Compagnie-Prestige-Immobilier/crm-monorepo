@@ -231,9 +231,8 @@ LEFT JOIN "visite_destinataires" s ON s."id" = v."destinataireId"`
 // Tri sur six colonnes et sept filtres facultatifs : le SQL est assemblé plutôt
 // que copié en douze requêtes sqlc (audits/go-donnees.md §10, cas D3).
 func (f *FiltresVisites) where() (clause string, args []any) {
-	// Une visite archivée sort du registre, des statistiques et de l'impression :
-	// c'est le seul endroit qui filtre la liste, d'où l'oubli impossible. La
-	// direction seule peut demander à voir les archives, pour les détruire.
+	// Seul filtre des visites archivées (registre, statistiques, impression) ; la direction seule
+	// demande à voir les archives, pour les détruire.
 	etat := `v."deletedAt" IS NULL`
 	if f.Archivees {
 		etat = `v."deletedAt" IS NOT NULL`
