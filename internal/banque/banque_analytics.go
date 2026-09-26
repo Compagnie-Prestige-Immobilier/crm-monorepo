@@ -38,13 +38,6 @@ const jointuresDossier = depuisDossier + `
 	LEFT JOIN "prospects" p ON p."id" = c."prospectId"
 	LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")`
 
-// Le PARCOURS, pas le projet d'entrée : un même numéro suit les deux. Sans
-// fiche au CRM, il n'y a pas de parcours et l'inscription donne le projet.
-const filtreProjetDossier = `(EXISTS (SELECT 1 FROM "prospect_journeys" pj
-		WHERE pj."prospectId" = c."prospectId" AND pj."projet" = $%[1]d::"Projet")
-	OR EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
-		WHERE ip."id" = c."inscriptionId" AND ip."projet" = $%[1]d::"Projet"))`
-
 func lireDossier(rows pgx.Rows, ref *referentielBanque) (DossierBanque, error) {
 	var d DossierBanque
 	var etapeID string
@@ -87,7 +80,7 @@ func (s *service) dossier(ctx context.Context, id, projet string, ref *referenti
 	where := `c."id" = $1 AND c."deletedAt" IS NULL`
 	args := []any{id}
 	if projet != "" {
-		where += " AND " + fmt.Sprintf(filtreProjetDossier, 2)
+		where += " AND " + fmt.Sprintf(exports.FiltreProjetDossier, 2)
 		args = append(args, projet)
 	}
 	liste, err := s.dossiers(ctx, colonnesDossier+jointuresDossier+" WHERE "+where, args, ref)
@@ -158,7 +151,7 @@ func banqueFiltresIdentite(c *clausesBanque, f *FiltreBanque) {
 		c.ajouter(`c."processingBankId" = $%d`, f.BanqueID)
 	}
 	if f.Projet != "" {
-		c.ajouter(filtreProjetDossier, f.Projet)
+		c.ajouter(exports.FiltreProjetDossier, f.Projet)
 	}
 	if f.RejectionReasonID != "" {
 		c.ajouter(`c."rejectionReasonId" = $%d`, f.RejectionReasonID)

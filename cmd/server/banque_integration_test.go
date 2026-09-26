@@ -756,6 +756,20 @@ func TestBanqueEncaissementSignaleLeTeleconseiller(t *testing.T) {
 		AND "sujet" LIKE '[CPI GRAND PUBLIC]%'`, idSansFiche); n != 1 {
 		t.Fatalf("un dossier sans fiche au CRM doit tracer son courriel Grand Public, %d trouvés", n)
 	}
+
+	var reference string
+	if err := s.pool.QueryRow(s.ctx, `SELECT "reference" FROM "bank_cases" WHERE "id" = $1`, idSansFiche).Scan(&reference); err != nil {
+		t.Fatal(err)
+	}
+	statut, _, classeur := s.classeur("/api/v1/export/bank-cases.xlsx?projet=GRAND_PUBLIC&banqueId=" + s.banqueID)
+	s.attend(statut, http.StatusOK, "export Grand Public des dossiers", nil)
+	lignes, err := classeur.GetRows("Dossiers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lignes) != 2 || lignes[1][0] != reference {
+		t.Fatalf("l'export Grand Public doit compter le dossier sans fiche %s : %v", reference, lignes)
+	}
 }
 
 // B09 : la liste « à ouvrir » et l'ouverture partagent désormais le même
