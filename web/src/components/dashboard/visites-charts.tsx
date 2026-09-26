@@ -327,7 +327,7 @@ function LineSeries({
     <Frame>
       <ResponsiveLine
         data={[
-          { id: label ?? 'Visites', data: items.map((item) => ({ x: item.label, y: item.value })) },
+          { id: label ?? 'Valeur', data: items.map((item) => ({ x: item.label, y: item.value })) },
         ]}
         colors={[paletteFill(theme, presentation?.palette, 0)]}
         curve={stepped ? 'step' : 'monotoneX'}
@@ -506,7 +506,7 @@ export function NuageChart({
   return (
     <Frame>
       <ResponsiveScatterPlot
-        data={[{ id: 'Visites', data: matrixPoints(matrice) }]}
+        data={[{ id: 'Valeur', data: matrixPoints(matrice) }]}
         colors={[paletteFill(theme, presentation?.palette, 0)]}
         nodeSize={9}
         margin={{ top: 12, right: 18, bottom: 34, left: 48 }}
@@ -531,7 +531,7 @@ export function BullesChart({
       <ResponsiveScatterPlot
         data={[
           {
-            id: 'Visites',
+            id: 'Valeur',
             data: matrixPoints(matrice).map((point) => ({
               ...point,
               size: 8 + (point.value / max) * 20,
@@ -679,7 +679,7 @@ export function TableauWidget({
         <thead>
           <tr>
             <th className="px-2 py-1.5 text-left">{entete}</th>
-            <th className="px-2 py-1.5 text-right">Visites</th>
+            <th className="px-2 py-1.5 text-right">Valeur</th>
             <th className="px-2 py-1.5 text-right">Part</th>
           </tr>
         </thead>
