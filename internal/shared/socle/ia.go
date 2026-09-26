@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -205,6 +207,67 @@ func (f *FournisseurIA) DemanderJSON(parent context.Context, modele, consigne, e
 	}
 	return []byte(sansBalises(reponse.texte())), nil
 }
+
+// Les fournisseurs de l'assistant servent aussi au résumé de fiche et au compte rendu.
+const (
+	FournisseursAssistant       = "ASSISTANT_AI_PROVIDERS"
+	FournisseursAssistantDefaut = "gemini,groq"
+)
+
+var (
+	ErrIANonConfiguree = errors.New("aucun fournisseur d'IA n'a de clé")
+	ErrIAIndisponible  = errors.New("aucun modèle n'a répondu")
+)
+
+// Chaque modèle des fournisseurs nommés par `variable` est essayé dans l'ordre ;
+// le premier JSON qui se décode dans `cible` gagne. Rend « fournisseur/modèle ».
+func DemanderIA(ctx context.Context, variable, parDefaut, consigne string, entree, cible any) (string, error) {
+	fournisseurs := FournisseursIA(variable, parDefaut)
+	if len(fournisseurs) == 0 {
+		return "", ErrIANonConfiguree
+	}
+	donnees, err := json.Marshal(entree)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range fournisseurs {
+		for _, modele := range f.Modeles {
+			if ctx.Err() != nil {
+				return "", fmt.Errorf("%w : %w", ErrIAIndisponible, ctx.Err())
+			}
+			brut, err := f.DemanderJSON(ctx, modele, consigne, string(donnees), nil)
+			if err == nil {
+				err = json.Unmarshal(brut, cible)
+			}
+			if err == nil {
+				return f.Nom + "/" + modele, nil
+			}
+			slog.Warn("modèle IA écarté", "fournisseur", f.Nom, "modele", modele, "err", err)
+		}
+	}
+	return "", ErrIAIndisponible
+}
+
+// Un texte rédigé par un modèle ne cite que des nombres reçus : un chiffre
+// inventé le fait écarter au profit du texte calculé.
+func NombresInventes(texte string, entree any) bool {
+	donnees, err := json.Marshal(entree)
+	if err != nil {
+		return true
+	}
+	connus := map[string]bool{}
+	for _, n := range motifNombre.FindAllString(string(donnees), -1) {
+		connus[strings.TrimLeft(n, "0")] = true
+	}
+	for _, n := range motifNombre.FindAllString(texte, -1) {
+		if !connus[strings.TrimLeft(n, "0")] {
+			return true
+		}
+	}
+	return false
+}
+
+var motifNombre = regexp.MustCompile(`\d+`)
 
 // Certains modèles entourent le JSON d'une balise Markdown malgré le format demandé.
 func sansBalises(texte string) string {
