@@ -217,7 +217,8 @@ LIMIT 500;
 -- name: DureesDeTraitement :many
 SELECT "closingAttemptId", "firstInputAt", "closedAt"
 FROM "ouvertures_fiche"
-WHERE "representantId" = $1 AND "closingAttemptId" IS NOT NULL AND "firstInputAt" IS NOT NULL
+WHERE "closingAttemptId" = ANY(@tentatives::text[]) AND "firstInputAt" IS NOT NULL
+ORDER BY "closedAt" DESC, "id" DESC
 LIMIT 5000;
 
 -- name: ListFicheChanges :many
