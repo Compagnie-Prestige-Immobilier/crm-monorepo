@@ -841,17 +841,9 @@ func (s *service) exportModeleProspects(ctx context.Context, _ *struct{}) (*huma
 		return nil, err
 	}
 	return exportEcrireModele(&exportModele{
-		feuille: exportEnteteProspects,
-		fichier: "modele-import-prospects-" + s.exportDateDuJour() + ".xlsx",
-		colonnes: []exportColonneModele{
-			{ExportEnteteNom, 24, true, "Nom de famille SEUL. Ne mettez pas le nom et le prénom dans la même cellule : le serveur ne les découpe pas.", "Ndiaye"},
-			{ExportEntetePrenom, 24, true, "Prénom SEUL, prénoms composés compris. Colonne distincte du nom, volontairement.", "Aminata"},
-			{ExportEnteteTelephone, 20, true, "Toutes les présentations sont admises : 77 123 45 67, +221 77 123 45 67, 00221771234567. Le serveur normalise. C’est ce numéro qui sert à repérer les doublons.", exportExempleTelephone},
-			{"Téléphone du représentant", 26, true, "Numéro du représentant qui a apporté le prospect. Le représentant doit DÉJÀ exister : importez d’abord les représentants, ce fichier n’en crée aucun.", "76 987 65 43"},
-			{exportEnteteBanque, 18, true, "Nom court de la banque, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", ExportCleCbao},
-			{ExportEnteteSyndicat, 18, true, "Sigle du syndicat, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", exportCleChues},
-			{ExportEnteteMethodeEnrolement, 32, false, "Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : choisir dans la liste déroulante. Laissée vide, la fiche part en attente d’appel.", exportLibellePlateforme},
-		},
+		feuille:  exportEnteteProspects,
+		fichier:  "modele-import-prospects-" + s.exportDateDuJour() + ".xlsx",
+		colonnes: exportColonnesProspects,
 		listes: []exportListeModele{
 			{5, "Banques", banques},
 			{6, "Syndicats", syndicats},
@@ -959,14 +951,28 @@ func (s *service) exportListesGrandPublic(ctx context.Context) ([]exportListeMod
 	}, nil
 }
 
-// L'import Grand Public reconnaît la ligne d'exemple du modèle pour la sauter :
-// les deux listes doivent rester dans le même ordre.
-func ExemplesGrandPublic() []string {
-	exemples := make([]string, len(exportColonnesGrandPublic))
-	for i, colonne := range exportColonnesGrandPublic {
+// L'import reconnaît la ligne d'exemple du modèle pour la sauter : ses colonnes
+// doivent rester dans l'ordre du modèle.
+func ExemplesGrandPublic() []string { return exemplesModele(exportColonnesGrandPublic) }
+
+func ExemplesProspects() []string { return exemplesModele(exportColonnesProspects) }
+
+func exemplesModele(colonnes []exportColonneModele) []string {
+	exemples := make([]string, len(colonnes))
+	for i, colonne := range colonnes {
 		exemples[i] = colonne.exemple
 	}
 	return exemples
+}
+
+var exportColonnesProspects = []exportColonneModele{
+	{ExportEnteteNom, 24, true, "Nom de famille SEUL. Ne mettez pas le nom et le prénom dans la même cellule : le serveur ne les découpe pas.", "Ndiaye"},
+	{ExportEntetePrenom, 24, true, "Prénom SEUL, prénoms composés compris. Colonne distincte du nom, volontairement.", "Aminata"},
+	{ExportEnteteTelephone, 20, true, "Toutes les présentations sont admises : 77 123 45 67, +221 77 123 45 67, 00221771234567. Le serveur normalise. C’est ce numéro qui sert à repérer les doublons.", exportExempleTelephone},
+	{"Téléphone du représentant", 26, true, "Numéro du représentant qui a apporté le prospect. Le représentant doit DÉJÀ exister : importez d’abord les représentants, ce fichier n’en crée aucun.", "76 987 65 43"},
+	{exportEnteteBanque, 18, true, "Nom court de la banque, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", ExportCleCbao},
+	{ExportEnteteSyndicat, 18, true, "Sigle du syndicat, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", exportCleChues},
+	{ExportEnteteMethodeEnrolement, 32, false, "Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : choisir dans la liste déroulante. Laissée vide, la fiche part en attente d’appel.", exportLibellePlateforme},
 }
 
 var exportColonnesGrandPublic = []exportColonneModele{

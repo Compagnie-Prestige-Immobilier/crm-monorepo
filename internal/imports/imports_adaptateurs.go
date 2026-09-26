@@ -28,7 +28,7 @@ var adaptateursImport = map[db.ImportKind]adaptateurImport{
 	db.ImportKindPROSPECTS: {
 		maxLignes: 150_000, colonnes: colonnesProspectsImport,
 		feuilles: &dispositionFeuilleImport{
-			ligneEntete: 1, premiereDonnee: 2, repliFeuillesRemplies: true,
+			ligneEntete: 1, premiereDonnee: 2, repliFeuillesRemplies: true, exemples: exports.ExemplesProspects(),
 		},
 		preparer: preparerProspectsImport, lire: lireProspectImport, ecrire: ecrireProspectsImport,
 	},
