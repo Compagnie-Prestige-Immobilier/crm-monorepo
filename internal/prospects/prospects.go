@@ -914,10 +914,6 @@ func (s *service) prospectAvantCreation(ctx context.Context, u *socle.Utilisateu
 	return phoneE164, id, s.prospectRepresentantUtilisable(ctx, corps.RepresentantID)
 }
 
-func ChampsLibresRetenus(ctx context.Context, d *socle.Deps, projet db.Projet, envoyes map[string]string) ([]byte, error) {
-	return (&service{Deps: d}).prospectLibresRetenus(ctx, projet, envoyes)
-}
-
 // Les reponses aux champs ajoutes, filtrees sur les champs declares pour le
 // projet. Une cle inconnue tombe, une reponse vide ne s'ecrit pas.
 func (s *service) prospectLibresRetenus(ctx context.Context, projet db.Projet, envoyes map[string]string) ([]byte, error) {
