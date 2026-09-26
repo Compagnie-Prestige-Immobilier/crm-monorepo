@@ -31,6 +31,7 @@ const (
 	formulaireTitreMax   = 120
 	formulaireCorpsMax   = 500
 	formulaireLibelleMel = "E-mail"
+	formulaireCourriel   = "FORMULAIRE_PUBLIC"
 )
 
 var (
@@ -338,18 +339,42 @@ func (s *service) formulaireAviserParEmail(ctx context.Context, parametres *Pros
 			Texte:         accuse, HTML: formulaireEnHtml(accuse),
 		})
 	}
-	if len(messages) == 0 {
-		return nil
-	}
-	if raison := notifications.CourrielSuspendu(s.Cfg); raison != nil {
-		slog.Info("avis de demande publique non expédié", "prospectId", prospectID, "cause", *raison)
-		return nil
-	}
-	transport := notifications.ConfigurerBrevo()
-	if envoi := transport.Envoyer(ctx, messages); envoi.Statut != notifications.BrevoEnvoye {
-		slog.Warn("avis de demande publique non remis", "prospectId", prospectID, "statut", envoi.Statut)
+	for i := range messages {
+		if err := s.formulaireExpedier(ctx, prospectID, &messages[i]); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// Comme EnvoyerCourriel, dont le gabarit ajouterait salutation et pied à un texte réglé par l'administrateur :
+// la ligne du journal est écrite même retenue ou refusée, et le rejeu la reprend à la prochaine heure ouvrable.
+func (s *service) formulaireExpedier(ctx context.Context, prospectID string, message *notifications.MessageBrevo) error {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	statut, erreur := notifications.CourrielEchec, notifications.CourrielSuspendu(s.Cfg)
+	var messageID *string
+	var envoyeLe *time.Time
+	if erreur == nil {
+		transport := notifications.ConfigurerBrevo()
+		envoi := transport.Envoyer(ctx, []notifications.MessageBrevo{*message})
+		erreur = &envoi.Statut
+		if envoi.Statut == notifications.BrevoEnvoye {
+			maintenant := time.Now()
+			statut, messageID, erreur, envoyeLe = notifications.CourrielEnvoye, &envoi.MessageID, nil, &maintenant
+		}
+	}
+	destinataires := make([]string, 0, len(message.Destinataires))
+	for _, d := range message.Destinataires {
+		destinataires = append(destinataires, d.Email)
+	}
+	return s.Q.CourrielInsert(ctx, db.CourrielInsertParams{
+		ID: id.String(), Type: formulaireCourriel, Sujet: message.Sujet, Destinataires: destinataires, Copies: []string{},
+		ObjetType: prospectEntite, ObjetId: prospectID, Html: message.HTML, Texte: message.Texte,
+		Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
+	})
 }
 
 // Le référentiel choisi n'est PAS repris : il est déjà sur la fiche, sous son

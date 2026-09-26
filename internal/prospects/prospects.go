@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -139,10 +140,10 @@ func prospectTypeEnum[T ~string](v string) *T {
 }
 
 func prospectTronquer(texte string, maximum int) string {
-	if len(texte) <= maximum {
+	if utf8.RuneCountInString(texte) <= maximum {
 		return texte
 	}
-	return strings.ToValidUTF8(texte[:maximum], "")
+	return string([]rune(texte)[:maximum])
 }
 
 type ProspectJourney struct {

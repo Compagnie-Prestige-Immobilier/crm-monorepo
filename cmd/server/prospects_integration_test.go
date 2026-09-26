@@ -764,8 +764,7 @@ func TestFusionDeuxRappelsEnAttente(t *testing.T) {
 	}
 }
 
-// Audit B21 : sans le contrôle de `prospectStatutModifiable` à la création,
-// une fiche pouvait naître directement CONVERTI, sans offre ni conversion signée.
+// Une fiche ne naît pas CONVERTI sans offre ni conversion signée.
 func TestProspectCreationRefuseConverti(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)
@@ -787,9 +786,7 @@ func TestProspectCreationRefuseConverti(t *testing.T) {
 	}
 }
 
-// Audit B22 : sans la garde de `ConvertirJourney`, une conversion Grand Public
-// rejouée sur une fiche déjà vendue redevenait CONVERTI et écrasait l'auteur et
-// le montant de la conversion signée.
+// Une conversion Grand Public rejouée sur une fiche vendue n'écrase pas la conversion signée.
 func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)
@@ -848,10 +845,7 @@ func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
 	}
 }
 
-// Audit B23 : la troncature par octets coupait un caractère accentué en deux,
-// et Postgres refusait la chaîne invalide (22021) sans notifier la supervision.
-// Le numéro et les noms sont choisis pour que l'octet 500 tombe au milieu d'un
-// `é`, comme relevé par l'audit.
+// Un long message accentué se tronque en caractères : la notification garde 500 caractères valides.
 func TestFormulairePublicMessageAccentuePrevientLaSupervision(t *testing.T) {
 	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
 	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
@@ -883,7 +877,43 @@ func TestFormulairePublicMessageAccentuePrevientLaSupervision(t *testing.T) {
 	if notifs != 1 {
 		t.Fatalf("la supervision doit recevoir une notification : %d", notifs)
 	}
-	if !utf8.ValidString(corpsNotif) {
-		t.Fatal("le corps tronqué doit rester un UTF-8 valide")
+	if !utf8.ValidString(corpsNotif) || utf8.RuneCountInString(corpsNotif) != 500 {
+		t.Fatalf("le corps tronqué doit garder 500 caractères valides : %d", utf8.RuneCountInString(corpsNotif))
+	}
+}
+
+// Une demande publique sur une fiche venue d'ailleurs garde sa provenance, et
+// l'accusé au visiteur entre au journal des courriels, qu'il parte ou attende l'heure ouvrable.
+func TestFormulairePublicSurFicheExistante(t *testing.T) {
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	reglagesPublicsSansObligation(b)
+	telephone := numeroDeCourse(89)
+	id := creerProspect(b, "Ndiaye", telephone)["id"].(string)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetId" = $1`, id)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "notifications" WHERE "route" = $1`, "/chues/prospects/"+id)
+	})
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "origin" = 'BANQUE' WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	email := "visiteur-" + id[:8] + "@exemple.sn"
+	demande := map[string]any{"nom": "Ndiaye", "prenom": "Awa", "phone": telephone, "email": email}
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), demande,
+		map[string]string{"X-Forwarded-For": "10.0.0.5"})
+	b.attend(statut, http.StatusCreated, "demande publique sur une fiche BANQUE", body)
+
+	var origine string
+	var accuses int
+	if err := b.pool.QueryRow(b.ctx, `SELECT "origin", (SELECT count(*) FROM "courriels" WHERE "objetId" = $1 AND $2 = ANY ("destinataires"))
+		FROM "prospects" WHERE "id" = $1`, id, email).Scan(&origine, &accuses); err != nil {
+		t.Fatal(err)
+	}
+	if origine != "BANQUE" || accuses != 1 {
+		t.Fatalf("provenance %q, accusés journalisés %d : attendu BANQUE et un accusé", origine, accuses)
 	}
 }
