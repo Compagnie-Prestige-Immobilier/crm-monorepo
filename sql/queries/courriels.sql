@@ -30,14 +30,14 @@ WHERE (sqlc.narg('type')::text IS NULL OR "type" = sqlc.narg('type')::text)
 
 -- name: CourrielsARejouer :many
 SELECT * FROM "courriels"
-WHERE "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
+WHERE "statut" IN ('ECHEC', 'EN_ATTENTE') AND "tentatives" < @tentatives_max::int
   AND "createdAt" > now() - interval '7 days'
 ORDER BY "createdAt"
 LIMIT @prendre::bigint;
 
 -- name: CourrielReserverRejeu :one
 SELECT "id" FROM "courriels"
-WHERE "id" = @id AND "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
+WHERE "id" = @id AND "statut" IN ('ECHEC', 'EN_ATTENTE') AND "tentatives" < @tentatives_max::int
 FOR UPDATE SKIP LOCKED;
 
 -- name: CourrielReserverRenvoi :one

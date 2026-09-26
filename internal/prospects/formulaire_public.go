@@ -350,13 +350,13 @@ func (s *service) formulaireExpedier(ctx context.Context, prospectID string, mes
 	if err != nil {
 		return err
 	}
-	statut, erreur := notifications.CourrielEchec, notifications.CourrielSuspendu(s.Cfg)
+	statut, erreur := notifications.CourrielSuspendu(s.Cfg)
 	var messageID *string
 	var envoyeLe *time.Time
 	if erreur == nil {
 		transport := notifications.ConfigurerBrevo()
 		envoi := transport.Envoyer(ctx, []notifications.MessageBrevo{*message})
-		erreur = &envoi.Statut
+		statut, erreur = notifications.CourrielEchec, &envoi.Statut
 		if envoi.Statut == notifications.BrevoEnvoye {
 			maintenant := time.Now()
 			statut, messageID, erreur, envoyeLe = notifications.CourrielEnvoye, &envoi.MessageID, nil, &maintenant

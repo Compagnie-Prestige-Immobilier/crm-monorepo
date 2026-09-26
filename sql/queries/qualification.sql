@@ -490,7 +490,10 @@ SELECT p."id", p."nom", p."prenom", p."phoneE164", p."email", p."projet"::text A
        p."enrollmentMethod"::text AS "methode", p."enrollmentCapturedAt",
        (SELECT a."rendezVousAt" FROM "call_attempts" a
          WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
-         ORDER BY a."createdAt" DESC LIMIT 1) AS "rendezVousAt"
+         ORDER BY a."createdAt" DESC LIMIT 1) AS "rendezVousAt",
+       COALESCE((SELECT c."texte" FROM "courriels" c
+         WHERE c."objetType" = 'prospect' AND c."objetId" = p."id" AND c."type" = 'PROSPECT_ENROLEMENT'
+         ORDER BY c."createdAt" DESC LIMIT 1), '')::text AS "dernierCourriel"
 FROM "prospects" p
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
