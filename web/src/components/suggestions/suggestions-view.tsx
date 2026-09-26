@@ -166,8 +166,7 @@ export function SuggestionsView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Ce sont des contacts recommandés par un représentant, pas encore des prospects. Les fiches
-          suspectes ou invalides sont automatiquement détectées pour vous éviter de perdre du temps.
+          Ce sont des contacts recommandés par un représentant, pas encore des prospects.
         </p>
 
         {suspiciousItems.length > 0 ? (
