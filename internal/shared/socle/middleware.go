@@ -94,6 +94,10 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		debut := time.Now()
 		_, motif := mux.Handler(r)
 		id := r.Header.Get("X-Request-Id")
+		if id == "" {
+			// Un appel de Kairos garde sa trace : le journal du CRM et celui de Kairos se recoupent.
+			id = r.Header.Get("X-Kairos-Trace")
+		}
 		if !idRequeteValide.MatchString(id) {
 			id = uuid.NewString()
 		}
@@ -283,7 +287,7 @@ func utilisateurDeLaRequete(w http.ResponseWriter, r *http.Request, q *db.Querie
 	if appelKairos {
 		u, err := utilisateurKairos(w, r, q, a, base)
 		if err != nil {
-			slog.Warn("appel Kairos refusé", "chemin", r.URL.Path, "err", err)
+			slog.Warn("appel Kairos refusé", "chemin", r.URL.Path, "requestId", w.Header().Get("X-Request-Id"), "err", err)
 			return Utilisateur{}, Problem(http.StatusUnauthorized, "KAIROS_REFUSE", "Appel Kairos refusé.")
 		}
 		return u, nil
