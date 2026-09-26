@@ -11,16 +11,19 @@ import (
 )
 
 // L'appel est déjà validé : un courriel d'enrôlement en échec est tracé au journal,
-// jamais remonté au téléconseiller.
+// jamais remonté au téléconseiller. Une liste de destinataires vide coupe ce courriel.
 func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, prospectID string) {
-	r, err := s.Q.ProspectPourCourrielEnrolement(ctx, prospectID)
-	if err != nil {
-		slog.Error("prospect enrôlé : lecture impossible", "prospect", prospectID, "err", err)
-		return
-	}
 	reglages, err := notifications.LireReglagesCourriels(ctx, s.Deps)
 	if err != nil {
 		slog.Error("prospect enrôlé : réglages illisibles", "prospect", prospectID, "err", err)
+		return
+	}
+	if len(reglages.Enrolement.Destinataires) == 0 {
+		return
+	}
+	r, err := s.Q.ProspectPourCourrielEnrolement(ctx, prospectID)
+	if err != nil {
+		slog.Error("prospect enrôlé : lecture impossible", "prospect", prospectID, "err", err)
 		return
 	}
 	projet, coque := "CPI CHUES", "chues"
@@ -28,12 +31,9 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 		projet, coque = "CPI GRAND PUBLIC", "grand-public"
 	}
 	client := strings.TrimSpace(r.Prenom + " " + r.Nom)
-	methode := "non précisée"
-	if r.Methode != "" {
-		methode = r.Methode
-		if libelle, connu := exports.ExportLibellesMethode[r.Methode]; connu {
-			methode = libelle
-		}
+	methode := methodeLisible(r.Methode)
+	if strings.Contains(r.DernierCourriel, libelleMethode+" : "+methode+"\n") {
+		return
 	}
 	obtenuLe := time.Now()
 	if r.EnrollmentCapturedAt != nil {
@@ -59,7 +59,7 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 		{"Téléphone", texteOuNonRenseigne(r.PhoneE164)},
 		{"Courriel", texteOuNonRenseigne(r.Email)},
 		{"Banque", texteOuNonRenseigne(r.BanqueName)},
-		{"Méthode d’enrôlement", methode},
+		{libelleMethode, methode},
 	}
 	if rendezVous != "" {
 		intro += " Rendez-vous : " + rendezVous + "."
@@ -77,16 +77,29 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 		ObjetType: "prospect", ObjetID: r.ID,
 		Titre: titre, Intro: intro, Lignes: lignes,
 		Lien: socle.Env("PUBLIC_WEB_URL", "") + chemin, LibelleLien: "Voir le prospect dans CPI GO",
-		NomPieceJointe: "prospect-enrolement-" + r.ID + ".pdf",
 	})
 	if err != nil {
 		slog.Error("prospect enrôlé : courriel non tracé", "prospect", prospectID, "err", err)
 	}
 }
 
-const formatDateEnrolement = "02/01/2006 à 15:04"
+const (
+	formatDateEnrolement = "02/01/2006 à 15:04"
+	// Relu dans le texte du dernier courriel : la même méthode ne se renvoie pas.
+	libelleMethode = "Méthode d’enrôlement"
+)
 
 var methodesRendezVous = map[string]bool{"APPOINTMENT": true, "PHYSICAL": true, "RDV_CPI": true}
+
+func methodeLisible(code string) string {
+	if code == "" {
+		return "non précisée"
+	}
+	if libelle, connu := exports.ExportLibellesMethode[code]; connu {
+		return libelle
+	}
+	return code
+}
 
 func texteOuNonRenseigne(v *string) string {
 	if v == nil || strings.TrimSpace(*v) == "" {
