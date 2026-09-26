@@ -35,10 +35,10 @@ func bancKairos(t *testing.T) *banc {
 }
 
 type appelKairosTest struct {
-	methode, chemin, corps string
-	identite               socle.IdentiteKairos
-	decalage               time.Duration
-	secret                 string
+	methode, chemin, corps, trace string
+	identite                      socle.IdentiteKairos
+	decalage                      time.Duration
+	secret                        string
 }
 
 func (b *banc) appelKairos(a *appelKairosTest) (statut int, reponse map[string]any) {
@@ -61,6 +61,9 @@ func (b *banc) appelKairos(a *appelKairosTest) (statut int, reponse map[string]a
 	req.Header.Set("X-Kairos-Identite", jeton)
 	req.Header.Set("X-Kairos-Horodatage", horodatage)
 	req.Header.Set("X-Kairos-Signature", hex.EncodeToString(mac.Sum(nil)))
+	if a.trace != "" {
+		req.Header.Set("X-Kairos-Trace", a.trace)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		b.t.Fatal(err)
@@ -141,6 +144,13 @@ func TestKairosAppelSigneAgitAuNomDeLUtilisateur(t *testing.T) {
 		appel.methode, appel.chemin = http.MethodGet, "/api/v1/auth/me"
 		statut, body = b.appelKairos(&appel)
 		b.attend(statut, http.StatusUnauthorized, quoi, body)
+	}
+
+	trace := "4bf92f3577b34da6a3ce929d0e0e4736"
+	statut, body = b.appelKairos(&appelKairosTest{methode: http.MethodGet, chemin: "/api/v1/auth/me", secret: "autre-secret", identite: identite, trace: trace})
+	b.attend(statut, http.StatusUnauthorized, "refus tracé", body)
+	if body["requestId"] != trace {
+		t.Fatalf("le refus ne reprend pas la trace Kairos : %v", body["requestId"])
 	}
 
 	b.afficherKairos(false)
