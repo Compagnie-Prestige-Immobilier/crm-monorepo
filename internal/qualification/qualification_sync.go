@@ -10,9 +10,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// Lot de synchronisation du panneau v1 : son seul chemin d'écriture pour une
-// tentative d'appel prospect. Le verdict de chaque opération est dans le corps,
-// jamais dans le statut HTTP.
+// Seul chemin d'écriture du panneau pour une tentative d'appel prospect : le verdict
+// de chaque opération est dans le corps, jamais dans le statut HTTP.
 type SyncPushInput struct {
 	Body struct {
 		ClientBatchID         string             `json:"clientBatchId" format:"uuid"`

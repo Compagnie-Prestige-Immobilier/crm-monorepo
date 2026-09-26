@@ -22,8 +22,19 @@ type ProspectJournalEntree struct {
 
 type ProspectJournalFicheOutput struct {
 	Body struct {
-		Items []ProspectJournalEntree `json:"items"`
+		Items   []ProspectJournalEntree `json:"items"`
+		Tronque bool                    `json:"tronque" doc:"Plus de 500 lignes : seules les 500 plus récentes sont rendues."`
 	}
+}
+
+const prospectHistoriqueMax = 500
+
+// Les requêtes d'historique lisent une ligne de plus que le plafond : sa présence dit que la liste est tronquée.
+func prospectHistoriqueBorne[T any](lignes []T) (bornees []T, tronque bool) {
+	if len(lignes) > prospectHistoriqueMax {
+		return lignes[:prospectHistoriqueMax], true
+	}
+	return lignes, false
 }
 
 func (s *service) prospectJournalFiche(ctx context.Context, in *ProspectIDInput) (*ProspectJournalFicheOutput, error) {
@@ -36,6 +47,7 @@ func (s *service) prospectJournalFiche(ctx context.Context, in *ProspectIDInput)
 		return nil, err
 	}
 	out := &ProspectJournalFicheOutput{}
+	lignes, out.Body.Tronque = prospectHistoriqueBorne(lignes)
 	out.Body.Items = make([]ProspectJournalEntree, 0, len(lignes))
 	for i := range lignes {
 		l := &lignes[i]

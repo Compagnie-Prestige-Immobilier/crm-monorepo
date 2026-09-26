@@ -385,6 +385,10 @@ INSERT INTO "prospects" (
   $35, $36
 );
 
+-- L'ordre des identifiants évite l'interblocage de deux fusions croisées.
+-- name: VerrouillerFichesAFusionner :many
+SELECT "id" FROM "prospects" WHERE "id" = ANY(@ids::text[]) AND "deletedAt" IS NULL ORDER BY "id" FOR UPDATE;
+
 -- name: SoftDeleteProspect :execrows
 UPDATE "prospects" SET "deletedAt" = now(), "rev" = "rev" + 1 WHERE "id" = $1 AND "deletedAt" IS NULL;
 
@@ -601,7 +605,7 @@ JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 LEFT JOIN "ouvertures_fiche" ou ON ou."closingAttemptId" = a."id" AND ou."firstInputAt" IS NOT NULL
 WHERE a."prospectId" = $1
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: AppSettingParCle :one
 SELECT "key", "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;
@@ -626,7 +630,7 @@ LEFT JOIN "users" t ON t."id" = a."after"->>'teleconseillerId'
 WHERE (a."entity" = 'prospect' AND a."entityId" = @prospect_id::text)
    OR (a."entity" IN ('lot_export', 'scheduled_callback') AND a."after"->>'prospectId' = @prospect_id::text)
 ORDER BY a."at" DESC, a."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: SupprimerAppSetting :execrows
 DELETE FROM "app_settings" WHERE "key" = $1;
@@ -714,7 +718,7 @@ FROM "segment_changes" c
 JOIN "users" u ON u."id" = c."changedById"
 WHERE c."prospectId" = $1
 ORDER BY c."changedAt" DESC, c."id" DESC
-LIMIT 500;
+LIMIT 501;
 
 -- name: BanqueSigleSegment :one
 SELECT "shortName" FROM "banques" WHERE "id" = $1;
@@ -739,14 +743,15 @@ UPDATE "prospect_journeys" SET
   "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
 WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
+-- Un autre projet que le principal ne touche que la remise en file.
 -- name: RequalifierProspect :execrows
 UPDATE "prospects" SET
-  "statut" = @statut::"ProspectStatut",
-  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
-  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "statut" = CASE WHEN "projet" = @projet THEN @statut::"ProspectStatut" ELSE "statut" END,
+  "phase2Status" = CASE WHEN "projet" = @projet AND @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN "projet" = @projet AND @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
-WHERE "id" = @prospect_id AND "statut" NOT IN ('CONVERTI', 'VENDU');
+WHERE "id" = @prospect_id AND ("projet" <> @projet OR "statut" NOT IN ('CONVERTI', 'VENDU'));
 
 -- Sans méthode, une fiche ne peut plus rester « méthode obtenue » : elle redevient jointe.
 -- name: ModifierMethodeJourney :exec

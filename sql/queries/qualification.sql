@@ -92,10 +92,8 @@ SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL
 FOR NO KEY UPDATE;
 
--- Un rappel promis se tient, même quand la campagne a rendu la fiche, et le
--- dernier à avoir appelé requalifie depuis « Mes contacts ». Une fiche
--- attribuée à un autre échappe à son créateur et à l'encadrement : deux
--- personnes appelleraient la même.
+-- Un rappel promis se tient même campagne rendue ; une fiche attribuée à un autre
+-- échappe à son créateur et à l'encadrement, sinon deux personnes l'appelleraient.
 -- name: ProspectAttribue :one
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
@@ -169,7 +167,7 @@ UPDATE "prospects" SET
   "whatsappStatus" = COALESCE(CAST(sqlc.narg('whatsapp_status') AS text)::"WhatsappStatus", "whatsappStatus"),
   "whatsappE164" = CASE WHEN @maj_whatsapp_e164::bool THEN sqlc.narg('whatsapp_e164') ELSE "whatsappE164" END,
   "champsLibres" = CASE WHEN @maj_champs_libres::bool
-    THEN COALESCE("champsLibres", '{}'::jsonb) || sqlc.narg('champs_libres')::jsonb
+    THEN jsonb_strip_nulls(COALESCE("champsLibres", '{}'::jsonb) || sqlc.narg('champs_libres')::jsonb)
     ELSE "champsLibres" END,
   "lastReasonId" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_reason_id') ELSE "lastReasonId" END,
   "lastCallAt" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_at') ELSE "lastCallAt" END,
@@ -295,9 +293,10 @@ WHERE c."status" = 'PENDING'
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        c."status", p."phoneE164", p."prenom", p."nom", p."projet",
        u."fullName" AS "assignedToName",
-       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous"
+       (p."phase2Status" = 'APPOINTMENT' AND r."code" IS DISTINCT FROM 'RDV_TELEPHONIQUE')::bool AS "rendezVousNonReportable"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
+LEFT JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 JOIN "users" u ON u."id" = c."assignedToId"
 WHERE c."id" = $1;
 
@@ -385,13 +384,11 @@ CROSS JOIN LATERAL (
 ) deja
 WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
        OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
-  AND (CAST(sqlc.narg('depuis') AS timestamp) IS NULL
-       OR o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp))
-  AND (CAST(sqlc.narg('jusqua') AS timestamp) IS NULL
-       OR o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp))
+  AND o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
+  AND o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
 GROUP BY 1, 2, 3
-ORDER BY 3 DESC, 2 ASC
-LIMIT 3000;
+ORDER BY 3 DESC, 2 ASC, 1
+LIMIT 3001;
 
 -- name: ListerSuggestions :many
 SELECT s."id", s."sourceRepresentantId", s."suggestedName", s."suggestedPhoneE164",
@@ -499,9 +496,8 @@ LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 WHERE p."id" = $1;
 
--- Une fiche que personne ne suit encore (titulaire = compte d'import) va au
--- premier qui l'appelle ; entre téléconseillers, elle change de main seulement
--- quand le second joint la personne.
+-- Une fiche du compte d'import va au premier qui l'appelle ; entre téléconseillers,
+-- elle change de main seulement quand le second joint la personne.
 -- name: PrendreLaFiche :execrows
 UPDATE "prospects" p SET "createdById" = @agent, "rev" = p."rev" + 1
 WHERE p."id" = @id AND p."createdById" <> @agent AND p."statut" NOT IN ('CONVERTI', 'VENDU')
@@ -525,12 +521,12 @@ SELECT "id", "label" FROM "points_rencontre"
 WHERE "isActive" ORDER BY "position", "label" LIMIT 100;
 
 -- name: RvSiteReservations :many
--- La date d'un rendez-vous se lit comme à l'accueil : le rappel en attente, sinon le dernier honoré.
+-- La date d'un rendez-vous se lit comme à l'accueil (RendezVousObtenus).
 SELECT rdv."quand"::timestamp AS "quand", count(*)::int AS "nombre"
 FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 LEFT JOIN LATERAL (
   SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-  WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+  WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
   ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
 ) rdv ON true
 WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
@@ -544,7 +540,7 @@ SELECT pg_advisory_xact_lock(hashtext('rv_site.creneaux'));
 SELECT (SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
         LEFT JOIN LATERAL (
           SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-          WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+          WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
           ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
         ) rdv ON true
         WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'

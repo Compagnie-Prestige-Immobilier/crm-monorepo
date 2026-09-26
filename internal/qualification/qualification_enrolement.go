@@ -10,9 +10,8 @@ import (
 	"time"
 )
 
-// Méthode d'enrôlement obtenue : le prospect part à l'enrôlement, l'équipe
-// et ses copies configurées reçoivent la fiche. L'appel est déjà validé, un
-// courriel en échec est tracé dans le journal, jamais remonté au téléconseiller.
+// L'appel est déjà validé : un courriel d'enrôlement en échec est tracé au journal,
+// jamais remonté au téléconseiller.
 func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, prospectID string) {
 	r, err := s.Q.ProspectPourCourrielEnrolement(ctx, prospectID)
 	if err != nil {

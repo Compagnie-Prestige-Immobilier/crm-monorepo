@@ -3,15 +3,16 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-// Un poste dont l'horloge avance ne doit pas figer le dernier appel pour tous
-// les appels suivants : le motif et l'heure gardés sont ceux du dernier appel
-// réellement passé, pas ceux du premier envoyé avec une date future.
+// Un poste en avance ne fige pas le dernier appel : on garde le dernier réellement passé.
 func TestTentativeHorlogeEnAvanceNeFigePasLaFiche(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	fiche := qualificationProspect(b)
@@ -63,10 +64,7 @@ func attendreAttentesVerrou(b *banc, n int) {
 	b.t.Fatalf("%d requête(s) attendue(s) sur le verrou de ligne, jamais atteint", n)
 }
 
-// Deux consignations forcées dans cet ordre sur la même fiche par un verrou
-// tenu par le test : sans verrou de ligne à la lecture, la seconde a lu la
-// fiche avant que la première n'ait écrit, et écrase le dernier appel avec sa
-// propre date, plus ancienne que celle déjà consignée.
+// Deux consignations ordonnées par un verrou du test : la plus ancienne n'écrase pas la plus récente.
 func TestTentativesConcurrentesGardentLaPlusRecente(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	fiche := qualificationProspect(b)
@@ -119,5 +117,81 @@ func TestTentativesConcurrentesGardentLaPlusRecente(t *testing.T) {
 	}
 	if reasonCode != "HESITANT" {
 		t.Fatalf("la fiche doit garder le dernier appel le plus récent, pas celui lu avant coup : %s", reasonCode)
+	}
+}
+
+// Un champ ajouté se remplit puis se vide depuis la console.
+func TestTentativeVideUnChampLibre(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	cle := "conversion.champs.CHUES"
+	var avant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = $1`, cle).Scan(&avant)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = $1`, cle)
+		if avant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ($1,$2,now())`, cle, *avant)
+		}
+	})
+	champ := "piste-" + uuid.NewString()[:8]
+	qualificationExec(b, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ($1,$2,now())
+		ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`,
+		cle, `{"champs":[],"libres":[{"id":"`+champ+`","libelle":"Piste","type":"TEXTE","options":[],"obligatoire":false}]}`)
+
+	for _, valeur := range []string{"Marché", ""} {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"champsLibres": map[string]string{champ: valeur, "inconnu": "x"}}))
+		b.attend(statut, http.StatusOK, "consignation du champ libre « "+valeur+" »", body)
+		var lue string
+		var present, inconnu bool
+		if err := b.pool.QueryRow(b.ctx, `SELECT COALESCE("champsLibres"->>$2, ''), COALESCE("champsLibres" ? $2, false),
+			COALESCE("champsLibres" ? 'inconnu', false) FROM "prospects" WHERE "id" = $1`, fiche, champ).Scan(&lue, &present, &inconnu); err != nil {
+			t.Fatal(err)
+		}
+		if lue != valeur || present != (valeur != "") || inconnu {
+			t.Fatalf("après « %s », le champ vaut %q (présent : %v, clé inconnue gardée : %v)", valeur, lue, present, inconnu)
+		}
+	}
+}
+
+func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	requalifiee, premiere := qualificationProspect(b), qualificationProspect(b)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
+	ouvrir := func(prospect string, ilYA time.Duration, tentative any) {
+		qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
+		                      VALUES ($1,$2,$3,now() - $4::interval,now() - $4::interval + interval '1 minute',$5,now())`,
+			uuid.NewString(), b.userID, prospect, fmt.Sprintf("%d seconds", int(ilYA.Seconds())), tentative)
+	}
+	ouvrir(requalifiee, 3*time.Hour, uuid.NewString())
+	ouvrir(requalifiee, 2*time.Hour, uuid.NewString())
+	ouvrir(requalifiee, time.Hour, nil)
+	ouvrir(premiere, time.Hour, uuid.NewString())
+
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage", nil)
+	b.attend(statut, http.StatusBadRequest, "comptage sans période", body)
+	jour := time.Now().UTC()
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage?from="+jour.AddDate(-2, 0, 0).Format(time.DateOnly)+"&to="+jour.Format(time.DateOnly), nil)
+	b.attend(statut, http.StatusBadRequest, "comptage sur plus d'un an", body)
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage?from="+jour.AddDate(0, 0, -1).Format(time.DateOnly)+"&to="+jour.Format(time.DateOnly), nil)
+	b.attend(statut, http.StatusOK, "comptage des ouvertures", body)
+	totaux := map[string]float64{}
+	for _, ligne := range body["items"].([]any) {
+		for cle, valeur := range ligne.(map[string]any) {
+			if nombre, ok := valeur.(float64); ok {
+				totaux[cle] += nombre
+			}
+		}
+	}
+	attendus := map[string]float64{"ouvertures": 4, "qualifiees": 3, "ouverturesDejaQualifiees": 2, "requalifiees": 1}
+	for cle, attendu := range attendus {
+		if totaux[cle] != attendu {
+			t.Fatalf("%s = %v, attendu %v (%v)", cle, totaux[cle], attendu, totaux)
+		}
 	}
 }

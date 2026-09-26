@@ -68,9 +68,9 @@ func rvSiteMonterRoutes(api huma.API, s *service) {
 	huma.Register(api, qualificationRoute("rvSiteReglagesEcrire", http.MethodPut, "/api/v1/rv-site/reglages"), s.rvSiteReglagesEcrire)
 }
 
-func (s *service) rvSiteReglages(ctx context.Context) (RvSiteReglages, error) {
+func rvSiteReglages(ctx context.Context, q *db.Queries) (RvSiteReglages, error) {
 	r := rvSiteReglagesParDefaut()
-	ligne, err := s.Q.GetSetting(ctx, cleReglagesRvSite)
+	ligne, err := q.GetSetting(ctx, cleReglagesRvSite)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, nil
 	}
@@ -82,7 +82,7 @@ func (s *service) rvSiteReglages(ctx context.Context) (RvSiteReglages, error) {
 }
 
 func (s *service) rvSiteReglagesLire(ctx context.Context, _ *struct{}) (*RvSiteReglagesOutput, error) {
-	r, err := s.rvSiteReglages(ctx)
+	r, err := rvSiteReglages(ctx, s.Q)
 	return &RvSiteReglagesOutput{Body: r}, err
 }
 
@@ -113,7 +113,7 @@ func (s *service) rvSiteReglagesEcrire(ctx context.Context, in *RvSiteReglagesIn
 	if err != nil {
 		return nil, err
 	}
-	avant, err := s.rvSiteReglages(ctx)
+	avant, err := rvSiteReglages(ctx, s.Q)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s *service) rvSiteReglagesEcrire(ctx context.Context, in *RvSiteReglagesIn
 func (s *service) rvSiteChoix(ctx context.Context, _ *struct{}) (*QualificationRvSiteOutput, error) {
 	out := &QualificationRvSiteOutput{}
 	var err error
-	if out.Body.Reglages, err = s.rvSiteReglages(ctx); err != nil {
+	if out.Body.Reglages, err = rvSiteReglages(ctx, s.Q); err != nil {
 		return nil, err
 	}
 	sites, err := s.Q.RvSiteSites(ctx)
@@ -191,7 +191,7 @@ func (s *service) rvSiteVerifier(ctx context.Context, q *db.Queries, b *Qualific
 	if b.CallbackAt == nil || b.SiteID == nil || b.PointRencontreID == nil {
 		return rvSiteRefus("PHASE2_RV_SITE_INCOMPLETE", "Un RV site exige la date, le site intéressé et le point de rencontre.")
 	}
-	reglages, err := s.rvSiteReglages(ctx)
+	reglages, err := rvSiteReglages(ctx, q)
 	if err != nil {
 		return err
 	}
