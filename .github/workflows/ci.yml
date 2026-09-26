@@ -45,6 +45,16 @@ jobs:
           done
           unitaires=$(git ls-files '*.test.ts' '*.test.tsx')
           [ -z "$unitaires" ] || { echo "::error::tests unitaires TypeScript :"; echo "$unitaires"; exit 1; }
+      # Littéral affiché : entre guillemets, avec une espace ou une majuscule initiale ; 'COMMERCIAL' et 'commercialId' restent des identifiants.
+      - name: Aucune suppression de lint, ni « commercial » ni tiret cadratin dans le panneau
+        run: |
+          echec=0
+          git grep -n -E 'nolint|eslint-disable|oxlint-disable|nosemgrep' -- '*.go' '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.py' '*.sh' '*.sql' \
+            && { echo "::error::suppression de lint : corriger la cause"; echec=1; }
+          git grep -n -P "(['\"\`])(?=[^'\"\`]*(?i:ommercia))(?=[^'\"\`]*\s|[A-Z][a-z])[^'\"\`]*\1" -- 'web/src/**.tsx' \
+            && { echo "::error::« commercial » dans un texte affiché"; echec=1; }
+          git grep -n '—' -- web/src && { echo "::error::tiret cadratin dans le panneau"; echec=1; }
+          exit $echec
       # goose refuse au démarrage une migration plus ancienne que la dernière appliquée : la production boucle.
       - name: Migrations ajoutées après la plus récente de la base
         env:
@@ -52,7 +62,7 @@ jobs:
         run: |
           git fetch -q --depth=1 origin "$BASE"
           max=$(git ls-tree --name-only FETCH_HEAD sql/migrations/ | grep -o '[0-9]\{14\}' | sort | tail -1)
-          git diff --name-only --diff-filter=A FETCH_HEAD HEAD -- sql/migrations | grep -o '[0-9]\{14\}' \
+          git diff --name-only --no-renames --diff-filter=A FETCH_HEAD HEAD -- sql/migrations | grep -o '[0-9]\{14\}' \
             | awk -v max="$max" '$1 <= max { print "::error::migration " $1 " <= " max; bad = 1 } END { exit bad }'
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
@@ -204,6 +214,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
       DATABASE_URL_DEMO: postgresql://crm:crm@localhost:5432/crm_demo?sslmode=disable
+      # Mêmes valeurs que le serveur lancé par `e2e/playwright.config.ts` : le semis les exige hors développement.
+      PUBLIC_WEB_URL: http://localhost:4000
+      SEED_FIXTURE_PASSWORD: fixtures-e2e-2026
     services:
       postgres:
         image: postgres:18.4
@@ -255,7 +268,7 @@ jobs:
   docker:
     name: image Docker, sans publication
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -265,6 +278,8 @@ jobs:
           push: false
           load: true
           tags: cpi-go:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Trivy sur l'image construite
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

@@ -70,6 +70,10 @@ SELECT * FROM (
          coalesce(sum(n - 1), 0)::bigint FROM (
            SELECT count(*) AS n FROM lot_export_items WHERE "prospectId" IS NOT NULL
            GROUP BY "lotId", "prospectId" HAVING count(*) > 1) d
+  UNION ALL SELECT 'campagnes : même représentant deux fois dans un lot',
+         coalesce(sum(n - 1), 0)::bigint FROM (
+           SELECT count(*) AS n FROM lot_export_items WHERE "representantId" IS NOT NULL
+           GROUP BY "lotId", "representantId" HAVING count(*) > 1) d
   UNION ALL SELECT 'campagnes : réaffectation vers un compte hors équipe',
          count(*) FROM lot_export_reaffectations r
          WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u."id" = r."toAssigneeId")

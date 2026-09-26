@@ -26,11 +26,6 @@ Chaque étape est IDEMPOTENTE : elle cherche l'existant avant de créer.
 Toute erreur est signalée et INTERROMPT l'étape. La version précédente affichait
 « ✓ » quoi qu'il arrive ; un script qui ment sur son résultat est pire qu'un
 script qui plante.
-
-POURQUOI PAS docker-compose.prod.yml
-    Il lance Caddy sur les ports 80 et 443, qui appartiennent déjà à Traefik sur
-    un hôte Dokploy. La forme native, un service Postgres et une application
-    construite depuis le Dockerfile, rend à Traefik le domaine et le TLS.
 """
 
 from __future__ import annotations
@@ -111,16 +106,8 @@ IMPORTS_VOLUME = "cpi-go-imports"
 # ─────────────────────────────────────────────────────────────────────────────
 # Sauvegarde nocturne de la base
 #
-# CE QUI NE MARCHAIT PAS
-#     infra/docker/backup.sh fait exactement le bon travail, mais il n'est câblé
-#     que dans docker-compose.prod.yml, et ce compose ne peut PAS tourner ici :
-#     son Caddy réclame les ports 80 et 443, déjà tenus par le Traefik de
-#     Dokploy. Le seul fichier qui définissait une sauvegarde était donc le seul
-#     qui ne s'exécutait jamais sur l'hôte de production. Il reste valable pour
-#     un VPS nu, sans Dokploy, et pour rien d'autre.
-#
 # CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI
-#     Une troisième application lançant backup.sh, avec un volume monté sur le
+#     Une troisième application lançant un script de dump, avec un volume monté sur le
 #     modèle des APK. Le volume vivrait dans /var/lib/docker/volumes, sur le
 #     MÊME disque et le MÊME hôte que celui de Postgres. C'est un volume
 #     distinct, donc il survit à un `docker volume rm pgdata` malheureux, mais
@@ -904,7 +891,7 @@ def cmd_redeploy() -> None:
     # pas, ou une migration qui échoue, passaient pour un déploiement réussi.
     step(f"Attente de {GO_NAME}")
     _attendre_application(ids["GO_ID"])
-    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
+    _attendre_sante(revision)
 
 
 def exiger_sauvegarde_recente(postgres_id: str) -> None:
@@ -992,18 +979,24 @@ def _attendre_application(application_id: str, minutes: int = 20) -> None:
     sys.exit(1)
 
 
-def _attendre_sante(url: str, secondes: int = 120) -> None:
+def _attendre_sante(revision: str, secondes: int = 120) -> None:
+    """L'ancien conteneur répond 200 tant que le nouveau démarre : seule la révision servie prouve la mise en ligne."""
     # Cloudflare refuse les agents non navigateur (erreur 1010).
-    requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
+    entetes = {"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"}
+    vivant = urllib.request.Request(f"https://{API_DOMAIN}/health/live", headers=entetes)
+    pret = urllib.request.Request(f"https://{API_DOMAIN}/health/ready", headers=entetes)
+    servie = None
     for _ in range(secondes // 5):
         try:
-            with CLIENT_HTTP.open(requete, timeout=10) as reponse:
-                if reponse.status == 200:
+            with CLIENT_HTTP.open(vivant, timeout=10) as reponse:
+                servie = json.load(reponse).get("revision", "")
+            with CLIENT_HTTP.open(pret, timeout=10) as reponse:
+                if reponse.status == 200 and servie == revision:
                     return
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ValueError):
             pass
         time.sleep(5)
-    fail(f"{url} ne répond pas 200 après {secondes} s.")
+    fail(f"https://{API_DOMAIN} ne sert pas la révision {revision or '(vide)'} après {secondes} s ; servie : {servie}.")
     sys.exit(1)
 
 
