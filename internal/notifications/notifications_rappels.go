@@ -236,9 +236,8 @@ func (s *service) compteRenduQuotidien(ctx context.Context) error {
 			"Téléconseillers sans acte aujourd’hui : {{sansActe}}.", "/supervision", "ANNONCE")
 }
 
-// L'idempotence est portée par l'index unique `(reminderKey, period)` : les
-// identifiants sont tirés avant l'écriture, et la relecture dit lequel est
-// réellement en base, donc si la ligne vient de ce passage ou d'un précédent.
+// Idempotence par l'index unique `(reminderKey, period)` : la relecture dit si la
+// ligne vient de ce passage ou d'un précédent.
 func (s *service) emettreRappelNotification(ctx context.Context, cle string, maintenant time.Time, candidats []notificationCandidatRappel, titre, corps, route, categorie string) error {
 	if len(candidats) == 0 {
 		return nil

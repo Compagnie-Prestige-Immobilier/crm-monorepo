@@ -167,9 +167,8 @@ func LireReglagesCourriels(ctx context.Context, d *socle.Deps) (ReglagesCourriel
 	return r, nil
 }
 
-// Rien ne sort d'une base de démonstration : les adresses y sont celles de
-// vrais clients, et un écran de démonstration ne doit pas leur écrire. La ligne
-// est écrite quand même, pour qu'on voie à l'écran ce qui serait parti.
+// Rien ne sort d'une base de démonstration, dont les adresses sont celles de vrais
+// clients ; la ligne est écrite pour montrer ce qui serait parti.
 func courrielRetenu(base string) *string {
 	if base == socle.BasePublique {
 		return nil
@@ -244,8 +243,7 @@ const (
 	courrielsParRejeu     = 20
 )
 
-// Un refus de Brevo perdait le courriel : le statut passait à ECHEC et personne
-// ne le reprenait. Trois tentatives, puis la ligne reste en échec pour l'alerte.
+// Trois tentatives, puis la ligne reste en échec pour l'alerte d'incident.
 func (s *service) rejouerCourrielsEnEchec(ctx context.Context) error {
 	// Sans cette garde, une nuit épuiserait les trois tentatives d'un courriel
 	// simplement mis en attente, et il ne partirait jamais.
@@ -289,8 +287,7 @@ func (s *service) rejouerCourriel(ctx context.Context, l *db.Courriel) error {
 	})
 }
 
-// Un envoi refusé ne se lisait que dans la colonne `erreur` du journal, écran
-// Exploitation ouvert. C'est ainsi qu'une clé Brevo invalide a pu refuser tous
+// Un refus est journalisé en erreur : sans cela, une clé Brevo invalide refuse tous
 // les courriels d'une journée sans qu'une ligne le dise.
 func expedierCourriel(ctx context.Context, message *MessageBrevo) (statut string, messageID, erreur *string, envoyeLe *time.Time) {
 	if len(message.Destinataires) == 0 {
