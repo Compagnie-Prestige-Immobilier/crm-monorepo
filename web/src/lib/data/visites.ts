@@ -40,7 +40,7 @@ export const VISITE_COLONNES = {
 
 const VISITE_PAGE_SIZE = 100;
 
-/** Le classeur, colonne à colonne, dans l'ordre où l'accueil le lit — et où il s'imprime. */
+/** Le classeur, colonne à colonne, dans l'ordre où l'accueil le lit, et où il s'imprime. */
 export const IMPRESSION_COLONNES = [
   'N° REGISTRE',
   VISITE_COLONNES.date,

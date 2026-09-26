@@ -110,7 +110,7 @@ function ApproveDialogFields({
           </span>
         </Label>
         {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-          pas le texte de l'item — ici, l'identifiant du syndicat. */}
+          pas le texte de l'item, ici, l'identifiant du syndicat. */}
         <Select
           items={syndicats.map((item) => ({
             value: item.id,

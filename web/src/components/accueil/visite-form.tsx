@@ -347,7 +347,7 @@ export function VisiteForm({
     >
       {/* Deux colonnes au maximum : le dialogue est plafonné à `max-w-4xl`, et
           `xl:grid-cols-4` se déclenche sur la largeur de l'écran, pas celle du
-          dialogue — quatre colonnes y tronquaient chaque valeur choisie. */}
+          dialogue, quatre colonnes y tronquaient chaque valeur choisie. */}
       <div className="grid gap-4 md:grid-cols-2">
         <ChampDate
           correction={correction}

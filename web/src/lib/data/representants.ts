@@ -139,7 +139,7 @@ export const SUIVI_PAGE_SIZE = 100;
 
 /**
  * Le suivi d'appels ne passe pas par `RepresentantFilters` : il n'a ni URL, ni
- * tri choisi — le serveur trie déjà chaque suivi par son échéance.
+ * tri choisi, le serveur trie déjà chaque suivi par son échéance.
  */
 export async function fetchRepresentantsSuivi(
   suivi: RepresentantSuivi,
