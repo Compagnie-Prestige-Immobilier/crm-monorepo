@@ -17,10 +17,12 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,7 +43,49 @@ func TestMain(m *testing.M) {
 	if os.Getenv("SEED_FIXTURE_PASSWORD") == "" {
 		_ = os.Setenv("SEED_FIXTURE_PASSWORD", uuid.NewString())
 	}
-	os.Exit(m.Run())
+	supprimer, err := baseEssaiNeuve(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "base d'essai :", err)
+		os.Exit(1)
+	}
+	code := m.Run()
+	supprimer()
+	os.Exit(code)
+}
+
+// Chaque lancement part d'une base vierge, supprimée à la fin : les lignes
+// qu'un test laisse ne faussent plus celui qui passe après lui.
+func baseEssaiNeuve(ctx context.Context) (func(), error) {
+	source := os.Getenv("TEST_DATABASE_URL")
+	if source == "" {
+		source = "postgres://localhost:5432/cpi_v2_dev?sslmode=disable"
+	}
+	nom := "essai_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	if err := executerMaintenance(ctx, source, "CREATE DATABASE "+pgx.Identifier{nom}.Sanitize()); err != nil {
+		return nil, err
+	}
+	supprimer := func() {
+		_ = executerMaintenance(ctx, source, "DROP DATABASE IF EXISTS "+pgx.Identifier{nom}.Sanitize()+" WITH (FORCE)")
+	}
+	dsn, err := urlPourBase(source, nom)
+	if err == nil {
+		err = poserSchemaSiVide(ctx, dsn)
+	}
+	if err != nil {
+		supprimer()
+		return nil, err
+	}
+	return supprimer, os.Setenv("TEST_DATABASE_URL", dsn)
+}
+
+func executerMaintenance(ctx context.Context, dsn, requete string) error {
+	conn, err := connexionMaintenance(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	_, err = conn.Exec(ctx, requete)
+	return err
 }
 
 func nouveauBanc(t *testing.T, role string) *banc {
