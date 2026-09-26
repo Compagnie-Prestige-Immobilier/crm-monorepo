@@ -3,12 +3,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { AUCUN_MOTIF, Palier, type Choix } from '@/components/console/console-paliers';
-import { Chrono, Kbd, copyPhone } from '@/components/console/console-ui';
+import {
+  Chrono,
+  Kbd,
+  copyPhone,
+  useGardeSaisie,
+  useFicheDansLUrl,
+} from '@/components/console/console-ui';
 import { Commentaire } from '@/components/console/console-view';
 import {
   ChampAnnuaire,
@@ -25,7 +31,6 @@ import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -117,11 +122,6 @@ function parametresAnnuaire(
   };
 }
 
-/** Le titre de la confirmation d'ouverture, sans fiche visée hors du dialogue. */
-function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
-  return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
-}
-
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -142,7 +142,6 @@ export function RepScript() {
   const searchParams = useSearchParams();
 
   const [choisi, setChoisi] = useState<Ouverte | null>(null);
-  const [visee, setVisee] = useState<ScriptedRepresentant | null>(null);
   // La fiche nommée dans l'URL, depuis « Consigner un appel » de sa page.
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
@@ -167,6 +166,7 @@ export function RepScript() {
 
   const { liste, pageCount } = pagesDe(annuaire.data);
 
+  const ficheDansLUrl = useFicheDansLUrl();
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
       representant: row,
@@ -174,30 +174,29 @@ export function RepScript() {
     }),
     onSuccess: (ouverte) => {
       setConfirme(null);
-      setVisee(null);
       setDemandee(null);
+      ficheDansLUrl.marquer(ouverte.representant.id);
       setChoisi(ouverte);
       queryClient.setQueryData(queryKeys.ouvertureCourante, ouverte.ouverture);
     },
     onError: (error) => {
+      setDemandee(null);
       toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
-  const aConfirmer = ficheVisee(visee, demandee, parLien.data);
-  const tranchee = aConfirmer === null ? null : relationTrancheeTexte(aConfirmer);
-
-  function fermerConfirmation(ouvert: boolean): void {
-    if (ouvert) return;
-    setVisee(null);
-    setDemandee(null);
+  function ouvrirLaFiche(row: ScriptedRepresentant): void {
+    if (!ouvrir.isPending) ouvrir.mutate(row);
   }
 
-  function confirmerOuverture(): void {
-    if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
-  }
+  const lienTraite = useRef(false);
+  useEffect(() => {
+    if (lienTraite.current || parLien.data === undefined) return;
+    lienTraite.current = true;
+    ouvrirLaFiche(parLien.data);
+  });
 
-  if (chargementParLien(demandee, parLien.isPending)) return <ListeSkeleton />;
+  if (chargementParLien(demandee, parLien.isPending || ouvrir.isPending)) return <ListeSkeleton />;
 
   if (choisi !== null) {
     return (
@@ -207,10 +206,12 @@ export function RepScript() {
         ouverture={choisi.ouverture}
         onAbandon={() => {
           setChoisi(null);
+          ficheDansLUrl.quitter();
         }}
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
+          ficheDansLUrl.quitter();
           // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
           // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
           queryClient.setQueryData(queryKeys.ouvertureCourante, null);
@@ -249,23 +250,10 @@ export function RepScript() {
         annuaire={annuaire}
         liste={liste}
         critereEnCours={critereEnCoursDe(cherche, relation)}
-        onOuvrir={setVisee}
+        onOuvrir={ouvrirLaFiche}
       />
 
       <Pages page={page} pageCount={pageCount} onPage={setPage} />
-
-      <ConfirmDialog
-        open={aConfirmer !== null}
-        onOpenChange={fermerConfirmation}
-        title={titreOuverture(aConfirmer)}
-        description={null}
-        confirmLabel="Ouvrir"
-        confirmVariant="default"
-        pending={ouvrir.isPending}
-        onConfirm={confirmerOuverture}
-      >
-        {tranchee === null ? null : <p className="text-[0.9375rem]">{tranchee}</p>}
-      </ConfirmDialog>
     </div>
   );
 }
@@ -274,17 +262,6 @@ export function RepScript() {
 interface Ouverte {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
-}
-
-/** La fiche cliquée dans l'annuaire, sinon celle que l'URL demande une fois lue. */
-function ficheVisee(
-  visee: ScriptedRepresentant | null,
-  demandee: string | null,
-  lue: ScriptedRepresentant | undefined,
-): ScriptedRepresentant | null {
-  if (visee !== null) return visee;
-  if (demandee === null) return null;
-  return lue ?? null;
 }
 
 const chargementParLien = (demandee: string | null, isPending: boolean): boolean =>
@@ -361,7 +338,6 @@ const CONTINUER: Suite = { libelle: 'Continuer' };
 
 const SUITE_PAS: Readonly<Partial<Record<Pas, Suite>>> = {
   syndicat: { libelle: 'Continuer', passer: 'Sans syndicat' },
-  precision: { libelle: 'Sans précision' },
   echeance: CONTINUER,
   recommande: { libelle: 'Continuer', passer: 'Personne à proposer' },
   note: { libelle: 'Enregistrer l’appel' },
@@ -520,12 +496,10 @@ function PiedPas({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {premier ? null : (
-        <Button variant="outline" disabled={disabled} onClick={onRetour}>
-          Retour
-          <Kbd>Échap</Kbd>
-        </Button>
-      )}
+      <Button variant="outline" disabled={disabled} onClick={onRetour}>
+        {premier ? 'Quitter la fiche' : 'Retour'}
+        <Kbd>Échap</Kbd>
+      </Button>
       {suite?.passer === undefined ? null : (
         <Button variant="ghost" disabled={disabled} onClick={onPasser}>
           {suite.passer}
@@ -670,7 +644,7 @@ function recapDe(r: Reponses): string[] {
   return lignes.filter((ligne): ligne is string => ligne !== null);
 }
 
-/** Ce qu'une relation DÉJÀ TRANCHÉE ajoute à la confirmation d'ouverture. */
+/** Ce qu'une relation DÉJÀ TRANCHÉE rappelle en tête de fiche. */
 function relationTrancheeTexte(row: ScriptedRepresentant): string | null {
   if (!repRelationSettled(row)) return null;
   return row.relationStatus === 'AMBASSADEUR'
@@ -698,6 +672,19 @@ function HistoriqueAppels({ representantId }: { representantId: string }) {
   );
 }
 
+function RelationTranchee({ representant }: { representant: ScriptedRepresentant }) {
+  const texte = relationTrancheeTexte(representant);
+  if (texte === null) return null;
+  return (
+    <p
+      role="status"
+      className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+    >
+      {texte}
+    </p>
+  );
+}
+
 function EnTeteRepresentant({ representant }: { representant: ScriptedRepresentant }) {
   const sousTitre = [representant.prenom, representant.etablissement].filter(Boolean).join(' · ');
 
@@ -719,10 +706,15 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
         />
       </div>
 
+      <RelationTranchee representant={representant} />
+
       <div className="flex flex-wrap items-center gap-3">
-        <span className="select-all font-display text-[1.5rem] font-[700] tracking-[-0.02em] tabular-nums">
+        <a
+          href={`tel:${representant.phoneE164}`}
+          className="rounded-sm font-display text-[1.5rem] font-[700] tracking-[-0.02em] tabular-nums underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
           {formatPhone(representant.phoneE164)}
-        </span>
+        </a>
         <Button
           variant="outline"
           size="sm"
@@ -940,6 +932,12 @@ function Qualification({
     commentaire,
   });
 
+  const garde = useGardeSaisie(resultat !== null || departChrono !== null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pas]);
+
   const reference = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
@@ -959,6 +957,7 @@ function Qualification({
         buildRepAttempt(representant.id, { ...answer, ouvertureId: ouverture.id }),
       ),
     onSuccess: () => {
+      garde.liberer();
       toast.success(`Appel enregistré pour ${representant.fullName}.`);
       onEnregistre(representant.fullName);
     },
@@ -1040,6 +1039,7 @@ function Qualification({
 
   function precedent(): void {
     if (rang === 0) {
+      garde.liberer();
       onAbandon();
       return;
     }
@@ -1119,10 +1119,6 @@ function Qualification({
       enregistrer();
       return;
     }
-    if (pas === 'precision') {
-      choisirPrecision(null);
-      return;
-    }
     if (pas === 'echeance' && rappelAt === null) return;
     setPas(suivantDe(pas, parcours));
   }
@@ -1180,14 +1176,24 @@ function Qualification({
 
   function choixStatuts(): Choix[] {
     if (pas === 'precision') {
-      return sousStatuts.map((ligne) => ({
-        cle: ligne.id,
-        label: ligne.label,
-        actif: statutChoisi?.id === ligne.id,
-        choisir: () => {
-          choisirPrecision(ligne.id);
+      return [
+        ...sousStatuts.map((ligne) => ({
+          cle: ligne.id,
+          label: ligne.label,
+          actif: statutChoisi?.id === ligne.id,
+          choisir: () => {
+            choisirPrecision(ligne.id);
+          },
+        })),
+        {
+          cle: 'sans-precision',
+          label: 'Sans précision',
+          actif: false,
+          choisir: () => {
+            choisirPrecision(null);
+          },
         },
-      }));
+      ];
     }
     return statutsRacine(statuts).map((ligne) =>
       choixStatut(ligne, statuts, ligne.id === racineRetenue?.id, () => {
@@ -1334,6 +1340,7 @@ function Qualification({
         onPasser: passer,
       }}
       pending={send.isPending}
+      dialogue={garde.dialogue}
       helpOpen={helpOpen}
       edit={edit}
       onAllerA={(cible) => {
@@ -1426,6 +1433,7 @@ function EcranPas({
   recap,
   pied,
   pending,
+  dialogue,
   helpOpen,
   edit,
   onAllerA,
@@ -1447,6 +1455,7 @@ function EcranPas({
     onPasser: () => void;
   };
   pending: boolean;
+  dialogue: React.ReactNode;
   helpOpen: boolean;
   edit: boolean;
   onAllerA: (rang: number) => void;
@@ -1486,6 +1495,8 @@ function EcranPas({
 
       {children}
 
+      {dialogue}
+
       <PiedPas
         premier={rang === 0}
         suite={pied.suite}
@@ -1497,6 +1508,7 @@ function EcranPas({
       />
 
       <details
+        className="pointer-coarse:hidden"
         open={helpOpen}
         onToggle={(event) => {
           onHelp(event.currentTarget.open);

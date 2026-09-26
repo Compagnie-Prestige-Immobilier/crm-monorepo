@@ -21,7 +21,6 @@ async function semer(): Promise<FicheSemee> {
 /** Le lien direct evite l'annuaire : la fiche appelee en sort. */
 async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(`/teleconseil/console?fiche=${fiche.id}`);
-  await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await expect(
     page.getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' }),
   ).toBeVisible();

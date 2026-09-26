@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { getApiClient } from '@/lib/api/browser';
 import type { CallbackSlot } from '@/lib/data/console';
 import { formatNumber } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const CODE_RV_SITE = 'RV_SITE';
 const CODES_RENDEZ_VOUS = new Set([
@@ -44,75 +45,105 @@ function corpsRvSite(saisie: RvSiteSaisie) {
   };
 }
 
+function ChampRvSite({
+  id,
+  libelle,
+  erreur,
+  valeur,
+  vide,
+  options,
+  onChange,
+}: {
+  id: string;
+  libelle: string;
+  erreur: string | null;
+  valeur: string;
+  vide: string;
+  options: readonly { id: string; libelle: string }[];
+  onChange: (valeur: string) => void;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{libelle} (obligatoire)</Label>
+      <select
+        id={id}
+        required
+        aria-invalid={erreur !== null}
+        aria-describedby={erreur === null ? undefined : `${id}-erreur`}
+        className={cn(CLASSE_SELECT, erreur !== null && 'border-destructive')}
+        value={valeur}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      >
+        <option value="">{vide}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.libelle}
+          </option>
+        ))}
+      </select>
+      {erreur === null ? null : (
+        <p id={`${id}-erreur`} className="text-[0.8125rem] text-destructive">
+          {erreur}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ChampsRvSite({
   choix,
   saisie,
+  verifie,
   onChange,
 }: {
   choix: Choix | undefined;
   saisie: RvSiteSaisie;
+  verifie: boolean;
   onChange: (patch: Partial<RvSiteSaisie>) => void;
 }) {
+  const manque = (valeur: string, texte: string): string | null =>
+    verifie && valeur === '' ? texte : null;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="grid gap-1.5">
-        <Label htmlFor="rv-site-site">Site intéressé</Label>
-        <select
-          id="rv-site-site"
-          className={CLASSE_SELECT}
-          value={saisie.siteId}
-          onChange={(event) => {
-            onChange({ siteId: event.target.value });
-          }}
-        >
-          <option value="">Choisir un site</option>
-          {(choix?.sites ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.nom} · {formatNumber(site.prix)} FCFA
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="rv-site-point">Point de rencontre</Label>
-        <select
-          id="rv-site-point"
-          className={CLASSE_SELECT}
-          value={saisie.pointRencontreId}
-          onChange={(event) => {
-            onChange({ pointRencontreId: event.target.value });
-          }}
-        >
-          <option value="">Choisir un point</option>
-          {(choix?.points ?? []).map((point) => (
-            <option key={point.id} value={point.id}>
-              {point.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {/* <div className="grid gap-1.5 sm:col-span-2">
-        <Label htmlFor="rv-site-point-commentaire">Précision sur le point de rencontre</Label>
-        <Input
-          id="rv-site-point-commentaire"
-          maxLength={500}
-          value={saisie.pointRencontreCommentaire}
-          onChange={(event) => {
-            onChange({ pointRencontreCommentaire: event.target.value });
-          }}
-        />
-      </div> */}
+      <ChampRvSite
+        id="rv-site-site"
+        libelle="Site intéressé"
+        erreur={manque(saisie.siteId, 'Choisissez le site avant la date.')}
+        valeur={saisie.siteId}
+        vide="Choisir un site"
+        options={(choix?.sites ?? []).map((site) => ({
+          id: site.id,
+          libelle: `${site.nom} · ${formatNumber(site.prix)} FCFA`,
+        }))}
+        onChange={(siteId) => {
+          onChange({ siteId });
+        }}
+      />
+      <ChampRvSite
+        id="rv-site-point"
+        libelle="Point de rencontre"
+        erreur={manque(saisie.pointRencontreId, 'Choisissez le point de rencontre avant la date.')}
+        valeur={saisie.pointRencontreId}
+        vide="Choisir un point"
+        options={(choix?.points ?? []).map((point) => ({ id: point.id, libelle: point.label }))}
+        onChange={(pointRencontreId) => {
+          onChange({ pointRencontreId });
+        }}
+      />
     </div>
   );
 }
 
 /**
  * Ce qu'un RV site ajoute à l'appel : ses créneaux à la place des créneaux de
- * rappel, puis le site visité et le point de rencontre dans la note.
+ * rappel, le site visité et le point de rencontre, exigés avant la date.
  */
 export function useRvSite(code: string | undefined) {
   const estRvSite = code === CODE_RV_SITE;
   const [saisie, setSaisie] = useState<RvSiteSaisie>(VIDE);
+  const [verifie, setVerifie] = useState(false);
   const choix = useQuery({
     queryKey: ['phase2', 'rv-site'],
     queryFn: fetchRvSite,
@@ -142,13 +173,21 @@ export function useRvSite(code: string | undefined) {
     );
   };
 
+  /** Vrai quand rien ne manque ; sinon l'erreur s'affiche sous le champ vide. */
+  const verifier = (): boolean => {
+    setVerifie(true);
+    return !estRvSite || (saisie.siteId !== '' && saisie.pointRencontreId !== '');
+  };
+
   return {
     filtrer,
     calendrier,
+    verifier,
     champs: estRvSite ? (
       <ChampsRvSite
         choix={choix.data}
         saisie={saisie}
+        verifie={verifie}
         onChange={(patch) => {
           setSaisie((avant) => ({ ...avant, ...patch }));
         }}

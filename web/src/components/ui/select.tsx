@@ -120,7 +120,7 @@ function SelectItem({ className, children, avant, ...props }: SelectItemProps) {
       className={cn(
         'relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-2 pr-8 pl-2',
         'text-[0.875rem] outline-none',
-        'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
+        'data-highlighted:outline-solid data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
         'data-highlighted:bg-secondary data-highlighted:text-secondary-foreground',
         'data-disabled:pointer-events-none data-disabled:text-muted-foreground',
         className,
