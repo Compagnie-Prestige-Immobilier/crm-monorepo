@@ -128,9 +128,22 @@ Choisir l'une des deux protections, avant la mise en production :
 
 - **Pare-feu aux plages Cloudflare** : n'autoriser le trafic entrant sur 80/443
   que depuis les [plages IP publiées par Cloudflare](https://www.cloudflare.com/ips/).
-  Le script `infra/dokploy/pare-feu-cloudflare.sh`, lancé en root sur le VPS,
-  pose ces règles avec `ufw` en gardant SSH ouvert. L'équivalent existe dans
-  hPanel Hostinger (VPS → Pare-feu) avec les mêmes plages.
+  `ufw` ne suffit pas : Docker route les ports publiés de Traefik hors de ses
+  règles. Le script `infra/dokploy/pare-feu-cloudflare.sh`, lancé en root sur
+  le VPS, télécharge et vérifie les plages avant toute modification, puis
+  filtre 80 et 443 dans `DOCKER-USER` et `INPUT`, en IPv4 et IPv6, sans toucher
+  à `ufw` ni à SSH. Relancé, il remplace les plages. Ces règles ne survivent pas
+  à un redémarrage : le relancer une fois Docker démarré. L'équivalent existe
+  dans hPanel Hostinger (VPS → Pare-feu) avec les mêmes plages.
+
+  Vérification depuis un poste hors Cloudflare, en visant l'IP du VPS : la
+  première commande doit expirer, la seconde répondre `401`.
+
+  ```bash
+  curl -m 10 -sk -o /dev/null -w '%{http_code}\n' --resolve go.cpi-chues.com:443:72.61.198.237 \
+    https://go.cpi-chues.com/api/v1/referentiels/banques
+  curl -m 10 -s -o /dev/null -w '%{http_code}\n' https://go.cpi-chues.com/api/v1/referentiels/banques
+  ```
 - **Authenticated Origin Pulls** : Cloudflare → **SSL/TLS → Origin Server**,
   activer _Authenticated Origin Pulls_ et faire vérifier par Traefik le
   certificat client `cloudflare.crt` que Cloudflare présente à chaque requête.
