@@ -601,6 +601,7 @@
   ],
   "POST /api/v1/phase2/callbacks/{id}/cancel": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
   "POST /api/v1/phase2/callbacks/{id}/snooze": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
+  "POST /api/v1/phase2/callbacks/{id}/retablir": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
   "POST /api/v1/presence/beat": [
     "ACCUEIL",
     "ADMIN",
@@ -711,10 +712,21 @@
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": ["ADMIN"],
   "PUT /api/v1/users/{id}/active": ["ADMIN"],
   "PUT /api/v1/users/{id}/password": ["ADMIN"],
-  "POST /api/v1/assistant/questions": ["ADMIN"],
-  "GET /api/v1/assistant/questions-enregistrees": ["ADMIN"],
-  "POST /api/v1/assistant/questions-enregistrees": ["ADMIN"],
-  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"],
+  "POST /api/v1/assistant/questions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/suggestions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/questions-enregistrees": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/assistant/questions-enregistrees": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PATCH /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/questions-enregistrees/{id}/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/resume": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/export/rendez-vous.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"]
 }

@@ -192,7 +192,7 @@ func (s *service) requeteLibre(ctx context.Context, question string, aujourdhui 
 		return nil, err
 	}
 	entree := map[string]any{
-		champQuestion: question, "aujourdhui": aujourdhui.Format(formatJour),
+		champQuestion: question, champAujourdhui: aujourdhui.Format(formatJour),
 		"schema": schema, "liens": s.liens,
 	}
 	var auteur, requete string
@@ -226,8 +226,10 @@ func (s *service) requeteLibre(ctx context.Context, question string, aujourdhui 
 		map[string]any{champQuestion: question, "requete": demande.SQL, "lignes": len(tableau.Lignes)}, nil); err != nil {
 		return nil, err
 	}
-	return &Reponse{
+	sortie := &Reponse{
 		Outil: "requete_libre", Requete: demande.SQL, ReponduPar: auteur,
 		Resultat: &Resultat{Tableau: tableau, Serie: []Point{}, Mesure: ""},
-	}, nil
+	}
+	sortie.Texte = phrase(sortie)
+	return sortie, nil
 }
