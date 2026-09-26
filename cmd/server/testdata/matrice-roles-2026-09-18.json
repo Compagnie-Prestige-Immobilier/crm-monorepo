@@ -437,6 +437,7 @@
   "GET /api/v1/supervision/prospects/marketing": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/supervision/representants": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/supervision/representants/qualite": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/tableaux-de-bord/amorces": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/tableaux-de-bord/{ecran}/disposition": [
     "ACCUEIL",
     "ADMIN",
