@@ -83,7 +83,7 @@ function DropdownMenuItem({
         'text-[0.875rem] outline-none transition-colors',
         // Base UI ne deplace pas le focus DOM d'un item a l'autre: l'anneau (3:1, WCAG 1.4.11)
         // se raccroche a `data-highlighted` et non a `:focus`.
-        'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
+        'data-highlighted:outline-solid data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
         'data-highlighted:bg-secondary data-highlighted:text-secondary-foreground',
         'data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive-surface',
         'data-[inset]:pl-8 data-disabled:pointer-events-none data-disabled:opacity-40',

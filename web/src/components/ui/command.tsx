@@ -92,7 +92,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
       className={cn(
         'relative flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2 py-2',
         'text-[0.875rem] outline-none',
-        'data-[selected=true]:outline-2 data-[selected=true]:-outline-offset-2 data-[selected=true]:outline-ring',
+        'data-[selected=true]:outline-solid data-[selected=true]:outline-2 data-[selected=true]:-outline-offset-2 data-[selected=true]:outline-ring',
         'data-[selected=true]:bg-secondary data-[selected=true]:text-secondary-foreground',
         'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-40',
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
