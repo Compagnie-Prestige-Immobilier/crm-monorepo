@@ -30,36 +30,14 @@ les intégrations exportées pour la session (`BREVO_API_KEY`, `TURNSTILE_*`,
 La clé n'est **jamais** écrite dans un fichier : elle ne vit que dans la variable
 d'environnement, le temps de la session.
 
-## Déploiement automatique sur `prod`
+## Mise en ligne de `prod`
 
-Ce paragraphe affirmait le contraire, et l'affirmation était fausse dans ses
-conséquences. Le raisonnement — « Dokploy possède déjà le dépôt, un workflow ne
-ferait que dupliquer un secret » — oubliait un fait : Dokploy est branché en
-**custom git** (`application.saveGitProvider`), pas via l'intégration GitHub.
-Il ne reçoit donc AUCUN crochet quand `prod` bouge. Une fusion vers `prod` avait
-toutes les apparences d'une mise en ligne sans en produire une seule, et
-personne ne le voyait avant d'aller regarder la version servie.
-
-Depuis le 16 septembre 2026, GitHub ne déploie plus rien et ne teste pas
-`prod` : la CI ne tourne que sur `dev`. La mise en ligne passe par Dokploy en
-git, qui construit le Dockerfile. Tant que l'application reste en « custom
-git », il faut soit activer l'intégration GitHub de Dokploy (auto-déploiement
-sur `prod`), soit lancer le déploiement à la main, soit
-`python3 infra/dokploy/deploy.py redeploy` (`redeploy` et **pas**
-`deploy`, voir la docstring de `cmd_redeploy`). Seule cette dernière voie
-vérifie la sauvegarde avant de déployer.
-
-### Le seul réglage à faire
-
-```bash
-gh secret set DOKPLOY_KEY --repo Compagnie-Prestige-Immobilier/crm-monorepo
-```
-
-`DOKPLOY_URL` peut être posée en variable de dépôt pour viser un autre hôte ;
-absente, le script retombe sur sa valeur par défaut. Toutes les autres valeurs
-(`PROJECT_ID`, `ENVIRONMENT_ID`, les domaines) sont dans le script.
-
-### Le lancer à la main reste possible
+Dokploy est branché en **custom git** (`application.saveGitProvider`), pas par
+l'intégration GitHub : il ne reçoit aucun crochet quand `prod` bouge, et aucun
+workflow ne déploie. La CI tourne sur `dev` et sur les pull requests vers
+`prod` ; la fusion ne met rien en ligne. Il faut ensuite soit activer
+l'intégration GitHub de Dokploy (auto-déploiement sur `prod`), soit lancer le
+déploiement à la main, soit :
 
 ```bash
 export DOKPLOY_KEY='…'
@@ -67,15 +45,16 @@ python3 infra/dokploy/deploy.py redeploy   # cpi-go seul
 python3 infra/dokploy/deploy.py deploy     # première mise en route, Postgres compris
 ```
 
+`redeploy` et **pas** `deploy` pour une mise à jour (voir la docstring de
+`cmd_redeploy`) : seule cette voie vérifie la sauvegarde avant de déployer.
+`DOKPLOY_URL` vise un autre hôte ; toutes les autres valeurs (`PROJECT_ID`,
+`ENVIRONMENT_ID`, les domaines) sont dans le script.
+
 Le script monte aussi `cpi-go-db-dumps` sur `/repo/storage/db-dumps`, qui porte
 les exports à la demande, et `cpi-go-imports` sur `/repo/storage/imports`. Ces
 volumes **ne sont pas des sauvegardes** : ils vivent sur le disque du VPS, et le
 premier est vidé dès le téléchargement de l'export. Les sauvegardes sont un
 dispositif à part, décrit plus bas.
-
-Un workflow SSH lançant `docker-compose.prod.yml` sur ce VPS serait pire que
-rien : il démarrerait Caddy sur les ports 80 et 443, déjà tenus par le Traefik
-de Dokploy, et l'un des deux ne monterait pas.
 
 ## Le binaire Go
 
@@ -94,16 +73,6 @@ droit `CREATEDB` du rôle de `DATABASE_URL`. Ne pas lancer `/cpi-go -seed` avec
 `DATABASE_URL` sur une base de démonstration : elle serait semée comme base
 principale, compte administrateur de production compris et sans comptes de
 démonstration.
-
-## Pourquoi pas `docker-compose.prod.yml`
-
-Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte
-Dokploy ces ports appartiennent à Traefik : les deux entreraient en collision et
-l'un ne démarrerait pas. La forme retenue est native, un service Postgres et une
-application construite depuis le Dockerfile, et laisse à Traefik le domaine et
-le TLS, qui lui reviennent.
-
-`docker-compose.prod.yml` reste valable pour un VPS nu, sans Dokploy.
 
 ## À faire avant le premier déploiement
 
@@ -226,8 +195,7 @@ d'origine n'est pas en place.
 
 > Tant que `deploy.py backup` n'a pas été lancé, cet hôte n'a **aucune**
 > sauvegarde automatique, `deploy.py status` l'affiche en rouge et
-> `deploy.py redeploy` refuse de déployer. Le service `backup` de
-> `docker-compose.prod.yml` n'y change rien : ce compose ne tourne pas ici.
+> `deploy.py redeploy` refuse de déployer.
 
 Le dispositif retenu est le routeur `backup` natif de Dokploy : `pg_dump -Fc`
 dans le conteneur de la base, compressé par `gzip` et poussé par `rclone` vers

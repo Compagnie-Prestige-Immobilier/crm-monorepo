@@ -82,9 +82,9 @@ NODE_ENV=development go run ./cmd/server -seed
 ## Déploiement
 
 `Dockerfile` construit le panneau puis le binaire. La CI
-(`.github/workflows/ci.yml`) ne tourne que sur `dev` et ne construit aucune
-image. `prod` n'a pas de CI : Dokploy tire la branche en git et construit le
-Dockerfile. Ne fusionner vers `prod` qu'un commit vert sur `dev`.
+(`.github/workflows/ci.yml`) tourne sur `dev` et sur les pull requests vers
+`dev` et `prod`, et construit l'image sans la publier. Dokploy tire `prod` en
+git et construit le Dockerfile. Ne fusionner vers `prod` qu'une pull request verte.
 Les migrations goose s'appliquent au démarrage. Avant chaque `git push`,
 `lefthook` exécute `pnpm verify:local` (installé par `pnpm install`). En production les logs sont en JSON
 (`LOG_FORMAT=json`), chaque ligne porte `requestId`, `pattern`, `status` et
