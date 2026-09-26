@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
+import { BoutonResume, EncartResume, useResumeFiche } from '@/components/assistant/resume-fiche';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
@@ -83,6 +84,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
   });
+  const resume = useResumeFiche();
 
   if (fiche.isPending) {
     return (
@@ -150,10 +152,17 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             />
             <SuiviRendezVous prospect={prospect} />
             <MarquerVendu prospect={prospect} user={user} />
+            {peut(user, 'prospects.lire') ? (
+              <BoutonResume resume={resume} prospectId={prospect.id} />
+            ) : null}
           </>
         }
         chiffres={chiffresDe(prospect)}
       />
+
+      {resume.data !== undefined && resume.variables === prospect.id ? (
+        <EncartResume resume={resume.data} />
+      ) : null}
 
       <CarteRendezVous prospect={prospect} />
 

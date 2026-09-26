@@ -13,6 +13,7 @@
     "gen": "openapi-typescript ../openapi.json -o src/api/schema.d.ts && prettier src/api/schema.d.ts --write"
   },
   "dependencies": {
+    "@assistant-ui/react": "catalog:",
     "@base-ui/react": "catalog:",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
