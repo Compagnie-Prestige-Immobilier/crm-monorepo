@@ -431,6 +431,67 @@ func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 	}
 }
 
+func TestBanqueEncaissementCorrigeCompteUneFoisParAgent(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	id, rev := s.ouvrirDossier()
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev, "amountXof": "800000"})
+	s.attend(statut, http.StatusCreated, "premier encaissement", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/corrections",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev + 1, "reason": "Montant faux"})
+	s.attend(statut, http.StatusCreated, "correction vers l'étude", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev + 2, "amountXof": "500000"})
+	s.attend(statut, http.StatusCreated, "second encaissement", body)
+
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/analytics?banqueId="+s.banqueID, nil)
+	s.attend(statut, http.StatusOK, "indicateurs", body)
+	agents, _ := body["byAgent"].([]any)
+	for _, brut := range agents {
+		agent := brut.(map[string]any)
+		if agent["agentId"] == s.userID && (agent["cashed"] != float64(1) || agent["amountXof"] != "500000") {
+			t.Fatalf("un encaissement corrigé compte une fois, au dernier montant : %v", agent)
+		}
+	}
+	if len(agents) == 0 {
+		t.Fatal("l'agent qui a encaissé doit figurer dans les indicateurs")
+	}
+}
+
+// Des ouvertures simultanées d'une même inscription butent sur son unicité, pas sur la référence.
+func TestBanqueOuverturesSimultaneesDUneInscription(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	var attente sync.WaitGroup
+	depart := make(chan struct{})
+	codes := make([]string, 8)
+	statuts := make([]int, len(codes))
+	for i := range codes {
+		attente.Add(1)
+		go func() {
+			defer attente.Done()
+			<-depart
+			statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases", map[string]any{"inscriptionId": s.inscriptionID})
+			statuts[i], codes[i] = statut, texteDe(body["code"])
+		}()
+	}
+	close(depart)
+	attente.Wait()
+	ouverts := 0
+	for i, statut := range statuts {
+		switch {
+		case statut == http.StatusCreated:
+			ouverts++
+		case statut != http.StatusConflict || codes[i] != "BANK_CASE_INSCRIPTION_ALREADY_OPEN":
+			t.Fatalf("ouverture %d : %d %s, attendu 409 BANK_CASE_INSCRIPTION_ALREADY_OPEN", i, statut, codes[i])
+		}
+	}
+	if ouverts != 1 {
+		t.Fatalf("un seul dossier par inscription : %d ouverts", ouverts)
+	}
+}
+
 func TestBanqueRechercheInsensibleAuxAccents(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
@@ -460,12 +521,18 @@ func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
 		banqueExec(s.banc, `DELETE FROM "client_creation_requests" WHERE "banqueId" = $1`, s.banqueID)
 	})
 
-	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", map[string]any{
+	nouvelle := map[string]any{
 		"nom": "Sow", "prenom": "Fatou", "banqueId": s.banqueID,
 		"phone": fmt.Sprintf("77%07d", uuid.New().ID()%10000000),
-	})
+	}
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", nouvelle)
 	s.attend(statut, http.StatusCreated, "dépôt de la demande", body)
 	demande := body["id"].(string)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", nouvelle)
+	s.attend(statut, http.StatusConflict, "second dépôt par le même agent", body)
+	if !strings.Contains(fmt.Sprint(body), demande) {
+		t.Fatalf("le 409 rend au demandeur l'identifiant de sa demande : %v", body)
+	}
 
 	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/client-requests/"+demande, nil)
 	s.attend(statut, http.StatusOK, "lecture de sa propre demande", body)
@@ -484,6 +551,11 @@ func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
 	autre.attend(statut, http.StatusNotFound, "demande déposée par une autre banque", body)
 	if body["code"] != "CLIENT_REQUEST_NOT_FOUND" {
 		t.Fatalf("code : %v", body["code"])
+	}
+	statut, body = banqueJSON(autre, http.MethodPost, "/api/v1/client-requests", nouvelle)
+	autre.attend(statut, http.StatusConflict, "même numéro déposé par une autre banque", body)
+	if strings.Contains(fmt.Sprint(body), demande) {
+		t.Fatalf("le 409 ne révèle pas la demande d'un autre portefeuille : %v", body)
 	}
 
 	arbitre := nouveauBanc(t, "ADMIN")

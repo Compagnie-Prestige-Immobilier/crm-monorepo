@@ -234,7 +234,8 @@ func TestAnalyticsEntonnoirEtFinance(t *testing.T) {
 	b := analyticsConnexion(t, "DIRECTION")
 	jeu := analyticsSemer(b)
 	analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
-	analyticsProspect(b, &jeu, b.userID, instantAnalytics, true)
+	avecDossiers := analyticsProspect(b, &jeu, b.userID, instantAnalytics, true)
+	analyticsDeuxDossiers(b, &jeu, avecDossiers)
 	portee := "?commercialId=" + b.userID + "&departementId=" + jeu.departement
 
 	statut, body := b.appel(http.MethodGet, "/api/v1/analytics/funnel"+portee, nil, false)
@@ -243,14 +244,32 @@ func TestAnalyticsEntonnoirEtFinance(t *testing.T) {
 	sommet := analyticsObjet(b, "sommet", etapes[0])
 	methode := analyticsObjet(b, "méthode obtenue", etapes[1])
 	dossier := analyticsObjet(b, "dossier ouvert", etapes[2])
-	analyticsEgal(b, "prospects saisis", sommet["count"], 2)
+	analyticsEgal(b, "prospects saisis, deux dossiers sur l'un d'eux", sommet["count"], 2)
 	analyticsEgal(b, "méthodes obtenues", methode["count"], 1)
+	analyticsEgal(b, "prospects au dossier ouvert", dossier["count"], 1)
 	analyticsEgal(b, "taux global de la deuxième étape", methode["tauxGlobal"], 50)
 	analyticsNonNul(b, "taux d'une étape précédente non vide", dossier["tauxEtapePrecedente"])
 
 	finance := analyticsObjet(b, "finance", body["finance"])
-	analyticsTexte(b, "montant encaissé sans dossier", finance["montantEncaisse"], "0")
+	analyticsTexte(b, "montant encaissé sans dossier encaissé", finance["montantEncaisse"], "0")
 	analyticsNul(b, "délai moyen sans dossier clos", finance["delaiMoyenJours"])
+}
+
+func analyticsDeuxDossiers(b *banc, jeu *jeuAnalytics, prospect string) {
+	b.t.Helper()
+	etape := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "bank_case_stages" ("id","code","label","position","color","type","updatedAt")
+		VALUES ($1,$1,'Étude test',50,'info','OPEN',now())`, etape)
+	for range 2 {
+		id := uuid.NewString()
+		analyticsExec(b, `INSERT INTO "bank_cases" ("id","reference","referenceKey","customerName","customerPhoneE164",
+			"processingBankId","currentStageId","createdById","prospectId","updatedAt")
+			VALUES ($1,$1,$1,'Nom Prenom','+221770000000',$2,$3,$4,$5,now())`, id, jeu.banque, etape, b.userID, prospect)
+	}
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bank_cases" WHERE "currentStageId" = $1`, etape)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bank_case_stages" WHERE "id" = $1`, etape)
+	})
 }
 
 func TestAnalyticsDelaisEtRendement(t *testing.T) {
