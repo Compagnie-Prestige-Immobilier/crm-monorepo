@@ -295,7 +295,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
       await invalider();
     },
     onError: (error: unknown) => {
-      toastApiError(error, 'Le tirage n’a pas pu être lancé.');
+      toastApiError(error, 'La lecture n’a pas pu être lancée.');
     },
   });
 
@@ -316,7 +316,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
       await invalider();
     },
     onError: (error: unknown) => {
-      toastApiError(error, 'Le miroir n’a pas pu être reconstruit.');
+      toastApiError(error, 'La relecture complète a échoué.');
     },
   });
 
@@ -340,7 +340,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`frequence-${projet}`}>Tirer toutes les</Label>
+              <Label htmlFor={`frequence-${projet}`}>Relire toutes les</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id={`frequence-${projet}`}
@@ -403,7 +403,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
               }}
             >
               <RefreshCwIcon className="size-4" />
-              {libelleBouton(reconstruire.isPending, 'Reconstruction…', 'Vider puis tirer')}
+              {libelleBouton(reconstruire.isPending, 'Relecture…', 'Tout relire')}
             </Button>
 
             <Button
@@ -414,7 +414,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
               }}
             >
               <DownloadCloudIcon className="size-4" />
-              {libelleBouton(tirer.isPending, 'Tirage en cours…', 'Tirer maintenant')}
+              {libelleBouton(tirer.isPending, 'Lecture en cours…', 'Relire la plateforme')}
             </Button>
           </div>
         </div>
@@ -422,9 +422,9 @@ function CarteReglages({ projet }: { projet: Projet }) {
         <ConfirmDialog
           open={reconstruction}
           onOpenChange={setReconstruction}
-          title="Vider le miroir puis le reconstruire ?"
+          title="Tout relire ?"
           description="Les inscriptions lues pour ce projet sont effacées du CRM, puis la plateforme est relue en entier. Elle n’est pas modifiée. Les rapprochements sont recalculés à l’identique."
-          confirmLabel="Vider puis tirer"
+          confirmLabel="Tout relire"
           pending={reconstruire.isPending}
           onConfirm={() => {
             reconstruire.mutate();
@@ -433,15 +433,15 @@ function CarteReglages({ projet }: { projet: Projet }) {
 
         {donnees.configuree ? null : (
           <p role="alert" className="text-[0.875rem] text-destructive">
-            L’adresse et le jeton de cette plateforme ne sont pas renseignés dans l’environnement du
-            serveur. Aucun tirage n’a lieu.
+            Plateforme non configurée. Adresse et jeton se règlent sur le serveur : prévenez
+            l’équipe technique.
           </p>
         )}
 
         <p className="text-[0.8125rem] text-muted-foreground">
           {dernier === null
-            ? 'Aucun tirage effectué pour le moment.'
-            : `Dernier tirage le ${formatDateTime(dernier.termineLe)} : ${formatNumber(dernier.lus)} lues, ${formatNumber(dernier.crees)} créées, ${formatNumber(dernier.misAJour)} mises à jour, ${formatNumber(dernier.rapproches)} rapprochées, ${formatNumber(dernier.disparues)} disparues.`}
+            ? 'Aucune lecture effectuée pour le moment.'
+            : `Dernière lecture le ${formatDateTime(dernier.termineLe)} : ${formatNumber(dernier.lus)} lues, ${formatNumber(dernier.crees)} créées, ${formatNumber(dernier.misAJour)} mises à jour, ${formatNumber(dernier.rapproches)} rapprochées, ${formatNumber(dernier.disparues)} disparues.`}
         </p>
 
         {dernier?.erreur == null ? null : (
@@ -726,7 +726,7 @@ function TableauInscriptions({
     mutationFn: (id: string) => supprimerInscription(projet, id),
     onSuccess: async () => {
       setARetirer(null);
-      toast.success('Inscription retirée du miroir.');
+      toast.success('Inscription retirée de cet écran.');
       await queryClient.invalidateQueries({ queryKey: queryKeys.enrolementRoot });
     },
     onError: (error: unknown) => {
@@ -751,7 +751,7 @@ function TableauInscriptions({
       <EmptyState
         icon={PlugZapIcon}
         title="Aucune inscription"
-        description="Lancez un tirage, ou élargissez les filtres : la plateforme n’a rien rendu sur cette période."
+        description="Relisez la plateforme, ou élargissez les filtres : la plateforme n’a rien rendu sur cette période."
       />
     );
   }
@@ -822,7 +822,7 @@ function TableauInscriptions({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Retirer ${ligne.prenom} ${ligne.nom} du miroir`}
+                  aria-label={`Retirer ${ligne.prenom} ${ligne.nom} de cet écran`}
                   onClick={() => {
                     setARetirer({ id: ligne.id, nom: `${ligne.prenom} ${ligne.nom}` });
                   }}
@@ -840,8 +840,8 @@ function TableauInscriptions({
         onOpenChange={(ouvert) => {
           if (!ouvert) setARetirer(null);
         }}
-        title="Retirer cette inscription du miroir ?"
-        description={`${aRetirer?.nom ?? ''} disparaît de cet écran. La plateforme n’est pas touchée : le prochain tirage la redépose si elle y figure encore.`}
+        title="Retirer cette inscription de cet écran ?"
+        description={`${aRetirer?.nom ?? ''} disparaît de cet écran. La plateforme n’est pas touchée : la prochaine lecture la redépose si elle y figure encore.`}
         confirmLabel="Retirer"
         pending={retirer.isPending}
         onConfirm={() => {
