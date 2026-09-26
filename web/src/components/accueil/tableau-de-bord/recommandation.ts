@@ -127,7 +127,3 @@ export function evaluerMarques(forme: Forme, mesure: Mesure): MarqueEvaluee[] {
 
   return evaluees.sort(comparerMarques(tableauEnTete));
 }
-
-export function marqueRecommandee(forme: Forme, mesure: Mesure): DashboardMarque {
-  return evaluerMarques(forme, mesure)[0]?.marque ?? marquesCompatibles(forme)[0] ?? 'tableau';
-}

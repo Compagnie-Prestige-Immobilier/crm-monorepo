@@ -11,6 +11,7 @@ import {
   useLocalRuntime,
   type ChatModelAdapter,
   type ThreadMessage,
+  type ToolCallMessagePartComponent,
 } from '@assistant-ui/react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpIcon } from 'lucide-react';
@@ -111,12 +112,18 @@ function MessageUtilisateur() {
   );
 }
 
-function MessageAssistant() {
+type Outils = Record<string, ToolCallMessagePartComponent | undefined>;
+
+function MessageAssistant({ outils }: { outils: Outils | undefined }) {
   return (
     <MessagePrimitive.Root className={`flex justify-start ${APPARITION}`}>
       <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2.5 text-[0.875rem] text-card-foreground has-[[data-riche]]:w-full">
         <MessagePrimitive.Parts
-          components={{ Text: Texte, data: { by_name: { reponse: ReponseRiche } } }}
+          components={{
+            Text: Texte,
+            data: { by_name: { reponse: ReponseRiche } },
+            tools: { by_name: outils ?? {} },
+          }}
         />
         <AuiIf condition={(s) => s.message.status?.type === 'running'}>
           <Ecrit />
@@ -131,12 +138,23 @@ function MessageAssistant() {
   );
 }
 
-function Message() {
+function Message({ outils }: { outils: Outils | undefined }) {
   const role = useAuiState((s) => s.message.role);
-  return role === 'user' ? <MessageUtilisateur /> : <MessageAssistant />;
+  return role === 'user' ? <MessageUtilisateur /> : <MessageAssistant outils={outils} />;
 }
 
-export function Conversation() {
+// Le constructeur d'indicateurs reprend ce fil avec son accueil et ses étapes.
+export function Conversation({
+  accueil = <Accueil />,
+  outils,
+  consigne = 'Votre question',
+  exemple = 'Combien d’appels hier ?',
+}: {
+  accueil?: ReactNode;
+  outils?: Outils;
+  consigne?: string;
+  exemple?: string;
+}) {
   return (
     <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col bg-background">
       <ThreadPrimitive.Viewport
@@ -144,17 +162,15 @@ export function Conversation() {
         scrollToBottomOnInitialize={false}
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-4"
       >
-        <AuiIf condition={(s) => s.thread.messages.length === 0}>
-          <Accueil />
-        </AuiIf>
-        <ThreadPrimitive.Messages>{() => <Message />}</ThreadPrimitive.Messages>
+        <AuiIf condition={(s) => s.thread.messages.length === 0}>{accueil}</AuiIf>
+        <ThreadPrimitive.Messages>{() => <Message outils={outils} />}</ThreadPrimitive.Messages>
         <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mt-auto bg-background pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <ComposerPrimitive.Root className="flex items-end gap-2 rounded-xl border border-border bg-card p-1.5 focus-within:border-ring">
             <ComposerPrimitive.Input
               rows={1}
               maxLength={500}
-              placeholder="Combien d’appels hier ?"
-              aria-label="Votre question"
+              placeholder={exemple}
+              aria-label={consigne}
               className="max-h-32 min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-[0.9375rem] outline-none placeholder:text-muted-foreground"
             />
             <ComposerPrimitive.Send

@@ -1,24 +1,20 @@
-import type { ApiClient, operations } from '@crm/api-client';
+import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
+import { z } from 'zod';
 
 import { getApiClient } from '@/lib/api/browser';
-import type {
-  DashboardMarque,
-  DashboardPreset,
-  DashboardSource,
-  DashboardTaille,
-  DispositionPresentation,
-} from '@/components/accueil/tableau-de-bord/sources';
+import type { DashboardPreset, DonneesSource } from '@/components/accueil/tableau-de-bord/sources';
+
+type Schemas = components['schemas'];
 
 export type DashboardEcran = operations['getDashboardLayout']['parameters']['path']['ecran'];
+export type Calcul = Schemas['Calcul'];
+export type Proposition = Schemas['Proposition'];
+export type EntreeCatalogueApi = Schemas['EntreeCatalogue'];
+export type ReponseConstructeur = Schemas['ConstruireOutputBody'];
+export type DashboardWidget = Schemas['DispositionWidget'] & { id: string };
 
-export interface DashboardWidget {
-  id: string;
-  source: DashboardSource;
-  marque?: DashboardMarque | undefined;
-  taille?: DashboardTaille | undefined;
-  presentation?: DispositionPresentation | undefined;
-}
+export const SOURCE_CALCUL = 'calcul';
 
 export interface Disposition {
   widgets: DashboardWidget[];
@@ -27,54 +23,42 @@ export interface Disposition {
   updatedAt: string | null;
 }
 
-function widgetId(source: DashboardSource, index: number): string {
-  return `${source}-${String(index)}`;
+export interface CalculRendu {
+  titre: string;
+  donnees?: DonneesSource;
+  erreur?: string;
+  explication?: string;
 }
 
-/**
- * Le seul point de sérialisation d'un widget vers l'API : `forbidNonWhitelisted`
- * y rejette la requête entière au moindre champ étranger, une clé client (id)
- * comprise.
- */
-export function serializeWidget(widget: DashboardWidget): {
-  source: DashboardSource;
-  marque?: DashboardMarque;
-  taille?: DashboardTaille;
-  presentation?: DispositionPresentation;
-} {
-  return {
-    source: widget.source,
-    ...(widget.marque === undefined ? {} : { marque: widget.marque }),
-    ...(widget.taille === undefined ? {} : { taille: widget.taille }),
-    ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
-  };
+// L'identifiant suit le contenu : un déplacement ne renomme pas la carte, qui ne se remonte pas.
+function widgetIds(widgets: readonly Schemas['DispositionWidget'][]): string[] {
+  const vus = new Set<string>();
+  return widgets.map((widget, index) => {
+    const c = widget.calcul;
+    const brut =
+      c === undefined
+        ? widget.source
+        : [SOURCE_CALCUL, c.outil, c.axe, c.periode, c.projet, ...(c.mesures ?? [])].join('-');
+    const id = brut
+      .normalize('NFD')
+      .replace(/[^a-zA-Z0-9-]+/gu, '-')
+      .toLowerCase();
+    const unique = vus.has(id) ? `${id}-${String(index)}` : id;
+    vus.add(unique);
+    return unique;
+  });
 }
 
-export function serializeDisposition(
-  widgets: readonly DashboardWidget[],
-  preset?: DashboardPreset,
-): { preset?: DashboardPreset; widgets: ReturnType<typeof serializeWidget>[] } {
-  return {
-    ...(preset === undefined ? {} : { preset }),
-    widgets: widgets.map(serializeWidget),
-  };
+function serializeWidget({ id: _id, ...widget }: DashboardWidget): Schemas['DispositionWidget'] {
+  return widget;
 }
 
-function toDisposition(response: {
-  widgets: {
-    source: DashboardSource;
-    marque?: DashboardMarque;
-    taille?: DashboardTaille;
-    presentation?: DispositionPresentation;
-  }[];
-  preset: DashboardPreset;
-  source: 'utilisateur' | 'defaut' | 'usine';
-  updatedAt: string | null;
-}): Disposition {
+function toDisposition(response: Schemas['DispositionOutputBody']): Disposition {
+  const ids = widgetIds(response.widgets);
   return {
     widgets: response.widgets.map((widget, index) => ({
-      id: widgetId(widget.source, index),
       ...widget,
+      id: ids[index] ?? widget.source,
     })),
     preset: response.preset,
     source: response.source,
@@ -105,7 +89,10 @@ export async function saveDisposition(
     unwrap(
       await client.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition', {
         params: { path: { ecran } },
-        body: serializeDisposition(widgets, preset),
+        body: {
+          ...(preset === undefined ? {} : { preset }),
+          widgets: widgets.map(serializeWidget),
+        },
       }),
     ),
   );
@@ -123,18 +110,61 @@ export async function resetDisposition(
   return fetchDisposition(ecran, client);
 }
 
-export async function saveDefaultDisposition(
+const point = z.object({ id: z.string(), label: z.string(), value: z.number() });
+const serie = z.array(point);
+const donneesCalcul = z.discriminatedUnion('forme', [
+  z.object({
+    forme: z.literal('scalaire'),
+    donnee: z.object({
+      libelle: z.string(),
+      valeur: z.number(),
+      affichage: z.string().exactOptional(),
+    }),
+  }),
+  z.object({ forme: z.literal('classement'), donnee: serie }),
+  z.object({ forme: z.literal('serie-temporelle'), donnee: serie }),
+  z.object({
+    forme: z.literal('composition'),
+    donnee: z.array(z.object({ ligne: z.string(), segments: serie })),
+  }),
+]);
+
+// `donnee` est `unknown` dans le contrat : rien ne s'affiche sans avoir été relu.
+function rendreCalcul(resultat: Schemas['DonneesCalcul']): CalculRendu {
+  const base = {
+    titre: resultat.titre,
+    ...(resultat.explication === undefined ? {} : { explication: resultat.explication }),
+  };
+  if (resultat.erreur !== undefined) return { ...base, erreur: resultat.erreur };
+  const lu = donneesCalcul.safeParse({ forme: resultat.forme, donnee: resultat.donnee });
+  if (!lu.success) return { ...base, erreur: 'Le calcul a rendu des données illisibles.' };
+  return { ...base, donnees: lu.data };
+}
+
+export async function fetchCalculs(
+  calculs: readonly Calcul[],
+  plage: { du: string; au: string },
+): Promise<CalculRendu[]> {
+  if (calculs.length === 0) return [];
+  const { resultats } = unwrap(
+    await getApiClient().POST('/api/v1/tableaux-de-bord/calculs', {
+      body: { du: plage.du, au: plage.au, calculs: [...calculs] },
+    }),
+  );
+  return resultats.map(rendreCalcul);
+}
+
+export async function construireIndicateur(
   ecran: DashboardEcran,
-  widgets: readonly DashboardWidget[],
-  preset: DashboardPreset | undefined,
-  client: ApiClient = getApiClient(),
-): Promise<Disposition> {
-  return toDisposition(
-    unwrap(
-      await client.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut', {
-        params: { path: { ecran } },
-        body: serializeDisposition(widgets, preset),
-      }),
-    ),
+  demande: string,
+  catalogue: EntreeCatalogueApi[],
+  proposition: Proposition | undefined,
+): Promise<ReponseConstructeur> {
+  return unwrap(
+    await getApiClient().POST('/api/v1/tableaux-de-bord/{ecran}/construire', {
+      params: { path: { ecran } },
+      body:
+        proposition === undefined ? { demande, catalogue } : { demande, catalogue, proposition },
+    }),
   );
 }

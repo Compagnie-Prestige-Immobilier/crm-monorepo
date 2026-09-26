@@ -162,7 +162,7 @@ export function ActionsQuestion({ question }: { question: string }) {
   );
 }
 
-const PUCE =
+export const PUCE =
   'rounded-full border border-border bg-card px-3 py-1.5 text-left text-[0.8125rem] text-foreground transition-colors hover:border-primary/40 hover:bg-secondary motion-reduce:transition-none';
 
 export function PucesQuestions({ suggestions }: { suggestions: string[] }) {
