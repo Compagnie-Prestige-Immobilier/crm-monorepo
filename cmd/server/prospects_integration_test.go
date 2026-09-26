@@ -701,7 +701,8 @@ func attendreFusionsBloquees(b *banc, nombre int) {
 	for range 100 {
 		var bloquees int
 		if err := b.pool.QueryRow(b.ctx,
-			`SELECT count(*) FROM pg_stat_activity WHERE "wait_event_type" = 'Lock' AND "query" LIKE '%SET "deletedAt" = now()%'`).Scan(&bloquees); err != nil {
+			`SELECT count(*) FROM pg_stat_activity
+			 WHERE "datname" = current_database() AND "wait_event_type" = 'Lock' AND "query" LIKE '%VerrouillerFichesAFusionner%'`).Scan(&bloquees); err != nil {
 			b.t.Fatal(err)
 		}
 		if bloquees >= nombre {
@@ -762,6 +763,44 @@ func TestFusionDeuxRappelsEnAttente(t *testing.T) {
 	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 		WHERE p."id" = $1 AND r."code" = 'MESSAGERIE' AND p."lastCallById" = $2`, cible, b.userID); n != 1 {
 		t.Fatal("la cible doit porter le dernier appel, celui de la source")
+	}
+}
+
+// Deux fusions croisées attendent les mêmes verrous : la seconde trouve sa cible absorbée au lieu d'un interblocage.
+func TestFusionCroiseeSansInterblocage(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	premiere := creerProspect(b, "Kane", numeroDeCourse(5))["id"].(string)
+	seconde := creerProspect(b, "Kane", numeroDeCourse(6))["id"].(string)
+
+	verrou, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = verrou.Rollback(b.ctx) }()
+	if _, err := verrou.Exec(b.ctx, `SELECT 1 FROM "prospects" WHERE "id" = ANY($1) FOR UPDATE`, []string{premiere, seconde}); err != nil {
+		t.Fatal(err)
+	}
+	statuts := make(chan int, 2)
+	for i, sens := range [][2]string{{premiere, seconde}, {seconde, premiere}} {
+		corps, err := json.Marshal(map[string]any{"sourceId": sens[0], "targetId": sens[1]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		go fusionnerEnArrierePlan(b, corps, statuts)
+		attendreFusionsBloquees(b, i+1)
+	}
+	if err := verrou.Rollback(b.ctx); err != nil {
+		t.Fatal(err)
+	}
+	premier, second := <-statuts, <-statuts
+	if premier+second != http.StatusOK+http.StatusConflict || premier*second != http.StatusOK*http.StatusConflict {
+		t.Fatalf("une fusion aboutit, l'autre trouve sa fiche absorbée : %d, %d", premier, second)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "id" = ANY($1) AND "deletedAt" IS NULL`,
+		[]string{premiere, seconde}); n != 1 {
+		t.Fatalf("une seule des deux fiches doit survivre : %d", n)
 	}
 }
 

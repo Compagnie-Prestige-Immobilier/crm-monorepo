@@ -385,6 +385,10 @@ INSERT INTO "prospects" (
   $35, $36
 );
 
+-- L'ordre des identifiants évite l'interblocage de deux fusions croisées.
+-- name: VerrouillerFichesAFusionner :many
+SELECT "id" FROM "prospects" WHERE "id" = ANY(@ids::text[]) AND "deletedAt" IS NULL ORDER BY "id" FOR UPDATE;
+
 -- name: SoftDeleteProspect :execrows
 UPDATE "prospects" SET "deletedAt" = now(), "rev" = "rev" + 1 WHERE "id" = $1 AND "deletedAt" IS NULL;
 

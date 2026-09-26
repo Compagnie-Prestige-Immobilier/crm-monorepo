@@ -238,6 +238,13 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, sourceID, targetID string, preferSource bool) error {
 	disparue := socle.Problem(http.StatusConflict, "MERGE_PROSPECT_GONE",
 		"L’une des deux fiches vient d’être fusionnée ou supprimée. Rechargez la page.")
+	verrouillees, err := q.VerrouillerFichesAFusionner(ctx, []string{sourceID, targetID})
+	if err != nil {
+		return err
+	}
+	if len(verrouillees) < 2 {
+		return disparue
+	}
 	supprimees, err := q.SoftDeleteProspect(ctx, sourceID)
 	if err != nil {
 		return err
