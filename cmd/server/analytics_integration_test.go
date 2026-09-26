@@ -585,3 +585,48 @@ func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
 	b.attend(statut, http.StatusOK, "qualité après l'appel", body)
 	analyticsEgal(b, "un appel abouti sans statut compte comme joint", body["joints"], avant+1)
 }
+
+func analyticsCompte(b *banc, role string, actif bool) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","isActive","updatedAt")
+		VALUES ($1,$1 || '@cpi.sn',$1,'x','Compte equipe',$2::"Role",$3,now())`, id, role, actif)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "performedById" = $1`, id)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, id)
+	})
+	return id
+}
+
+// Un compte désactivé reste au tableau d'équipe s'il a agi dans la période,
+// sinon ses actes compteraient au total sans ligne qui les porte.
+func TestSupervisionEquipeSansComptesHorsPlateau(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	enPoste := analyticsCompte(b, "COMMERCIAL", true)
+	parti := analyticsCompte(b, "COMMERCIAL", false)
+	partiApresAvoirAppele := analyticsCompte(b, "COMMERCIAL", false)
+	direction := analyticsCompte(b, "DIRECTION", true)
+	prospect := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",$4::timestamp FROM "call_outcome_reasons" WHERE "code" = 'PAS_DE_REPONSE'`,
+		uuid.NewString(), prospect, partiApresAvoirAppele, instantAnalytics)
+	analyticsViderCache()
+
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite?actFrom="+jourAnalytics+"&actTo="+jourAnalytics, nil, false)
+	b.attend(statut, http.StatusOK, "activité de l'équipe", body)
+	membres, ok := body["teleconseillers"].([]any)
+	if !ok {
+		t.Fatalf("liste des téléconseillers attendue, %v reçu", body["teleconseillers"])
+	}
+	listes := map[any]bool{}
+	for _, membre := range membres {
+		listes[analyticsObjet(b, "membre", membre)["id"]] = true
+	}
+	attendus := map[string]bool{enPoste: true, parti: false, partiApresAvoirAppele: true, direction: false, b.userID: false}
+	for id, attendu := range attendus {
+		if listes[id] != attendu {
+			t.Fatalf("compte %s listé=%v, attendu %v", id, listes[id], attendu)
+		}
+	}
+}
