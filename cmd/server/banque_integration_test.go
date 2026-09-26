@@ -3,6 +3,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"cpi-go/db"
 	"cpi-go/internal/banque"
@@ -10,10 +11,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -824,4 +827,56 @@ func TestBanqueMotifVideRefuse(t *testing.T) {
 	if transitions != 1 {
 		t.Fatalf("un motif refusé ne doit rien écrire au-delà de la transition d’ouverture : %d transitions", transitions)
 	}
+}
+
+// Plateforme locale : l'archive CHUES est relue à chaque pièce, une pièce Grand Public
+// sans Content-Length au-delà du plafond est refusée plutôt que servie tronquée.
+func TestBanquePiecesDUnePlateformeLocale(t *testing.T) {
+	var archives atomic.Int32
+	var zippee bytes.Buffer
+	zipper := zip.NewWriter(&zippee)
+	fichier, _ := zipper.Create("cni.pdf")
+	_, _ = fichier.Write([]byte("%PDF-1.4 cni"))
+	_ = zipper.Close()
+	var plateforme *httptest.Server
+	plateforme = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/dossiers/42/archive":
+			archives.Add(1)
+			_, _ = w.Write(zippee.Bytes())
+		case strings.HasSuffix(r.URL.Path, "/docs"):
+			_, _ = fmt.Fprintf(w, `{"data":[{"docId":"lourde","label":"Lourde","status":"accepte","fileUrl":%q}]}`, plateforme.URL+"/fichiers/lourde?signature=secrete")
+		case r.URL.Path == "/fichiers/lourde":
+			bloc := make([]byte, 1<<20)
+			for range 65 {
+				_, _ = w.Write(bloc)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(plateforme.Close)
+	for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
+		t.Setenv("PLATEFORME_"+projet+"_URL", plateforme.URL)
+		t.Setenv("PLATEFORME_"+projet+"_TOKEN", "jeton-de-test")
+	}
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	chues := s.inscriptionDistante("CHUES", "validated", `{"dossier":{"id":42}}`)
+
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/pieces", nil)
+	s.attend(statut, http.StatusOK, "pièces CHUES d'une plateforme locale", body)
+	for range 2 {
+		statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/piece?code=cni.pdf", nil)
+		s.attend(statut, http.StatusOK, "pièce CHUES", nil)
+	}
+	statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+chues+"/pieces.zip", nil)
+	s.attend(statut, http.StatusOK, "archive CHUES relayée", nil)
+	if n := archives.Load(); n != 4 {
+		t.Fatalf("l'archive se relit à chaque appel, sans cache : %d lectures au lieu de 4", n)
+	}
+
+	grandPublic := s.inscriptionDistante("GRAND_PUBLIC", "etape-2", `{}`)
+	statut, _ = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-inscriptions/"+grandPublic+"/piece?code=lourde", nil)
+	s.attend(statut, http.StatusNotFound, "pièce de plus de 64 Mo sans Content-Length", nil)
 }
