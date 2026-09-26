@@ -329,8 +329,7 @@ export function RendezVousComptoir({
 
       {liste.data !== undefined && liste.data.items.length === 0 ? (
         <p className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          Aucun rendez-vous ici. Choisissez « Toutes les dates », changez d’onglet ou videz la
-          recherche.
+          Aucun rendez-vous ici. Élargissez les dates, changez d’onglet ou videz la recherche.
         </p>
       ) : null}
 
