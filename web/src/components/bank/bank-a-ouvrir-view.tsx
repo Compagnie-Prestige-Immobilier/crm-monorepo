@@ -33,7 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { bankBasePath } from '@/lib/bank-filters';
 import { createBankCase, fetchInscriptionsAOuvrir } from '@/lib/data/bank-cases';
 import { fetchBanques } from '@/lib/data/reference';
-import { formatDateTime, formatPhone, withRetired } from '@/lib/format';
+import { formatDateTime, formatNumber, formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { InscriptionAOuvrir, Projet } from '@/lib/types';
@@ -119,7 +119,7 @@ export function BankAOuvrirView({ projet }: { projet?: Projet | null | undefined
         </div>
       </div>
 
-      {inscriptions.data.length === 0 ? (
+      {inscriptions.data.items.length === 0 ? (
         <EmptyState
           icon={InboxIcon}
           title="Aucun dossier complet en attente"
@@ -127,7 +127,7 @@ export function BankAOuvrirView({ projet }: { projet?: Projet | null | undefined
         />
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {inscriptions.data.map((inscription) => (
+          {inscriptions.data.items.map((inscription) => (
             <CarteInscription
               key={inscription.id}
               inscription={inscription}
@@ -147,6 +147,13 @@ export function BankAOuvrirView({ projet }: { projet?: Projet | null | undefined
           ))}
         </ul>
       )}
+
+      {inscriptions.data.tronque ? (
+        <p className="text-[0.75rem] text-muted-foreground">
+          Liste limitée aux {formatNumber(inscriptions.data.items.length)} éléments les plus
+          récents.
+        </p>
+      ) : null}
 
       <ChoixBanqueDialog
         inscription={aOuvrir}
