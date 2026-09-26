@@ -124,7 +124,11 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     page,
   }) => {
     await page.goto('/admin/imports');
-    await deposerClasseur(page, 'Leads Marketing (SharePoint / Adhésions)', classeur);
+    await deposerClasseur(
+      page,
+      'Prospects du marketing (adhésions en ligne, publicités)',
+      classeur,
+    );
     await appliquerImport(page, 'Créer 3 prospects Grand Public', 'Appliqué');
 
     const fiches = await fichesDuClasseur();
