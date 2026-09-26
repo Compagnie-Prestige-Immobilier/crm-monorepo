@@ -945,7 +945,7 @@ func TestAdminIdentifiantsUniquesSansCasse(t *testing.T) {
 	}
 	for _, essai := range essais {
 		statut, body := adminAppel(b, http.MethodPost, "/api/v1/users", map[string]any{
-			"email": essai.email, "username": essai.username, "fullName": "Doublon Casse", "password": "MotDePasseDoublon2026",
+			"email": essai.email, "username": essai.username, "fullName": "Doublon Casse", "password": "Mdp-" + uuid.NewString(),
 		})
 		if id := texteDe(body["id"]); id != "" {
 			t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, id) })
