@@ -6,6 +6,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,18 +64,9 @@ func (s *service) rappelsQuotidiens(ctx context.Context) error {
 func (s *service) rappelerEcheancesVentesNotification(ctx context.Context, maintenant time.Time) error {
 	aujourdhui := maintenant.In(s.Cfg.TimeZone)
 	demain := time.Date(aujourdhui.Year(), aujourdhui.Month(), aujourdhui.Day()+1, 0, 0, 0, 0, time.UTC)
-	ventes, err := s.Q.EcheancesVentesACredit(ctx)
-	if err != nil {
+	clients, err := s.clientsEcheantLe(ctx, demain)
+	if err != nil || len(clients) == 0 {
 		return err
-	}
-	var clients []string
-	for i := range ventes {
-		if echeanceLe(&ventes[i], demain) {
-			clients = append(clients, ventes[i].Client)
-		}
-	}
-	if len(clients) == 0 {
-		return nil
 	}
 	lecteurs, err := s.Q.ActiveUsersByPermission(ctx, string(socle.PermissionVentesLire))
 	if err != nil {
@@ -88,6 +80,28 @@ func (s *service) rappelerEcheancesVentesNotification(ctx context.Context, maint
 	}
 	return s.emettreRappelNotification(ctx, notificationCleEcheancesVentes, maintenant, candidats, "Échéances de demain",
 		"{{nombre}} client(s) doivent verser demain : {{clients}}.", "/ventes", "RAPPEL")
+}
+
+const echeancesParPage = 1000
+
+func (s *service) clientsEcheantLe(ctx context.Context, jour time.Time) ([]string, error) {
+	var clients []string
+	for apres := int64(0); ; {
+		page, err := s.Q.EcheancesVentesACredit(ctx, db.EcheancesVentesACreditParams{Apres: apres, Taille: echeancesParPage})
+		if err != nil {
+			return nil, err
+		}
+		for i := range page {
+			if echeanceLe(&page[i], jour) {
+				clients = append(clients, page[i].Client)
+			}
+		}
+		if len(page) < echeancesParPage {
+			slices.Sort(clients)
+			return clients, nil
+		}
+		apres = page[len(page)-1].ID
+	}
 }
 
 // La première échéance tombe à la date choisie, les suivantes au jour de

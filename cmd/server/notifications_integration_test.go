@@ -482,6 +482,15 @@ func TestNotificationEcheanceVenteLaVeille(t *testing.T) {
 	s := b.notificationService()
 	client := "CLIENT ECHEANCE " + uuid.NewString()[:8]
 	demain := notifications.JourNotification(s, time.Now().Add(24*time.Hour))
+	lointaines := "AAA ECHEANCE LOINTAINE " + uuid.NewString()[:8]
+	if _, err := b.pool.Exec(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "jourVersement", "premierVersement")
+		SELECT 'SAISIE', 0, 'CPI', $1 || n, '770000000', 'THIEO', 1, '', '', 4000000, 4000000, 0, 4000000,
+		0, 0, 4000000, 'CREDIT', 1, 5, $2::date + 400 FROM generate_series(1, 5000) n`, lointaines, demain); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "client" LIKE $1 || '%'`, lointaines) })
 	var venteID int64
 	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
 		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
