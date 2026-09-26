@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BellIcon,
   CalendarClockIcon,
+  ChevronDownIcon,
   ClockIcon,
   EllipsisIcon,
   PhoneCallIcon,
@@ -41,6 +42,7 @@ import {
   formatDelay,
   snoozeCallback,
   type Callback,
+  type DureeReport,
 } from '@/lib/data/console';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { getApiClient } from '@/lib/api/browser';
@@ -166,13 +168,64 @@ export function AnnulerRappel({
   );
 }
 
+const REPORTS: readonly { duree: DureeReport; libelle: string; annonce: string }[] = [
+  { duree: '15min', libelle: '15 min', annonce: 'de 15 minutes' },
+  { duree: '1h', libelle: '1 h', annonce: 'd’une heure' },
+  { duree: '2h', libelle: '2 h', annonce: 'de 2 heures' },
+  { duree: 'demain', libelle: 'Demain matin', annonce: 'à demain matin' },
+];
+
+export function useReportRappel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, duree }: { id: string; duree: DureeReport }) => snoozeCallback(id, duree),
+    onSuccess: (_rappel, { duree }) => {
+      const annonce = REPORTS.find((report) => report.duree === duree)?.annonce ?? '';
+      toast.success(`Rappel reporté ${annonce}.`);
+      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+    },
+    onError: (error) => {
+      toastApiError(error, 'Le rappel n’a pas pu être reporté.');
+    },
+  });
+}
+
+export function RappelerDans({
+  pending,
+  onReporter,
+  className,
+}: {
+  pending: boolean;
+  onReporter: (duree: DureeReport) => void;
+  className?: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="outline" size="sm" disabled={pending} className={className} />}
+      >
+        <ClockIcon className="size-4" aria-hidden="true" />
+        Rappeler dans
+        <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        {REPORTS.map((report) => (
+          <DropdownMenuItem key={report.duree} onClick={() => onReporter(report.duree)}>
+            {report.libelle}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ContenuRappelProps {
   readonly callback: Rappel;
   readonly serverTimeMs: number;
   readonly racine: string;
   readonly onIgnorer: () => void;
   readonly onAnnuler: (id: string) => void;
-  readonly onReporter: (id: string) => void;
+  readonly onReporter: (id: string, duree: DureeReport) => void;
   readonly isPendingCancel: boolean;
   readonly isPendingSnooze: boolean;
   readonly enAttente: number;
@@ -286,16 +339,11 @@ function ContenuRappelPopUp({
           />
 
           {rendezVousFixe(callback) ? null : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isPendingSnooze}
-              onClick={() => onReporter(callback.id)}
-              className="w-full gap-1.5 sm:w-auto"
-            >
-              <ClockIcon className="h-4 w-4" />
-              Reporter de 15 min
-            </Button>
+            <RappelerDans
+              className="w-full sm:w-auto"
+              pending={isPendingSnooze}
+              onReporter={(duree) => onReporter(callback.id, duree)}
+            />
           )}
 
           <Link
@@ -320,7 +368,6 @@ function ContenuRappelPopUp({
 export function RappelPopUpIntrusif({ userId }: { userId: string }) {
   const projet = undefined;
   const racine = '/teleconseil';
-  const queryClient = useQueryClient();
   const ficheOuverte = useSearchParams().get('fiche') !== null;
 
   // Un rappel reporté change d'heure : c'est une nouvelle échéance, à signaler à son tour.
@@ -371,17 +418,7 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
 
   const cancelMutation = useAnnulationRappel();
 
-  const snoozeMutation = useMutation({
-    mutationFn: (id: string) => snoozeCallback(id),
-    onSuccess: () => {
-      toast.success('Rappel reporté de 15 minutes.');
-      masquerRappelsEnAttente();
-      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
-    },
-    onError: (error) => {
-      toastApiError(error, 'Le rappel n’a pas pu être reporté.');
-    },
-  });
+  const snoozeMutation = useReportRappel();
 
   useEffect(() => {
     if (activeCallback === null || !sonActif()) return;
@@ -401,7 +438,9 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
       racine={racine}
       onIgnorer={masquerRappelsEnAttente}
       onAnnuler={annulerRappel}
-      onReporter={(id) => snoozeMutation.mutate(id)}
+      onReporter={(id, duree) =>
+        snoozeMutation.mutate({ id, duree }, { onSuccess: masquerRappelsEnAttente })
+      }
       isPendingCancel={cancelMutation.isPending}
       isPendingSnooze={snoozeMutation.isPending}
       enAttente={enAttente.length}

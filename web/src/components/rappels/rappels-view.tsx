@@ -12,8 +12,10 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import {
   AnnulerRappel,
+  RappelerDans,
   rendezVousFixe,
   useAnnulationRappel,
+  useReportRappel,
 } from '@/components/rappels/rappel-pop-up-intrusif';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -38,6 +40,7 @@ import {
   type Callback,
   type CallbackList,
   type CallbackScope,
+  type DureeReport,
 } from '@/lib/data/console';
 import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
@@ -147,6 +150,8 @@ function RappelsTable({
   scope,
   cancelPending,
   onCancel,
+  reportPending,
+  onReport,
   onPage,
 }: {
   list: UseQueryResult<CallbackList>;
@@ -156,6 +161,8 @@ function RappelsTable({
   scope: CallbackScope;
   cancelPending: boolean;
   onCancel: (callback: Callback) => void;
+  reportPending: boolean;
+  onReport: (callback: Callback, duree: DureeReport) => void;
   onPage: (page: number) => void;
 }) {
   const tri = useTriLocal(filteredItems, COLONNES_RAPPELS);
@@ -198,13 +205,21 @@ function RappelsTable({
         Consigner l’appel
       </Link>
       {rendezVousFixe(callback) ? null : (
-        <AnnulerRappel
-          callback={callback}
-          pending={cancelPending}
-          onAnnuler={() => {
-            onCancel(callback);
-          }}
-        />
+        <>
+          <RappelerDans
+            pending={reportPending}
+            onReporter={(duree) => {
+              onReport(callback, duree);
+            }}
+          />
+          <AnnulerRappel
+            callback={callback}
+            pending={cancelPending}
+            onAnnuler={() => {
+              onCancel(callback);
+            }}
+          />
+        </>
       )}
     </>
   );
@@ -452,6 +467,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   });
 
   const cancel = useAnnulationRappel();
+  const report = useReportRappel();
 
   const overdueCount = overdue.data?.total ?? 0;
 
@@ -517,6 +533,10 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 cancelPending={cancel.isPending}
                 onCancel={(cb) => {
                   cancel.mutate(cb.id);
+                }}
+                reportPending={report.isPending}
+                onReport={(cb, duree) => {
+                  report.mutate({ id: cb.id, duree });
                 }}
               />
             ) : null}
