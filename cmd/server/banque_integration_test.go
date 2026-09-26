@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/db"
 	"cpi-go/internal/banque"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
@@ -679,6 +680,20 @@ func TestBanqueCourrielRenvoyeEtWebhookBrevo(t *testing.T) {
 	}
 	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "id" = $1 AND "statut" = 'REMIS' AND "remisLe" IS NOT NULL`, courrielID); n != 1 {
 		t.Fatal("l'événement delivered doit marquer le courriel remis")
+	}
+
+	rebond := map[string]any{"event": "hard_bounce", "message-id": messageID}
+	if statut = s.appelSansOrigine(http.MethodPost, "/api/v1/webhooks/brevo?secret=secret-de-test", rebond); statut/100 != 2 {
+		t.Fatalf("webhook hard_bounce : %d", statut)
+	}
+	aRejouer, err := db.New(s.pool).CourrielsARejouer(s.ctx, db.CourrielsARejouerParams{TentativesMax: 3, Prendre: 100_000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range aRejouer {
+		if aRejouer[i].ID == courrielID {
+			t.Fatal("un rebond définitif ne se rejoue pas")
+		}
 	}
 }
 

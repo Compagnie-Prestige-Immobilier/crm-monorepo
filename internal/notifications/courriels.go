@@ -590,6 +590,7 @@ func (s *service) evenementBrevo(ctx context.Context, in *EvenementBrevoInput) (
 	}
 	n, err := s.Q.CourrielEvenementBrevo(ctx, db.CourrielEvenementBrevoParams{
 		Statut: statut, Quand: time.Now(), Erreur: in.Body.Event + " " + in.Body.Reason, MessageID: in.Body.MessageID,
+		TentativesMax: tentativesCourrielMax,
 	})
 	if err != nil {
 		return nil, err
