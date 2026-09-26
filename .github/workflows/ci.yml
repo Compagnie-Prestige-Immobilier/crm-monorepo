@@ -45,6 +45,16 @@ jobs:
           done
           unitaires=$(git ls-files '*.test.ts' '*.test.tsx')
           [ -z "$unitaires" ] || { echo "::error::tests unitaires TypeScript :"; echo "$unitaires"; exit 1; }
+      # Littéral affiché : entre guillemets, avec une espace ou une majuscule initiale ; 'COMMERCIAL' et 'commercialId' restent des identifiants.
+      - name: Aucune suppression de lint, ni « commercial » ni tiret cadratin dans le panneau
+        run: |
+          echec=0
+          git grep -n -E 'nolint|eslint-disable|oxlint-disable|nosemgrep' -- '*.go' '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.py' '*.sh' '*.sql' \
+            && { echo "::error::suppression de lint : corriger la cause"; echec=1; }
+          git grep -n -P "(['\"\`])(?=[^'\"\`]*(?i:ommercia))(?=[^'\"\`]*\s|[A-Z][a-z])[^'\"\`]*\1" -- 'web/src/**.tsx' \
+            && { echo "::error::« commercial » dans un texte affiché"; echec=1; }
+          git grep -n '—' -- web/src && { echo "::error::tiret cadratin dans le panneau"; echec=1; }
+          exit $echec
       # goose refuse au démarrage une migration plus ancienne que la dernière appliquée : la production boucle.
       - name: Migrations ajoutées après la plus récente de la base
         env:

@@ -80,13 +80,11 @@ func adresseClient(r *http.Request, trustProxy bool) string {
 
 func EcrireProblem(w http.ResponseWriter, r *http.Request, p *ProblemError) {
 	p.RequestID, _ = r.Context().Value(cleRequete{}).(string)
-	corps, err := json.Marshal(p)
-	if err != nil {
-		corps = []byte(`{"status":500,"code":"INTERNAL_ERROR","message":"Une erreur interne est survenue."}`)
-	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(p.Status)
-	_, _ = w.Write(corps) // nosemgrep: go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		_ = json.NewEncoder(w).Encode(Problem(http.StatusInternalServerError, "INTERNAL_ERROR", "Une erreur interne est survenue."))
+	}
 }
 
 func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) http.Handler {
