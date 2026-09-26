@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
+  ArchiveIcon,
   ChartNoAxesCombinedIcon,
   HeartHandshakeIcon,
   ListChecksIcon,
@@ -48,6 +49,12 @@ const TABS: readonly {
     label: 'Import',
     icon: UploadIcon,
     permission: 'accueil.listes',
+  },
+  {
+    href: '/accueil/archives',
+    label: 'Archives',
+    icon: ArchiveIcon,
+    permission: 'visites.voir_archivees',
   },
 ];
 

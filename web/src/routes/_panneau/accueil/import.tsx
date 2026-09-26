@@ -1,11 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { RegistreImportView } from '@/components/accueil/registre-import-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardPermission } from '@/lib/guard';
+import { type Contexte, guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/accueil/import')({
-  beforeLoad: guardPermission('accueil.listes'),
+  beforeLoad: (contexte: Contexte) => {
+    guardPermission('accueil.listes')(contexte);
+    if (peut(contexte.context.user, 'imports.administrer')) {
+      throw redirect({ href: '/admin/imports?entite=registre', replace: true });
+    }
+  },
   component: RegistreImportPage,
   pendingComponent: Loading,
 });
@@ -23,7 +29,7 @@ function Loading() {
   );
 }
 
-/** La page `(panel)/accueil/import` de la v1. */
+/** L'aller-retour du registre pour qui n'a pas la porte d'import de l'administration. */
 function RegistreImportPage() {
   return <RegistreImportView />;
 }

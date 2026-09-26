@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/parametres')({
-  beforeLoad: guardPermission('parametres.administrer'),
+  beforeLoad: guardPermission('exploitation.administrer'),
   component: ParametresPage,
   pendingComponent: Loading,
 });
@@ -24,7 +24,7 @@ function Loading() {
   );
 }
 
-/** La page `(panel)/admin/parametres` de la v1. */
+/** Suppression des données : même permission que les routes de purge et de copie de la base. */
 function ParametresPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">

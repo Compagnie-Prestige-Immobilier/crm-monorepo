@@ -104,3 +104,82 @@ test.describe('parcours utilisateurs et rôles', () => {
     }
   });
 });
+
+const BARRES = [
+  {
+    role: 'ADMIN',
+    arrivee: /\/admin\/commerciaux$/u,
+    groupes: ['Au quotidien', 'Réglages'],
+    liens: [
+      'Comptes et rôles',
+      'Importer un classeur',
+      'Journal des actions',
+      'Envois et tâches',
+      'Listes de référence',
+      'Courriels et messages',
+      'Notifications',
+      'Champs de la conversion',
+      'Plateformes d’enrôlement',
+    ],
+    espaces: true,
+  },
+  {
+    role: 'DIRECTION',
+    arrivee: /\/teleconseil\/tableau-de-bord$/u,
+    groupes: ['Piloter', 'Appeler'],
+    liens: [
+      'Tableau de bord',
+      'Campagnes d’appels',
+      'Intéressés, hésitants et RDV',
+      'Ventes',
+      'Banque & Finance',
+      'Fiche représentant',
+      'Fiche prospect',
+      'Rappels promis',
+    ],
+    espaces: true,
+  },
+  {
+    role: 'SUPERVISEUR',
+    arrivee: /\/teleconseil\/tableau-de-bord$/u,
+    groupes: ['Piloter', 'Appeler'],
+    liens: [
+      'Tableau de bord',
+      'Campagnes d’appels',
+      'Intéressés, hésitants et RDV',
+      'Fiche représentant',
+      'Fiche prospect',
+      'Rappels promis',
+    ],
+    espaces: true,
+  },
+  {
+    role: 'COMMERCIAL',
+    arrivee: /\/teleconseil$/u,
+    groupes: [],
+    liens: ['Mon travail', 'Fiche représentant', 'Fiche prospect', 'Rappels promis'],
+    espaces: false,
+  },
+] as const;
+
+for (const barre of BARRES) {
+  test.describe(`parcours navigation, la barre de ${barre.role}`, () => {
+    test.use({ storageState: compteDe(barre.role).etat });
+
+    test('arrivée, groupes, un seul « Plus » et accès aux espaces', async ({ page }) => {
+      await page.goto('/');
+      await expect(page).toHaveURL(barre.arrivee);
+
+      const menu = page.getByRole('navigation', { name: 'Navigation principale' });
+      await expect(menu.getByRole('link')).toHaveText([...barre.liens]);
+      await expect(menu.getByRole('heading', { level: 2 })).toHaveText([...barre.groupes]);
+      await expect(menu.getByText('Plus', { exact: true })).toHaveCount(1);
+
+      const espaces = page.getByRole('link', { name: 'Espaces', exact: true });
+      await expect(espaces).toHaveCount(barre.espaces ? 1 : 0);
+      if (barre.espaces) return;
+      await page.goto('/espaces');
+      await expect(page).toHaveURL(barre.arrivee);
+    });
+  });
+}

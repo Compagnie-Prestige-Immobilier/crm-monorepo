@@ -7,7 +7,9 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import {
+  aPlusieursEspaces,
   COQUES,
+  coqueHomePath,
   coqueOf,
   fallbackCoque,
   HUB_PATH,
@@ -43,6 +45,29 @@ function useMoreOpen(repliActif: boolean): [boolean, (open: boolean) => void] {
   return [moreOpen, setMoreOpen];
 }
 
+/** Un seul « Plus » par espace ; un intitulé de groupe ne sert que s'il y a au moins deux groupes. */
+function barre(visiteur: Visiteur, pathname: string) {
+  const coque = coqueOf(pathname) ?? fallbackCoque(visiteur);
+  const sections = coque === null ? [] : navSections(visiteur, coque);
+  const plusieursEspaces = aPlusieursEspaces(visiteur);
+  const groupes = sections
+    .map((section) => ({
+      title: section.title,
+      items: section.items.filter((item) => item.secondary !== true),
+    }))
+    .filter((groupe) => groupe.items.length > 0);
+  const titres = groupes.length > 1;
+  return {
+    coqueLabel: COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO',
+    plusieursEspaces,
+    hubHref: plusieursEspaces
+      ? `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`
+      : coqueHomePath(visiteur, coque ?? 'accueil'),
+    groupes: groupes.map((groupe) => ({ ...groupe, title: titres ? groupe.title : null })),
+    replies: sections.flatMap((section) => section.items.filter((item) => item.secondary === true)),
+  };
+}
+
 export function SidebarNav({
   visiteur,
   onNavigate = () => undefined,
@@ -55,132 +80,163 @@ export function SidebarNav({
   navId?: string | undefined;
 }) {
   const pathname = usePathname();
-  const coque = coqueOf(pathname) ?? fallbackCoque(visiteur);
-  const sections = coque === null ? [] : navSections(visiteur, coque);
-  const coqueLabel = COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO';
-  const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;
+  const { coqueLabel, plusieursEspaces, hubHref, groupes, replies } = barre(visiteur, pathname);
 
   // Un écran replié ne peut pas être l'écran courant SANS que son repli
   // s'ouvre : la surbrillance serait invisible.
-  const repliActif = sections.some((section) =>
-    section.items.some(
-      (item) => item.secondary === true && isNavItemActive(visiteur, pathname, item),
-    ),
-  );
+  const repliActif = replies.some((item) => isNavItemActive(visiteur, pathname, item));
 
   const [moreOpen, setMoreOpen] = useMoreOpen(repliActif);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div
-        className={cn(
-          'flex h-16 shrink-0 items-center border-b border-sidebar-border',
-          collapsed ? 'justify-center px-2' : 'px-5',
-        )}
-      >
-        <Link
-          href={hubHref}
-          onClick={onNavigate}
-          aria-label="CPI GO, tous les espaces"
-          className="flex h-full items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
-        >
-          {(() => {
-            /*
-              Réduite, la barre passe au logo CARRÉ. Le logo en bandeau mesuré
-              pour 17 rem se retrouverait à moins de 40 px de large : le texte
-              « Compagnie Prestige Immobilier » y devient une bavure grise, et une
-              marque illisible vaut moins qu'une marque absente. Côté CHUES, la
-              marque dessinée remplace le logo pour la même raison.
-            */
-            return (
-              <Image
-                src={collapsed ? '/brand/icon-512.webp' : '/brand/cpi-header.webp'}
-                alt="CPI"
-                width={collapsed ? 72 : 312}
-                height={collapsed ? 72 : 128}
-                priority
-                className={cn('w-auto', collapsed ? 'size-9 rounded-sm' : 'h-8')}
-              />
-            );
-          })()}
-          {collapsed ? null : (
-            <span className="cpi-go-mark ml-3" aria-label="GO">
-              GO
-            </span>
-          )}
-        </Link>
-      </div>
+      <Marque
+        href={hubHref}
+        label={plusieursEspaces ? 'CPI GO, tous les espaces' : 'CPI GO, accueil'}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
 
       <nav
         id={navId}
         aria-label="Navigation principale"
         className={cn('flex-1 overflow-y-auto scrollbar-thin', collapsed ? 'p-2' : 'p-3')}
       >
-        {sections.map((section, index) => {
-          const primaires = section.items.filter((item) => item.secondary !== true);
-          const replies = section.items.filter((item) => item.secondary === true);
+        {groupes.map((groupe, index) => (
+          <Groupe
+            key={groupe.title ?? `principal-${String(index)}`}
+            index={index}
+            titre={groupe.title}
+            items={groupe.items}
+            visiteur={visiteur}
+            pathname={pathname}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
 
-          return (
-            <div
-              key={section.title ?? `principal-${String(index)}`}
-              className={cn(index > 0 && 'mt-5')}
-            >
-              {section.title !== null ? (
-                <h2
-                  id={`nav-section-${String(index)}`}
-                  className={cn(
-                    collapsed ? 'sr-only' : 'eyebrow px-3 pb-1.5 text-sidebar-muted-foreground',
-                  )}
-                >
-                  {section.title}
-                </h2>
-              ) : null}
-              {collapsed && section.title !== null ? (
-                <div aria-hidden="true" className="mx-2 mb-2 h-px bg-sidebar-border" />
-              ) : null}
-              <ul
-                className="flex flex-col gap-1"
-                {...(section.title !== null
-                  ? { 'aria-labelledby': `nav-section-${String(index)}` }
-                  : {})}
-              >
-                {primaires.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    visiteur={visiteur}
-                    pathname={pathname}
-                    collapsed={collapsed}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </ul>
-
-              <Replis
-                items={replies}
-                visiteur={visiteur}
-                pathname={pathname}
-                collapsed={collapsed}
-                open={moreOpen}
-                onOpenChange={(next) => {
-                  setMoreOpen(next);
-                  persistMoreOpen(next);
-                }}
-                onNavigate={onNavigate}
-              />
-            </div>
-          );
-        })}
+        <Replis
+          items={replies}
+          visiteur={visiteur}
+          pathname={pathname}
+          collapsed={collapsed}
+          open={moreOpen}
+          onOpenChange={(next) => {
+            setMoreOpen(next);
+            persistMoreOpen(next);
+          }}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       {/* Le retour au hub est un LIEN VISIBLE, pas seulement le logo : personne
           ne devine qu'un logo change de projet. */}
-      <SidebarFooterLink
-        collapsed={collapsed}
-        hubHref={hubHref}
-        onNavigate={onNavigate}
-        coqueLabel={coqueLabel}
-      />
+      {plusieursEspaces ? (
+        <SidebarFooterLink
+          collapsed={collapsed}
+          hubHref={hubHref}
+          onNavigate={onNavigate}
+          coqueLabel={coqueLabel}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function Marque({
+  href,
+  label,
+  collapsed,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex h-16 shrink-0 items-center border-b border-sidebar-border',
+        collapsed ? 'justify-center px-2' : 'px-5',
+      )}
+    >
+      <Link
+        href={href}
+        onClick={onNavigate}
+        aria-label={label}
+        className="flex h-full items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
+      >
+        {/* Réduite, la barre passe au logo CARRÉ : le bandeau à moins de 40 px
+            de large rendrait « Compagnie Prestige Immobilier » illisible. */}
+        <Image
+          src={collapsed ? '/brand/icon-512.webp' : '/brand/cpi-header.webp'}
+          alt="CPI"
+          width={collapsed ? 72 : 312}
+          height={collapsed ? 72 : 128}
+          priority
+          className={cn('w-auto', collapsed ? 'size-9 rounded-sm' : 'h-8')}
+        />
+        {collapsed ? null : (
+          <span className="cpi-go-mark ml-3" aria-label="GO">
+            GO
+          </span>
+        )}
+      </Link>
+    </div>
+  );
+}
+
+function Groupe({
+  index,
+  titre,
+  items,
+  visiteur,
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  index: number;
+  titre: string | null;
+  items: readonly NavItem[];
+  visiteur: Visiteur;
+  pathname: string;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
+  const titreId = `nav-section-${String(index)}`;
+  return (
+    <div className={cn(index > 0 && 'mt-5')}>
+      {titre === null ? null : (
+        <>
+          <h2
+            id={titreId}
+            className={cn(
+              collapsed ? 'sr-only' : 'eyebrow px-3 pb-1.5 text-sidebar-muted-foreground',
+            )}
+          >
+            {titre}
+          </h2>
+          {collapsed ? (
+            <div aria-hidden="true" className="mx-2 mb-2 h-px bg-sidebar-border" />
+          ) : null}
+        </>
+      )}
+      <ul
+        className="flex flex-col gap-1"
+        {...(titre === null ? {} : { 'aria-labelledby': titreId })}
+      >
+        {items.map((item) => (
+          <NavLink
+            key={item.href}
+            item={item}
+            visiteur={visiteur}
+            pathname={pathname}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </ul>
     </div>
   );
 }

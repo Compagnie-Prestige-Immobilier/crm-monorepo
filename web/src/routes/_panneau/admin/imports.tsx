@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-import { ImportsView } from '@/components/imports/imports-view';
+import { ENTITES, ImportsView } from '@/components/imports/imports-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UPLOADABLE_IMPORT_KINDS } from '@/lib/data/imports';
 import { guardPermission } from '@/lib/guard';
 import { readEnum } from '@/lib/search-params';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/admin/imports')({
   beforeLoad: guardPermission('imports.administrer'),
@@ -26,9 +26,20 @@ function Loading() {
   );
 }
 
-/** La page `(panel)/admin/imports` de la v1. */
+/** La seule porte d'import ; `?entite=` choisit le classeur. */
 function ImportsPage() {
-  const kind = readEnum(useSearchParams(), 'kind', UPLOADABLE_IMPORT_KINDS);
+  const { user } = Route.useRouteContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  const lue = readEnum(useSearchParams(), 'entite', ENTITES) ?? 'prospects';
+  const entite = lue === 'registre' && !peut(user, 'accueil.listes') ? 'prospects' : lue;
 
-  return <ImportsView initialKind={kind ?? 'PROSPECTS'} />;
+  return (
+    <ImportsView
+      entite={entite}
+      onEntiteChange={(suivante) => {
+        router.replace(`${pathname}?entite=${suivante}`, { scroll: false });
+      }}
+    />
+  );
 }

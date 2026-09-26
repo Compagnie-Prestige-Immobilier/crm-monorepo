@@ -15,6 +15,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { SearchField } from '@/components/filters/search-field';
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
 import { OpenReferentialTab } from '@/components/referentiels/open-referential-tab';
@@ -28,6 +29,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -51,28 +59,50 @@ import {
 import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { Banque, Departement, Syndicat } from '@/lib/types';
+import { type Banque, type Departement, type Permission, peut, type Syndicat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const TABS = [
-  'banques',
-  'syndicats',
-  'departements',
-  'professions',
-  'employeurs',
-  'incomeBands',
-  'offers',
-  'pointsRencontre',
-  'rvSite',
-  'statutsQualification',
-] as const;
+const ISSUES_APPEL = '/admin/referentiels/issues-appel';
 
-type ReferentielTab = (typeof TABS)[number];
+const LIBELLES = {
+  banques: 'Banques',
+  syndicats: 'Syndicats',
+  departements: 'Départements',
+  professions: 'Professions',
+  employeurs: 'Employeurs',
+  incomeBands: 'Revenus',
+  offers: 'Offres',
+  pointsRencontre: 'Points de rencontre',
+  rvSite: 'RV site',
+  statutsQualification: 'Statuts de qualification',
+} as const;
+
+type ReferentielTab = keyof typeof LIBELLES;
+
+const TABS = Object.keys(LIBELLES) as ReferentielTab[];
+
+const AUTRES_LISTES: readonly { href: string; label: string; permission: Permission }[] = [
+  { href: '/ventes/reglages', label: 'Sites et canaux de vente', permission: 'ventes.gerer' },
+  {
+    href: '/finance/dossiers/etapes',
+    label: 'Étapes des dossiers',
+    permission: 'banque.administrer',
+  },
+  { href: '/accueil/listes', label: 'Listes de l’accueil', permission: 'accueil.listes' },
+];
+
+const CHOIX_TELEPHONE = [
+  { value: ISSUES_APPEL, label: 'Issues d’appel' },
+  ...TABS.map((value) => ({ value, label: LIBELLES[value] })),
+];
 
 export function ReferentielsView() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const { data: user } = useQuery(meQueryOptions);
+  const autresListes = AUTRES_LISTES.filter((liste) => peut(user, liste.permission));
 
   const tab: ReferentielTab = useMemo(() => {
     const raw = searchParams.get('onglet');
@@ -94,12 +124,41 @@ export function ReferentielsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
-        Listes de valeurs proposées à la saisie des prospects.{' '}
-        <Link href="/admin/referentiels/issues-appel" className="underline underline-offset-2">
-          Issues d’appel
-        </Link>
-      </p>
+      {autresListes.length === 0 ? null : (
+        <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
+          Autres listes :{' '}
+          {autresListes.map((liste, index) => (
+            <span key={liste.href}>
+              {index > 0 ? ' · ' : null}
+              <Link href={liste.href} className="underline underline-offset-2">
+                {liste.label}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
+
+      <div className="md:hidden">
+        <Select
+          items={CHOIX_TELEPHONE}
+          value={tab}
+          onValueChange={(value: string | null) => {
+            if (value === ISSUES_APPEL) router.push(ISSUES_APPEL);
+            else if (value !== null) write(value as ReferentielTab, '');
+          }}
+        >
+          <SelectTrigger aria-label="Liste affichée" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CHOIX_TELEPHONE.map((choix) => (
+              <SelectItem key={choix.value} value={choix.value}>
+                {choix.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <Tabs
         value={tab}
@@ -107,18 +166,22 @@ export function ReferentielsView() {
           write(value as ReferentielTab, '');
         }}
       >
-        <TabsList>
-          <TabsTrigger value="banques">Banques</TabsTrigger>
-          <TabsTrigger value="syndicats">Syndicats</TabsTrigger>
-          <TabsTrigger value="departements">Départements</TabsTrigger>
-          <TabsTrigger value="professions">Professions</TabsTrigger>
-          <TabsTrigger value="employeurs">Employeurs</TabsTrigger>
-          <TabsTrigger value="incomeBands">Revenus</TabsTrigger>
-          <TabsTrigger value="offers">Offres</TabsTrigger>
-          <TabsTrigger value="pointsRencontre">Points de rencontre</TabsTrigger>
-          <TabsTrigger value="rvSite">RV site</TabsTrigger>
-          <TabsTrigger value="statutsQualification">Statuts de qualification</TabsTrigger>
-        </TabsList>
+        {/* Issues d'appel a sa propre page : un lien, pas un onglet, en tête de la même barre. */}
+        <div className="hidden w-fit max-w-full items-start rounded-md bg-secondary p-1 md:flex">
+          <Link
+            href={ISSUES_APPEL}
+            className="inline-flex h-9 shrink-0 items-center rounded-sm px-3 text-[0.875rem] font-[600] whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Issues d’appel
+          </Link>
+          <TabsList className="h-auto min-w-0 flex-wrap justify-start p-0">
+            {TABS.map((valeur) => (
+              <TabsTrigger key={valeur} value={valeur} className="flex-none">
+                {LIBELLES[valeur]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         <TabsContent value="banques">
           <BanquesTab

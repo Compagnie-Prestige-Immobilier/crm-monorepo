@@ -12,7 +12,14 @@ const DevRoleSwitcher =
         import('@/components/auth/dev-role-switcher').then((m) => ({ default: m.DevRoleSwitcher })),
       )
     : null;
-import { coqueOf, hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
+import {
+  aPlusieursEspaces,
+  coqueOf,
+  hasInbox,
+  HUB_PATH,
+  inboxPathFor,
+  navTitle,
+} from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { SignalerProbleme } from '@/components/layout/signaler-probleme';
 import { GlobalExportButton } from '@/components/exports/global-export-button';
@@ -30,6 +37,8 @@ export function Topbar({ user }: { user: SessionUser }) {
   const accueil = coqueOf(pathname) === 'accueil';
 
   const title = navTitle(user, pathname);
+  const plusieursEspaces = aPlusieursEspaces(user);
+  const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;
 
   return (
     <header
@@ -42,7 +51,7 @@ export function Topbar({ user }: { user: SessionUser }) {
     >
       {accueil ? (
         <Link
-          href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
+          href={plusieursEspaces ? hubHref : '/accueil'}
           className="hidden items-center gap-2 md:flex"
         >
           <img src="/brand/cpi-header.webp" alt="CPI" className="h-10 w-auto" />
@@ -103,18 +112,20 @@ export function Topbar({ user }: { user: SessionUser }) {
         </div>
       ) : null}
 
-      <div className="hidden md:block">
-        <Link
-          href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
-          className={buttonVariants({
-            variant: 'ghost',
-            className: 'cpi-nav-action h-11 gap-2 px-3',
-          })}
-        >
-          <LayoutGridIcon className="size-5" aria-hidden="true" />
-          <span className="sr-only sm:not-sr-only">Espaces</span>
-        </Link>
-      </div>
+      {plusieursEspaces ? (
+        <div className="hidden md:block">
+          <Link
+            href={hubHref}
+            className={buttonVariants({
+              variant: 'ghost',
+              className: 'cpi-nav-action h-11 gap-2 px-3',
+            })}
+          >
+            <LayoutGridIcon className="size-5" aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Espaces</span>
+          </Link>
+        </div>
+      ) : null}
 
       {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à
           ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
