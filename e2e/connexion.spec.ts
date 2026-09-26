@@ -154,12 +154,11 @@ test.describe('parcours 1, cache vidé au changement de compte', () => {
     await page.getByRole('link', { name: 'Fiche prospect' }).click();
     await page.getByLabel('Quel prospect avez-vous appelé ?').fill(ficheDeA.nom);
     await page.getByRole('button', { name: ficheDeA.nom }).click();
-    await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
     await page
       .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
       .getByRole('button', { name: /Oui, elle a répondu/u })
       .click();
-    await page.getByRole('button', { name: 'Passer le formulaire' }).click();
+    await page.getByRole('button', { name: /^Continuer/u }).click();
     await page
       .getByRole('group', { name: 'Qu’a dit la personne ?' })
       .getByRole('button', { name: /À rappeler/u })

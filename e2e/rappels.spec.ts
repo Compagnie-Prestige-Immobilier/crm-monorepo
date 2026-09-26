@@ -76,12 +76,11 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(CONSOLE);
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
   await page.getByRole('button', { name: fiche.nom }).click();
-  await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
     .getByRole('button', { name: /Oui, elle a répondu/u })
     .click();
-  await page.getByRole('button', { name: 'Passer le formulaire' }).click();
+  await page.getByRole('button', { name: /^Continuer/u }).click();
   await page
     .getByRole('group', { name: 'Qu’a dit la personne ?' })
     .getByRole('button', { name: /À rappeler/u })

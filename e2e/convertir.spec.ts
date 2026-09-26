@@ -100,7 +100,6 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(CONSOLE);
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
   await page.getByRole('button', { name: fiche.nom }).click();
-  await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Phase 3 · Conversion' })).toHaveCount(0);
 }
 
@@ -307,6 +306,29 @@ test.describe('parcours 5, convertir un prospect', () => {
         await client.query('DELETE FROM lots_export WHERE id = $1', [lotId]);
       });
     }
+  });
+
+  test('un appel sans reponse se consigne en trois clics et rend la main a la page d’origine', async ({
+    page,
+  }) => {
+    const fiche = await semer('SansReponse');
+    await page.goto(`/teleconseil/prospects/${fiche.id}`);
+    await page.getByRole('link', { name: 'Consigner un appel' }).click();
+    // Personne d'autre ne tient la fiche : elle s'ouvre sans confirmation.
+    await expect(page.getByRole('heading', { name: fiche.nom, level: 2 })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await issue(page, 'Injoignable', /NRP/u);
+    await expect(
+      page.getByRole('group', { name: 'Pourquoi n’a-t-elle pas répondu ?' }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Commentaire, facultatif')).toBeVisible();
+    await enregistrer(page);
+
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${fiche.id}$`, 'u'));
+    await expect
+      .poll(() => lireClassement(fiche.id))
+      .toMatchObject({ tentatives: 1, phase2Status: 'UNREACHABLE' });
   });
 
   test('une fiche ouverte n’empeche pas d’en ouvrir une autre ailleurs', async ({ page }) => {
