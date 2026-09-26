@@ -351,6 +351,7 @@ export function WidgetGrid({
   editable,
   messageVide = 'Aucune visite sur la période.',
   onReorder,
+  onModifier,
   onRemove,
   onChangeTaille,
 }: {
@@ -361,6 +362,7 @@ export function WidgetGrid({
   editable: boolean;
   messageVide?: string;
   onReorder: (fromId: string, toId: string) => void;
+  onModifier: (id: string) => void;
   onRemove: (id: string) => void;
   onChangeTaille: (id: string, taille: DashboardTaille | undefined) => void;
 }) {
@@ -396,6 +398,9 @@ export function WidgetGrid({
         entree={entree}
         donnees={donnee}
         editable={editable}
+        onModifier={() => {
+          onModifier(widget.id);
+        }}
         onRemove={() => {
           onRemove(widget.id);
         }}

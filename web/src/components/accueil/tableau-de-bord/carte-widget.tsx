@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVerticalIcon, Maximize2Icon, Minimize2Icon, XIcon } from 'lucide-react';
+import { GripVerticalIcon, Maximize2Icon, Minimize2Icon, PencilIcon, XIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import {
@@ -39,6 +39,7 @@ function ActionsWidget({
   attributes,
   listeners,
   setActivatorNodeRef,
+  onModifier,
   onRemove,
   onChangeTaille,
 }: {
@@ -47,6 +48,7 @@ function ActionsWidget({
   attributes: ReturnType<typeof useSortable>['attributes'];
   listeners: ReturnType<typeof useSortable>['listeners'];
   setActivatorNodeRef: ReturnType<typeof useSortable>['setActivatorNodeRef'];
+  onModifier: () => void;
   onRemove: () => void;
   onChangeTaille: (taille: DashboardTaille | undefined) => void;
 }) {
@@ -79,6 +81,15 @@ function ActionsWidget({
         type="button"
         variant="ghost"
         size="icon-sm"
+        aria-label={`Modifier ${titre}`}
+        onClick={onModifier}
+      >
+        <PencilIcon aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
         aria-label={`Retirer ${titre}`}
         onClick={onRemove}
       >
@@ -93,6 +104,7 @@ export function CarteWidget({
   entree,
   donnees,
   editable,
+  onModifier,
   onRemove,
   onChangeTaille,
   children,
@@ -101,6 +113,7 @@ export function CarteWidget({
   entree: CatalogueEntree;
   donnees: DonneesSource | undefined;
   editable: boolean;
+  onModifier: () => void;
   onRemove: () => void;
   onChangeTaille: (taille: DashboardTaille | undefined) => void;
   children: ReactNode;
@@ -142,6 +155,7 @@ export function CarteWidget({
               attributes={attributes}
               listeners={listeners}
               setActivatorNodeRef={setActivatorNodeRef}
+              onModifier={onModifier}
               onRemove={onRemove}
               onChangeTaille={onChangeTaille}
             />

@@ -178,12 +178,38 @@ test.describe('parcours 9, le tableau de pilotage', () => {
     const formes = constructeur.getByRole('group', { name: 'Formes possibles' });
     await expect(formes.getByRole('button').first()).toBeVisible();
     await expect(constructeur.getByText('Rien sur la période')).toHaveCount(0);
+    const question = constructeur.getByText(/^Comment afficher « (.+?) » \?/u);
+    const ventes = /« (.+?) »/u.exec((await question.textContent()) ?? '')?.[1] ?? '';
     await formes.getByRole('button').first().click();
     await expect(constructeur.getByText('C’est celui-ci ?')).toBeVisible();
     await expect(constructeur.getByText('Rien sur la période')).toHaveCount(0);
+    await constructeur.getByRole('button', { name: 'Oui, l’ajouter' }).click();
+    await expect(constructeur.getByText(`« ${ventes} » est sur le tableau de bord.`)).toBeVisible();
     await page.keyboard.press('Escape');
 
     await page.reload();
+    const marques = async () => {
+      const reponse = await page.request.get('/api/v1/tableaux-de-bord/pilotage/disposition');
+      const { widgets } = (await reponse.json()) as { widgets: { marque?: string }[] };
+      return widgets.map((widget) => widget.marque ?? '');
+    };
+    const avant = await marques();
+    await page.getByRole('button', { name: `Modifier ${ventes}` }).click();
+    const edition = page.getByRole('dialog', { name: 'Modifier un indicateur' });
+    await edition
+      .getByRole('group', { name: 'Formes possibles' })
+      .getByRole('button')
+      .nth(1)
+      .click();
+    await edition.getByRole('button', { name: 'Oui, l’ajouter' }).click();
+    await expect(
+      page.getByRole('dialog').getByText(`« ${ventes} » est sur le tableau de bord.`),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect.poll(marques).not.toEqual(avant);
+    expect(await marques()).toHaveLength(avant.length);
+    await page.getByRole('button', { name: `Retirer ${ventes}` }).click();
+
     const retirer = page.getByRole('button', { name: `Retirer ${titre}` });
     await expect(retirer).toBeVisible();
     await retirer.click();
