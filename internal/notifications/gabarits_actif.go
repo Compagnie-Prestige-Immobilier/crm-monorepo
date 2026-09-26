@@ -11,9 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Un gabarit ne se supprime pas : une notification déjà partie le cite, et le
-// détruire priverait le journal de ce qui a été annoncé. Il se retire de la
-// liste, comme une entrée de référentiel.
+// Un gabarit ne se supprime pas, une notification partie le cite : il se retire de
+// la liste, comme une entrée de référentiel.
 type GabaritActifInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {

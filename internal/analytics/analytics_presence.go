@@ -63,9 +63,8 @@ type ligneRepresentantsParTeleconseiller struct {
 	CompteursRepresentants
 }
 
-// Ce que les tentatives seules ne disent pas : les appels vus par le téléphone,
-// la durée passée en ligne et le sort des rappels promis. Chaque source a sa
-// propre date d'acte.
+// Appels vus par le téléphone, durée en ligne et sort des rappels promis, chaque
+// source datée par son propre acte.
 type CompteursJournalEtRappels struct {
 	Detectes          int32
 	NonConsignes      int32
@@ -303,9 +302,8 @@ func (s *service) creneauxOuValeursParDefaut(ctx context.Context) []CreneauDeTra
 	return reglage.Shifts
 }
 
-// Les actes de la fenêtre, toutes sources confondues : une ligne d'agent sans
-// aucune tentative est le cas même que la supervision cherche, un téléphone qui
-// appelle et rien de consigné.
+// Toutes sources confondues : un agent qui appelle sans rien consigner est le cas
+// même que la supervision cherche.
 func (perimetre perimetreSupervision) actes(p *parametresSQL) string {
 	return `
 	SELECT
@@ -361,9 +359,8 @@ func (perimetre perimetreSupervision) tentativesRepresentants(p *parametresSQL) 
 	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
 }
 
-// Un représentant ne se qualifie qu'une fois : c'est sa DERNIÈRE réponse de la
-// fenêtre qui vaut, et elle revient à qui l'a obtenue. Le classement porte sur
-// tous les agents, sinon filtrer sur l'un lui attribuerait la réponse d'un autre.
+// Seule la DERNIÈRE réponse de la fenêtre vaut, à qui l'a obtenue : le classement
+// porte sur tous les agents, sinon un filtre attribuerait celle d'un autre.
 func (perimetre perimetreSupervision) reponsesDesRepresentants(p *parametresSQL) string {
 	return `
 	SELECT DISTINCT ON (rca."representantId")
@@ -685,9 +682,8 @@ func (s *service) histogrammesDesProspects(ctx context.Context, perimetre perime
 	return parTeleconseiller, parRepresentant, nil
 }
 
-// Le dernier appel portant un statut dans la fenêtre détermine le comptage. Les
-// statuts actifs apparaissent même à zéro ; les désactivés seulement s'ils sont
-// réellement présents.
+// Le dernier appel à statut de la fenêtre compte ; les statuts actifs paraissent
+// même à zéro, les désactivés seulement s'ils sont présents.
 func (s *service) repartitionParStatut(ctx context.Context, perimetre perimetreSupervision) (*RepartitionParStatut, error) {
 	p := &parametresSQL{}
 	sql := `WITH derniers_appels AS (
@@ -731,9 +727,8 @@ func (s *service) repartitionParStatut(ctx context.Context, perimetre perimetreS
 	return repartition, nil
 }
 
-// Une seule ligne par appel, prospects et représentants confondus : c'est
-// l'assiette de la note, du temps mort et des rappels. Le créneau se lit sur
-// deux tranches, arité figée par les réglages.
+// Une ligne par appel, prospects et représentants confondus : l'assiette de la note,
+// du temps mort et des rappels. Deux tranches de créneau, figées par les réglages.
 func (perimetre perimetreSupervision) appelsSituesDansLeCreneau(p *parametresSQL, shifts []CreneauDeTravail) string {
 	branches := make([]string, 0, len(shifts))
 	for _, shift := range shifts {
@@ -844,10 +839,8 @@ func (s *service) joursVus(ctx context.Context, perimetre perimetreSupervision, 
 	return lignesAgregat[ligneDeJourVu](ctx, s, sql, p.args)
 }
 
-// La note complète l'écran, elle ne le porte pas : un échec vide `scores` sans
-// effacer l'activité. Le dénominateur ne retient que les jours OÙ LE COMPTE A
-// ÉTÉ VU : le dépôt n'a pas de calendrier ouvré, et facturer les dimanches ferait
-// chuter l'assiduité de tout le monde.
+// Un échec vide `scores` sans effacer l'activité. Le dénominateur ne compte que les
+// jours où le compte a été vu : sans calendrier ouvré, les dimanches pèseraient.
 func (s *service) notesDeRendement(ctx context.Context, perimetre perimetreSupervision, equipe []ligneDeLEquipe, shifts []CreneauDeTravail, creneaux []CreneauEffectif) []RendementDunTeleconseiller {
 	mesures, err := s.rendementParAgent(ctx, perimetre, shifts)
 	if err != nil {

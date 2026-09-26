@@ -350,9 +350,8 @@ func exportCelluleOuiNon(v *bool) any {
 	return exportLibelleNon
 }
 
-// Le classeur est monté en entier avant le premier octet : excelize garde les
-// lignes en fichier temporaire, et une erreur de lecture rend encore un 5xx
-// lisible au lieu d'un fichier tronqué qui s'ouvre quand même.
+// Monté en entier avant le premier octet (excelize passe par un fichier temporaire) :
+// une erreur rend un 5xx lisible plutôt qu'un fichier tronqué qui s'ouvre.
 func exportReponseClasseur(c *exportClasseur, nom string) *huma.StreamResponse {
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
 		ctx.SetHeader("Content-Type", exportTypeMimeXlsx)

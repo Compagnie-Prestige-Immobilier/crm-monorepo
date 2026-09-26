@@ -274,9 +274,8 @@ func TestNotificationDeuxExpediteursConcurrentsNenvoientQuUneFois(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	// Brevo tient la ligne le temps que le second expéditeur lise : sans ce
-	// délai les deux passages se suivent au lieu de se chevaucher, et le test
-	// ne prouverait plus rien du bail.
+	// Brevo tient la ligne pendant que le second expéditeur lit : sans ce délai, les
+	// deux passages se suivent au lieu de se chevaucher.
 	faux.mu.Lock()
 	faux.delai = 300 * time.Millisecond
 	faux.mu.Unlock()

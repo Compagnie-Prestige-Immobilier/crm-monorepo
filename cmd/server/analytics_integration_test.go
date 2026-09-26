@@ -565,9 +565,8 @@ func TestSupervisionActiviteParCampagneRepresentants(t *testing.T) {
 	analyticsEgal(b, "fiches représentants de la campagne regardée", totaux["repFiches"], 1)
 }
 
-// Les appels d'avant le référentiel du 7 septembre 2026 n'ont posé aucun
-// statut : la qualité de la base lit alors l'issue de l'appel, sinon elle
-// compte un représentant joint comme jamais atteint.
+// Un appel d'avant le référentiel du 7 septembre 2026 n'a pas de statut : son
+// issue fait foi, sinon un représentant joint compte comme jamais atteint.
 func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
 	b := analyticsConnexion(t, "SUPERVISEUR")
 	jeu := analyticsSemer(b)

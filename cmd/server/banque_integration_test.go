@@ -79,9 +79,8 @@ func banqueLigne(b *banc, requete string, args ...any) string {
 	return id
 }
 
-// Les index partiels du schéma n'admettent qu'une seule étape initiale, une
-// seule CASHED et une seule REJECTED dans TOUTE la base : le seed v2 les porte
-// déjà, on les emprunte et on ne crée que ce qui manque.
+// Une seule étape initiale, CASHED et REJECTED dans toute la base (index partiels) :
+// on emprunte celles du seed et on ne crée que ce qui manque.
 func (s *socleBanque) etape(filtre, code, genre string, position int, initiale bool) string {
 	s.t.Helper()
 	id := banqueLigne(s.banc, `SELECT COALESCE((SELECT "id" FROM "bank_case_stages"
@@ -844,9 +843,8 @@ func TestBanqueEncaissementSignaleLeTeleconseiller(t *testing.T) {
 	}
 }
 
-// B09 : la liste « à ouvrir » et l'ouverture partagent désormais le même
-// prédicat (pièces acceptées, sans exiger de date de décision) ; une
-// inscription Grand Public proposée doit donc s'ouvrir sans détour.
+// La liste « à ouvrir » et l'ouverture partagent le même prédicat : une inscription
+// Grand Public proposée s'ouvre.
 func TestBanqueInscriptionProposeeEstOuvrable(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
@@ -865,9 +863,8 @@ func TestBanqueInscriptionProposeeEstOuvrable(t *testing.T) {
 	s.attend(statut, http.StatusCreated, "ouverture d’une inscription proposée à l’ouverture", body)
 }
 
-// B10 : vider le miroir des inscriptions ne doit pas couper le lien d'un
-// dossier bancaire, et la suppression unitaire d'une inscription liée refuse
-// au lieu de laisser `bank_cases.inscriptionId` retomber à NULL.
+// Vider le miroir des inscriptions garde le lien d'un dossier, et supprimer une
+// inscription liée est refusé plutôt que de remettre `inscriptionId` à NULL.
 func TestEnrolementPurgeGardeLeDossier(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()
@@ -891,9 +888,8 @@ func TestEnrolementPurgeGardeLeDossier(t *testing.T) {
 	}
 }
 
-// B91 : le schéma accepte un motif de trois espaces (minLength satisfait),
-// mais une fois nettoyé il ne reste rien à consigner : la correction doit le
-// refuser, pas l'écrire tel quel dans l'audit.
+// Un motif de trois espaces passe le schéma mais, nettoyé, ne dit rien : la
+// correction le refuse.
 func TestBanqueMotifVideRefuse(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()

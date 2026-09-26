@@ -122,9 +122,8 @@ func piecesIndisponibles(raison string) error {
 	return huma.Error404NotFound(piecesMessageIndispo)
 }
 
-// Où lire les pièces d'une inscription. L'inscription, et non le dossier
-// bancaire : la banque doit pouvoir lire les justificatifs pour décider
-// d'ouvrir, pas seulement après avoir ouvert.
+// Les pièces se lisent depuis l'inscription, pas le dossier : la banque lit les
+// justificatifs pour décider d'ouvrir.
 type sourceDesPieces struct {
 	projet  string
 	base    string
@@ -329,9 +328,8 @@ func lirePlateformeBrut(ctx context.Context, url, jeton string) (lu []byte, type
 	return lu, typeMime, err
 }
 
-// La plateforme est une source distante : réémettre son `Content-Type` tel quel
-// afficherait un `text/html` qu'elle rendrait dans l'origine du panneau. Seuls
-// les types que la visionneuse sait afficher passent, le reste est téléchargé.
+// Un `Content-Type` distant réémis tel quel afficherait un `text/html` dans l'origine
+// du panneau : seuls ces types s'affichent, le reste se télécharge.
 var typesPieceAffichables = map[string]bool{
 	"application/pdf": true, "image/jpeg": true, "image/png": true, "image/webp": true,
 }

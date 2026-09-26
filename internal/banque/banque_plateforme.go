@@ -197,9 +197,8 @@ func texteOuTiret(v *string) string {
 	return *v
 }
 
-// Appelé après chaque tirage : chaque inscription devenue complète est marquée
-// avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel,
-// lui, part de la plateforme : ici, seule la notification in-app.
+// Marquée avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel
+// part de la plateforme : ici, seule la notification in-app.
 func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string) (int, error) {
 	s := &service{d}
 	lignes, err := s.inscriptionsCompletes(ctx, projet, true, nil)

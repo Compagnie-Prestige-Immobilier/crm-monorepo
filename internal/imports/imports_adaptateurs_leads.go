@@ -29,9 +29,8 @@ func provenanceEtDateGrandPublicImport(ligne *ligneGrandPublicImport, cellules m
 	ligne.plateforme = plateformeGrandPublicImport(canal)
 }
 
-// Le canal nomme le réseau, la règle nomme la campagne : elle seule sait à quel
-// projet le prospect répondait, et passe avant le libellé exact d'un canal.
-// Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
+// La règle de provenance nomme la campagne, donc le projet : elle passe avant le
+// canal. Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
 func provenanceGrandPublicImport(canal, provenance string, etat *etatGrandPublicImport) provenanceImport {
 	cle := cleImport(canal)
 	if cle != "" {
