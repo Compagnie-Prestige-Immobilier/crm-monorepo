@@ -204,6 +204,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
       DATABASE_URL_DEMO: postgresql://crm:crm@localhost:5432/crm_demo?sslmode=disable
+      # Mêmes valeurs que le serveur lancé par `e2e/playwright.config.ts` : le semis les exige hors développement.
+      PUBLIC_WEB_URL: http://localhost:4000
+      SEED_FIXTURE_PASSWORD: fixtures-e2e-2026
     services:
       postgres:
         image: postgres:18.4
