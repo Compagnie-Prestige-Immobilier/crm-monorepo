@@ -66,11 +66,11 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
     const premier = (await blocs.first().getAttribute('aria-label')) ?? '';
     const retire = premier.replace('À propos de ', '');
 
-    await page.getByRole('button', { name: 'Composer l’écran' }).click();
+    await page.getByRole('button', { name: 'Organiser les graphiques' }).click();
     await page.getByRole('button', { name: `Retirer ${retire}` }).click();
     await page.getByRole('button', { name: 'Descendre', exact: false }).first().click();
     await page.getByRole('button', { name: 'Enregistrer' }).click();
-    await expect(page.getByRole('button', { name: 'Composer l’écran' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Organiser les graphiques' })).toBeVisible();
 
     const sources = await widgetsDe(SUPERVISEUR.id);
     expect(sources.length, 'la disposition enregistrée doit perdre un bloc').toBe(avant - 1);
