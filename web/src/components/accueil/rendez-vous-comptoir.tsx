@@ -1,15 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, DownloadIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
+import { CheckIcon, DownloadIcon, PlusIcon, XIcon } from 'lucide-react';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { VisiteForm } from '@/components/accueil/visite-form';
+import { DatePicker } from '@/components/filters/date-picker';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -34,7 +36,12 @@ import {
   lireRendezVous,
   type RendezVousObtenu,
 } from '@/lib/data/rendez-vous';
-import { formatDateTime } from '@/lib/format';
+import {
+  VISITE_REFERENTIELS_QUERY_KEY,
+  dakarNow,
+  fetchVisiteReferentiels,
+} from '@/lib/data/visites';
+import { formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
 const SUIVIS: Record<string, { libelle: string; variante: 'success' | 'destructive' | 'warning' }> =
@@ -44,7 +51,15 @@ const SUIVIS: Record<string, { libelle: string; variante: 'success' | 'destructi
     REPORTE: { libelle: 'Reporté', variante: 'warning' },
   };
 
-function Suivi({ fiche, peutNoter }: { fiche: RendezVousObtenu; peutNoter: boolean }) {
+function Suivi({
+  fiche,
+  peutNoter,
+  onEnregistrerVisite,
+}: {
+  fiche: RendezVousObtenu;
+  peutNoter: boolean;
+  onEnregistrerVisite: ((fiche: RendezVousObtenu) => void) | null;
+}) {
   const client = useQueryClient();
   const noter = useMutation({
     mutationFn: (issue: 'HONORE' | 'NON_HONORE') => suivreRendezVous(fiche.id, { issue }),
@@ -57,8 +72,20 @@ function Suivi({ fiche, peutNoter }: { fiche: RendezVousObtenu; peutNoter: boole
 
   const connu = SUIVIS[fiche.issue];
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {connu === undefined ? null : <Badge variant={connu.variante}>{connu.libelle}</Badge>}
+      {fiche.issue === 'HONORE' && onEnregistrerVisite !== null ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            onEnregistrerVisite(fiche);
+          }}
+          className="gap-1.5"
+        >
+          <PlusIcon className="size-3.5" aria-hidden="true" />
+          Enregistrer la visite
+        </Button>
+      ) : null}
       {peutNoter ? (
         <>
           <Button
@@ -93,6 +120,115 @@ function Suivi({ fiche, peutNoter }: { fiche: RendezVousObtenu; peutNoter: boole
   );
 }
 
+function PeriodeRendezVous({
+  today,
+  du,
+  au,
+  onChange,
+}: {
+  today: string;
+  du: string;
+  au: string;
+  onChange: (du: string, au: string) => void;
+}) {
+  const duId = useId();
+  const auId = useId();
+  const aujourdhui = du === today && au === today;
+  const toutes = du === '' && au === '';
+  return (
+    <>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={aujourdhui ? 'default' : 'outline'}
+          aria-pressed={aujourdhui}
+          onClick={() => {
+            onChange(today, today);
+          }}
+        >
+          Aujourd’hui
+        </Button>
+        <Button
+          size="sm"
+          variant={toutes ? 'default' : 'outline'}
+          aria-pressed={toutes}
+          onClick={() => {
+            onChange('', '');
+          }}
+        >
+          Toutes les dates
+        </Button>
+      </div>
+      <div className="flex items-end gap-2">
+        <DatePicker
+          id={duId}
+          label="Du"
+          value={du || null}
+          max={au || null}
+          onChange={(valeur) => {
+            onChange(valeur ?? '', au);
+          }}
+        />
+        <DatePicker
+          id={auId}
+          label="Au"
+          value={au || null}
+          min={du || null}
+          onChange={(valeur) => {
+            onChange(du, valeur ?? '');
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
+// Le registre n'a pas d'objet « rendez-vous » : l'accueil le choisit, le commentaire garde la trace.
+function VisiteDuRendezVous({
+  rendezVous,
+  onClose,
+}: {
+  rendezVous: RendezVousObtenu | null;
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  const referentiels = useQuery({
+    queryKey: VISITE_REFERENTIELS_QUERY_KEY,
+    queryFn: () => fetchVisiteReferentiels(),
+    staleTime: 5 * 60_000,
+    enabled: rendezVous !== null,
+  });
+  if (rendezVous === null) return null;
+  const telephone = rendezVous.phoneE164 === null ? '' : formatPhone(rendezVous.phoneE164);
+  return (
+    <Dialog
+      open
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onClose();
+      }}
+    >
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Enregistrer une visite</DialogTitle>
+        </DialogHeader>
+        <VisiteForm
+          referentiels={referentiels.data}
+          preremplie={{
+            visitorName: `${rendezVous.prenom} ${rendezVous.nom}`.trim(),
+            phone: telephone,
+            comment: `Rendez-vous ${rendezVous.type} pris par ${rendezVous.prisPar}`,
+          }}
+          onSaved={() => {
+            onClose();
+            void client.invalidateQueries({ queryKey: ['visites'] });
+          }}
+          onCancel={onClose}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * Le comptoir confirme depuis la liste : ouvrir chaque fiche pour un seul clic
  * ferait perdre la file d'attente.
@@ -109,15 +245,19 @@ export function RendezVousComptoir({
   type,
   peutNoter,
   peutExporter,
+  peutEnregistrerVisite,
 }: {
   type: string | null;
   peutNoter: boolean;
   peutExporter: boolean;
+  peutEnregistrerVisite: boolean;
 }) {
+  const [today] = useState(() => dakarNow().date);
   const [search, setSearch] = useState('');
   const [issue, setIssue] = useState('');
-  const [du, setDu] = useState('');
-  const [au, setAu] = useState('');
+  const [du, setDu] = useState(today);
+  const [au, setAu] = useState(today);
+  const [visiteDe, setVisiteDe] = useState<RendezVousObtenu | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const filtres = { type, search, issue, du, au, page, pageSize };
@@ -125,6 +265,11 @@ export function RendezVousComptoir({
     queryKey: [...CLE_RENDEZ_VOUS, filtres],
     queryFn: () => lireRendezVous(filtres),
   });
+  function choisirPeriode(debut: string, fin: string): void {
+    setDu(debut);
+    setAu(fin);
+    setPage(1);
+  }
 
   if (liste.isError) {
     return <QueryErrorState error={liste.error} onRetry={() => void liste.refetch()} />;
@@ -144,30 +289,7 @@ export function RendezVousComptoir({
             setPage(1);
           }}
         />
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rdv-du">Du</Label>
-          <Input
-            id="rdv-du"
-            type="date"
-            value={du}
-            onChange={(e) => {
-              setDu(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rdv-au">Au</Label>
-          <Input
-            id="rdv-au"
-            type="date"
-            value={au}
-            onChange={(e) => {
-              setAu(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+        <PeriodeRendezVous today={today} du={du} au={au} onChange={choisirPeriode} />
         <Select
           items={VENUES}
           value={issue === '' ? 'tous' : issue}
@@ -207,8 +329,8 @@ export function RendezVousComptoir({
 
       {liste.data !== undefined && liste.data.items.length === 0 ? (
         <p className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          Aucun rendez-vous ici. Changez d’onglet, videz la recherche, ou revenez quand les
-          téléconseillers en auront pris.
+          Aucun rendez-vous ici. Choisissez « Toutes les dates », changez d’onglet ou videz la
+          recherche.
         </p>
       ) : null}
 
@@ -241,7 +363,7 @@ export function RendezVousComptoir({
                           href={`tel:${fiche.phoneE164}`}
                           className="font-mono text-xs text-primary"
                         >
-                          {fiche.phoneE164}
+                          {formatPhone(fiche.phoneE164)}
                         </a>
                       )}
                     </TableCell>
@@ -261,7 +383,11 @@ export function RendezVousComptoir({
                     </TableCell>
                     <TableCell>{fiche.prisPar}</TableCell>
                     <TableCell>
-                      <Suivi fiche={fiche} peutNoter={peutNoter} />
+                      <Suivi
+                        fiche={fiche}
+                        peutNoter={peutNoter}
+                        onEnregistrerVisite={peutEnregistrerVisite ? setVisiteDe : null}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -280,6 +406,13 @@ export function RendezVousComptoir({
           />
         </>
       ) : null}
+
+      <VisiteDuRendezVous
+        rendezVous={visiteDe}
+        onClose={() => {
+          setVisiteDe(null);
+        }}
+      />
     </div>
   );
 }
