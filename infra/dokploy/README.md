@@ -174,6 +174,28 @@ Depuis un terminal du conteneur `cpi-go`, **une seule fois** :
 Sans le seed, aucune saisie n'est possible : les banques, syndicats et
 départements sont des clés étrangères obligatoires.
 
+## Migrations d'index `CONCURRENTLY`
+
+`20260925230100` et `20260925230200` créent leurs index sans bloquer les
+écritures, mais le binaire migre avec `lock_timeout=5s`. Derrière une
+transaction longue (export, tirage de campagne : jusqu'à 120 s), l'attente
+dépasse ce délai : la migration échoue, le conteneur sort en 1 et Dokploy le
+relance jusqu'à ce que la base soit calme.
+
+- Déployer ces versions hors pointe, sans export en cours.
+- `20260925230100` retire d'abord les fiches en double dans un lot (la plus
+  petite position reste). Pour les compter avant, lancer
+  `tools/dev/audit-coherence.sql` sur une copie de la base.
+- En cas d'échec, le journal de démarrage nomme la migration. Un
+  `CONCURRENTLY` interrompu laisse un index `INVALID` : le supprimer avant de
+  relancer.
+
+```bash
+docker exec -i <postgres> psql -U crm -d crm -Atc \
+  'select indexrelid::regclass from pg_index where not indisvalid'
+docker exec -i <postgres> psql -U crm -d crm -c 'DROP INDEX CONCURRENTLY IF EXISTS public."<index>"'
+```
+
 ## Fichiers engendrés, jamais commités
 
 | Fichier              | Contenu                                     |
