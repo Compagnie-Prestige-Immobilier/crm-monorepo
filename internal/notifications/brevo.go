@@ -197,24 +197,14 @@ func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []tra
 
 func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
 	sort := trancheBrevo{destinataires: tranche}
-	adresses := brevoAdresses(tranche)
 	charge := corpsBrevo{
 		Sender:      map[string]string{"email": b.expediteur, notificationCleNom: b.nom},
-		To:          adresses,
 		Cc:          brevoAdresses(message.Copies),
 		Subject:     message.Sujet,
 		HTMLContent: message.HTML,
 		TextContent: message.Texte,
 	}
-	// Une copie serait reçue une fois par version : les versions l'excluent.
-	if message.UneVersionParDestinataire && len(message.Copies) == 0 && len(adresses) > 1 {
-		versions := make([]versionBrevo, len(adresses))
-		for i, adresse := range adresses {
-			versions[i] = versionBrevo{To: []map[string]string{adresse}}
-		}
-		charge.To = adresses[:1]
-		charge.MessageVersions = versions
-	}
+	charge.To, charge.MessageVersions = brevoDestinataires(message, brevoAdresses(tranche))
 	if message.PieceJointe != nil {
 		charge.Attachment = []map[string]string{{
 			"name": message.PieceJointe.Nom, "content": base64.StdEncoding.EncodeToString(message.PieceJointe.Contenu),
@@ -258,6 +248,18 @@ func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranc
 	sort.transitoire = reponse.StatusCode == http.StatusTooManyRequests ||
 		reponse.StatusCode >= http.StatusInternalServerError
 	return sort
+}
+
+// Une copie serait reçue une fois par version : les versions l'excluent.
+func brevoDestinataires(message *MessageBrevo, adresses []map[string]string) (to []map[string]string, versions []versionBrevo) {
+	if !message.UneVersionParDestinataire || len(message.Copies) > 0 || len(adresses) < 2 {
+		return adresses, nil
+	}
+	versions = make([]versionBrevo, len(adresses))
+	for i, adresse := range adresses {
+		versions[i] = versionBrevo{To: []map[string]string{adresse}}
+	}
+	return adresses[:1], versions
 }
 
 func brevoErreurReseau(sort trancheBrevo, err error) trancheBrevo {
