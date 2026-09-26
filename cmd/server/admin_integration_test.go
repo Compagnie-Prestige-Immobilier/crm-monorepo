@@ -581,10 +581,10 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 	telephone := adminTelephone()
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.GRAND_PUBLIC'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 
 	recu := &appelPlateformeRecu{}
 	plateforme := adminPlateformeGrandPublic(telephone, recu)
@@ -702,10 +702,10 @@ func TestAdminTirageEnrolementChuesDemandeRejeteeSansCompteEstNegative(t *testin
 	b := adminConnecte(t)
 	demandeID := uuid.NewString()
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 
 	plateforme := adminPlateformeChuesAdhesionRejetee(demandeID)
 	t.Cleanup(plateforme.Close)
@@ -770,10 +770,10 @@ func TestAdminTirageEnrolementChuesFluxEtPurge(t *testing.T) {
 	b := adminConnecte(t)
 	compteID, purgeID := uuid.NewString(), uuid.NewString()
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 	adminExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","chargeUtile","dernierTirageAt","updatedAt")
 		VALUES ($1,'CHUES',$2,'Purgé','Client','submitted','{"email":"purge@example.sn"}'::jsonb,now(),now())`, uuid.NewString(), purgeID)
 
