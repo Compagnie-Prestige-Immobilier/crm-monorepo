@@ -35,10 +35,7 @@ const LIBELLES: Record<string, string> = {
   adhesionObjet: 'Avis d’adhésion, objet',
   adhesionCorps: 'Avis d’adhésion, corps',
   destinatairesAdhesion: 'Avis d’adhésion, destinataires',
-  destinatairesEnrolement: 'Cellule enrôlement',
-  destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
-  destinatairesDirection: 'Direction',
   codificationProvenances: 'Règles de provenance',
 };
 
@@ -58,22 +55,12 @@ const INFOS: Record<string, string> = {
     'L’objet du courriel envoyé au prospect qui dépose une demande par le formulaire public.',
   accuseReceptionCorps:
     'Le corps de ce courriel d’accusé de réception, envoyé à l’adresse saisie dans le formulaire.',
-  destinatairesEnrolement:
-    'Reçoit une copie de chaque demande déposée par le formulaire public, pour la cellule enrôlement.',
-  destinatairesBpe: 'Reçoit une copie de chaque demande déposée, pour la cellule BPE.',
   destinatairesSupervision: 'Reçoit une copie de chaque demande déposée, pour les superviseurs.',
-  destinatairesDirection: 'Reçoit une copie de chaque demande déposée, pour la direction.',
   codificationProvenances:
     'Traduit la colonne de provenance d’un classeur importé en canal et projet. Une campagne absente d’ici fait refuser ses lignes.',
 };
 
-const LISTES = [
-  'destinatairesEnrolement',
-  'destinatairesBpe',
-  'destinatairesSupervision',
-  'destinatairesDirection',
-  'destinatairesAdhesion',
-] as const;
+const LISTES = ['destinatairesSupervision', 'destinatairesAdhesion'] as const;
 
 const CODIFICATION = 'codificationProvenances';
 

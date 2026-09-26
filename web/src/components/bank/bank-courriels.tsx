@@ -28,6 +28,7 @@ const VARIANTE_STATUT: Record<
   ENVOYE: 'secondary',
   REMIS: 'success',
   OUVERT: 'info',
+  EN_ATTENTE: 'secondary',
   ECHEC: 'destructive',
 };
 
