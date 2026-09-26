@@ -2,7 +2,13 @@ import type { ApiClient, components } from '@crm/api-client';
 import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import { flattenPage, toProspectQuery, type ProspectQuery } from '@/lib/api/query-params';
+import {
+  estTronque,
+  flattenPage,
+  toProspectQuery,
+  type ListeBornee,
+  type ProspectQuery,
+} from '@/lib/api/query-params';
 import type { OrigineFiche } from '@/lib/data/grand-public';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
@@ -203,11 +209,11 @@ export type ProspectCallAttempt = components['schemas']['ProspectCallAttempt'];
 export async function fetchProspectCallAttempts(
   id: string,
   client: ApiClient = getApiClient(),
-): Promise<ProspectCallAttempt[]> {
+): Promise<ListeBornee<ProspectCallAttempt>> {
   const payload = unwrap(
     await client.GET('/api/v1/prospects/{id}/call-attempts', { params: { path: { id } } }),
   );
-  return payload.items;
+  return { items: payload.items, tronque: estTronque(payload) };
 }
 
 export type ProspectParrainage = components['schemas']['ProspectParrainageDTO'];
@@ -392,13 +398,13 @@ export async function changeProspectSegment(
 export async function fetchProspectSegmentHistory(
   id: string,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
-): Promise<SegmentChangeRow[]> {
+): Promise<ListeBornee<SegmentChangeRow>> {
   const page = await callRelay<{ items: SegmentChangeRow[] }>(
     `/api/v1/prospects/${encodeURIComponent(id)}/segment-history`,
     { method: 'GET' },
     fetchImpl,
   );
-  return page.items;
+  return { items: page.items, tronque: estTronque(page) };
 }
 
 /** Une ligne du journal de la fiche : qui, quand, quoi, avec l'avant et l'après. */
@@ -415,13 +421,13 @@ export interface ProspectJournalEntry {
 export async function fetchProspectJournal(
   id: string,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
-): Promise<ProspectJournalEntry[]> {
+): Promise<ListeBornee<ProspectJournalEntry>> {
   const page = await callRelay<{ items: ProspectJournalEntry[] }>(
     `/api/v1/prospects/${encodeURIComponent(id)}/journal`,
     { method: 'GET' },
     fetchImpl,
   );
-  return page.items;
+  return { items: page.items, tronque: estTronque(page) };
 }
 
 export async function reassignProspects(
