@@ -14,3 +14,11 @@ export function classifySegment(input: {
   if (isChues) return isCbao ? 'BDD1' : 'BDD2';
   return isCbao ? 'BDD3' : 'BDD4';
 }
+
+/** Les quatre bases sans leur code : le syndicat, puis la banque. */
+export const SEGMENT_LISIBLE: Record<BddSegment, string> = {
+  BDD1: 'CHUES, CBAO',
+  BDD2: 'CHUES, autre banque',
+  BDD3: 'Autre syndicat, CBAO',
+  BDD4: 'Autre syndicat, autre banque',
+};

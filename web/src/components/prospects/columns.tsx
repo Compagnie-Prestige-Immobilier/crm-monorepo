@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
+import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,7 +26,6 @@ import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import {
   enrollmentMethodLabel,
   PROSPECT_STATUT_LABELS,
-  SEGMENT_LABELS,
   statutForProjet,
   type Projet,
   type ProspectRow,
@@ -110,8 +110,8 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
         return segment === null ? (
           <span className="text-muted-foreground">Aucun</span>
         ) : (
-          <Badge variant="outline" title={SEGMENT_LABELS[segment]}>
-            {segment}
+          <Badge variant="outline" title={segment}>
+            {SEGMENT_LISIBLE[segment]}
           </Badge>
         );
       },
