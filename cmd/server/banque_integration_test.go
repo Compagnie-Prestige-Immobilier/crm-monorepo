@@ -920,7 +920,8 @@ func TestBanqueInscriptionsAOuvrirSignalentLeurPlafond(t *testing.T) {
 		FROM generate_series(1, 2001) n`, s.banqueID)
 	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
 	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
-	if items, _ := body["items"].([]any); len(items) != 2000 || body["truncated"] != true {
+	items, _ := body["items"].([]any)
+	if tronquee, _ := body["truncated"].(bool); len(items) != 2000 || !tronquee {
 		t.Fatalf("2000 inscriptions et le plafond signalé attendus : %d, truncated=%v", len(items), body["truncated"])
 	}
 }

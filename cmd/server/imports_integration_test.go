@@ -1068,20 +1068,11 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	if phase != "METHOD_OBTAINED" || methode != "APPOINTMENT" || banqueLue != banque {
 		t.Fatalf("« Enrôlement sur place » relu : %s, %s, banque %s", phase, methode, banqueLue)
 	}
-	var refusees int
-	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]).Scan(&refusees); err != nil {
-		t.Fatal(err)
-	}
-	if refusees != 0 {
+	if refusees := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]); refusees != 0 {
 		t.Fatalf("les lignes refusées ne s'écrivent pas : %d fiches", refusees)
 	}
-	var exemples int
-	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = '+221771234567' AND "createdAt" >= $1`,
-		debut).Scan(&exemples); err != nil {
-		t.Fatal(err)
-	}
-	if exemples != 0 {
-		t.Fatalf("la ligne d'exemple a créé %d fiche(s)", exemples)
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = '+221771234567' AND "createdAt" >= $1`, debut); n != 0 {
+		t.Fatalf("la ligne d'exemple a créé %d fiche(s)", n)
 	}
 }
 
