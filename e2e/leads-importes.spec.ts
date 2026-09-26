@@ -62,11 +62,8 @@ test.afterAll(async () => {
 });
 
 test.describe('parcours 17, leads importes lus par la direction', () => {
-  test('la direction atterrit sur les leads, lit le classeur et ouvre la fiche', async ({
-    page,
-  }) => {
-    await page.goto('/');
-    await expect(page).toHaveURL(/\/teleconseil\/leads-importes$/u);
+  test('la direction lit le classeur et ouvre la fiche', async ({ page }) => {
+    await page.goto('/teleconseil/leads-importes');
 
     const classeur = page.getByRole('table').first().getByRole('row').filter({ hasText: FICHIER });
     await expect(classeur).toHaveCount(1);

@@ -111,7 +111,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionComptesAdministrer:       {domaineComptes, "Créer, modifier et désactiver les comptes", AdminSeul},
 	PermissionComptesLister:            {domaineComptes, "Lister les comptes", Encadrement},
 	PermissionRolesAdministrer:         {domaineComptes, "Créer les rôles et régler leurs permissions", AdminSeul},
-	PermissionExploitationAdministrer:  {"Exploitation", "Exploitation, journal et purge", AdminSeul},
+	PermissionExploitationAdministrer:  {"Exploitation", "Envois et tâches, journal des actions et suppression des données", AdminSeul},
 	PermissionCourrielsAdministrer:     {"Courriels", "Régler les courriels", AdminSeul},
 	PermissionEnrolementAdministrer:    {"Enrôlement", "Suivre et régler l'enrôlement", AdminSeul},
 	PermissionNotificationsAdministrer: {"Notifications", "Envoyer et régler les notifications", AdminSeul},

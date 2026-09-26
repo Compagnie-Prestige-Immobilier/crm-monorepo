@@ -145,7 +145,10 @@ test.describe('parcours 7, les listes CHUES', () => {
 
     await page.getByRole('link', { name: new RegExp(`CHUES ${cle}`) }).click();
     await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${prospectChues}$`));
-    await expect(page.getByRole('heading', { level: 2 })).toContainText(`CHUES ${cle}`);
+    await expect(page.getByRole('heading', { name: 'Fiche prospect', level: 1 })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toContainText(
+      `CHUES ${cle}`,
+    );
     await expect(page.getByRole('link', { name: 'Ouvrir la fiche du représentant' })).toBeVisible();
   });
 

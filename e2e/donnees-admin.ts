@@ -77,7 +77,7 @@ export async function doterPortefeuille(
 
 /** Dépôt d'un classeur sur `/admin/imports`, en simulation d'abord. */
 export async function deposerClasseur(page: Page, entite: string, chemin: string): Promise<void> {
-  await page.getByRole('combobox', { name: 'Entité à importer' }).click();
+  await page.getByRole('combobox', { name: 'Classeur à importer' }).click();
   await page.getByRole('option', { name: entite, exact: true }).click();
   await page.getByLabel(/Glissez le classeur ici/u).setInputFiles(chemin);
 }
