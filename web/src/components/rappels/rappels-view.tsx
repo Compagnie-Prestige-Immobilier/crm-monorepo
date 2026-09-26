@@ -1,18 +1,23 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { ClockIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
-import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
+import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { QueryErrorState } from '@/components/query-error-state';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
+import {
+  AnnulerRappel,
+  rendezVousFixe,
+  useAnnulationRappel,
+} from '@/components/rappels/rappel-pop-up-intrusif';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ListeCartes, NumeroAppel } from '@/components/ui/liste-cartes';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -27,7 +32,6 @@ import { useTriLocal } from '@/components/ui/tri-local';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   callbackKeys,
-  cancelCallback,
   fetchCallbacks,
   formatCallbackAt,
   formatDelay,
@@ -37,8 +41,8 @@ import {
 } from '@/lib/data/console';
 import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
-import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { matchesSearch } from '@/lib/search';
 import type { Projet } from '@/lib/types';
 import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
 
@@ -71,6 +75,39 @@ const SCOPES: readonly { value: CallbackScope; label: string }[] = [
   { value: 'week', label: 'Cette semaine' },
 ];
 
+interface FiltresRappels {
+  scope: CallbackScope;
+  projet: Projet | null;
+  teleconseiller: string | null;
+  search: string;
+  page: number;
+}
+
+/** L'onglet et les filtres vivent dans l'URL : revenir d'une consignation retombe au même endroit. */
+const FILTRES_RAPPELS: UrlFilterAdapter<FiltresRappels> = {
+  parse: (params) => {
+    const page = Number(params.get('page'));
+    const projet = params.get('projet');
+    return {
+      scope: SCOPES.find((tab) => tab.value === params.get('onglet'))?.value ?? 'overdue',
+      projet: projet === 'CHUES' || projet === 'GRAND_PUBLIC' ? projet : null,
+      teleconseiller: params.get('teleconseiller'),
+      search: params.get('search') ?? '',
+      page: Number.isInteger(page) && page > 1 ? page : 1,
+    };
+  },
+  serialize: (filtres) => {
+    const params = new URLSearchParams();
+    if (filtres.scope !== 'overdue') params.set('onglet', filtres.scope);
+    if (filtres.projet !== null) params.set('projet', filtres.projet);
+    if (filtres.teleconseiller !== null) params.set('teleconseiller', filtres.teleconseiller);
+    if (filtres.search !== '') params.set('search', filtres.search);
+    if (filtres.page > 1) params.set('page', String(filtres.page));
+    return params;
+  },
+  cleared: (filtres) => ({ ...filtres, projet: null, teleconseiller: null, search: '', page: 1 }),
+};
+
 const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> = {
   overdue: {
     title: 'Aucun rappel en retard',
@@ -90,15 +127,8 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
   },
 };
 
-function filterCallbackBySearch(cb: Callback, search: string): boolean {
-  if (search.trim() === '') return true;
-  const q = search.trim().toLowerCase();
-  return (
-    cb.prospectName.toLowerCase().includes(q) ||
-    (cb.phoneE164 ?? '').toLowerCase().includes(q) ||
-    (cb.comment ?? '').toLowerCase().includes(q)
-  );
-}
+const filterCallbackBySearch = (cb: Callback, search: string): boolean =>
+  matchesSearch(`${cb.prospectName} ${cb.phoneE164 ?? ''} ${cb.comment ?? ''}`, search);
 
 const COLONNES_RAPPELS = {
   prospect: (cb: Callback) => (cb.prospectName === '' ? cb.phoneE164 : cb.prospectName),
@@ -157,9 +187,48 @@ function RappelsTable({
       />
     );
   }
+  const serverTimeMs = Date.parse(list.data.serverTime);
+  const actions = (callback: Callback) => (
+    <>
+      <Link
+        href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+        className={buttonVariants({ variant: 'default', size: 'sm' })}
+      >
+        <PhoneCallIcon aria-hidden="true" />
+        Consigner l’appel
+      </Link>
+      {rendezVousFixe(callback) ? null : (
+        <AnnulerRappel
+          callback={callback}
+          pending={cancelPending}
+          onAnnuler={() => {
+            onCancel(callback);
+          }}
+        />
+      )}
+    </>
+  );
   return (
     <>
-      <Table>
+      <ListeCartes
+        items={tri.lignes}
+        libelle="Rappels promis"
+        cle={(callback) => callback.id}
+        titre={nomDuRappel}
+        sousTitre={(callback) => (
+          <>
+            <ProjetBadge projet={callback.projet} />
+            <time dateTime={callback.scheduledAt}>
+              {formatCallbackAt(callback.scheduledAt, serverTimeMs)}
+            </time>
+            <Retard callback={callback} serverTimeMs={serverTimeMs} />
+            {canFilter ? <span>{callback.assignedToName}</span> : null}
+          </>
+        )}
+        numero={(callback) => callback.phoneE164}
+        action={actions}
+      />
+      <Table containerClassName="hidden md:block">
         <TableHeader>
           <TableRow>
             <SortableTableHead
@@ -213,57 +282,30 @@ function RappelsTable({
                   href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
                   className="font-[600] underline-offset-4 hover:underline"
                 >
-                  {callback.prospectName === ''
-                    ? formatPhone(callback.phoneE164)
-                    : callback.prospectName}
+                  {nomDuRappel(callback)}
                 </Link>
-                <span className="block text-[0.8125rem] tabular-nums text-muted-foreground">
-                  {formatPhone(callback.phoneE164)}
-                </span>
+                <NumeroAppel
+                  phoneE164={callback.phoneE164}
+                  className="block w-fit text-[0.8125rem] text-muted-foreground"
+                />
               </TableCell>
               <TableCell>
                 <ProjetBadge projet={callback.projet} />
               </TableCell>
               <TableCell>
                 <time dateTime={callback.scheduledAt}>
-                  {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
+                  {formatCallbackAt(callback.scheduledAt, serverTimeMs)}
                 </time>
               </TableCell>
               <TableCell>
-                {callback.overdue ? (
-                  <Badge variant="destructive">
-                    {formatDelay(
-                      Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
-                    )}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">À venir</Badge>
-                )}
+                <Retard callback={callback} serverTimeMs={serverTimeMs} />
               </TableCell>
               <TableCell className="max-w-80 text-muted-foreground">
                 {callback.comment ?? ''}
               </TableCell>
               {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
               <TableCell>
-                <div className="flex justify-end gap-2">
-                  <Link
-                    href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                    className={buttonVariants({ variant: 'default', size: 'sm' })}
-                  >
-                    <PhoneCallIcon aria-hidden="true" />
-                    Consigner l’appel
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={cancelPending}
-                    onClick={() => {
-                      onCancel(callback);
-                    }}
-                  >
-                    Annuler
-                  </Button>
-                </div>
+                <div className="flex justify-end gap-2">{actions(callback)}</div>
               </TableCell>
             </TableRow>
           ))}
@@ -294,6 +336,18 @@ function RappelsTable({
         </div>
       ) : null}
     </>
+  );
+}
+
+const nomDuRappel = (callback: Callback): string =>
+  callback.prospectName === '' ? formatPhone(callback.phoneE164) : callback.prospectName;
+
+function Retard({ callback, serverTimeMs }: { callback: Callback; serverTimeMs: number }) {
+  if (!callback.overdue) return <Badge variant="secondary">À venir</Badge>;
+  return (
+    <Badge variant="destructive">
+      {formatDelay(serverTimeMs - Date.parse(callback.scheduledAt))}
+    </Badge>
   );
 }
 
@@ -344,7 +398,7 @@ function RappelsFilterControls({
         value={search}
         onChange={setSearch}
         placeholder="Nom, téléphone…"
-        className="w-64"
+        className="w-full sm:w-64"
       />
       <FilterCombobox
         label="Projet"
@@ -374,25 +428,9 @@ function RappelsFilterControls({
 
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const racine = '/teleconseil';
-  const queryClient = useQueryClient();
-  const [scope, setScope] = useState<CallbackScope>('overdue');
-  const [assignedToId, setAssignedToId] = useState<string | null>(null);
-  const [projet, setProjet] = useState<Projet | null>(null);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-
-  const choisirScope = (value: CallbackScope): void => {
-    setScope(value);
-    setPage(1);
-  };
-  const choisirProjet = (value: Projet | null): void => {
-    setProjet(value);
-    setPage(1);
-  };
-  const choisirTeleconseiller = (id: string | null): void => {
-    setAssignedToId(id);
-    setPage(1);
-  };
+  const { filters, setFilters } = useUrlFilters(FILTRES_RAPPELS);
+  const { scope, projet, search, page } = filters;
+  const assignedToId = canFilter ? filters.teleconseiller : null;
 
   const overdue = useQuery({
     queryKey: [...callbackKeys.list('overdue', assignedToId), projet, 1],
@@ -413,16 +451,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
     staleTime: 300_000,
   });
 
-  const cancel = useMutation({
-    mutationFn: (callback: Callback) => cancelCallback(callback.id),
-    onSuccess: () => {
-      toast.success('Rappel annulé.');
-      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
-    },
-    onError: (error) => {
-      toastApiError(error, 'Le rappel n’a pas été annulé.');
-    },
-  });
+  const cancel = useAnnulationRappel();
 
   const overdueCount = overdue.data?.total ?? 0;
 
@@ -439,20 +468,26 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
         <RappelsFilterControls
           search={search}
-          setSearch={setSearch}
+          setSearch={(value) => {
+            setFilters({ search: value });
+          }}
           projet={projet}
-          setProjet={choisirProjet}
+          setProjet={(value) => {
+            setFilters({ projet: value });
+          }}
           canFilter={canFilter}
           teleconseillers={teleconseillers.data?.items ?? []}
           assignedToId={assignedToId}
-          setAssignedToId={choisirTeleconseiller}
+          setAssignedToId={(id) => {
+            setFilters({ teleconseiller: id });
+          }}
         />
       </div>
 
       <Tabs
         value={scope}
         onValueChange={(value) => {
-          choisirScope(value as CallbackScope);
+          setFilters({ scope: value as CallbackScope });
         }}
         className="gap-6"
       >
@@ -476,10 +511,12 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 canFilter={canFilter}
                 racine={racine}
                 scope={scope}
-                onPage={setPage}
+                onPage={(value) => {
+                  setFilters({ page: value });
+                }}
                 cancelPending={cancel.isPending}
                 onCancel={(cb) => {
-                  cancel.mutate(cb);
+                  cancel.mutate(cb.id);
                 }}
               />
             ) : null}
