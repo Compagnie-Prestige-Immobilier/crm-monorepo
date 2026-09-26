@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"cpi-go/internal/prospects"
 	"cpi-go/internal/shared/database"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -972,4 +973,85 @@ func TestFormulairePublicSurFicheExistante(t *testing.T) {
 	if origine != "BANQUE" || accuses != 1 {
 		t.Fatalf("provenance %q, accusés journalisés %d : attendu BANQUE et un accusé", origine, accuses)
 	}
+}
+
+// Cinq numéros recommandés, quatre devenus fiches, trois convertis dont deux vendus :
+// l'un par son statut, l'autre par une vente saisie à son numéro.
+func TestParrainageSuiviJusquALaVente(t *testing.T) {
+	b := qualificationConnecte(t, "DIRECTION")
+	parrain := qualificationProspect(b)
+	tentative := uuid.NewString()
+	qualificationExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",now() FROM "call_outcome_reasons" WHERE "code" = 'PAS_DE_REPONSE'`, tentative, parrain, b.userID)
+	venduParTelephone := qualificationProspect(b)
+	venduParStatut := qualificationProspect(b)
+	convertie := qualificationProspect(b)
+	filleuls := []string{qualificationProspect(b), convertie, venduParTelephone, venduParStatut, ""}
+	qualificationExec(b, `UPDATE "prospects" SET "statut" = 'CONVERTI' WHERE "id" = $1`, convertie)
+	qualificationExec(b, `UPDATE "prospects" SET "statut" = 'VENDU' WHERE "id" = $1`, venduParStatut)
+	u := uuid.New()
+	national := fmt.Sprintf("77%07d", binary.BigEndian.Uint32(u[:4])%10000000)
+	qualificationExec(b, `UPDATE "prospects" SET "phoneE164" = $2 WHERE "id" = $1`, venduParTelephone, "+221"+national)
+	client := "CLIENT FILLEUL " + strings.ToUpper(b.userID[:8])
+	qualificationExec(b, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone", "site", "nombreLots",
+		"numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat", "partProprietaire", "partApporteur", "partCpi")
+		VALUES ('SAISIE', 0, 'CPI', $1, $2, 'THIEO', 1, '', '', 1, 1, 0, 1, 0, 0, 1)`, client, national[:2]+" "+national[2:5]+" "+national[5:7]+" "+national[7:])
+	suggestions := make([]string, 0, len(filleuls)+1)
+	for i, filleul := range append(filleuls, filleuls[0]) {
+		id, resolu, telephone := uuid.NewString(), &filleul, qualificationNumero()
+		if filleul == "" {
+			resolu = nil
+		} else {
+			_ = b.pool.QueryRow(b.ctx, `SELECT "phoneE164" FROM "prospects" WHERE "id" = $1`, filleul).Scan(&telephone)
+		}
+		qualificationExec(b, `INSERT INTO "prospect_suggestions" ("id","sourceProspectId","suggestedName","suggestedPhoneE164",
+			"suggestedById","sourceAttemptId","resolvedProspectId","clientCreatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,now())`,
+			id, parrain, fmt.Sprintf("Filleul %d", i), telephone, b.userID, tentative, resolu)
+		suggestions = append(suggestions, id)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "client" = $1`, client)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_suggestions" WHERE "id" = ANY($1)`, suggestions)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, tentative)
+	})
+	attendu := map[string]any{"recommandes": float64(5), "fiches": float64(4), "convertis": float64(3), "vendus": float64(2)}
+
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+parrain+"/parrainage", nil, nil)
+	b.attend(statut, http.StatusOK, "parrainage de la fiche", body)
+	if suivi, _ := body["suivi"].(map[string]any); !parrainageEgal(suivi, attendu) {
+		t.Fatalf("suivi %v, attendu %v", body["suivi"], attendu)
+	}
+	jour := time.Now().In(dakar(t)).Format(time.DateOnly)
+	statut, body = appelJSON(b, http.MethodGet, "/api/v1/parrainage/classement?du="+jour+"&au="+jour, nil, nil)
+	b.attend(statut, http.StatusOK, "classement du jour", body)
+	if ligne := parrainClasse(body, parrain); !parrainageEgal(ligne, attendu) || ligne["nom"] != "Awa Diop" {
+		t.Fatalf("classement du jour : %v", body)
+	}
+	statut, body = appelJSON(b, http.MethodGet, "/api/v1/parrainage/classement?du=2020-01-01&au=2020-01-31", nil, nil)
+	b.attend(statut, http.StatusOK, "classement d'une période sans recommandation", body)
+	if parrainClasse(body, parrain) != nil {
+		t.Fatalf("hors période : %v", body)
+	}
+	teleconseiller := qualificationConnecte(t, "COMMERCIAL")
+	statut, body = appelJSON(teleconseiller, http.MethodGet, "/api/v1/parrainage/classement", nil, nil)
+	teleconseiller.attend(statut, http.StatusForbidden, "classement réservé à l'encadrement", body)
+}
+
+func parrainClasse(body map[string]any, id string) map[string]any {
+	parrains, _ := body["parrains"].([]any)
+	for _, p := range parrains {
+		if ligne, _ := p.(map[string]any); ligne["id"] == id {
+			return ligne
+		}
+	}
+	return nil
+}
+
+func parrainageEgal(suivi, attendu map[string]any) bool {
+	for cle, valeur := range attendu {
+		if suivi[cle] != valeur {
+			return false
+		}
+	}
+	return true
 }
