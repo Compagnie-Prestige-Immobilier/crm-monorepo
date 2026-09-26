@@ -139,7 +139,7 @@ export function CalendrierRvSite({
                 aria-pressed={cle === jour}
                 aria-label={JOUR_LONG.format(date)}
                 className={cn(
-                  'h-9 rounded-md text-[0.875rem] tabular-nums',
+                  'h-9 rounded-md text-[0.875rem] tabular-nums pointer-coarse:h-11',
                   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                   ouvert ? 'bg-muted font-[600] hover:bg-muted/60' : 'text-muted-foreground/50',
                   cle === jour && 'bg-primary text-primary-foreground hover:bg-primary',
