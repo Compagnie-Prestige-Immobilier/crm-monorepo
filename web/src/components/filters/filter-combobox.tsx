@@ -117,7 +117,7 @@ export function FilterCombobox({
               On filtre nous-mêmes, sur le texte replié, et la liste reste
               intégralement présente tant que rien n'est tapé.
             */}
-            <Command shouldFilter={false}>
+            <Command id={listeId} shouldFilter={false}>
               <CommandInput
                 placeholder="Chercher…"
                 value={search}
@@ -127,7 +127,6 @@ export function FilterCombobox({
                 }}
               />
               <ComboboxList
-                id={listeId}
                 options={options}
                 value={value}
                 search={search}
@@ -167,7 +166,6 @@ export function FilterCombobox({
 }
 
 export function ComboboxList({
-  id,
   options,
   value,
   search,
@@ -177,7 +175,6 @@ export function ComboboxList({
   onClose,
   onCreate,
 }: {
-  id?: string | undefined;
   options: readonly FilterOption[];
   value: string | null;
   search: string;
@@ -188,7 +185,7 @@ export function ComboboxList({
   onCreate?: ((search: string) => void) | undefined;
 }) {
   return (
-    <CommandList id={id}>
+    <CommandList>
       <CommandEmpty>Aucun résultat.</CommandEmpty>
       <CommandGroup>
         <CommandItem
