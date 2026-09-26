@@ -694,10 +694,7 @@ type ProspectParametresChues struct {
 	AccuseReceptionCorps     string   `json:"accuseReceptionCorps"`
 	AdhesionObjet            string   `json:"adhesionObjet"`
 	AdhesionCorps            string   `json:"adhesionCorps"`
-	DestinatairesEnrolement  []string `json:"destinatairesEnrolement"`
-	DestinatairesBpe         []string `json:"destinatairesBpe"`
 	DestinatairesSupervision []string `json:"destinatairesSupervision"`
-	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	DestinatairesAdhesion    []string `json:"destinatairesAdhesion"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
 	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
@@ -724,10 +721,7 @@ var prospectParametresUsine = ProspectParametresChues{
 	AdhesionCorps: "Bonjour, {prenomNom} ({telephone}) a adhéré le {date}. " +
 		"Offre : {offre}. Paiement : {paiement}. Montant : {montant}. " +
 		"Conversion enregistrée par {teleconseiller}. CPI.",
-	DestinatairesEnrolement:  []string{},
-	DestinatairesBpe:         []string{},
 	DestinatairesSupervision: []string{},
-	DestinatairesDirection:   []string{},
 	CodificationProvenances:  []string{},
 	DestinatairesAdhesion:    []string{},
 }
@@ -743,10 +737,7 @@ const (
 	prospectCleAdhesionObjet = "adhesionObjet"
 	prospectCleAdhesionCorps = "adhesionCorps"
 	prospectCleAdhesionDest  = "destinatairesAdhesion"
-	prospectCleEnrolement    = "destinatairesEnrolement"
-	prospectCleBpe           = "destinatairesBpe"
 	prospectCleSupervision   = "destinatairesSupervision"
-	prospectCleDirection     = "destinatairesDirection"
 	prospectCleCodification  = "codificationProvenances"
 	prospectPrefixeParametre = "chues."
 )
@@ -759,8 +750,7 @@ var prospectClesParametres = []string{
 	prospectCleLienChues, prospectCleLienGP, prospectCleEmail, prospectCleWhatsapp,
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
 	prospectCleAdhesionObjet, prospectCleAdhesionCorps,
-	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleCodification, prospectCleAdhesionDest,
+	prospectCleSupervision, prospectCleCodification, prospectCleAdhesionDest,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -808,8 +798,7 @@ func (p *ProspectParametresChues) textes() map[string]*string {
 
 func (p *ProspectParametresChues) listes() map[string]*[]string {
 	return map[string]*[]string{
-		prospectCleEnrolement: &p.DestinatairesEnrolement, prospectCleBpe: &p.DestinatairesBpe,
-		prospectCleSupervision: &p.DestinatairesSupervision, prospectCleDirection: &p.DestinatairesDirection,
+		prospectCleSupervision:  &p.DestinatairesSupervision,
 		prospectCleCodification: &p.CodificationProvenances,
 		prospectCleAdhesionDest: &p.DestinatairesAdhesion,
 	}
@@ -885,10 +874,7 @@ type ProspectMajParametresInput struct {
 		AccuseReceptionCorps     *string   `json:"accuseReceptionCorps,omitempty" maxLength:"4000" required:"false"`
 		AdhesionObjet            *string   `json:"adhesionObjet,omitempty" maxLength:"200" required:"false"`
 		AdhesionCorps            *string   `json:"adhesionCorps,omitempty" maxLength:"4000" required:"false"`
-		DestinatairesEnrolement  *[]string `json:"destinatairesEnrolement,omitempty" maxItems:"50" required:"false"`
-		DestinatairesBpe         *[]string `json:"destinatairesBpe,omitempty" maxItems:"50" required:"false"`
 		DestinatairesSupervision *[]string `json:"destinatairesSupervision,omitempty" maxItems:"50" required:"false"`
-		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
 		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
 		DestinatairesAdhesion    *[]string `json:"destinatairesAdhesion,omitempty" maxItems:"50" required:"false"`
 	}
@@ -909,8 +895,7 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		}
 	}
 	listes := map[string]*[]string{
-		prospectCleEnrolement: in.Body.DestinatairesEnrolement, prospectCleBpe: in.Body.DestinatairesBpe,
-		prospectCleSupervision: in.Body.DestinatairesSupervision, prospectCleDirection: in.Body.DestinatairesDirection,
+		prospectCleSupervision:  in.Body.DestinatairesSupervision,
 		prospectCleCodification: in.Body.CodificationProvenances,
 		prospectCleAdhesionDest: in.Body.DestinatairesAdhesion,
 	}
