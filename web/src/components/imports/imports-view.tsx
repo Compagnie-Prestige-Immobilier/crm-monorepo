@@ -16,6 +16,8 @@ import {
 import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
+import { RegistreImportView } from '@/components/accueil/registre-import-view';
 import { EmptyState } from '@/components/empty-state';
 import { useFileDownload } from '@/components/exports/download-button';
 import { csvRows, downloadCsv } from '@/lib/csv';
@@ -61,7 +63,6 @@ import {
   IMPORT_KIND_LABELS,
   IMPORT_MAX_ROWS,
   IMPORT_TEMPLATES,
-  UPLOADABLE_IMPORT_KINDS,
   type ImportJob,
   type ImportJobReport,
   type ImportKind,
@@ -71,6 +72,7 @@ import { formatDateTime, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { peut } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 /** Aligné sur `IMPORTS_MAX_BYTES` de l'API : refuser ici évite un 413. */
@@ -78,9 +80,18 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-/** `items` est obligatoire sur le Select Base UI, sinon la gâchette montre la valeur brute. */
-const KIND_OPTIONS: readonly { value: UploadableImportKind; label: string }[] =
-  UPLOADABLE_IMPORT_KINDS.map((value) => ({ value, label: IMPORT_KIND_LABELS[value] }));
+/** La valeur lisible de `?entite=`, dans l'ordre de la liste déroulante. */
+const ENTITES_IMPORT = {
+  prospects: 'PROSPECTS',
+  'prospects-marketing': 'PROSPECTS_GRAND_PUBLIC',
+  representants: 'REPRESENTANTS',
+  visites: 'VISITES',
+  registre: 'VISITES_REGISTRE',
+} as const satisfies Record<string, ImportKind>;
+
+type EntiteImport = keyof typeof ENTITES_IMPORT;
+
+export const ENTITES = Object.keys(ENTITES_IMPORT) as EntiteImport[];
 
 const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
   PROSPECTS_GRAND_PUBLIC:
@@ -192,7 +203,6 @@ function errorsCaption(report: ImportJobReport): string {
 
 function UploadCard({
   kind,
-  onKindChange,
   inputRef,
   pending,
   templatePending,
@@ -200,7 +210,6 @@ function UploadCard({
   onFile,
 }: {
   kind: UploadableImportKind;
-  onKindChange: (next: UploadableImportKind) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   pending: boolean;
   templatePending: boolean;
@@ -210,7 +219,6 @@ function UploadCard({
   onFile: (candidate: File | null) => void;
 }) {
   const inputId = useId();
-  const selectId = useId();
   const [dragging, setDragging] = useState(false);
   const selectedTemplate = IMPORT_TEMPLATES[kind];
 
@@ -225,30 +233,6 @@ function UploadCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="flex min-w-56 flex-col gap-1.5">
-            <Label htmlFor={selectId}>Entité à importer</Label>
-            <Select
-              items={KIND_OPTIONS}
-              value={kind}
-              onValueChange={(next) => {
-                // Base UI rend `value | null` : un `null` remet à vide, et
-                // l'écran n'a pas d'état « aucune entité ».
-                if (next !== null) onKindChange(next);
-              }}
-            >
-              <SelectTrigger id={selectId}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {KIND_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {selectedTemplate === undefined ? null : (
             <Button
               type="button"
@@ -332,13 +316,55 @@ function UploadCard({
   );
 }
 
-export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: UploadableImportKind }) {
+export function ImportsView({
+  entite,
+  onEntiteChange,
+}: {
+  entite: EntiteImport;
+  onEntiteChange: (suivante: EntiteImport) => void;
+}) {
+  const selectId = useId();
+  const { data: user } = useQuery(meQueryOptions);
+  const options = ENTITES.filter(
+    (valeur) => valeur !== 'registre' || peut(user, 'accueil.listes'),
+  ).map((value) => ({ value, label: IMPORT_KIND_LABELS[ENTITES_IMPORT[value]] }));
+  const kind = ENTITES_IMPORT[entite];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex max-w-md flex-col gap-1.5">
+        <Label htmlFor={selectId}>Classeur à importer</Label>
+        {/* `items` est obligatoire sur le Select Base UI, sinon la gâchette montre la valeur brute. */}
+        <Select
+          items={options}
+          value={entite}
+          onValueChange={(suivante) => {
+            if (suivante !== null) onEntiteChange(suivante);
+          }}
+        >
+          <SelectTrigger id={selectId}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {kind === 'VISITES_REGISTRE' ? <RegistreImportView /> : <DepotClasseur kind={kind} />}
+    </div>
+  );
+}
+
+function DepotClasseur({ kind }: { kind: UploadableImportKind }) {
   const queryClient = useQueryClient();
   const live = useLive({ topic: 'imports' });
   const inputRef = useRef<HTMLInputElement>(null);
   const template = useFileDownload();
 
-  const [kind, setKind] = useState<UploadableImportKind>(initialKind);
   const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
@@ -413,7 +439,6 @@ export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: Uploa
     <div className="flex flex-col gap-6">
       <UploadCard
         kind={kind}
-        onKindChange={setKind}
         inputRef={inputRef}
         pending={deposit.isPending}
         templatePending={template.pending}
