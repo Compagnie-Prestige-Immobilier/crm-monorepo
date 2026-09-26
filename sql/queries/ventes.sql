@@ -174,3 +174,8 @@ WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuelle
     AND "id" > @apres::bigint
 ORDER BY "id"
 LIMIT @taille::bigint;
+
+-- name: LotsVendusParSite :many
+SELECT "site", SUM("nombreLots")::integer AS "lots" FROM "ventes"
+WHERE "archiveeLe" IS NULL AND "site" = ANY(@sites::text[]) AND "id" <> @exclue::bigint
+GROUP BY "site";
