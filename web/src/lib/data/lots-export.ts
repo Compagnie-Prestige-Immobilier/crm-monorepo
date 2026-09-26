@@ -2,6 +2,7 @@ import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 import { format, getISOWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
@@ -244,6 +245,8 @@ export interface Teleconseiller {
   role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION';
 }
 
+const COMPTES_PAR_ROLE = 200;
+
 export async function fetchTeleconseillers(
   client: ApiClient = getApiClient(),
 ): Promise<Teleconseiller[]> {
@@ -252,13 +255,20 @@ export async function fetchTeleconseillers(
       client.GET('/api/v1/users', {
         // Le maximum de l'API : au-dela d'une page, un teleconseiller actif
         // disparaissait sans un mot du choix d'equipe de la campagne.
-        params: { query: { role, isActive: 'true', pageSize: 200 } },
+        params: { query: { role, isActive: 'true', pageSize: COMPTES_PAR_ROLE } },
       }),
     ),
   );
 
-  return pages
-    .flatMap((page) => unwrap(page).items)
+  const comptes = pages.map((page) => unwrap(page));
+  if (comptes.some((page) => page.meta.total > page.items.length)) {
+    toast.warning(
+      `Seuls les ${String(COMPTES_PAR_ROLE)} premiers comptes actifs de chaque rôle sont proposés. Signalez-le à l’administrateur.`,
+      { id: 'plafond-teleconseillers' },
+    );
+  }
+  return comptes
+    .flatMap((page) => page.items)
     .map((user) => ({
       id: user.id,
       fullName: user.fullName,
