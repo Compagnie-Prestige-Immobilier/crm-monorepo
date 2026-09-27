@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ActionBarPrimitive,
   AssistantRuntimeProvider,
   AuiIf,
   ComposerPrimitive,
@@ -10,23 +11,21 @@ import {
   useAuiState,
   useLocalRuntime,
   type ChatModelAdapter,
+  type FeedbackAdapter,
   type ThreadMessage,
   type ToolCallMessagePartComponent,
 } from '@assistant-ui/react';
+import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpIcon } from 'lucide-react';
+import { ArrowUpIcon, SquareIcon, ThumbsUpIcon, ThumbsDownIcon } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 
 import { PucesQuestions } from '@/components/assistant/questions';
 import { ReponseRiche, type Echange } from '@/components/assistant/reponse-assistant';
 import { buttonVariants } from '@/components/ui/button';
-import {
-  CLE_SUGGESTIONS,
-  lireSuggestions,
-  poserQuestion,
-  texteErreurAssistant,
-  type ParametresAssistant,
-} from '@/lib/data/assistant';
+import { CLE_SUGGESTIONS, lireSuggestions } from '@/lib/data/assistant';
+
+import { CAPACITES_ASSISTANT, converser, envoyerRetour } from '@/lib/data/kairos';
 
 const APPARITION =
   'animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none';
@@ -36,33 +35,51 @@ function derniereQuestion(messages: readonly ThreadMessage[]): string {
   return partie?.type === 'text' ? partie.text.trim() : '';
 }
 
-// Chaque question de suivi renvoie les paramètres de la réponse précédente.
-function creerAdaptateur(): ChatModelAdapter {
-  let precedent: ParametresAssistant | undefined;
+function creerAdaptateur(conversation: string): ChatModelAdapter {
   return {
-    async run({ messages, abortSignal }) {
+    async *run({ messages, abortSignal }) {
       const question = derniereQuestion(messages);
-      try {
-        const reponse = await poserQuestion(question, precedent, abortSignal);
-        precedent = reponse.parametres;
-        const echange: Echange = { question, reponse };
-        return {
+      const historique = messages
+        .filter((message) => message.role === 'user' || message.role === 'assistant')
+        .slice(-40)
+        .map((message) => ({
+          role: message.role as 'user' | 'assistant',
+          texte: message.content
+            .filter((partie) => partie.type === 'text')
+            .map((partie) => partie.text)
+            .join('\n'),
+        }));
+      let texte = '';
+      let echange: Echange | undefined;
+      const flux = converser(conversation, historique, abortSignal);
+      for await (const evenement of flux) {
+        if (evenement.type === 'texte') texte += evenement.texte;
+        if (evenement.type === 'resultat' && evenement.nom === 'crm_interroger') {
+          echange = { question, reponse: evenement.resultat };
+        }
+        yield {
           content: [
-            { type: 'text', text: reponse.texte },
-            { type: 'data', name: 'reponse', data: echange },
+            { type: 'text' as const, text: texte },
+            ...(echange ? [{ type: 'data' as const, name: 'reponse', data: echange }] : []),
           ],
         };
-      } catch (error) {
-        if (abortSignal.aborted) throw error;
-        throw new Error(texteErreurAssistant(error), { cause: error });
       }
     },
   };
 }
 
 export function FournisseurAssistant({ children }: { children: ReactNode }) {
-  const adaptateur = useMemo(() => creerAdaptateur(), []);
-  const runtime = useLocalRuntime(adaptateur);
+  const conversation = useMemo(() => crypto.randomUUID(), []);
+  const adaptateur = useMemo(() => creerAdaptateur(conversation), [conversation]);
+  const feedback = useMemo<FeedbackAdapter>(
+    () => ({
+      async submit({ type }) {
+        await envoyerRetour(conversation, type === 'positive');
+      },
+    }),
+    [conversation],
+  );
+  const runtime = useLocalRuntime(adaptateur, { adapters: { feedback } });
   return <AssistantRuntimeProvider runtime={runtime}>{children}</AssistantRuntimeProvider>;
 }
 
@@ -102,6 +119,15 @@ function Texte({ text }: { text: string }) {
   return <p className="whitespace-pre-line">{text}</p>;
 }
 
+function TexteAssistant() {
+  return (
+    <MarkdownTextPrimitive
+      className="space-y-2 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto"
+      components={{ img: () => null }}
+    />
+  );
+}
+
 function MessageUtilisateur() {
   return (
     <MessagePrimitive.Root className={`flex justify-end ${APPARITION}`}>
@@ -120,7 +146,7 @@ function MessageAssistant({ outils }: { outils: Outils | undefined }) {
       <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2.5 text-[0.875rem] text-card-foreground has-[[data-riche]]:w-full">
         <MessagePrimitive.Parts
           components={{
-            Text: Texte,
+            Text: TexteAssistant,
             data: { by_name: { reponse: ReponseRiche } },
             tools: { by_name: outils ?? {} },
           }}
@@ -128,6 +154,20 @@ function MessageAssistant({ outils }: { outils: Outils | undefined }) {
         <AuiIf condition={(s) => s.message.status?.type === 'running'}>
           <Ecrit />
         </AuiIf>
+        <ActionBarPrimitive.Root hideWhenRunning autohide="not-last" className="mt-2 flex gap-1">
+          <ActionBarPrimitive.FeedbackPositive
+            aria-label="Réponse utile"
+            className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+          >
+            <ThumbsUpIcon aria-hidden="true" />
+          </ActionBarPrimitive.FeedbackPositive>
+          <ActionBarPrimitive.FeedbackNegative
+            aria-label="Réponse inutile"
+            className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+          >
+            <ThumbsDownIcon aria-hidden="true" />
+          </ActionBarPrimitive.FeedbackNegative>
+        </ActionBarPrimitive.Root>
         <MessagePrimitive.Error>
           <ErrorPrimitive.Root role="alert" className="text-destructive">
             <ErrorPrimitive.Message />
@@ -156,7 +196,10 @@ export function Conversation({
   exemple?: string;
 }) {
   return (
-    <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col bg-background">
+    <ThreadPrimitive.Root
+      data-voix={CAPACITES_ASSISTANT.voix ? 'active' : 'desactivee'}
+      className="flex h-full min-h-0 flex-col bg-background"
+    >
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         scrollToBottomOnInitialize={false}
@@ -173,12 +216,22 @@ export function Conversation({
               aria-label={consigne}
               className="max-h-32 min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-[0.9375rem] outline-none placeholder:text-muted-foreground"
             />
-            <ComposerPrimitive.Send
-              aria-label="Envoyer"
-              className={buttonVariants({ size: 'icon-sm', className: 'rounded-full' })}
-            >
-              <ArrowUpIcon aria-hidden="true" />
-            </ComposerPrimitive.Send>
+            <AuiIf condition={(s) => !s.thread.isRunning}>
+              <ComposerPrimitive.Send
+                aria-label="Envoyer"
+                className={buttonVariants({ size: 'icon-sm', className: 'rounded-full' })}
+              >
+                <ArrowUpIcon aria-hidden="true" />
+              </ComposerPrimitive.Send>
+            </AuiIf>
+            <AuiIf condition={(s) => s.thread.isRunning}>
+              <ComposerPrimitive.Cancel
+                aria-label="Arrêter la réponse"
+                className={buttonVariants({ size: 'icon-sm', className: 'rounded-full' })}
+              >
+                <SquareIcon aria-hidden="true" className="size-3 fill-current" />
+              </ComposerPrimitive.Cancel>
+            </AuiIf>
           </ComposerPrimitive.Root>
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
