@@ -84,7 +84,8 @@ func diffuserKairo(ctx context.Context, h huma.Context, u *socle.Utilisateur, in
 		return
 	}
 	defer func() { _ = reponse.Body.Close() }()
-	h.SetHeader("Content-Type", reponse.Header.Get("Content-Type"))
+	h.SetHeader("Content-Type", typeReponseKairo(chemin, reponse.StatusCode))
+	h.SetHeader("X-Content-Type-Options", "nosniff")
 	h.SetHeader("Cache-Control", "no-store")
 	h.SetHeader("X-Accel-Buffering", "no")
 	h.SetHeader("X-Kairos-Trace", reponse.Header.Get("X-Kairos-Trace"))
@@ -92,7 +93,21 @@ func diffuserKairo(ctx context.Context, h huma.Context, u *socle.Utilisateur, in
 	copierFluxKairo(w, reponse.Body, controle)
 }
 
-func copierFluxKairo(w http.ResponseWriter, corps io.Reader, controle *http.ResponseController) {
+func typeReponseKairo(chemin string, statut int) string {
+	if statut >= http.StatusBadRequest {
+		return "application/problem+json"
+	}
+	switch chemin {
+	case "/kairos-client.js":
+		return "text/javascript; charset=utf-8"
+	case "/v1/conversation":
+		return "text/event-stream"
+	default:
+		return "application/json"
+	}
+}
+
+func copierFluxKairo(w io.Writer, corps io.Reader, controle *http.ResponseController) {
 	tampon := make([]byte, 16<<10)
 	for {
 		n, err := corps.Read(tampon)
