@@ -23,10 +23,8 @@ import (
 
 func bancAssistant(t *testing.T, role string) *banc {
 	t.Helper()
-	// Un seul fournisseur déclaré, sans clé : aucun appel réseau ne part d'un
-	// test, même quand l'environnement du poste en porte une.
-	t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
-	t.Setenv("GROQ_API_KEY", "")
+	// Aucun appel réel ne part des tests sans serveur Kairos explicite.
+	t.Setenv("KAIRO_SDK_SECRET", "")
 	b := nouveauBanc(t, role)
 	statut, body := b.connexion(b.email, "motdepasse")
 	b.attend(statut, http.StatusOK, "connexion", body)
@@ -36,8 +34,7 @@ func bancAssistant(t *testing.T, role string) *banc {
 	return b
 }
 
-// Un fournisseur au format Groq qui répond par `repondre` et garde chaque
-// message reçu : ce qui part chez le fournisseur se lit après coup.
+// Le serveur Kairos de test conserve les entrées reçues avec une identité signée.
 type fauxFournisseur struct {
 	mu       sync.Mutex
 	recus    []string
@@ -48,22 +45,18 @@ func demarrerFauxFournisseur(t *testing.T, repondre func(entree map[string]any) 
 	t.Helper()
 	f := &fauxFournisseur{repondre: repondre}
 	serveur := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !verifierIdentiteKairo(t, r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		var requete struct {
-			Messages []struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			} `json:"messages"`
+			Entrees json.RawMessage `json:"entrees"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&requete); err != nil {
 			t.Error(err)
 			return
 		}
-		var brut string
-		for _, m := range requete.Messages {
-			if m.Role == "user" {
-				brut = m.Content
-			}
-		}
+		brut := string(requete.Entrees)
 		entree := map[string]any{}
 		_ = json.Unmarshal([]byte(brut), &entree)
 		f.mu.Lock()
@@ -71,7 +64,7 @@ func demarrerFauxFournisseur(t *testing.T, repondre func(entree map[string]any) 
 		repondre := f.repondre
 		f.mu.Unlock()
 		corps, err := json.Marshal(map[string]any{
-			"choices": []map[string]any{{"message": map[string]string{"content": repondre(entree)}}},
+			"resultat": repondre(entree), "modele": "groq/faux-modele",
 		})
 		if err != nil {
 			t.Error(err)
@@ -81,10 +74,10 @@ func demarrerFauxFournisseur(t *testing.T, repondre func(entree map[string]any) 
 		_, _ = w.Write(corps)
 	}))
 	t.Cleanup(serveur.Close)
-	t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
-	t.Setenv("GROQ_API_KEY", "jeton-essai")
-	t.Setenv("GROQ_URL", serveur.URL)
-	t.Setenv("GROQ_MODELS", "faux-modele")
+	t.Setenv("KAIRO_URL", serveur.URL)
+	t.Setenv("KAIRO_SDK_SECRET", "secret-essai")
+	t.Setenv("KAIRO_WORKSPACE_ID", "1")
+	t.Setenv("KAIRO_APPLICATION", "crm")
 	return f
 }
 
@@ -357,8 +350,8 @@ func TestAssistantJeuEvaluationFournisseurReel(t *testing.T) {
 	if os.Getenv("ASSISTANT_EVAL_REEL") != "1" {
 		t.Skip("ASSISTANT_EVAL_REEL=1 rejoue le jeu contre le fournisseur réel")
 	}
-	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GROQ_API_KEY") == "" {
-		t.Skip("aucune clé GEMINI_API_KEY ni GROQ_API_KEY")
+	if os.Getenv("KAIRO_SDK_SECRET") == "" {
+		t.Skip("KAIRO_SDK_SECRET absent")
 	}
 	jeu := lireJeuEvaluation(t)
 	b := nouveauBanc(t, "DIRECTION")
@@ -746,8 +739,7 @@ func telephoneAssistant() string {
 
 // Le compte rendu de 17 h dit ce qui a changé à partir des chiffres, sans modèle.
 func TestAssistantCompteRenduCeQuiAChange(t *testing.T) {
-	t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
-	t.Setenv("GROQ_API_KEY", "")
+	t.Setenv("KAIRO_SDK_SECRET", "")
 	b := nouveauBanc(t, "ADMIN")
 	campagne := b.semerCampagneARelancer()
 	corps := b.compteRenduDuJour()

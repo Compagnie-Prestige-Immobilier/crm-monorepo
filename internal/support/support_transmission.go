@@ -121,7 +121,7 @@ func (s *service) fixerTexteTransmis(ctx context.Context, sig *db.SupportSignale
 	for i, r := range rangees {
 		images[i] = socle.ImageIA{TypeMime: r.TypeMime, Contenu: r.Contenu}
 	}
-	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte}, sig.AuteurRoleLibelle, images)
+	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte}, &socle.Utilisateur{ID: sig.AuteurId, RoleLibelle: sig.AuteurRoleLibelle}, images)
 	lignes, err := s.Q.SupportTexteTransmisFixe(ctx, db.SupportTexteTransmisFixeParams{
 		ID: sig.ID, Jeton: jeton, Description: texte.Description, Contexte: texte.Contexte, ReformulePar: auteur,
 	})

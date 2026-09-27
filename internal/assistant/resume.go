@@ -103,7 +103,8 @@ func (s *service) resumer(ctx context.Context, in *ResumeInput) (*ResumeOutput, 
 		var redige struct {
 			Lignes []string `json:"lignes"`
 		}
-		auteur, err := socle.DemanderIA(ctxIA, socle.FournisseursAssistant, socle.FournisseursAssistantDefaut, consigneResume, faits, &redige)
+		utilisateur := socle.UtilisateurCourant(ctxIA)
+		auteur, err := socle.DemanderKairo(ctxIA, &utilisateur, "resume", consigneResume, faits, &redige, nil)
 		annuler()
 		if err == nil && redactionValide(redige.Lignes, &faits) {
 			memorise.lignes, memorise.auteur = avecParrain(redige.Lignes, faits.parrain), auteur

@@ -155,8 +155,8 @@ func (s *service) tableauKairo(ctx context.Context, in *TableauKairoInput) (*Tab
 	r := &out.Body.Reformulation
 	r.Active, r.Fournisseurs = reformulationActive(), []string{}
 	r.ParModele, r.Recentes = []UsageModele{}, []ReformulationRecente{}
-	for _, f := range fournisseursConfigures() {
-		r.Fournisseurs = append(r.Fournisseurs, f.Nom)
+	if socle.KairoConfigure() {
+		r.Fournisseurs = append(r.Fournisseurs, "Kairos")
 	}
 	for _, ligne := range parModele {
 		r.ParModele = append(r.ParModele, UsageModele{Modele: ligne.Modele, Nombre: ligne.Nombre})
