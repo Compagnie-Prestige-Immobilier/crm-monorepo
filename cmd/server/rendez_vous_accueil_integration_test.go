@@ -17,12 +17,32 @@ func contientFiche(body map[string]any, fiche string) bool {
 	})
 }
 
-// Deux rendez-vous posés par un téléconseiller, un par type, pour demain.
-func rendezVousPoses(t *testing.T) (teleconseiller *banc, fiches map[string]string) {
+// Le mardi ou le jeudi à 10h : créneau ouvert par les réglages RV site par
+// défaut (jours 2 et 4, 9h-20h), sans dépendre d'un autre test qui les change.
+func prochainCreneauRvSite() time.Time {
+	d := time.Now().UTC().AddDate(0, 0, 1)
+	for d.Weekday() != time.Tuesday && d.Weekday() != time.Thursday {
+		d = d.AddDate(0, 0, 1)
+	}
+	return time.Date(d.Year(), d.Month(), d.Day(), 10, 0, 0, 0, time.UTC)
+}
+
+// Deux rendez-vous posés par un téléconseiller, un par type, au même créneau.
+func rendezVousPoses(t *testing.T) (teleconseiller *banc, fiches map[string]string, quandRV time.Time) {
 	t.Helper()
 	t.Setenv("BETA_SUIVI_RENDEZ_VOUS", "true")
 	teleconseiller = qualificationConnecte(t, "COMMERCIAL")
-	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	quandRV = prochainCreneauRvSite()
+	quand := quandRV.Format(time.RFC3339)
+	var site, point string
+	if err := teleconseiller.pool.QueryRow(teleconseiller.ctx, `SELECT (SELECT "id" FROM "ventes_sites" WHERE "actif" LIMIT 1),
+		(SELECT "id" FROM "points_rencontre" WHERE "isActive" LIMIT 1)`).Scan(&site, &point); err != nil {
+		t.Fatal(err)
+	}
+	champsParMotif := map[string]map[string]any{
+		"RV_CPI":  {"reasonCode": "RV_CPI", "callbackAt": quand},
+		"RV_SITE": {"reasonCode": "RV_SITE", "callbackAt": quand, "siteId": site, "pointRencontreId": point},
+	}
 	fiches = map[string]string{}
 	for _, motif := range []string{"RV_CPI", "RV_SITE"} {
 		fiche := qualificationProspect(teleconseiller)
@@ -33,10 +53,10 @@ func rendezVousPoses(t *testing.T) (teleconseiller *banc, fiches map[string]stri
 			_, _ = teleconseiller.pool.Exec(teleconseiller.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
 		})
 		statut, body := qualificationEnvoi(teleconseiller, http.MethodPost, "/api/v1/phase2/call-attempts",
-			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": motif, "callbackAt": quand}))
+			qualificationCorpsTentative(fiche, champsParMotif[motif]))
 		teleconseiller.attend(statut, http.StatusOK, motif+" consigné", body)
 	}
-	return teleconseiller, fiches
+	return teleconseiller, fiches, quandRV
 }
 
 const listeRendezVous = "/api/v1/rendez-vous?pageSize=200"
@@ -44,7 +64,7 @@ const listeRendezVous = "/api/v1/rendez-vous?pageSize=200"
 // Le comptoir trie les rendez-vous par type : il reçoit ceux qui viennent à
 // l'agence, pas ceux qui se tiennent ailleurs.
 func TestRendezVousFiltresParType(t *testing.T) {
-	teleconseiller, fiches := rendezVousPoses(t)
+	teleconseiller, fiches, _ := rendezVousPoses(t)
 
 	// Sans la permission, le comptoir ne lit rien : le téléconseiller la teste
 	// pour tout le monde, lui qui vit pourtant dans les fiches.
@@ -73,7 +93,7 @@ func TestRendezVousFiltresParType(t *testing.T) {
 
 // La venue notée au comptoir sépare les filtres, et le classeur les emporte.
 func TestRendezVousVenuesEtClasseur(t *testing.T) {
-	teleconseiller, fiches := rendezVousPoses(t)
+	teleconseiller, fiches, quandRV := rendezVousPoses(t)
 	accueil := qualificationConnecte(t, "ACCUEIL")
 
 	statut, body := qualificationEnvoi(accueil, http.MethodPost,
@@ -93,7 +113,7 @@ func TestRendezVousVenuesEtClasseur(t *testing.T) {
 	}
 
 	// Le lendemain du rendez-vous ne le contient plus.
-	jour := time.Now().Add(24 * time.Hour)
+	jour := quandRV
 	statut, body = qualificationEnvoi(accueil, http.MethodGet,
 		listeRendezVous+"&du="+jour.Format("2006-01-02")+"&au="+jour.Format("2006-01-02"), nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous du jour", body)

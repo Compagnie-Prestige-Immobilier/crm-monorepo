@@ -15,10 +15,8 @@ import (
 
 func bancAssistant(t *testing.T, role string) *banc {
 	t.Helper()
-	// Un seul fournisseur déclaré, sans clé : aucun appel réseau ne part d'un
-	// test, même quand l'environnement du poste en porte une.
-	t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
-	t.Setenv("GROQ_API_KEY", "")
+	// Aucun appel Kairos réel dans les tests.
+	t.Setenv("KAIRO_SDK_SECRET", "")
 	b := nouveauBanc(t, role)
 	statut, body := b.connexion(b.email, "motdepasse")
 	b.attend(statut, http.StatusOK, "connexion", body)
@@ -74,7 +72,7 @@ func TestAssistantRefuseSansPermission(t *testing.T) {
 	b.attend(statut, http.StatusForbidden, "question sans permission", body)
 }
 
-// Sans clé Groq ni Gemini, l'écran doit dire quoi faire, pas planter.
+// Sans Kairos, l’écran indique comment rétablir le service.
 func TestAssistantSansFournisseur(t *testing.T) {
 	b := bancAssistant(t, "ADMIN")
 	statut, body := b.appel(http.MethodPost, "/api/v1/assistant/questions", map[string]string{"question": "combien d'appels hier ?"}, true)

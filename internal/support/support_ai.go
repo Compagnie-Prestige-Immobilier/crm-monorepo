@@ -3,8 +3,6 @@ package support
 import (
 	"context"
 	"cpi-go/internal/shared/socle"
-	"encoding/json"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -32,58 +30,31 @@ type texteTicket struct {
 	Contexte    string `json:"contexte"`
 }
 
-var errReformulationRejetee = errors.New("reformulation vide ou trop longue")
-
 // Rend toujours un texte transmissible : l'original, sans auteur, quand aucun modèle ne convient dans le délai.
-func reformuler(parent context.Context, original texteTicket, role string, images []socle.ImageIA) (texte texteTicket, auteur *string) {
+func reformuler(parent context.Context, original texteTicket, utilisateur *socle.Utilisateur, images []socle.ImageIA) (texte texteTicket, auteur *string) {
 	if !reformulationActive() {
 		return original, nil
 	}
-	entree, err := json.Marshal(struct {
+	entree := struct {
 		texteTicket
 		RoleAuteur string `json:"role_auteur,omitempty"`
-	}{texteTicket: original, RoleAuteur: role})
-	if err != nil {
-		return original, nil
-	}
+	}{texteTicket: original, RoleAuteur: utilisateur.RoleLibelle}
 	ctx, annuler := context.WithTimeout(parent, reformulationMax)
 	defer annuler()
-	for _, f := range fournisseursConfigures() {
-		for _, modele := range f.Modeles {
-			if ctx.Err() != nil {
-				slog.Warn("reformulation IA abandonnée, texte d'origine transmis", "err", ctx.Err())
-				return original, nil
-			}
-			propose, err := proposer(ctx, &f, modele, string(entree), images)
-			if err == nil {
-				if retenu, ok := texteRetenu(original, propose); ok {
-					retenuPar := f.Nom + "/" + modele
-					return retenu, &retenuPar
-				}
-				err = errReformulationRejetee
-			}
-			slog.Warn("modèle IA écarté", "fournisseur", f.Nom, "modele", modele, "err", err)
-		}
+	var propose texteTicket
+	modele, err := socle.DemanderKairo(ctx, utilisateur, "reformulation", consigneIA, entree, &propose, images)
+	if err != nil {
+		slog.Warn("reformulation indisponible, texte d'origine transmis", "err", err)
+		return original, nil
+	}
+	if retenu, ok := texteRetenu(original, propose); ok {
+		return retenu, &modele
 	}
 	return original, nil
 }
 
-func proposer(ctx context.Context, f *socle.FournisseurIA, modele, entree string, images []socle.ImageIA) (texteTicket, error) {
-	var propose texteTicket
-	brut, err := f.DemanderJSON(ctx, modele, consigneIA, entree, images)
-	if err != nil {
-		return propose, err
-	}
-	err = json.Unmarshal(brut, &propose)
-	return propose, err
-}
-
 func reformulationActive() bool {
 	return socle.Env("SUPPORT_AI_ENABLED", socle.Faux) == socle.Vrai
-}
-
-func fournisseursConfigures() []socle.FournisseurIA {
-	return socle.FournisseursIA("SUPPORT_AI_PROVIDERS", "gemini,groq,cerebras,openrouter")
 }
 
 func texteRetenu(original, propose texteTicket) (texteTicket, bool) {
