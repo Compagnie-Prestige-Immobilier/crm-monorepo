@@ -63,7 +63,7 @@ export function ScoreToggle({
       type="button"
       aria-expanded={open}
       onClick={onToggle}
-      className="flex w-full items-center gap-2 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="flex w-full items-center gap-2 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <ChevronRightIcon
         className={`size-4 shrink-0 text-muted-foreground transition-transform duration-(--dur-2) ease-(--ease-out-cpi) ${open ? 'rotate-90' : ''}`}

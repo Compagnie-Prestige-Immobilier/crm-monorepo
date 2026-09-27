@@ -1,6 +1,7 @@
 package socle
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -73,12 +74,15 @@ func LireConfig() (*Config, error) {
 		{"AUTH_LOGIN_RATE_LIMIT", 10, &cfg.LoginRate},
 		{"API_GLOBAL_RATE_LIMIT", 0, &cfg.GlobalRate},
 		{"PASSWORD_MIN_LENGTH", 8, &cfg.PasswordMin},
-		{"PASSWORD_MAX_LENGTH", 24, &cfg.PasswordMax},
+		{"PASSWORD_MAX_LENGTH", 128, &cfg.PasswordMax},
 	}
 	for _, e := range entiers {
 		if *e.cible, err = EnvInt(e.nom, e.defaut); err != nil {
 			return nil, err
 		}
+	}
+	if jours <= 0 {
+		return nil, errors.New("SESSION_TTL_DAYS doit être positif")
 	}
 	cfg.SessionTTL = time.Duration(jours) * 24 * time.Hour
 	return cfg, nil

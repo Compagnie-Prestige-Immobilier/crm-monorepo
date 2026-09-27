@@ -1,8 +1,25 @@
 -- name: SupprimerClasseursVentes :exec
 DELETE FROM "ventes_classeurs";
 
--- name: SupprimerVentesImportees :exec
-DELETE FROM "ventes" WHERE "origine" = 'IMPORT';
+-- name: SupprimerVersementsVentesImportees :many
+DELETE FROM "ventes_versements" vv USING "ventes" v
+WHERE vv."venteId" = v."id" AND v."origine" = 'IMPORT'
+RETURNING vv."venteId", vv."rang", vv."date", vv."montant";
+
+-- name: SupprimerVentesImportees :many
+DELETE FROM "ventes" WHERE "origine" = 'IMPORT' RETURNING *;
+
+-- Rien ne marque un versement saisi au panneau : seule sa trace au journal désigne la vente qui en a reçu.
+-- name: VentesAuxVersementsAbsentsDuClasseur :many
+SELECT DISTINCT v."numero" FROM "ventes" v
+INNER JOIN "ventes_versements" vv ON vv."venteId" = v."id"
+WHERE v."origine" = 'IMPORT'
+    AND EXISTS (SELECT 1 FROM "audit_logs" a
+        WHERE a."entity" = 'vente' AND a."entityId" = v."id"::text AND a."action" = 'vente.versement_ajouter')
+    AND NOT EXISTS (SELECT 1 FROM generate_subscripts(@numeros::int[], 1) AS i
+        WHERE (@numeros::int[])[i] = v."numero" AND (@dates::date[])[i] = vv."date" AND (@montants::bigint[])[i] = vv."montant")
+ORDER BY v."numero"
+LIMIT 20;
 
 -- name: InsererClasseurVentes :exec
 INSERT INTO "ventes_classeurs" ("id", "nomFichier", "contenu", "depuis", "importeParId")
@@ -14,6 +31,10 @@ INSERT INTO "ventes" ("classeurId", "origine", "numero", "canal", "dateSouscript
     "reliquat", "partProprietaire", "partApporteur", "partCpi")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING "id";
+
+-- Deux saisies simultanées liraient sinon le même MAX("numero").
+-- name: VerrouNumerotationVentes :exec
+SELECT pg_advisory_xact_lock(hashtext('ventes.numero'));
 
 -- name: ProchainNumeroVente :one
 SELECT COALESCE(MAX("numero"), 0)::integer + 1 AS "numero" FROM "ventes";
@@ -64,10 +85,15 @@ FROM "ventes_versements" WHERE "venteId" = $1;
 SELECT COALESCE(SUM("montant"), 0)::bigint AS "total"
 FROM "ventes_versements" WHERE "venteId" = $1;
 
--- name: ModifierReliquatVente :exec
-UPDATE "ventes"
-SET "reliquat" = $2
-WHERE "id" = $1 AND "archiveeLe" IS NULL;
+-- name: VenteVerrouillee :one
+SELECT * FROM "ventes" WHERE "id" = $1 FOR UPDATE;
+
+-- name: RecalculerReliquatVente :one
+UPDATE "ventes" v
+SET "reliquat" = v."prixTotal" - v."acompte"
+    - (SELECT COALESCE(SUM(vv."montant"), 0) FROM "ventes_versements" vv WHERE vv."venteId" = v."id")
+WHERE v."id" = $1 AND v."archiveeLe" IS NULL
+RETURNING v."reliquat";
 
 -- name: ClasseurVentes :one
 SELECT c."id", c."nomFichier", c."depuis", c."importeLe", u."fullName" AS "importePar"
@@ -78,13 +104,15 @@ INNER JOIN "users" u ON u."id" = c."importeParId";
 SELECT "nomFichier", "contenu" FROM "ventes_classeurs";
 
 -- name: ListerVentes :many
-SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL ORDER BY "dateSouscription", "numero";
+SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL
+ORDER BY "dateSouscription" DESC NULLS LAST, "numero" DESC, "id" DESC
+LIMIT @limite;
 
 -- name: VenteParID :one
 SELECT * FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ListerVersementsVentes :many
-SELECT * FROM "ventes_versements" ORDER BY "venteId", "rang";
+SELECT * FROM "ventes_versements" WHERE "venteId" = ANY(@ventes::bigint[]) ORDER BY "venteId", "rang";
 
 -- name: ListerSitesVentes :many
 SELECT * FROM "ventes_sites" ORDER BY "ordre", "nom";
@@ -110,6 +138,9 @@ SET "nom" = $2, "ordre" = $3, "totalLots" = $4, "superficieDefaut" = $5,
 WHERE "id" = $1
 RETURNING *;
 
+-- name: RenommerSiteDesVentes :exec
+UPDATE "ventes" SET "site" = @nouveau::text WHERE "site" = @ancien::text;
+
 -- name: ActiverSiteVente :one
 UPDATE "ventes_sites" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1
@@ -128,13 +159,25 @@ INSERT INTO "ventes_canaux" ("libelle", "ordre") VALUES ($1, $2) RETURNING *;
 UPDATE "ventes_canaux" SET "libelle" = $2, "ordre" = $3, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
 
+-- name: RenommerCanalDesVentes :exec
+UPDATE "ventes" SET "canal" = @nouveau::text WHERE "canal" = @ancien::text;
+
 -- name: ActiverCanalVente :one
 UPDATE "ventes_canaux" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
 
 -- name: EcheancesVentesACredit :many
-SELECT "client", "telephone", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement"
-FROM "ventes"
+SELECT v."id", v."numero", v."client", v."telephone", v."site", v."prixTotal", v."acompte",
+    v."nombreEcheances", v."periodiciteMois", v."jourVersement", v."premierVersement",
+    (SELECT COALESCE(SUM(vv."montant"), 0) FROM "ventes_versements" vv WHERE vv."venteId" = v."id")::bigint AS "verse"
+FROM "ventes" v
 WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuellement"
     AND "reliquat" > 0 AND "jourVersement" IS NOT NULL AND "premierVersement" IS NOT NULL
-ORDER BY "client";
+    AND "id" > @apres::bigint
+ORDER BY "id"
+LIMIT @taille::bigint;
+
+-- name: LotsVendusParSite :many
+SELECT "site", SUM("nombreLots")::integer AS "lots" FROM "ventes"
+WHERE "archiveeLe" IS NULL AND "site" = ANY(@sites::text[]) AND "id" <> @exclue::bigint
+GROUP BY "site";

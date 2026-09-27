@@ -1,38 +1,60 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LoaderIcon, MoreHorizontalIcon } from 'lucide-react';
+import { LoaderIcon, SearchIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
 import { AIDE_PERMISSIONS } from '@/components/commerciaux/permissions-aide';
-import { RoleDialog } from '@/components/commerciaux/role-dialog';
+import { EnteteRole } from '@/components/commerciaux/role-entete';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InfoPopover } from '@/components/ui/info-popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  deleteRole,
-  type PermissionCatalogue,
-  replacePermissions,
-  type RoleCompte,
-} from '@/lib/data/roles';
+import { Input } from '@/components/ui/input';
+import { type PermissionCatalogue, replacePermissions, type RoleCompte } from '@/lib/data/roles';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { type Permission, ROLE_LABELS } from '@/lib/types';
+import type { Permission } from '@/lib/types';
 
 /** ADMIN garde toujours de quoi réparer : le serveur refuse de les lui retirer. */
 const VERROUILLEES_ADMIN = ['comptes.administrer', 'roles.administrer'];
 
+/** Les domaines du serveur, rangés en familles pour l'écran seulement. */
+const FAMILLES: [string, string[]][] = [
+  [
+    'Téléconseil et fiches',
+    ['Fiches', 'Qualification', 'Portefeuille', 'Campagnes', 'Rendez-vous'],
+  ],
+  ['Chiffres et exports', ['Chiffres', 'Exports', 'Assistant']],
+  ['Banque & Finance, ventes et enrôlement', ['Banque & Finance', 'Ventes', 'Enrôlement']],
+  ['Accueil', ['Accueil']],
+  ['Comptes et accès', ['Panneau', 'Comptes', 'Données', 'Support']],
+  [
+    'Administration',
+    [
+      'Imports',
+      'Référentiels',
+      'Formulaires',
+      'Courriels',
+      'Notifications',
+      'Paramètres',
+      'Exploitation',
+      'Bases',
+    ],
+  ],
+];
+const AUTRES = 'Autres';
+
+const familleDe = (domaine: string): string =>
+  FAMILLES.find(([, domaines]) => domaines.includes(domaine))?.[0] ?? AUTRES;
+
 const memes = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((p) => b.includes(p));
+
+const sansAccents = (texte: string): string =>
+  texte.normalize('NFD').replaceAll(/\p{M}/gu, '').toLowerCase();
 
 function parDefaut(
   role: RoleCompte,
@@ -43,6 +65,12 @@ function parDefaut(
     return catalogue.filter((p) => p.parDefaut.includes(role.roleDeBase)).map((p) => p.permission);
   }
   return roles.find((r) => r.id === role.roleDeBase)?.permissions ?? [];
+}
+
+function correspond(permission: PermissionCatalogue, recherche: string): boolean {
+  if (recherche === '') return true;
+  const aide = AIDE_PERMISSIONS[permission.permission as Permission] ?? '';
+  return sansAccents(`${permission.libelle} ${permission.domaine} ${aide}`).includes(recherche);
 }
 
 export function EditeurRole({
@@ -61,6 +89,8 @@ export function EditeurRole({
   const queryClient = useQueryClient();
   const [brouillon, setBrouillon] = useState<string[]>(role.permissions);
   const [confirmation, setConfirmation] = useState(false);
+  const [recherche, setRecherche] = useState('');
+  const [ecartsSeuls, setEcartsSeuls] = useState(false);
 
   const enregistrer = useMutation({
     mutationFn: () => replacePermissions(role.id, brouillon),
@@ -76,7 +106,15 @@ export function EditeurRole({
     },
   });
 
-  const domaines = [...new Set(catalogue.map((p) => p.domaine))];
+  const defaut = parDefaut(role, roles, catalogue);
+  const ecart = (p: string): boolean => brouillon.includes(p) !== defaut.includes(p);
+  const cle = sansAccents(recherche.trim());
+  const visibles = catalogue.filter(
+    (p) => correspond(p, cle) && (!ecartsSeuls || ecart(p.permission)),
+  );
+  const familles = [...FAMILLES.map(([nom]) => nom), AUTRES]
+    .map((nom) => ({ nom, permissions: visibles.filter((p) => familleDe(p.domaine) === nom) }))
+    .filter((famille) => famille.permissions.length > 0);
   const modifie = !memes(brouillon, role.permissions);
   const basculer = (permission: string, coche: boolean): void => {
     setBrouillon((courant) =>
@@ -88,24 +126,59 @@ export function EditeurRole({
     <section aria-label={`Permissions de ${role.libelle}`} className="flex flex-col gap-4">
       <EnteteRole role={role} roles={roles} onSupprime={onSupprime} />
 
-      {domaines.map((domaine) => (
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative w-full max-w-sm">
+          <SearchIcon
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            aria-label="Chercher une permission"
+            placeholder="Chercher une permission"
+            className="pl-9"
+            value={recherche}
+            onChange={(event) => {
+              setRecherche(event.target.value);
+            }}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-[0.875rem]">
+          <input
+            type="checkbox"
+            className="size-4"
+            checked={ecartsSeuls}
+            onChange={(event) => {
+              setEcartsSeuls(event.target.checked);
+            }}
+          />
+          N’afficher que les écarts avec le rôle de base
+        </label>
+      </div>
+
+      {familles.length === 0 ? (
+        <p className="rounded-lg border border-border bg-card p-4 text-[0.875rem] text-muted-foreground">
+          Aucune permission ne correspond. Effacez la recherche ou décochez le filtre des écarts.
+        </p>
+      ) : null}
+
+      {familles.map((famille) => (
         <fieldset
-          key={domaine}
+          key={famille.nom}
           className="rounded-lg border border-border bg-card p-4 shadow-elev-sm"
         >
-          <legend className="px-1 text-[0.875rem] font-[600]">{domaine}</legend>
-          <ul className="flex flex-col">
-            {catalogue
-              .filter((p) => p.domaine === domaine)
-              .map((p) => (
-                <LignePermission
-                  key={p.permission}
-                  permission={p}
-                  role={role}
-                  coche={brouillon.includes(p.permission)}
-                  onChange={basculer}
-                />
-              ))}
+          <legend className="px-1 text-[0.875rem] font-[600]">{famille.nom}</legend>
+          <ul className="grid gap-x-6 lg:grid-cols-2">
+            {famille.permissions.map((p) => (
+              <LignePermission
+                key={p.permission}
+                permission={p}
+                role={role}
+                coche={brouillon.includes(p.permission)}
+                ecart={ecart(p.permission)}
+                onChange={basculer}
+              />
+            ))}
           </ul>
         </fieldset>
       ))}
@@ -114,7 +187,7 @@ export function EditeurRole({
         <Button
           variant="ghost"
           onClick={() => {
-            setBrouillon(parDefaut(role, roles, catalogue));
+            setBrouillon(defaut);
           }}
         >
           Rétablir les valeurs par défaut
@@ -162,18 +235,19 @@ function LignePermission({
   permission,
   role,
   coche,
+  ecart,
   onChange,
 }: {
   permission: PermissionCatalogue;
   role: RoleCompte;
   coche: boolean;
+  ecart: boolean;
   onChange: (permission: string, coche: boolean) => void;
 }) {
   const verrouillee = role.id === 'ADMIN' && VERROUILLEES_ADMIN.includes(permission.permission);
-  const ecart = role.systeme && coche !== permission.parDefaut.includes(role.roleDeBase);
 
   return (
-    <li className="flex min-h-11 items-center gap-3 border-b border-border py-1 last:border-b-0">
+    <li className="flex min-h-11 items-center gap-3 border-b border-border py-1">
       <input
         type="checkbox"
         className="size-4"
@@ -193,100 +267,5 @@ function LignePermission({
       </span>
       {ecart ? <Badge variant="outline">modifié</Badge> : null}
     </li>
-  );
-}
-
-function EnteteRole({
-  role,
-  roles,
-  onSupprime,
-}: {
-  role: RoleCompte;
-  roles: RoleCompte[];
-  onSupprime: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [edition, setEdition] = useState(false);
-  const [suppression, setSuppression] = useState(false);
-  const supprimer = useMutation({
-    mutationFn: () => deleteRole(role.id),
-    onSuccess: () => {
-      setSuppression(false);
-      toast.success(`Rôle ${role.libelle} supprimé.`);
-      onSupprime();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.roles });
-    },
-    onError: (error) => {
-      setSuppression(false);
-      toastApiError(error, 'Suppression impossible. Réessayez.');
-    },
-  });
-
-  return (
-    <header className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 className="flex items-center gap-2 text-[1.125rem] font-[600]">
-          {role.libelle}
-          <Badge variant="secondary">
-            {role.systeme ? 'système' : `base : ${ROLE_LABELS[role.roleDeBase]}`}
-          </Badge>
-        </h2>
-        {role.systeme ? null : (
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Les notifications, la page d’accueil et les files de rappels suivent le rôle de base.
-          </p>
-        )}
-      </div>
-      {role.systeme ? null : (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label={`Actions pour ${role.libelle}`} />
-            }
-          >
-            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
-            <DropdownMenuItem
-              onClick={() => {
-                setEdition(true);
-              }}
-            >
-              Renommer ou changer la base
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={role.comptes > 0}
-              onClick={() => {
-                setSuppression(true);
-              }}
-            >
-              {role.comptes > 0
-                ? `Retirez d’abord les ${String(role.comptes)} comptes`
-                : 'Supprimer le rôle'}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      <RoleDialog
-        key={String(edition)}
-        open={edition}
-        onOpenChange={setEdition}
-        role={role}
-        roles={roles}
-        onSaved={() => undefined}
-      />
-      <ConfirmDialog
-        open={suppression}
-        onOpenChange={setSuppression}
-        title={`Supprimer le rôle ${role.libelle} ?`}
-        description="Le rôle et ses permissions disparaissent. Aucun compte ne le porte."
-        confirmLabel="Supprimer le rôle"
-        pending={supprimer.isPending}
-        onConfirm={() => {
-          supprimer.mutate();
-        }}
-      />
-    </header>
   );
 }

@@ -7,7 +7,9 @@ import (
 	"cpi-go/internal/shared/socle"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -254,6 +256,96 @@ func TestBaseDemoSupprimeeLaisseLaBasePubliqueIntacte(t *testing.T) {
 	}
 	statut, body = appelJSON(b, http.MethodGet, "/api/v1/auth/me", nil, nil)
 	b.attend(statut, http.StatusOK, "la session publique survit à la suppression", body)
+}
+
+// Les intégrations lisent l'environnement du processus sans regarder la base servie.
+func TestBaseDemoNAtteintAucunServiceExterne(t *testing.T) {
+	var appels int32
+	faux := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&appels, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(faux.Close)
+
+	t.Setenv("KAIRO_URL", faux.URL)
+	t.Setenv("KAIRO_ADMIN_TOKEN", "jeton-essai")
+	t.Setenv("GLPI_URL", faux.URL)
+	t.Setenv("GLPI_APP_TOKEN", "jeton-essai")
+	t.Setenv("GLPI_USER_TOKEN", "jeton-essai")
+	t.Setenv("PLATEFORME_CHUES_URL", faux.URL)
+	t.Setenv("PLATEFORME_CHUES_TOKEN", "jeton-essai")
+	t.Setenv("PLATEFORME_WEBHOOK_SECRET", "secret-essai")
+	t.Setenv("IMPORT_LEADS_URL", faux.URL)
+
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	d := creerBaseDemo(b, "externes")
+	connexionDansBase(b, d)
+
+	appelsInterdits := []struct {
+		methode, chemin string
+		corps           any
+	}{
+		{http.MethodPost, "/api/v1/admin/kairo/pause", nil},
+		{http.MethodPost, "/api/v1/support/tickets", map[string]any{"sujet": "essai", "message": "essai"}},
+		{http.MethodPost, "/api/v1/enrolement/CHUES/tirage", nil},
+		{http.MethodGet, "/api/v1/support/categories", nil},
+		{http.MethodPost, "/api/v1/imports/rattraper-feuilles", nil},
+		{http.MethodPost, "/api/v1/webhooks/enrolement/chues?secret=secret-essai", nil},
+	}
+	for _, appel := range appelsInterdits {
+		statut, body := appelJSON(b, appel.methode, appel.chemin, appel.corps, nil)
+		if statut != http.StatusForbidden {
+			t.Fatalf("%s %s depuis une base de démonstration : 403 attendu, %d reçu %v", appel.methode, appel.chemin, statut, body)
+		}
+		if code, _ := body["code"].(string); code != "BASE_DEMO" {
+			t.Fatalf("%s %s : code BASE_DEMO attendu, reçu %v", appel.methode, appel.chemin, body)
+		}
+	}
+	if n := atomic.LoadInt32(&appels); n != 0 {
+		t.Fatalf("le faux service a reçu %d appel(s) depuis une base de démonstration", n)
+	}
+}
+
+// Les bases de démonstration existantes gardent `admin@cpi.sn` : le profil ne doit plus l'ouvrir.
+func TestBaseDemoRefuseLeProfilAdmin(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	d := creerBaseDemo(b, "profil-admin")
+	condensat, err := database.HacherMotDePasse(uuid.NewString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	execDansBase(b, d.baseSQL,
+		`INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","updatedAt")
+		 VALUES ($1,'admin@cpi.sn','admin',$2,'Administrateur CPI','ADMIN',now())`,
+		uuid.NewString(), condensat)
+	basculer(b, d.nom)
+
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/auth/demo-login", map[string]any{"role": "ADMIN"}, nil)
+	if statut != http.StatusBadRequest {
+		t.Fatalf("demo-login ADMIN : 400 attendu, %d reçu %v", statut, body)
+	}
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/auth/demo-login", map[string]any{"role": "SUPERVISEUR"}, nil)
+	b.attend(statut, http.StatusOK, "profil de démonstration existant", body)
+}
+
+func TestBaseDemoSansMotDePasseDesFixtures(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	t.Setenv("SEED_FIXTURE_PASSWORD", "")
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = 'sans-fixtures'`)
+		_ = detruireBaseSQL(b.ctx, b.dsn, prefixeBaseSQL+"sans_fixtures")
+	})
+
+	statut, body := appelJSON(b, http.MethodPost, cheminBases, map[string]any{"nom": "sans-fixtures"}, nil)
+	if statut != http.StatusServiceUnavailable {
+		t.Fatalf("création sans SEED_FIXTURE_PASSWORD : 503 attendu, %d reçu %v", statut, body)
+	}
+	if code, _ := body["code"].(string); code != "SEED_FIXTURE_PASSWORD_MANQUANT" {
+		t.Fatalf("code SEED_FIXTURE_PASSWORD_MANQUANT attendu, reçu %v", body)
+	}
 }
 
 func basePublique(t *testing.T, b *banc) string {

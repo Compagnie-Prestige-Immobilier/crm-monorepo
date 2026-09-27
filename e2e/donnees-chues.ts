@@ -159,7 +159,6 @@ export const listeDeLaQuestion = (page: Page, question: string): Locator =>
 export async function ouvrirFicheDepuisAnnuaire(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByLabel('Qui avez-vous appelé ?').fill(fiche.nom);
   await page.getByRole('button', { name: fiche.nom }).click();
-  await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await expect(page.getByRole('heading', { name: fiche.nom, level: 2 })).toBeVisible();
 }
 

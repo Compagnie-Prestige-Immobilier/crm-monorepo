@@ -394,6 +394,16 @@ export function BankCaseDetailView({
   );
 }
 
+// Un rejet porte 0 FCFA côté serveur : l'afficher laisserait croire à un encaissement nul.
+function MontantTransition({ transition }: { transition: BankCaseTransition }) {
+  if (transition.amountXof === null || transition.rejectionReason !== null) return null;
+  return (
+    <p className="mt-1 text-[0.875rem] tabular-nums">
+      Montant : <span className="font-[600]">{formatXof(transition.amountXof)}</span>
+    </p>
+  );
+}
+
 function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
   if (history.length === 0) {
     return (
@@ -437,11 +447,7 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
                 · {transition.performedByName}
               </p>
 
-              {transition.amountXof !== null ? (
-                <p className="mt-1 text-[0.875rem] tabular-nums">
-                  Montant : <span className="font-[600]">{formatXof(transition.amountXof)}</span>
-                </p>
-              ) : null}
+              <MontantTransition transition={transition} />
 
               {transition.rejectionReason !== null ? (
                 <p className="mt-1 text-[0.875rem]">
@@ -506,10 +512,8 @@ function AdvanceAmountField({
         id={amountId}
         inputMode="numeric"
         autoComplete="off"
-        // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-        autoFocus
         value={amount ?? ''}
-        placeholder="1200000"
+        placeholder="ex. 1 200 000"
         aria-describedby={`${amountId}-apercu`}
         onChange={(event) => {
           onChange(parseMoneyInput(event.target.value));
@@ -735,7 +739,7 @@ export function RejectDialog({
     },
     onSuccess: () => {
       onDone();
-      toast.success('Dossier rejeté. Montant : 0 FCFA.');
+      toast.success('Dossier rejeté.');
       reset();
       onOpenChange(false);
     },
@@ -771,12 +775,7 @@ export function RejectDialog({
         <DialogHeader>
           <DialogTitle>Rejeter ce dossier ?</DialogTitle>
           <DialogDescription>
-            {/* On ÉCRIT le montant en toutes lettres. Le serveur force 0 sur un
-                rejet, quoi qu'on lui envoie : mais un agent qui vient de voir
-                un montant à l'écran croirait sinon que le rejet le conserve, et
-                s'étonnerait de le voir disparaître de la synthèse. */}
-            Le rejet clôt le dossier. <strong className="font-[600]">Montant : 0 FCFA</strong>.
-            Correction possible ensuite par un administrateur.
+            Le rejet clôt le dossier. Correction possible ensuite par un administrateur.
           </DialogDescription>
         </DialogHeader>
 
@@ -794,7 +793,7 @@ export function RejectDialog({
                 </span>
               </Label>
               {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-                  pas le texte de l'item — ici, l'identifiant du motif. */}
+                  pas le texte de l'item, ici, l'identifiant du motif. */}
               <Select
                 items={reasonList.map((reason) => ({
                   value: reason.id,
@@ -831,8 +830,6 @@ export function RejectDialog({
                   id={detailId}
                   value={detail}
                   maxLength={2000}
-                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-                  autoFocus
                   aria-describedby={`${detailId}-aide`}
                   onChange={(event) => {
                     setDetail(event.target.value);

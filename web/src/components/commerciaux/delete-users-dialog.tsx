@@ -1,7 +1,7 @@
 'use client';
 
 import { InfoIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Field } from '@/components/forms/field';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 function dialogTitre(users: UserRow[], unique: UserRow | null): string {
   if (unique !== null) return `Supprimer le compte de ${unique.fullName} ?`;
@@ -55,11 +56,10 @@ export function DeleteUsersDialog({
 
   const cles = users.map((row) => row.id).join(',');
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par sélection
+  useRecalage([cles], () => {
     setRepreneur(null);
     setErreur(undefined);
-  }, [cles]);
+  });
 
   const prospects = users.reduce((total, row) => total + row.prospectCount, 0);
   const reprisRequise = prospects > 0;

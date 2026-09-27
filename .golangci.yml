@@ -2,6 +2,8 @@ version: '2'
 
 run:
   timeout: 5m
+  # Plusieurs sessions lancent le lint sur le meme poste : attendre plutot qu'echouer.
+  allow-parallel-runners: true
   build-tags:
     - integration
 

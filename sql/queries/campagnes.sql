@@ -81,6 +81,9 @@ LIMIT 1000;
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;
 
+-- name: VerrouillerLot :one
+SELECT "filters" FROM "lots_export" WHERE "id" = $1 FOR UPDATE;
+
 -- name: SupprimerLot :execrows
 DELETE FROM "lots_export" WHERE "id" = $1;
 
@@ -122,9 +125,10 @@ SELECT i."position", i."assigneeId"
 FROM "lot_export_items" i
 WHERE i."lotId" = $1 AND i."position" = ANY($2::int[]);
 
--- name: DeplacerPositions :exec
-UPDATE "lot_export_items" SET "assigneeId" = $3
-WHERE "lotId" = $1 AND "position" = ANY($2::int[]);
+-- name: DeplacerPositions :many
+UPDATE "lot_export_items" SET "assigneeId" = sqlc.narg('vers')
+WHERE "lotId" = @lot_id AND "position" = ANY(@positions::int[]) AND "assigneeId" IS NOT DISTINCT FROM sqlc.narg('de')
+RETURNING "position";
 
 -- name: InsertReaffectation :exec
 INSERT INTO "lot_export_reaffectations"
@@ -347,7 +351,7 @@ INNER JOIN "departements" d ON d."id" = r."departementId"
 INNER JOIN "users" c ON c."id" = r."createdById"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "iefs" ief ON ief."id" = r."iefId"
-WHERE i."lotId" = $1
+WHERE i."lotId" = $1 AND r."deletedAt" IS NULL
 ORDER BY i."position";
 
 -- name: LotLignesProspects :many
@@ -373,6 +377,7 @@ LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "representants" r ON r."id" = i."representantId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1 AND i."assigneeId" = $2 AND i."day" = $3
+  AND (i."representantId" IS NULL OR r."deletedAt" IS NULL)
 ORDER BY i."position";
 
 -- name: LotItemsPourPdfPositions :many
@@ -383,6 +388,7 @@ LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "representants" r ON r."id" = i."representantId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1 AND i."assigneeId" = $2 AND i."position" = ANY($3::int[])
+  AND (i."representantId" IS NULL OR r."deletedAt" IS NULL)
 ORDER BY i."position";
 
 -- name: CompterRepresentantsCible :one
@@ -479,18 +485,26 @@ FROM "representant_suggestions" s
 INNER JOIN "representants" src ON src."id" = s."sourceRepresentantId"
 WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedRepresentantId" IS NULL
   AND src."deletedAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "representants" r WHERE r."phoneE164" = s."suggestedPhoneE164" AND r."deletedAt" IS NULL)
   AND (sqlc.narg('departement_id')::text IS NULL OR src."departementId" = sqlc.narg('departement_id'))
   AND (sqlc.narg('ief_id')::text IS NULL OR src."iefId" = sqlc.narg('ief_id'));
 
 -- name: TirerSuggestions :many
-SELECT s."id", s."suggestedName", s."suggestedPhoneE164", src."departementId", src."iefId"
-FROM "representant_suggestions" s
-INNER JOIN "representants" src ON src."id" = s."sourceRepresentantId"
-WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedRepresentantId" IS NULL
-  AND src."deletedAt" IS NULL
-  AND (sqlc.narg('departement_id')::text IS NULL OR src."departementId" = sqlc.narg('departement_id'))
-  AND (sqlc.narg('ief_id')::text IS NULL OR src."iefId" = sqlc.narg('ief_id'))
-ORDER BY s."createdAt" ASC;
+SELECT d."id", d."suggestedName", d."suggestedPhoneE164", d."departementId", d."iefId"
+FROM (
+  SELECT DISTINCT ON (s."suggestedPhoneE164") s."id", s."suggestedName", s."suggestedPhoneE164",
+         src."departementId", src."iefId", s."createdAt"
+  FROM "representant_suggestions" s
+  INNER JOIN "representants" src ON src."id" = s."sourceRepresentantId"
+  WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedRepresentantId" IS NULL
+    AND src."deletedAt" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "representants" r WHERE r."phoneE164" = s."suggestedPhoneE164" AND r."deletedAt" IS NULL)
+    AND (sqlc.narg('departement_id')::text IS NULL OR src."departementId" = sqlc.narg('departement_id'))
+    AND (sqlc.narg('ief_id')::text IS NULL OR src."iefId" = sqlc.narg('ief_id'))
+  ORDER BY s."suggestedPhoneE164", s."createdAt", s."id"
+) d
+ORDER BY d."createdAt", d."id"
+LIMIT sqlc.arg('places');
 
 -- name: TelephonesRepresentantsConnus :many
 SELECT r."phoneE164" FROM "representants" r

@@ -427,7 +427,7 @@ export function ConversionFields({
             type="radio"
             name="console-method"
             checked={draft.method === null}
-            label="Aucun"
+            label="Aucune"
             onChange={() => {
               onChange({ method: null, rendezVousAt: '' });
             }}
@@ -587,14 +587,17 @@ function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
   if (attendue === undefined || parametres.data === undefined) return null;
 
   const valeur = parametres.data[attendue.cle];
+  if (valeur === '') {
+    return (
+      <p className="rounded-md border border-border px-3 py-2 text-[0.875rem] text-warning sm:col-span-2">
+        {attendue.libelle} indisponible, prévenez l’encadrement.
+      </p>
+    );
+  }
   return (
     <p className="rounded-md border border-border px-3 py-2 text-[0.875rem] sm:col-span-2">
       <span className="text-muted-foreground">{attendue.libelle} : </span>
-      {valeur === '' ? (
-        'à renseigner dans les paramètres CHUES.'
-      ) : (
-        <span className="select-all font-[600]">{valeur}</span>
-      )}
+      <span className="select-all font-[600]">{valeur}</span>
     </p>
   );
 }

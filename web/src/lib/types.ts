@@ -111,7 +111,7 @@ export type Projet = Schemas['Prospect']['projet'];
  * L'API classe sur `journeys.some({ projet, statut })` : une fiche entrée par
  * CHUES puis convertie en Grand Public reste « Nouveau » en premier niveau,
  * alors qu'elle remonte dans une liste filtrée sur « Converti ». Sans parcours
- * pour ce projet — fiche d'avant les parcours — le champ de premier niveau est
+ * pour ce projet, fiche d'avant les parcours, le champ de premier niveau est
  * la seule réponse disponible.
  */
 export function statutForProjet(prospect: ProspectRow, projet: Projet | null): ProspectStatut {
@@ -177,6 +177,7 @@ export const PERMISSIONS = [
   'roles.administrer',
   'support.plateforme',
   'support.signaler',
+  'ventes.gerer',
   'ventes.lire',
   'visites.detruire',
   'visites.voir_archivees',
@@ -207,11 +208,16 @@ export const readsOnly = (role: Role | undefined): boolean =>
   role === 'SUPERVISEUR' || role === 'DIRECTION';
 
 /**
- * L'export des prospects n'est pas un geste d'écriture : la DIRECTION y a droit
- * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
+ * L'export des prospects n'est pas un geste d'écriture : côté API la permission
+ * `exports.prospects` couvre le groupe Parcours (Admin, Commercial, Chargé de
+ * clientèle, Superviseur, Direction), l'écran le leur laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
@@ -298,10 +304,10 @@ export const BDD_SEGMENTS = [
 ] as const satisfies readonly BddSegment[];
 
 export const SEGMENT_LABELS: Record<BddSegment, string> = {
-  BDD1: 'BDD1 : CHUES / CBAO',
-  BDD2: 'BDD2 : CHUES / autre banque',
-  BDD3: 'BDD3 : autre syndicat / CBAO',
-  BDD4: 'BDD4 : autre syndicat / autre banque',
+  BDD1: 'CHUES, CBAO',
+  BDD2: 'CHUES, autre banque',
+  BDD3: 'Autre syndicat, CBAO',
+  BDD4: 'Autre syndicat, autre banque',
 };
 
 export const PHASE2_STATUSES = [

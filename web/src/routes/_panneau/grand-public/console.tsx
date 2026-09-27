@@ -3,11 +3,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { ConsoleView } from '@/components/console/console-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/console')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: GrandPublicConsolePage,
   pendingComponent: Loading,
 });

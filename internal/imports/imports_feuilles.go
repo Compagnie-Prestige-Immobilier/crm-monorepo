@@ -1,9 +1,7 @@
 package imports
 
-// Le classeur des leads porte un onglet par jour, et le relevé le relit en
-// entier : le bilan global dit combien de lignes sont arrivées, jamais quel
-// jour a livré quoi. Sans ce compte, « j'ai donné 900 leads » ne se vérifie
-// pas.
+// Un onglet par jour, relu en entier à chaque relevé : sans ce compte par onglet,
+// « j'ai donné 900 leads » ne se vérifie pas.
 type StatsFeuilleImportDTO struct {
 	Feuille        string `json:"feuille"`
 	Lignes         int    `json:"lignes"`
@@ -55,11 +53,8 @@ func (s *statsFeuillesImport) liste() []StatsFeuilleImportDTO {
 	return liste
 }
 
-// Ce qu'un onglet a livre : un numero inedit, un numero deja livre un jour
-// precedent, un doublon du meme onglet, une ligne inexploitable. Le compte se
-// fait sur le classeur seul, jamais sur ce que la base sait deja : le releve
-// relit le classeur entier toutes les heures, et un jour livre ne doit pas
-// changer de bilan au releve suivant.
+// Compté sur le classeur seul, jamais sur la base : relu toutes les heures, un
+// jour livré ne doit pas changer de bilan au relevé suivant.
 func compterFeuillesGrandPublicImport(stats *statsFeuillesImport, lues, uniques []any,
 	premiere map[string]string,
 ) {

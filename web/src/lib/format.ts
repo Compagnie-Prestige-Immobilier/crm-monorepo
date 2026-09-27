@@ -1,4 +1,3 @@
-import { format, parseISO } from 'date-fns';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
 const DAKAR_UTC_OFFSET = '+00:00';
@@ -19,7 +18,6 @@ export function formatDakarDateTime(local: string): string | null {
   const pad = (value: number): string => String(value).padStart(2, '0');
   return `${pad(at.getUTCDate())}/${pad(at.getUTCMonth() + 1)}/${String(at.getUTCFullYear())} à ${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())} (heure de Dakar)`;
 }
-import { fr } from 'date-fns/locale';
 
 import { RETIRED_SUFFIX } from '@/lib/types';
 
@@ -31,6 +29,11 @@ const decimalFormatter = new Intl.NumberFormat('fr-SN', {
 
 export function formatNumber(value: number): string {
   return numberFormatter.format(value);
+}
+
+/** `compte(2, 'dossier')` : « 2 dossiers » ; 0 et 1 restent au singulier. */
+export function compte(value: number, singulier: string, pluriel = `${singulier}s`): string {
+  return `${formatNumber(value)} ${Math.abs(value) >= 2 ? pluriel : singulier}`;
 }
 
 export function formatDecimal(value: number): string {
@@ -45,16 +48,44 @@ export function formatRateOrNone(value: number | null): string {
   return value === null ? 'Sans objet' : formatRate(value);
 }
 
+const DAKAR = 'Africa/Dakar';
+const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+const shortDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  day: '2-digit',
+  month: 'short',
+});
+const clockFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 export function formatDate(iso: string): string {
-  return format(parseISO(iso), 'dd MMM yyyy', { locale: fr });
+  return dateFormatter.format(new Date(iso));
 }
 
 export function formatDateTime(iso: string): string {
-  return format(parseISO(iso), "dd MMM yyyy 'à' HH:mm", { locale: fr });
+  const at = new Date(iso);
+  return `${dateFormatter.format(at)} à ${clockFormatter.format(at)}`;
 }
 
 export function formatShortDate(iso: string): string {
-  return format(parseISO(iso), 'dd MMM', { locale: fr });
+  return shortDateFormatter.format(new Date(iso));
+}
+
+/** `jour` : minuit du poste au jour calendaire de Dakar (UTC+0 toute l'année), pour date-fns. */
+export function reperesDakar(iso: string): { jour: Date; heure: string } {
+  const at = new Date(iso);
+  return {
+    jour: new Date(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
+    heure: String(at.getUTCHours()).padStart(2, '0'),
+  };
 }
 
 const DEVICE_CALL_LABELS: Record<string, string> = {
@@ -84,7 +115,7 @@ export function formatDetectedCall(call: {
   const duree = call.deviceCallDurationSeconds ?? null;
   const parts = [DEVICE_CALL_LABELS[call.deviceCallType ?? ''] ?? 'Inconnu'];
   if (duree !== null) parts.push(formatCallDuration(duree));
-  parts.push(format(parseISO(call.deviceCallAt), 'HH:mm', { locale: fr }));
+  parts.push(clockFormatter.format(new Date(call.deviceCallAt)));
   return parts.join(' · ');
 }
 

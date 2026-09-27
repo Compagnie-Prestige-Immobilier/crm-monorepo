@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -45,26 +44,33 @@ type InscriptionsAOuvrirInput struct {
 
 type InscriptionsAOuvrirOutput struct {
 	Body struct {
-		Items []InscriptionAOuvrir `json:"items"`
+		Items   []InscriptionAOuvrir `json:"items"`
+		Tronque bool                 `json:"tronque" doc:"Plus de 2000 inscriptions à ouvrir : seules les plus récentes sont listées."`
 	}
 }
 
-func (s *service) inscriptionsCompletes(ctx context.Context, projet string, aSignaler bool) ([]db.BankInscriptionsCompletesRow, error) {
+const inscriptionsCompletesMax = 2000
+
+// Une ligne de plus que le plafond : sa présence dit que la liste est tronquée.
+func (s *service) inscriptionsCompletes(ctx context.Context, projet string, aSignaler bool, id *string) ([]db.BankInscriptionsCompletesRow, error) {
 	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, projet)
 	if err != nil {
 		return nil, err
 	}
 	return s.Q.BankInscriptionsCompletes(ctx, db.BankInscriptionsCompletesParams{
-		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler,
+		Projet: db.Projet(projet), Statuts: statuts, ASignaler: aSignaler, ID: id, Prendre: inscriptionsCompletesMax + 1,
 	})
 }
 
 func (s *service) inscriptionsAOuvrir(ctx context.Context, in *InscriptionsAOuvrirInput) (*InscriptionsAOuvrirOutput, error) {
-	lignes, err := s.inscriptionsCompletes(ctx, in.Projet, false)
+	lignes, err := s.inscriptionsCompletes(ctx, in.Projet, false, nil)
 	if err != nil {
 		return nil, err
 	}
 	out := &InscriptionsAOuvrirOutput{}
+	if len(lignes) > inscriptionsCompletesMax {
+		lignes, out.Body.Tronque = lignes[:inscriptionsCompletesMax], true
+	}
 	out.Body.Items = make([]InscriptionAOuvrir, 0, len(lignes))
 	for i := range lignes {
 		r := &lignes[i]
@@ -94,17 +100,17 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 	if err != nil {
 		return insc, err
 	}
+	completes, err := s.inscriptionsCompletes(ctx, string(insc.Projet), false, &insc.ID)
+	if err != nil {
+		return insc, err
+	}
 	if existant, err := s.Q.BankCaseParInscription(ctx, &insc.ID); err == nil {
 		return insc, problemBanque(http.StatusConflict, "BANK_CASE_INSCRIPTION_ALREADY_OPEN",
 			"Un dossier bancaire existe déjà pour cette inscription.", map[string]any{"bankCaseId": existant})
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return insc, err
 	}
-	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, string(insc.Projet))
-	if err != nil {
-		return insc, err
-	}
-	if !inscriptionComplete(insc.StatutDistant, insc.DecideeLe, statuts) {
+	if len(completes) == 0 {
 		return insc, socle.Problem(http.StatusUnprocessableEntity, "BANK_CASE_INSCRIPTION_INCOMPLETE",
 			"Le dossier n’est pas encore validé sur la plateforme : statut « "+insc.StatutDistant+" ».")
 	}
@@ -114,12 +120,13 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 // Sans fiche rapprochée, le dossier porte l'identité de l'inscription : les
 // plateformes suivent seules leurs inscrits, le CRM n'a plus de fiche à opposer.
 func (s *service) prospectDuDossier(ctx context.Context, insc *db.BankInscriptionPourDossierRow) (db.BankCaseProspectRow, error) {
+	identite := db.BankCaseProspectRow{Nom: insc.Nom, Prenom: insc.Prenom, PhoneE164: insc.PhoneE164}
 	if insc.ProspectId == nil {
-		return db.BankCaseProspectRow{Nom: insc.Nom, Prenom: insc.Prenom, PhoneE164: insc.PhoneE164}, nil
+		return identite, nil
 	}
 	prospect, err := s.Q.BankCaseProspect(ctx, *insc.ProspectId)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return prospect, socle.Problem(http.StatusNotFound, "BANK_CASE_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
+		return identite, nil
 	}
 	return prospect, err
 }
@@ -158,13 +165,6 @@ func (s *service) creerDossier(ctx context.Context, in *CreationDossierInput) (*
 	return &DossierOutput{Body: dossier}, err
 }
 
-func inscriptionComplete(statut string, decideeLe *time.Time, statuts []string) bool {
-	if len(statuts) == 0 {
-		return decideeLe != nil
-	}
-	return slices.Contains(statuts, statut)
-}
-
 var prefixeReference = map[db.Projet]string{db.ProjetCHUES: "CHUES", db.ProjetGRANDPUBLIC: "GP"}
 
 func (s *service) referenceSuivante(ctx context.Context, projet db.Projet) (string, error) {
@@ -197,12 +197,11 @@ func texteOuTiret(v *string) string {
 	return *v
 }
 
-// Appelé après chaque tirage : chaque inscription devenue complète est marquée
-// avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel,
-// lui, part de la plateforme : ici, seule la notification in-app.
+// Marquée avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel
+// part de la plateforme : ici, seule la notification in-app.
 func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string) (int, error) {
 	s := &service{d}
-	lignes, err := s.inscriptionsCompletes(ctx, projet, true)
+	lignes, err := s.inscriptionsCompletes(ctx, projet, true, nil)
 	if err != nil || len(lignes) == 0 {
 		return 0, err
 	}
@@ -261,12 +260,14 @@ func (s *service) signalerIssue(ctx context.Context, id, typeEtape string) {
 		valeurs["motif"] = valeur
 	}
 	chemin := "/" + coqueDe(r.Projet) + "/dossiers/" + r.ID
-	if _, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
-		Title: "Dossier bancaire " + issue + " : " + r.CustomerName, Category: "DOSSIER", Route: chemin,
-		Body:     r.Reference + ", " + r.BanqueName + ". " + detail + " : " + valeur + ".",
-		Audience: "USERS", AudienceUserIDs: []string{r.SuiviParId},
-	}); err != nil {
-		slog.Warn("issue du dossier : notification in-app non créée", "dossier", id, "err", err)
+	if r.SuiviParId != nil {
+		if _, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
+			Title: "Dossier bancaire " + issue + " : " + r.CustomerName, Category: "DOSSIER", Route: chemin,
+			Body:     r.Reference + ", " + r.BanqueName + ". " + detail + " : " + valeur + ".",
+			Audience: "USERS", AudienceUserIDs: []string{*r.SuiviParId},
+		}); err != nil {
+			slog.Warn("issue du dossier : notification in-app non créée", "dossier", id, "err", err)
+		}
 	}
 	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          typeCourriel,

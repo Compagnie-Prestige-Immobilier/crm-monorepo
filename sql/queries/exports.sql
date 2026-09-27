@@ -1,6 +1,5 @@
--- Classeurs d'export. Les pages sont keyset : $1 nul = première page.
--- Les prospects filtrés, les représentants filtrés et les dossiers bancaires
--- ont des prédicats optionnels et restent en pgx direct (plan.md 2.1).
+-- Pages keyset : $1 nul = première page. Les exports à prédicats optionnels
+-- (prospects, représentants, dossiers) restent en pgx direct (plan.md 2.1).
 
 -- name: ExportBanquesActives :many
 SELECT "shortName" FROM "banques" WHERE "isActive" ORDER BY "sortOrder" ASC, "shortName" ASC;
@@ -244,7 +243,8 @@ INNER JOIN "visite_entreprises" e ON e."id" = v."entrepriseId"
 INNER JOIN "visite_objets" o ON o."id" = v."objetId"
 LEFT JOIN "visite_directions" d ON d."id" = v."directionId"
 LEFT JOIN "visite_destinataires" ds ON ds."id" = v."destinataireId"
-WHERE (sqlc.narg('apres')::text IS NULL OR v."reference" > sqlc.narg('apres')::text)
+WHERE v."deletedAt" IS NULL
+  AND (sqlc.narg('apres')::text IS NULL OR v."reference" > sqlc.narg('apres')::text)
   AND (sqlc.narg('du')::timestamp IS NULL OR v."visitedAt" >= sqlc.narg('du')::timestamp)
   AND (sqlc.narg('au')::timestamp IS NULL OR v."visitedAt" <= sqlc.narg('au')::timestamp)
   AND (sqlc.narg('entreprise')::text IS NULL OR v."entrepriseId" = sqlc.narg('entreprise')::text)
@@ -256,3 +256,13 @@ WHERE (sqlc.narg('apres')::text IS NULL OR v."reference" > sqlc.narg('apres')::t
        OR v."reference" LIKE '%' || upper(sqlc.narg('recherche')::text) || '%')
 ORDER BY v."reference" ASC
 LIMIT 1000;
+
+-- name: VentesSommesDues :many
+SELECT v."numero", v."dateSouscription", v."client", v."site", v."nombreLots", v."numerosLots", v."prixTotal",
+    v."partProprietaire", v."partApporteur", v."representant", v."partCpi", v."reliquat",
+    (v."acompte" + COALESCE((SELECT SUM(vv."montant") FROM "ventes_versements" vv WHERE vv."venteId" = v."id"), 0))::bigint AS "encaisse"
+FROM "ventes" v
+WHERE v."archiveeLe" IS NULL AND v."dateSouscription" BETWEEN @du::date AND @au::date
+    AND (sqlc.narg('site')::text IS NULL OR v."site" = sqlc.narg('site')::text)
+ORDER BY v."site", v."dateSouscription", v."numero", v."id"
+LIMIT @limite::bigint;

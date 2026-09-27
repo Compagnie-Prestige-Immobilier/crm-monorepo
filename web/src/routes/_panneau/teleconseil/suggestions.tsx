@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { SuggestionsView } from '@/components/suggestions/suggestions-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/suggestions')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: TeleconseilSuggestionsPage,
   pendingComponent: Loading,
 });

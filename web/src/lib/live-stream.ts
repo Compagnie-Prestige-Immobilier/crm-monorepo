@@ -12,6 +12,8 @@ export const LIVE_TOPIC_KEYS = {
   'db-dump': [queryKeys.databaseDump],
   referentiels: [queryKeys.referentielsRoot, queryKeys.reference],
   courriels: [queryKeys.courrielsRoot],
+  ventes: [queryKeys.ventes],
+  visites: [queryKeys.visitesRoot],
 } as const satisfies Record<string, readonly (readonly string[])[]>;
 
 export type LiveTopic = keyof typeof LIVE_TOPIC_KEYS;

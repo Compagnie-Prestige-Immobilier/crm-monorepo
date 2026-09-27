@@ -51,6 +51,7 @@ export function FilterCombobox({
   const [search, setSearch] = useState('');
   const triggerId = useId();
   const labelId = useId();
+  const listeId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const ouvrir = (next: boolean): void => {
@@ -82,8 +83,9 @@ export function FilterCombobox({
                 id={triggerId}
                 ref={triggerRef}
                 variant="outline"
-                // oxlint-disable-next-line jsx-a11y/role-has-required-aria-props -- aria posé par Base UI
                 role="combobox"
+                aria-expanded={open}
+                aria-controls={listeId}
                 onBlur={onBlur}
                 aria-labelledby={`${labelId} ${triggerId}`}
                 aria-haspopup="listbox"
@@ -115,7 +117,7 @@ export function FilterCombobox({
               On filtre nous-mêmes, sur le texte replié, et la liste reste
               intégralement présente tant que rien n'est tapé.
             */}
-            <Command shouldFilter={false}>
+            <Command id={listeId} shouldFilter={false}>
               <CommandInput
                 placeholder="Chercher…"
                 value={search}

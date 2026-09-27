@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/internal/shared/socle"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,11 +30,11 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur?depuis=2026-09-10", "ventes.xlsx", contenu)
 	b.attend(statut, http.StatusOK, "dépôt", reponse)
 
-	ventes, _ := reponse["ventes"].([]any)
+	ventes := ventesImportees(reponse)
 	if len(ventes) != 1 {
-		t.Fatalf("une vente depuis le 10 septembre attendue, %d reçues : %v", len(ventes), ventes)
+		t.Fatalf("une vente importée depuis le 10 septembre attendue, %d reçues : %v", len(ventes), ventes)
 	}
-	vente, _ := ventes[0].(map[string]any)
+	vente := ventes[0]
 	versements, _ := vente["versements"].([]any)
 	if vente["client"] != "AWA SARR" || vente["prixTotal"] != float64(6_000_000) || len(versements) != 2 {
 		t.Fatalf("vente mal lue : %v", vente)
@@ -43,7 +44,7 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	// retirait 13 millions du chiffre d'affaires du vrai classeur.
 	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", contenu)
 	b.attend(statut, http.StatusOK, "dépôt sans date de début", reponse)
-	if toutes, _ := reponse["ventes"].([]any); len(toutes) != 3 {
+	if toutes := ventesImportees(reponse); len(toutes) != 3 {
 		t.Fatalf("trois ventes attendues, dont une sans date : %v", toutes)
 	}
 
@@ -51,7 +52,7 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur?depuis=2030-01-01", "ventes.xlsx", contenu)
 	b.attend(statut, http.StatusBadRequest, "dépôt qui ne garderait aucune vente", reponse)
 	statut, reponse = b.appel(http.MethodGet, "/api/v1/ventes", nil, false)
-	if toutes, _ := reponse["ventes"].([]any); statut != http.StatusOK || len(toutes) != 3 {
+	if toutes := ventesImportees(reponse); statut != http.StatusOK || len(toutes) != 3 {
 		t.Fatalf("le classeur en place doit rester intact : %d %v", statut, reponse)
 	}
 
@@ -70,6 +71,24 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	connecte(superviseur)
 	statut, reponse = superviseur.appel(http.MethodGet, "/api/v1/ventes", nil, false)
 	superviseur.attend(statut, http.StatusForbidden, "lecture par un superviseur", reponse)
+}
+
+// Au-delà du plafond, ce sont les ventes les plus anciennes qui manquent, et la réponse le dit.
+func TestVentesListeTronqueeAuxPlusRecentes(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT PLAFOND " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client) })
+	b.exec(`INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone", "site", "nombreLots",
+		"numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat", "partProprietaire", "partApporteur", "partCpi")
+		SELECT 'SAISIE', 0, 'CPI', DATE '2090-01-01' - i, $1, '770000004', 'THIEO', 1, '', '', 1, 1, 0, 1, 0, 0, 1
+		FROM generate_series(0, 5000) i`, client)
+	statut, liste := appelJSON(b, http.MethodGet, "/api/v1/ventes", nil, nil)
+	b.attend(statut, http.StatusOK, "liste des ventes", liste)
+	ventes, _ := liste["ventes"].([]any)
+	if tronque, _ := liste["tronque"].(bool); !tronque || len(ventes) != 5000 || ventes[0].(map[string]any)["dateSouscription"] != "2090-01-01" {
+		t.Fatalf("5 000 ventes, les plus récentes d’abord, et l’indication de troncature : %v, %d ventes", liste["tronque"], len(ventes))
+	}
 }
 
 func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.T) {
@@ -135,6 +154,212 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		"vente.creer  500000", "vente.corriger 500000 900000", "vente.versement_ajouter  ",
 		"vente.archiver 900000 ", "vente.restaurer  900000", "vente.corriger 900000 100000",
 	})
+}
+
+// Corriger une vente sans toucher site, lots ni prix garde ses parts, même si la règle du site a changé.
+func TestVenteCorrectionGardeSesParts(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	site := map[string]any{
+		"nom": "SITE PARTS " + b.userID[:8], "ordre": 99, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 500000, "partApporteurMode": "POURCENTAGE_PROPRIETAIRE", "partApporteurValeur": 10,
+	}
+	statut, siteCree := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", site, nil)
+	b.attend(statut, http.StatusOK, "ajout du site", siteCree)
+	siteID := fmt.Sprint(siteCree["id"])
+	nomSite := fmt.Sprint(siteCree["nom"])
+	var venteID int64
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		if venteID != 0 {
+			b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+		}
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, siteID)
+	})
+
+	corps := map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-18", "client": "CLIENT PARTS " + b.userID[:8],
+		"telephone": "77 111 00 88", "site": nomSite, "nombreLots": 1, "numerosLots": "", "superficie": "",
+		"prixUnitaire": 1000000, "acompte": 0, "modePaiement": "COMPTANT",
+	}
+	statut, vente := appelJSON(b, http.MethodPost, "/api/v1/ventes", corps, nil)
+	b.attend(statut, http.StatusCreated, "création de la vente sur le site", vente)
+	venteID = int64(vente["id"].(float64))
+	// Site à 500 000 propriétaire, 10 % apporteur : 50 000 apporteur, 450 000 CPI.
+	if vente["partProprietaire"] != float64(500000) || vente["partApporteur"] != float64(50000) || vente["partCpi"] != float64(450000) {
+		t.Fatalf("parts à la création : %v", vente)
+	}
+
+	site["partApporteurValeur"] = 50
+	statut, siteModifie := appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+siteID, site, nil)
+	b.attend(statut, http.StatusOK, "règle apporteur relevée à 50 %", siteModifie)
+
+	corps["client"] = "CLIENT PARTS MODIFIE " + b.userID[:8]
+	statut, vente = appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
+	b.attend(statut, http.StatusOK, "correction sans toucher site, lots ni prix", vente)
+	if vente["partProprietaire"] != float64(500000) || vente["partApporteur"] != float64(50000) || vente["partCpi"] != float64(450000) {
+		t.Fatalf("les parts doivent rester celles de la saisie malgré la nouvelle règle du site : %v", vente)
+	}
+}
+
+// Le classeur fait foi pour ses ventes : le panneau ne les corrige pas, ne les archive pas et n'y verse rien.
+func TestVenteImporteeRefuseLesEcrituresDuPanneau(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurVentesTest(t))
+	b.attend(statut, http.StatusOK, "dépôt", reponse)
+	vente := ventesImportees(reponse)[0]
+	chemin := fmt.Sprintf("/api/v1/ventes/%d", int64(vente["id"].(float64)))
+	correction := map[string]any{
+		"canal": vente["canal"], "dateSouscription": "2026-09-05", "client": vente["client"], "telephone": "77 000 00 01",
+		"site": vente["site"], "nombreLots": vente["nombreLots"], "numerosLots": "", "superficie": "",
+		"prixUnitaire": vente["prixUnitaire"], "acompte": 0, "modePaiement": "COMPTANT",
+	}
+	for _, ecriture := range []struct {
+		methode, chemin string
+		corps           map[string]any
+	}{
+		{http.MethodPatch, chemin, correction},
+		{http.MethodPost, chemin + "/versements", map[string]any{"date": "2026-09-19", "montant": 500000}},
+		{http.MethodDelete, chemin, nil},
+		{http.MethodPost, chemin + "/restaurer", nil},
+	} {
+		statut, corps := appelJSON(b, ecriture.methode, ecriture.chemin, ecriture.corps, nil)
+		b.attend(statut, http.StatusConflict, ecriture.methode+" "+ecriture.chemin, corps)
+		if corps["code"] != "VENTE_DU_CLASSEUR" {
+			t.Fatalf("%s %s : code %v", ecriture.methode, ecriture.chemin, corps["code"])
+		}
+	}
+}
+
+// Un versement saisi au panneau et absent du nouveau classeur bloque le dépôt ; sa seule trace au journal ne bloque plus rien.
+func TestDepotClasseurNeFaitPasDisparaitreUnVersement(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	contenu := classeurVentesTest(t)
+	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "premier dépôt", reponse)
+	var venteID int64
+	for _, vente := range ventesImportees(reponse) {
+		if vente["numero"] == float64(2) {
+			venteID = int64(vente["id"].(float64))
+		}
+	}
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 3, '2026-09-19', 250000)`, venteID)
+	b.exec(`INSERT INTO "audit_logs" ("id", "userId", "action", "entity", "entityId", "before")
+		VALUES (gen_random_uuid()::text, $1, 'vente.versement_ajouter', 'vente', $2::bigint::text, '{"montant": 250000}')`, b.userID, venteID)
+
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
+	b.attend(statut, http.StatusConflict, "redépôt qui effacerait le versement saisi au panneau", reponse)
+	if reponse["code"] != "VENTES_VERSEMENTS_HORS_CLASSEUR" || !strings.Contains(fmt.Sprint(reponse["message"]), "n° 2 ") {
+		t.Fatalf("le refus nomme la vente en cause : %v", reponse)
+	}
+	if n := venteCompteTest(t, b, `SELECT count(*)::int FROM "ventes_versements" WHERE "venteId" = $1`, venteID); n != 3 {
+		t.Fatalf("le versement saisi hors classeur ne doit pas disparaître : %d", n)
+	}
+
+	b.exec(`DELETE FROM "ventes_versements" WHERE "venteId" = $1 AND "rang" = 3`, venteID)
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes-versement.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "redépôt une fois le versement retiré, malgré son ancienne trace", reponse)
+	remplacees := venteCompteTest(t, b, `SELECT jsonb_array_length("before"->'ventes') FROM "audit_logs"
+		WHERE "userId" = $1 AND "action" = 'vente.importer' ORDER BY "at" DESC, "id" DESC LIMIT 1`, b.userID)
+	versements := venteCompteTest(t, b, `SELECT jsonb_array_length(v->'versements') FROM "audit_logs" a,
+		jsonb_array_elements(a."before"->'ventes') v
+		WHERE a."userId" = $1 AND a."action" = 'vente.importer' AND (v->>'id')::bigint = $2`, b.userID, venteID)
+	if remplacees != 3 || versements != 2 {
+		t.Fatalf("la trace du dépôt garde les ventes remplacées et leurs versements : %d ventes, %d versements", remplacees, versements)
+	}
+}
+
+// Un dépôt numérote ses ventes sous le même verrou qu'une saisie.
+func TestDepotAttendLeVerrouDeNumerotation(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT NUMERO " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	contenu := classeurVentesTest(t)
+	deposer := func() int {
+		statut, _ := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", contenu)
+		return statut
+	}
+	creer := func() int {
+		statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", venteComptant(client), nil)
+		return statut
+	}
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil, deposer, creer)
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusCreated {
+		t.Fatalf("dépôt puis saisie aboutissent : %v", statuts)
+	}
+}
+
+// « - », « #N/A » et cellule vide valent zéro ; un montant vraiment illisible refuse le dépôt en nommant sa ligne.
+func TestDepotClasseurMontantsVidesOuIllisibles(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
+	contenu := classeurModifie(t, map[string]string{"P3": "-", "Q4": "#N/A"}, map[string]string{"E5": "#N/A"})
+	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "dépôt avec « - » et « #N/A »", reponse)
+	for _, vente := range ventesImportees(reponse) {
+		versements, _ := vente["versements"].([]any)
+		if vente["numero"] == float64(2) && (vente["partCpi"] != float64(0) || len(versements) != 1) {
+			t.Fatalf("« #N/A » vaut zéro dans une part et aucun versement dans les échéances : %v", vente)
+		}
+	}
+
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurModifie(t, map[string]string{"K4": "1 500 000"}, nil))
+	b.attend(statut, http.StatusBadRequest, "dépôt avec un montant illisible", reponse)
+	if !strings.Contains(fmt.Sprint(reponse["message"]), "ligne 4") {
+		t.Fatalf("le refus nomme la ligne : %v", reponse)
+	}
+}
+
+// Un rôle qui ne fait que lire les ventes ne saisit rien et ne dépose aucun classeur.
+func TestVentesLecteurNePeutPasEcrire(t *testing.T) {
+	admin := adminConnecte(t)
+	roleID := creerRolePersonnalise(admin, "Lecteur ventes "+admin.userID[:8], socle.Direction,
+		[]string{string(socle.PermissionPanneauAcceder), string(socle.PermissionVentesLire)})
+	_, email := compteDuRole(admin, roleID)
+	lecteur := adminSession(admin, email)
+	statut, corps := appelJSON(lecteur, http.MethodPost, "/api/v1/ventes", venteComptant("CLIENT LECTEUR"), nil)
+	lecteur.attend(statut, http.StatusForbidden, "saisie par un lecteur", corps)
+	statut, corps = lecteur.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurVentesTest(t))
+	lecteur.attend(statut, http.StatusForbidden, "dépôt par un lecteur", corps)
+}
+
+func classeurModifie(t *testing.T, ventes, echeances map[string]string) []byte {
+	t.Helper()
+	f, err := excelize.OpenReader(bytes.NewReader(classeurVentesTest(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for feuille, cellules := range map[string]map[string]string{"1. TABLEAU DES VENTES": ventes, "2. ECHEANCES MENSUELLES": echeances} {
+		for cellule, valeur := range cellules {
+			if err := f.SetCellStr(feuille, cellule, valeur); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	var tampon bytes.Buffer
+	if err := f.Write(&tampon); err != nil {
+		t.Fatal(err)
+	}
+	return tampon.Bytes()
 }
 
 // Changer la règle d'un site change les parts des ventes suivantes : l'ancienne valeur reste lisible.
@@ -204,9 +429,157 @@ func TestVenteAncienneCorrigeableSurSiteEtCanalRetires(t *testing.T) {
 		"acompte": 0, "modePaiement": "CREDIT", "nombreEcheances": 10,
 	}, nil)
 	b.attend(statut, http.StatusOK, "correction d’une ancienne vente", vente)
-	if vente["telephone"] == "770000001" || vente["jourVersement"] != nil {
+	if vente["telephone"] == "770000001" || vente["jourVersement"] != nil || vente["partCpi"] != float64(5000000) {
 		t.Fatalf("vente ancienne corrigée : %v", vente)
 	}
+}
+
+// Une ancienne vente dont la part CPI est négative se corrige encore, tant que ses parts ne sont pas recalculées.
+func TestVenteAncienneAPartCpiNegativeResteCorrigeable(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	var venteID int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement")
+		VALUES ('SAISIE', 0, 'CPI', 'CLIENT PARTS NEGATIVES', '770000003', 'THIEO', 1, '', '', 1000000, 1000000, 0, 1000000,
+		900000, 200000, -100000, 'COMPTANT') RETURNING "id"`).Scan(&venteID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+	})
+	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-01", "client": "CLIENT PARTS NEGATIVES", "telephone": "77 000 00 03",
+		"site": "THIEO", "nombreLots": 1, "numerosLots": "", "superficie": "", "prixUnitaire": 1000000, "acompte": 0,
+		"modePaiement": "COMPTANT", "email": "client.parts@exemple.sn",
+	}, nil)
+	b.attend(statut, http.StatusOK, "correction de l’e-mail", vente)
+	if vente["email"] != "client.parts@exemple.sn" || vente["partCpi"] != float64(-100000) {
+		t.Fatalf("e-mail corrigé, parts inchangées : %v", vente)
+	}
+}
+
+func venteComptant(client string) map[string]any {
+	return map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-18", "client": client, "telephone": "77 000 00 77",
+		"site": "THIEO", "nombreLots": 1, "numerosLots": "", "superficie": "", "prixUnitaire": 1000000,
+		"acompte": 0, "modePaiement": "COMPTANT", "partProprietaire": 0, "partApporteur": 0,
+	}
+}
+
+func TestVenteRefusePartsSuperieuresAuPrix(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	t.Cleanup(func() { b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID) })
+	for quoi, parts := range map[string]map[string]any{
+		"somme des parts au-dessus du prix": {"partProprietaire": 900000, "partApporteur": 200000},
+		"part CPI négative":                 {"partCpi": -1},
+	} {
+		corps := venteComptant("CLIENT PARTS " + b.userID[:8])
+		for cle, valeur := range parts {
+			corps[cle] = valeur
+		}
+		statut, body := appelJSON(b, http.MethodPost, "/api/v1/ventes", corps, nil)
+		b.attend(statut, http.StatusBadRequest, quoi, body)
+		if body["code"] != "VENTE_PARTS_INVALIDES" {
+			t.Fatalf("%s : code %v", quoi, body["code"])
+		}
+	}
+}
+
+// Deux versements et deux saisies partent ensemble : rangs et numéros distincts, reliquat juste.
+func TestVersementsSimultanesMemeVente(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT VERSEMENTS " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client)
+	})
+	creer := func() int {
+		statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", venteComptant(client), nil)
+		return statut
+	}
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil, creer, creer)
+	if statuts[0] != http.StatusCreated || statuts[1] != http.StatusCreated {
+		t.Fatalf("les deux saisies aboutissent : %v", statuts)
+	}
+	var venteID int64
+	var numeros int
+	if err := b.pool.QueryRow(b.ctx, `SELECT min("id"), count(DISTINCT "numero")::int FROM "ventes" WHERE "client" = $1`,
+		client).Scan(&venteID, &numeros); err != nil {
+		t.Fatal(err)
+	}
+	if numeros != 2 {
+		t.Fatalf("deux saisies simultanées reçoivent deux numéros, %d distinct(s)", numeros)
+	}
+
+	verser := func(montant int) func() int {
+		return func() int {
+			statut, _ := appelJSON(b, http.MethodPost, fmt.Sprintf("/api/v1/ventes/%d/versements", venteID),
+				map[string]any{"date": "2026-09-19", "montant": montant}, nil)
+			return statut
+		}
+	}
+	statuts = sousVerrou(b, `SELECT 1 FROM "ventes" WHERE "id" = $1 FOR UPDATE`, []any{venteID}, verser(100000), verser(200000))
+	if statuts[0] != http.StatusCreated || statuts[1] != http.StatusCreated {
+		t.Fatalf("les deux versements aboutissent : %v", statuts)
+	}
+	var rangs, reliquat int64
+	if err := b.pool.QueryRow(b.ctx, `SELECT (SELECT sum("rang") FROM "ventes_versements" WHERE "venteId" = $1), "reliquat"
+		FROM "ventes" WHERE "id" = $1`, venteID).Scan(&rangs, &reliquat); err != nil {
+		t.Fatal(err)
+	}
+	if rangs != 3 || reliquat != 700000 {
+		t.Fatalf("rangs 1 et 2, reliquat 700000 attendus : somme des rangs %d, reliquat %d", rangs, reliquat)
+	}
+}
+
+// Un site ou un canal renommé emporte ses ventes : les corriger ensuite ne répond plus 400.
+func TestRenommerSiteSuitLesVentes(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	suffixe := strings.ToUpper(b.userID[:8])
+	statut, site := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", map[string]any{
+		"nom": "SITE AVANT " + suffixe, "ordre": 99, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 0, "partApporteurMode": "AUCUNE", "partApporteurValeur": 0,
+	}, nil)
+	b.attend(statut, http.StatusOK, "ajout d’un site", site)
+	statut, canal := appelJSON(b, http.MethodPost, "/api/v1/ventes/canaux", map[string]any{"libelle": "CANAL AVANT " + suffixe, "ordre": 99}, nil)
+	b.attend(statut, http.StatusOK, "ajout d’un canal", canal)
+	corps := venteComptant("CLIENT RENOMME " + suffixe)
+	corps["site"], corps["canal"] = site["nom"], canal["libelle"]
+	statut, vente := appelJSON(b, http.MethodPost, "/api/v1/ventes", corps, nil)
+	b.attend(statut, http.StatusCreated, "vente sur le site", vente)
+	venteID, siteID, canalID := int64(vente["id"].(float64)), fmt.Sprint(site["id"]), fmt.Sprint(canal["id"])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, siteID)
+		b.exec(`DELETE FROM "ventes_canaux" WHERE "id" = $1`, canalID)
+	})
+
+	statut, site = appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+siteID, map[string]any{
+		"nom": "SITE APRES " + suffixe, "ordre": 99, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 0, "partApporteurMode": "AUCUNE", "partApporteurValeur": 0,
+	}, nil)
+	b.attend(statut, http.StatusOK, "renommage du site", site)
+	statut, canal = appelJSON(b, http.MethodPatch, "/api/v1/ventes/canaux/"+canalID,
+		map[string]any{"libelle": "CANAL APRES " + suffixe, "ordre": 99}, nil)
+	b.attend(statut, http.StatusOK, "renommage du canal", canal)
+
+	var siteVente, canalVente string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "site", "canal" FROM "ventes" WHERE "id" = $1`, venteID).Scan(&siteVente, &canalVente); err != nil {
+		t.Fatal(err)
+	}
+	if siteVente != site["nom"] || canalVente != canal["libelle"] {
+		t.Fatalf("la vente suit le site et le canal renommés : %s, %s", siteVente, canalVente)
+	}
+	corps["site"], corps["canal"] = siteVente, canalVente
+	statut, vente = appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
+	b.attend(statut, http.StatusOK, "correction après renommage", vente)
 }
 
 func exigerIdentiteClient(t *testing.T, vente map[string]any) {
@@ -244,6 +617,8 @@ func venteArchiveePuisSoldee(t *testing.T, b *banc, venteID int64, corps map[str
 	if int64(vente["id"].(float64)) != venteID {
 		t.Fatalf("vente restaurée : %v", vente)
 	}
+	statut, vente = appelJSON(b, http.MethodPost, "/api/v1/ventes/999999999999/restaurer", nil, nil)
+	b.attend(statut, http.StatusNotFound, "restauration d’une vente inconnue", vente)
 	corps["modePaiement"] = "COMPTANT"
 	delete(corps, "nombreEcheances")
 	corps["acompte"] = 100000
@@ -255,6 +630,15 @@ func venteArchiveePuisSoldee(t *testing.T, b *banc, venteID int64, corps map[str
 	if !soldee || !manuellement {
 		t.Fatalf("la vente doit être soldée après confirmation explicite : %v", vente)
 	}
+}
+
+func venteCompteTest(t *testing.T, b *banc, requete string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := b.pool.QueryRow(b.ctx, requete, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
 
 func venteDansListe(elements []any, id int64) bool {
@@ -397,4 +781,190 @@ func classeurVentesTest(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	return tampon.Bytes()
+}
+
+// La base locale peut porter des ventes saisies à la main : seules celles du classeur comptent.
+func ventesImportees(reponse map[string]any) []map[string]any {
+	toutes, _ := reponse["ventes"].([]any)
+	var importees []map[string]any
+	for _, brute := range toutes {
+		if v, _ := brute.(map[string]any); v["origine"] == "IMPORT" {
+			importees = append(importees, v)
+		}
+	}
+	return importees
+}
+
+// Stock de trois lots : une saisie et une correction simultanées ne le dépassent pas.
+func TestVenteStockDuSite(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	suffixe := strings.ToUpper(b.userID[:8])
+	reglage := map[string]any{
+		"nom": "SITE STOCK " + suffixe, "ordre": 99, "totalLots": 3, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 0, "partApporteurMode": "AUCUNE", "partApporteurValeur": 0,
+	}
+	statut, site := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", reglage, nil)
+	b.attend(statut, http.StatusOK, "site avec stock", site)
+	nom, siteID := fmt.Sprint(site["nom"]), fmt.Sprint(site["id"])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "site" = $1`, nom)
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, siteID)
+	})
+	if site["lotsVendus"] != float64(0) || site["lotsRestants"] != float64(3) {
+		t.Fatalf("site neuf : %v vendus, %v restants", site["lotsVendus"], site["lotsRestants"])
+	}
+	vente := func(client string, lots int) map[string]any {
+		corps := venteComptant(client + " " + suffixe)
+		corps["site"], corps["nombreLots"] = nom, lots
+		return corps
+	}
+	statut, premiere := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT A", 1), nil)
+	b.attend(statut, http.StatusCreated, "premier lot", premiere)
+	cheminA := fmt.Sprintf("/api/v1/ventes/%v", premiere["id"])
+
+	statuts := sousVerrou(b, `SELECT pg_advisory_xact_lock(hashtext('ventes.numero'))`, nil,
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT B", 2), nil)
+			return statut
+		},
+		func() int {
+			statut, _ := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A", 2), nil)
+			return statut
+		})
+	if (statuts[0] == http.StatusConflict) == (statuts[1] == http.StatusConflict) {
+		t.Fatalf("une seule des deux écritures tient dans le stock : %v", statuts)
+	}
+	vendus := venteCompteTest(t, b, `SELECT COALESCE(sum("nombreLots"), 0)::int FROM "ventes" WHERE "site" = $1`, nom)
+	if lu := stockDuSite(t, b, siteID); vendus != 3 || lu["lotsVendus"] != float64(3) || lu["lotsRestants"] != float64(0) {
+		t.Fatalf("trois lots vendus attendus : %d en base, %v", vendus, lu)
+	}
+
+	statut, refus := appelJSON(b, http.MethodPost, "/api/v1/ventes", vente("CLIENT C", 1), nil)
+	b.attend(statut, http.StatusConflict, "stock épuisé", refus)
+	if refus["code"] != "VENTE_STOCK_EPUISE" {
+		t.Fatalf("code %v", refus["code"])
+	}
+	reglage["totalLots"] = 1
+	statut, site = appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+siteID, reglage, nil)
+	b.attend(statut, http.StatusOK, "stock abaissé", site)
+	if site["lotsRestants"] != float64(-2) {
+		t.Fatalf("stock dépassé de deux lots : %v", site["lotsRestants"])
+	}
+	lotsA := venteCompteTest(t, b, `SELECT "nombreLots" FROM "ventes" WHERE "id" = $1`, premiere["id"])
+	statut, corrigee := appelJSON(b, http.MethodPatch, cheminA, vente("CLIENT A CORRIGE", lotsA), nil)
+	b.attend(statut, http.StatusOK, "correction sans lot de plus sur un stock dépassé", corrigee)
+	statut, _ = appelJSON(b, http.MethodDelete, cheminA, nil, nil)
+	b.attend(statut, http.StatusNoContent, "archivage", nil)
+	if lu := stockDuSite(t, b, siteID); lu["lotsVendus"] != float64(3-lotsA) {
+		t.Fatalf("une vente archivée ne compte plus : %v", lu)
+	}
+}
+
+func stockDuSite(t *testing.T, b *banc, id string) map[string]any {
+	t.Helper()
+	statut, configuration := appelJSON(b, http.MethodGet, "/api/v1/ventes/configuration", nil, nil)
+	b.attend(statut, http.StatusOK, "configuration", configuration)
+	for _, s := range configuration["sites"].([]any) {
+		if site := s.(map[string]any); site["id"] == id {
+			return site
+		}
+	}
+	t.Fatalf("site %s absent de la configuration", id)
+	return nil
+}
+
+func venteACredit(b *banc, client string, prix, acompte int64, echeances, periodicite, jour int, premier string) int64 {
+	b.t.Helper()
+	var id int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement")
+		VALUES ('SAISIE', 0, 'CPI', DATE '2025-10-01', $1, '77 000 00 66', 'THIEO', 1, '', '', $2::bigint, $2, $3::bigint, $2 - $3, 0, 0, $2,
+		'CREDIT', $4, $5, $6, $7::date) RETURNING "id"`, client, prix, acompte, echeances, periodicite, jour, premier).Scan(&id); err != nil {
+		b.t.Fatal(err)
+	}
+	return id
+}
+
+// Des dates fixes et passées : seul le nombre de jours de retard dépend du jour de l'exécution.
+func TestEcheancesEnRetard(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT RETARD " + strings.ToUpper(b.userID[:8])
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client) })
+	enRetard := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 1, '2026-01-12', 100000)`, enRetard)
+	bimestriel := venteACredit(b, client, 200000, 0, 2, 2, 5, "2025-11-10")
+	aJour := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant") VALUES ($1, 1, '2026-03-01', 300000)`, aJour)
+	aVenir := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2099-01-10")
+	archivee := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2026-01-10")
+	b.exec(`UPDATE "ventes" SET "archiveeLe" = now() WHERE "id" = $1`, archivee)
+
+	lignes := echeancesEnRetard(t, b)
+	for _, absente := range []int64{aJour, aVenir, archivee} {
+		if _, trouvee := lignes[absente]; trouvee {
+			t.Fatalf("la vente %d n'est pas en retard : %v", absente, lignes[absente])
+		}
+	}
+	local := time.Now().In(dakar(t))
+	aujourdhui := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	jours := func(date string) float64 {
+		d, _ := time.Parse(time.DateOnly, date)
+		return aujourdhui.Sub(d).Hours() / 24
+	}
+	exigerRetard(t, lignes[enRetard], map[string]any{
+		"montantDu": float64(200000), "echeancesManquees": float64(2), "premiereImpayee": "2026-02-10",
+		"derniereEcheance": "2026-03-10", "joursRetard": jours("2026-02-10"), "telephoneE164": "+221770000066",
+	})
+	if !strings.Contains(fmt.Sprint(lignes[enRetard]["messageWhatsapp"]), "200 000 FCFA") {
+		t.Fatalf("le message donne le montant dû : %v", lignes[enRetard]["messageWhatsapp"])
+	}
+	exigerRetard(t, lignes[bimestriel], map[string]any{
+		"montantDu": float64(200000), "echeancesManquees": float64(2), "premiereImpayee": "2025-11-10",
+		"derniereEcheance": "2026-01-05", "joursRetard": jours("2025-11-10"),
+	})
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/ventes/echeances-en-retard?taille=201", nil, nil)
+	b.attend(statut, http.StatusUnprocessableEntity, "page trop grande", body)
+	superviseur := nouveauBanc(t, "SUPERVISEUR")
+	connecte(superviseur)
+	statut, body = appelJSON(superviseur, http.MethodGet, "/api/v1/ventes/echeances-en-retard", nil, nil)
+	superviseur.attend(statut, http.StatusForbidden, "sans ventes.lire", body)
+}
+
+func exigerRetard(t *testing.T, ligne, attendu map[string]any) {
+	t.Helper()
+	for cle, valeur := range attendu {
+		if ligne[cle] != valeur {
+			t.Fatalf("%s : %v attendu, ligne %v", cle, valeur, ligne)
+		}
+	}
+}
+
+func dakar(t *testing.T) *time.Location {
+	t.Helper()
+	zone, err := time.LoadLocation("Africa/Dakar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return zone
+}
+
+func echeancesEnRetard(t *testing.T, b *banc) map[int64]map[string]any {
+	t.Helper()
+	parVente := map[int64]map[string]any{}
+	for page := 1; ; page++ {
+		statut, body := appelJSON(b, http.MethodGet, fmt.Sprintf("/api/v1/ventes/echeances-en-retard?taille=200&page=%d", page), nil, nil)
+		b.attend(statut, http.StatusOK, "échéances en retard", body)
+		lignes, _ := body["lignes"].([]any)
+		for _, l := range lignes {
+			ligne := l.(map[string]any)
+			parVente[int64(ligne["venteId"].(float64))] = ligne
+		}
+		if len(lignes) < 200 {
+			return parVente
+		}
+	}
 }

@@ -7,7 +7,7 @@ const buttonVariants = cva(
   [
     'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md',
     'font-[600] transition-colors duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]',
-    'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+    'outline-hidden focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
     'disabled:pointer-events-none disabled:border-transparent disabled:bg-muted',
     'disabled:text-muted-foreground disabled:shadow-none',
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

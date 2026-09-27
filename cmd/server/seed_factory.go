@@ -168,6 +168,33 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`DELETE FROM "representant_suggestions" WHERE "note"='Recommandation de démonstration' AND "id"<>'0199f100-0000-701b-8000-000000000001'`,
 		`INSERT INTO "representant_suggestions" ("id","sourceRepresentantId","suggestedName","suggestedPhoneE164","note","suggestedById","sourceAttemptId","clientCreatedAt") SELECT '0199f100-0000-701b-8000-000000000001',(SELECT "id" FROM "representants" WHERE "id"='0199f100-0000-7000-8000-000000000001'),'Moussa Fall','+221776439021','Recommandation de démonstration',u."id",'0199f100-0000-7004-8000-000000000001',now() FROM "users" u WHERE u."email"='fixture.awa@cpi.sn' ON CONFLICT (id) DO UPDATE SET "suggestedPhoneE164"=EXCLUDED."suggestedPhoneE164"`,
 		`INSERT INTO "lot_export_reaffectations" ("id","lotId","toAssigneeId","fiches","performedById","positions") SELECT '0199f100-0000-701c-8000-000000000001','0199f100-0000-700d-8000-000000000001',u."id",1,u."id",ARRAY[1] FROM "users" u WHERE u."email"='fixture.fatou@cpi.sn' ON CONFLICT DO NOTHING`,
+		// Les ventes ont un identifiant de séquence : rattachées à un classeur fixe,
+		// elles sont remplacées à chaque semis au lieu de s'additionner.
+		`INSERT INTO "ventes_classeurs" ("id","nomFichier","contenu","importeParId") SELECT '0199f100-0000-7021-8000-000000000001','demonstration.xlsx','\x'::bytea,"id" FROM "users" WHERE "email"='fixture.superviseur@cpi.sn' ON CONFLICT DO NOTHING`,
+		`DELETE FROM "ventes" WHERE "classeurId"='0199f100-0000-7021-8000-000000000001'`,
+		`INSERT INTO "ventes" ("classeurId","numero","canal","dateSouscription","client","telephone","site","nombreLots","numerosLots","superficie","prixUnitaire","prixTotal","acompte","reliquat",
+		  "partProprietaire","partApporteur","partCpi","modePaiement","nombreEcheances","periodiciteMois","jourVersement","premierVersement","nomTeleconseiller")
+		SELECT '0199f100-0000-7021-8000-000000000001',g,c.libelle,jour,
+		  (ARRAY['Aminata','Mamadou','Fatou','Ibrahima','Awa','Cheikh'])[1+(g-1)%6]||' '||(ARRAY['Diop','Ndiaye','Fall','Sow','Diallo','Sarr','Ba'])[1+(g-1)%7],
+		  '+22177009'||lpad(g::text,4,'0'),s.nom,lots,'L-'||g,'150 m²',pu,pu*lots,
+		  CASE WHEN credit THEN pu*lots*3/10 ELSE pu*lots END,CASE WHEN credit THEN pu*lots-pu*lots*3/10 ELSE 0 END,
+		  s."partProprietaireParLot"*lots,0,pu*lots-s."partProprietaireParLot"*lots,
+		  CASE WHEN credit THEN 'CREDIT' ELSE 'COMPTANT' END,CASE WHEN credit THEN 12 END,1,CASE WHEN credit THEN 5 END,
+		  CASE WHEN credit THEN (date_trunc('month',jour)+interval '1 month 4 days')::date END,u."fullName"
+		FROM generate_series(1,120) g
+		CROSS JOIN LATERAL (SELECT current_date-(g-1)%60 AS jour,1+g%3 AS lots,g%3=0 AS credit) v
+		JOIN (SELECT nom,"partProprietaireParLot",COALESCE(NULLIF("prixUnitaireDefaut",0),5000000) AS pu,row_number() OVER (ORDER BY ordre,nom) AS rang,count(*) OVER () AS n
+		  FROM "ventes_sites" WHERE actif) s ON s.rang=1+(g-1)%s.n
+		JOIN (SELECT libelle,row_number() OVER (ORDER BY ordre,libelle) AS rang,count(*) OVER () AS n FROM "ventes_canaux" WHERE actif) c ON c.rang=1+(g/2)%c.n
+		JOIN "users" u ON u.email=CASE WHEN g%2=0 THEN 'fixture.awa@cpi.sn' ELSE 'fixture.fatou@cpi.sn' END`,
+		// Une vente à crédit sur deux paie ses échéances échues, l'autre alimente les retards.
+		`INSERT INTO "ventes_versements" ("venteId","rang","date","montant")
+		SELECT v.id,r,(v."premierVersement"+make_interval(months=>r-1))::date,(v."prixTotal"-v."acompte")/12
+		FROM "ventes" v CROSS JOIN LATERAL generate_series(1,12) r
+		WHERE v."classeurId"='0199f100-0000-7021-8000-000000000001' AND v."modePaiement"='CREDIT' AND v.numero%2=0
+		  AND v."premierVersement"+make_interval(months=>r-1)<=current_date`,
+		`UPDATE "ventes" v SET "reliquat"=v."prixTotal"-v."acompte"-(SELECT COALESCE(SUM(vv."montant"),0) FROM "ventes_versements" vv WHERE vv."venteId"=v.id)
+		WHERE v."classeurId"='0199f100-0000-7021-8000-000000000001'`,
 		`INSERT INTO "visite_import_changes" ("id","importJobId","sheet","rowNumber","kind","reference","visiteId","label","fields") SELECT '0199f100-0000-701d-8000-000000000001','0199f100-0000-700c-8000-000000000001','Visites',2,'CREATE'::"VisiteImportChangeKind",'DEV-VISITE-001','0199f100-0000-7007-8000-000000000001','Visite de démonstration','{}'::jsonb ON CONFLICT DO NOTHING`,
 	}
 	for i, statement := range statements {

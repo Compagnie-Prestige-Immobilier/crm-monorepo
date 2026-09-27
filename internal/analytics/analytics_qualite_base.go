@@ -41,11 +41,8 @@ type QualiteDeLaBase struct {
 
 type QualiteOutput struct{ Body QualiteDeLaBase }
 
-// Le score dit ce que vaut la liste remise, sur les deux seules promesses
-// qu'elle porte : le representant repond, et il apporte des prospects. La
-// joignabilite ne se mesure que sur les fiches deja appelees ; la productivite
-// se mesure sur toute la base, un representant productif l'etant meme sans
-// appel de notre part.
+// Joignabilité mesurée sur les fiches déjà appelées, productivité sur toute la base :
+// un représentant apporte des prospects même sans appel de notre part.
 func score(q db.QualiteBaseRepresentantsRow) *int {
 	if q.Total == 0 || q.Eprouves == 0 {
 		return nil

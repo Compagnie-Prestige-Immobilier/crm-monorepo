@@ -1,7 +1,6 @@
 'use client';
 
-import { InfoIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/forms/field';
@@ -14,32 +13,7 @@ import {
 } from '@/components/ui/select';
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
-
-function TransfertInfo({
-  reprisRequise,
-  choisi,
-}: {
-  reprisRequise: boolean;
-  choisi: UserRow | null;
-}) {
-  if (!reprisRequise) {
-    return (
-      <>
-        <strong>Rien n’est supprimé.</strong> Ce compte ne détient aucune fiche : son historique
-        reste en place et il peut être réactivé à tout moment.
-      </>
-    );
-  }
-
-  return (
-    <>
-      <strong>Rien n’est supprimé.</strong> Ses prospects, ses représentants et ses appels à passer
-      sont transférés
-      {choisi === null ? ' au repreneur' : ` à ${choisi.fullName}`}, et son historique reste à son
-      nom. Le compte peut être réactivé à tout moment.
-    </>
-  );
-}
+import { useRecalage } from '@/lib/use-recalage';
 
 export function DeactivateUserDialog({
   user,
@@ -58,18 +32,16 @@ export function DeactivateUserDialog({
   const [repreneur, setRepreneur] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par compte
+  useRecalage([user?.id], () => {
     setRepreneur(null);
     setErreur(undefined);
-  }, [user?.id]);
+  });
 
   // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
   // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.
   const reprisRequise = user !== null && user.prospectCount > 0;
 
   const candidats = repreneurs.filter((row) => row.id !== user?.id && row.isActive);
-  const choisi = candidats.find((row) => row.id === repreneur) ?? null;
 
   return (
     <ConfirmDialog
@@ -86,7 +58,7 @@ export function DeactivateUserDialog({
       }}
       confirmLabel="Désactiver le compte"
       title={user === null ? '' : `Désactiver le compte de ${user.fullName} ?`}
-      description="Sa connexion au panneau est fermée immédiatement. Aucune saisie n’est supprimée."
+      description="Sa connexion est fermée tout de suite. Le compte se réactive à tout moment."
     >
       {user === null ? null : (
         <div className="flex flex-col gap-3">
@@ -99,7 +71,12 @@ export function DeactivateUserDialog({
           </p>
 
           {reprisRequise ? (
-            <Field label="Qui reprend le portefeuille" required error={erreur}>
+            <Field
+              label="Qui reprend le portefeuille"
+              required
+              description="Ses prospects, ses représentants et ses appels à passer lui sont transférés."
+              error={erreur}
+            >
               {(props) => (
                 <Select
                   items={candidats.map((row) => ({ value: row.id, label: row.fullName }))}
@@ -123,13 +100,6 @@ export function DeactivateUserDialog({
               )}
             </Field>
           ) : null}
-
-          <p className="flex items-start gap-2 rounded-md border border-accent-border/30 bg-accent-surface px-3 py-2.5 text-[0.8125rem]">
-            <InfoIcon className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden="true" />
-            <span>
-              <TransfertInfo reprisRequise={reprisRequise} choisi={choisi} />
-            </span>
-          </p>
         </div>
       )}
     </ConfirmDialog>

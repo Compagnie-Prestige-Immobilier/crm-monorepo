@@ -26,7 +26,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { bankBasePath } from '@/lib/bank-filters';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
-import { formatDecimal, formatNumber } from '@/lib/format';
+import { compte, formatDecimal, formatNumber } from '@/lib/format';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { ExactAmountsToggle, MoneyText } from '@/components/money/exact-amounts';
 import { formatXof } from '@/lib/money';
@@ -56,7 +56,7 @@ export function BankDashboardView({ projet }: { projet?: Projet | null | undefin
   const agentOptions: FilterOption[] = (data?.byAgent ?? []).map((agent) => ({
     value: agent.agentId,
     label: agent.label,
-    hint: `${formatNumber(agent.cashed)} encaissés`,
+    hint: compte(agent.cashed, 'encaissé'),
   }));
 
   return (
@@ -111,7 +111,7 @@ export function BankDashboardView({ projet }: { projet?: Projet | null | undefin
                   index={2}
                   label="Taux de rejet"
                   value={`${formatDecimal(data.totals.rejectionRate)} %`}
-                  hint={`${formatNumber(data.totals.rejetes)} dossiers rejetés`}
+                  hint={compte(data.totals.rejetes, 'dossier rejeté', 'dossiers rejetés')}
                   icon={PercentIcon}
                 />
                 <Kpi
@@ -125,7 +125,7 @@ export function BankDashboardView({ projet }: { projet?: Projet | null | undefin
                   hint={
                     data.totals.meanDelayHours === null
                       ? 'Aucun dossier encore clos'
-                      : `${formatNumber(Math.round(data.totals.meanDelayHours))} heures entre ouverture et issue`
+                      : `${compte(Math.round(data.totals.meanDelayHours), 'heure')} entre ouverture et issue`
                   }
                   icon={ClockIcon}
                 />

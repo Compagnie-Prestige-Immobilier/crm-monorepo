@@ -66,6 +66,49 @@ function clickIndex(items: readonly NamedCount[], value: unknown) {
   return items.findIndex((item) => item.id === String(value) || item.label === String(value));
 }
 
+const LIBELLE_MAX = 28;
+
+// Un compte n'a pas de graduation 0,2 : l'axe ne porte que des entiers.
+function graduationsEntieres(items: readonly NamedCount[]): number[] | undefined {
+  if (!items.every((item) => Number.isInteger(item.value))) return undefined;
+  const max = Math.max(1, ...items.map((item) => item.value));
+  const pas = Math.ceil(max / 5);
+  return Array.from({ length: Math.floor(max / pas) + 1 }, (_, rang) => rang * pas);
+}
+
+function libelleCourt(valeur: string | number): string {
+  const texte = String(valeur);
+  return texte.length > LIBELLE_MAX ? `${texte.slice(0, LIBELLE_MAX - 1)}…` : texte;
+}
+
+function margeDesLibelles(items: readonly NamedCount[]): number {
+  const plusLong = Math.max(0, ...items.map((item) => Math.min(item.label.length, LIBELLE_MAX)));
+  return Math.min(210, Math.max(60, 16 + plusLong * 7));
+}
+
+function axesDesBarres(items: readonly NamedCount[], horizontal: boolean) {
+  const graduations = graduationsEntieres(items);
+  const entieres = graduations === undefined ? {} : { tickValues: graduations };
+  if (horizontal) {
+    return {
+      margin: { top: 12, right: 12, bottom: 38, left: margeDesLibelles(items) },
+      axisBottom: null,
+      axisLeft: { tickSize: 0, tickPadding: 8, format: libelleCourt },
+      enableGridX: true,
+      enableGridY: false,
+      ...(graduations === undefined ? {} : { gridXValues: graduations }),
+    };
+  }
+  return {
+    margin: { top: 12, right: 12, bottom: 38, left: 42 },
+    axisBottom: { tickSize: 0, tickPadding: 10 },
+    axisLeft: { tickSize: 0, tickPadding: 8, ...entieres },
+    enableGridX: false,
+    enableGridY: true,
+    ...(graduations === undefined ? {} : { gridYValues: graduations }),
+  };
+}
+
 function Bars({
   items,
   horizontal,
@@ -88,7 +131,6 @@ function Bars({
         keys={['value']}
         indexBy="label"
         layout={horizontal ? 'horizontal' : 'vertical'}
-        margin={{ top: 12, right: 12, bottom: 38, left: horizontal ? 116 : 42 }}
         padding={0.28}
         borderRadius={6}
         colors={(datum) =>
@@ -101,10 +143,7 @@ function Bars({
         borderColor={{ from: 'color', modifiers: [['darker', 0.25]] }}
         enableLabel={presentation?.valeurs === true}
         labelTextColor="#fff"
-        enableGridX={horizontal === true}
-        enableGridY={horizontal !== true}
-        axisBottom={horizontal ? null : { tickSize: 0, tickPadding: 10 }}
-        axisLeft={horizontal ? { tickSize: 0, tickPadding: 8 } : { tickSize: 0, tickPadding: 8 }}
+        {...axesDesBarres(items, horizontal === true)}
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
         {...clickProps}
@@ -282,11 +321,13 @@ function LineSeries({
 }: ItemsChartProps & { stepped?: boolean; area?: boolean }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
+  const graduations = graduationsEntieres(items);
+  const entieres = graduations === undefined ? {} : { tickValues: graduations };
   return (
     <Frame>
       <ResponsiveLine
         data={[
-          { id: label ?? 'Visites', data: items.map((item) => ({ x: item.label, y: item.value })) },
+          { id: label ?? 'Valeur', data: items.map((item) => ({ x: item.label, y: item.value })) },
         ]}
         colors={[paletteFill(theme, presentation?.palette, 0)]}
         curve={stepped ? 'step' : 'monotoneX'}
@@ -297,7 +338,8 @@ function LineSeries({
         enableGridX={false}
         margin={{ top: 14, right: 12, bottom: 34, left: 42 }}
         axisBottom={{ tickSize: 0, tickPadding: 10 }}
-        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8, ...entieres }}
+        {...(graduations === undefined ? {} : { gridYValues: graduations })}
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
         useMesh={true}
@@ -464,7 +506,7 @@ export function NuageChart({
   return (
     <Frame>
       <ResponsiveScatterPlot
-        data={[{ id: 'Visites', data: matrixPoints(matrice) }]}
+        data={[{ id: 'Valeur', data: matrixPoints(matrice) }]}
         colors={[paletteFill(theme, presentation?.palette, 0)]}
         nodeSize={9}
         margin={{ top: 12, right: 18, bottom: 34, left: 48 }}
@@ -489,7 +531,7 @@ export function BullesChart({
       <ResponsiveScatterPlot
         data={[
           {
-            id: 'Visites',
+            id: 'Valeur',
             data: matrixPoints(matrice).map((point) => ({
               ...point,
               size: 8 + (point.value / max) * 20,
@@ -637,7 +679,7 @@ export function TableauWidget({
         <thead>
           <tr>
             <th className="px-2 py-1.5 text-left">{entete}</th>
-            <th className="px-2 py-1.5 text-right">Visites</th>
+            <th className="px-2 py-1.5 text-right">Valeur</th>
             <th className="px-2 py-1.5 text-right">Part</th>
           </tr>
         </thead>

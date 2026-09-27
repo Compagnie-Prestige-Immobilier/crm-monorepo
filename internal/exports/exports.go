@@ -83,7 +83,6 @@ const (
 	ExportEnteteRepresentant      = "Représentant"
 	ExportEnteteDepartement       = "Département"
 	ExportEnteteIef               = "IEF"
-	exportEnteteCommercial        = "Commercial"
 	ExportEnteteProfession        = "Profession"
 	ExportEnteteWhatsapp          = "WhatsApp"
 	exportEnteteDernierResultat   = "Dernier résultat"
@@ -92,6 +91,7 @@ const (
 	ExportEnteteNotes             = "Notes"
 	exportEnteteCommentaire       = "Commentaire"
 	exportEnteteDate              = "Date"
+	exportEnteteClient            = "Client"
 	exportEnteteProjet            = "Projet"
 	exportEnteteIdentifiantFiche  = "Identifiant fiche"
 	exportEnteteCreeLe            = "Créé le"
@@ -126,6 +126,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.PermissionExportsModeles,
 	"GET /api/v1/export/representants-modele.xlsx":          socle.PermissionExportsModeles,
 	"GET " + cheminExportRendezVous:                         socle.PermissionRendezVousExporter,
+	"GET " + cheminExportSommesDues:                         socle.PermissionVentesLire,
 }
 
 // LibellePaiement nomme un mode de paiement, ici comme dans les classeurs.
@@ -144,6 +145,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "modele-import-prospects-grand-public", Method: http.MethodGet, Path: "/api/v1/export/prospects-grand-public-modele.xlsx"}, s.exportModeleGrandPublic)
 	huma.Register(api, huma.Operation{OperationID: "modele-import-representants", Method: http.MethodGet, Path: "/api/v1/export/representants-modele.xlsx"}, s.exportModeleRepresentants)
 	huma.Register(api, huma.Operation{OperationID: "export-rendez-vous", Method: http.MethodGet, Path: cheminExportRendezVous}, s.exportRendezVous)
+	huma.Register(api, huma.Operation{OperationID: "export-sommes-dues", Method: http.MethodGet, Path: cheminExportSommesDues}, s.exportSommesDues)
 }
 
 var (
@@ -351,9 +353,8 @@ func exportCelluleOuiNon(v *bool) any {
 	return exportLibelleNon
 }
 
-// Le classeur est monté en entier avant le premier octet : excelize garde les
-// lignes en fichier temporaire, et une erreur de lecture rend encore un 5xx
-// lisible au lieu d'un fichier tronqué qui s'ouvre quand même.
+// Monté en entier avant le premier octet (excelize passe par un fichier temporaire) :
+// une erreur rend un 5xx lisible plutôt qu'un fichier tronqué qui s'ouvre.
 func exportReponseClasseur(c *exportClasseur, nom string) *huma.StreamResponse {
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
 		ctx.SetHeader("Content-Type", exportTypeMimeXlsx)
@@ -532,7 +533,7 @@ func (s *service) exportRepresentants(ctx context.Context, in *ExportRepresentan
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille(exportNomFeuilleRepresentants,
-		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteEtablissement, ExportEnteteDepartement, ExportEnteteIef, ExportEnteteQualification, exportEnteteCommercial, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
+		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteEtablissement, ExportEnteteDepartement, ExportEnteteIef, ExportEnteteQualification, ExportEnteteTeleconseiller, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
 		[]float64{30, 20, 26, 24, 26, 20, 26, 12, 40, 20, 20}, nil)
 	if err != nil {
 		_ = c.f.Close()
@@ -842,17 +843,9 @@ func (s *service) exportModeleProspects(ctx context.Context, _ *struct{}) (*huma
 		return nil, err
 	}
 	return exportEcrireModele(&exportModele{
-		feuille: exportEnteteProspects,
-		fichier: "modele-import-prospects-" + s.exportDateDuJour() + ".xlsx",
-		colonnes: []exportColonneModele{
-			{ExportEnteteNom, 24, true, "Nom de famille SEUL. Ne mettez pas le nom et le prénom dans la même cellule : le serveur ne les découpe pas.", "Ndiaye"},
-			{ExportEntetePrenom, 24, true, "Prénom SEUL, prénoms composés compris. Colonne distincte du nom, volontairement.", "Aminata"},
-			{ExportEnteteTelephone, 20, true, "Toutes les présentations sont admises : 77 123 45 67, +221 77 123 45 67, 00221771234567. Le serveur normalise. C’est ce numéro qui sert à repérer les doublons.", exportExempleTelephone},
-			{"Téléphone du représentant", 26, true, "Numéro du représentant qui a apporté le prospect. Le représentant doit DÉJÀ exister : importez d’abord les représentants, ce fichier n’en crée aucun.", "76 987 65 43"},
-			{exportEnteteBanque, 18, true, "Nom court de la banque, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", ExportCleCbao},
-			{ExportEnteteSyndicat, 18, true, "Sigle du syndicat, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", exportCleChues},
-			{ExportEnteteMethodeEnrolement, 32, false, "Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : choisir dans la liste déroulante. Laissée vide, la fiche part en attente d’appel.", exportLibellePlateforme},
-		},
+		feuille:  exportEnteteProspects,
+		fichier:  "modele-import-prospects-" + s.exportDateDuJour() + ".xlsx",
+		colonnes: exportColonnesProspects,
 		listes: []exportListeModele{
 			{5, "Banques", banques},
 			{6, "Syndicats", syndicats},
@@ -960,14 +953,28 @@ func (s *service) exportListesGrandPublic(ctx context.Context) ([]exportListeMod
 	}, nil
 }
 
-// L'import Grand Public reconnaît la ligne d'exemple du modèle pour la sauter :
-// les deux listes doivent rester dans le même ordre.
-func ExemplesGrandPublic() []string {
-	exemples := make([]string, len(exportColonnesGrandPublic))
-	for i, colonne := range exportColonnesGrandPublic {
+// L'import reconnaît la ligne d'exemple du modèle pour la sauter : ses colonnes
+// doivent rester dans l'ordre du modèle.
+func ExemplesGrandPublic() []string { return exemplesModele(exportColonnesGrandPublic) }
+
+func ExemplesProspects() []string { return exemplesModele(exportColonnesProspects) }
+
+func exemplesModele(colonnes []exportColonneModele) []string {
+	exemples := make([]string, len(colonnes))
+	for i, colonne := range colonnes {
 		exemples[i] = colonne.exemple
 	}
 	return exemples
+}
+
+var exportColonnesProspects = []exportColonneModele{
+	{ExportEnteteNom, 24, true, "Nom de famille SEUL. Ne mettez pas le nom et le prénom dans la même cellule : le serveur ne les découpe pas.", "Ndiaye"},
+	{ExportEntetePrenom, 24, true, "Prénom SEUL, prénoms composés compris. Colonne distincte du nom, volontairement.", "Aminata"},
+	{ExportEnteteTelephone, 20, true, "Toutes les présentations sont admises : 77 123 45 67, +221 77 123 45 67, 00221771234567. Le serveur normalise. C’est ce numéro qui sert à repérer les doublons.", exportExempleTelephone},
+	{"Téléphone du représentant", 26, true, "Numéro du représentant qui a apporté le prospect. Le représentant doit DÉJÀ exister : importez d’abord les représentants, ce fichier n’en crée aucun.", "76 987 65 43"},
+	{exportEnteteBanque, 18, true, "Nom court de la banque, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", ExportCleCbao},
+	{ExportEnteteSyndicat, 18, true, "Sigle du syndicat, repris EXACTEMENT du référentiel (liste déroulante). Seuls la casse et les espaces autour sont tolérés.", exportCleChues},
+	{ExportEnteteMethodeEnrolement, 32, false, "Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : choisir dans la liste déroulante. Laissée vide, la fiche part en attente d’appel.", exportLibellePlateforme},
 }
 
 var exportColonnesGrandPublic = []exportColonneModele{
@@ -999,3 +1006,10 @@ const (
 	LotEtatARappeler           = "A_RAPPELER"
 	FormulaireLibelleEmployeur = "Employeur"
 )
+
+// Le PARCOURS, pas le projet d'entrée : un même numéro suit les deux. Sans
+// fiche au CRM, il n'y a pas de parcours et l'inscription donne le projet.
+const FiltreProjetDossier = `(EXISTS (SELECT 1 FROM "prospect_journeys" pj
+		WHERE pj."prospectId" = c."prospectId" AND pj."projet" = $%[1]d::"Projet")
+	OR EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+		WHERE ip."id" = c."inscriptionId" AND ip."projet" = $%[1]d::"Projet"))`

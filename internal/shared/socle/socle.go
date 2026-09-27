@@ -3,7 +3,9 @@ package socle
 import (
 	"context"
 	"cpi-go/db"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -26,6 +28,14 @@ type Deps struct {
 }
 
 const ChaqueMinute = "*/1 * * * *"
+
+// `defer func() { socle.JournaliserPanique(tache, recover()) }()` en tête de toute goroutine
+// détachée : le recover du middleware ne couvre que la goroutine de la requête.
+func JournaliserPanique(tache string, panique any) {
+	if panique != nil {
+		slog.Error("panique en arrière-plan", "tache", tache, "panic", panique, "pile", string(debug.Stack()))
+	}
+}
 
 type Tache struct {
 	Nom  string

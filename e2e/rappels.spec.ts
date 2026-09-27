@@ -53,17 +53,20 @@ async function lireRappel(prospectId: string): Promise<RappelEnBase> {
   return lu;
 }
 
+const lisible = (telephoneE164: string): string =>
+  telephoneE164.replace(/^\+221(\d{2})(\d{3})(\d{2})(\d{2})$/u, '+221 $1 $2 $3 $4');
+
 /** Le meme rappel, qu'il soit rendu en tableau au bureau ou en carte au pouce. */
 function ligneRappel(page: Page, telephoneE164: string) {
-  const lisible = telephoneE164.replace(/^\+221(\d{2})(\d{3})(\d{2})(\d{2})$/u, '+221 $1 $2 $3 $4');
+  const numero = lisible(telephoneE164);
   return page
     .getByRole('row')
-    .filter({ hasText: lisible })
+    .filter({ hasText: numero })
     .or(
       page
         .getByRole('list', { name: 'Rappels promis' })
         .getByRole('listitem')
-        .filter({ hasText: lisible }),
+        .filter({ hasText: numero }),
     );
 }
 
@@ -73,12 +76,11 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(CONSOLE);
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
   await page.getByRole('button', { name: fiche.nom }).click();
-  await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
     .getByRole('button', { name: /Oui, elle a répondu/u })
     .click();
-  await page.getByRole('button', { name: 'Passer le formulaire' }).click();
+  await page.getByRole('button', { name: /^Continuer/u }).click();
   await page
     .getByRole('group', { name: 'Qu’a dit la personne ?' })
     .getByRole('button', { name: /À rappeler/u })
@@ -146,12 +148,58 @@ test.describe('parcours 6, rappels promis', () => {
     await expect(ligne).toBeVisible();
     await expect(ligne.getByRole('link', { name: 'Consigner l’appel' })).toBeVisible();
 
-    await ligne.getByRole('button', { name: 'Annuler' }).click();
+    // L'onglet vit dans l'URL : un rechargement ou un retour de la fiche d'appel y retombe.
+    await page.reload();
+    await expect(page.getByRole('tab', { name: ongletDe(promis.scheduledAt) })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await ligne.getByRole('button', { name: /Autres actions/u }).click();
+    await page.getByRole('menuitem', { name: 'Annuler le rappel' }).click();
     await expect(page.getByText('Rappel annulé.')).toBeVisible();
     await expect(ligne).toHaveCount(0);
+    expect((await lireRappel(fiche.id)).status).toBe('CANCELLED');
 
-    const traite = await lireRappel(fiche.id);
-    expect(traite.status).toBe('CANCELLED');
+    await page.getByRole('button', { name: 'Rétablir', exact: true }).click();
+    await expect(page.getByText('Rappel rétabli.')).toBeVisible();
+    await expect(ligne).toBeVisible();
+    const retabli = await lireRappel(fiche.id);
+    expect(retabli.status).toBe('PENDING');
+    expect(retabli.scheduledAt.getTime()).toBe(promis.scheduledAt.getTime());
+  });
+});
+
+test.describe('parcours 6, rappel en retard reporté', () => {
+  test('« Rappeler dans 1 h » repousse l’échéance d’une heure à partir de maintenant', async ({
+    page,
+  }) => {
+    const fiche = await semer('Report');
+    await promettreUnRappel(page, fiche);
+    await avecBase(async (client) => {
+      await client.query(
+        `UPDATE scheduled_callbacks SET "scheduledAt" = now() - interval '30 minutes'
+          WHERE "prospectId" = $1`,
+        [fiche.id],
+      );
+    });
+
+    await ouvrirRappelsProspects(page);
+    const ligne = ligneRappel(page, fiche.phoneE164);
+    await expect(ligne).toBeVisible();
+    const avant = Date.now();
+    await ligne.getByRole('button', { name: 'Rappeler dans' }).click();
+    await page.getByRole('menuitem', { name: '1 h', exact: true }).click();
+    await expect(page.getByText('Rappel reporté d’une heure.')).toBeVisible();
+    await expect(ligne).toHaveCount(0);
+
+    const reporte = await lireRappel(fiche.id);
+    expect(reporte.status).toBe('PENDING');
+    const ecart = reporte.scheduledAt.getTime() - avant;
+    expect(ecart).toBeGreaterThan(59 * 60_000);
+    expect(ecart).toBeLessThan(62 * 60_000);
+    // Reporté à aujourd'hui, il repousserait la carte du parcours en 390 px hors de l'écran.
+    await effacerFiches([fiche.phoneE164]);
   });
 });
 
@@ -166,7 +214,13 @@ test.describe('parcours 6 en 390 px', () => {
     const promis = await lireRappel(fiche.id);
     await ouvrirRappelsProspects(page);
     await page.getByRole('tab', { name: ongletDe(promis.scheduledAt) }).click();
-    await expect(ligneRappel(page, fiche.phoneE164)).toBeVisible();
+    const carte = ligneRappel(page, fiche.phoneE164);
+    await expect(carte).toBeVisible();
+    await expect(carte.getByRole('link', { name: lisible(fiche.phoneE164) })).toHaveAttribute(
+      'href',
+      `tel:${fiche.phoneE164}`,
+    );
+    await expect(carte.getByRole('link', { name: 'Consigner l’appel' })).toBeInViewport();
     await sansDebordementHorizontal(page);
 
     expect(promis.status).toBe('PENDING');

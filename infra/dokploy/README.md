@@ -6,111 +6,73 @@ Un seul script, `deploy.py`, et des étapes à lancer dans l'ordre. Chacune est
 ```bash
 export DOKPLOY_KEY='votre-clé-api'
 
-python3 infra/dokploy/deploy.py provision   # Postgres + Redis + les deux applications
-python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
+python3 infra/dokploy/deploy.py provision   # Postgres + l'application cpi-go
+python3 infra/dokploy/deploy.py configure   # dépôt, build, variables fusionnées, domaines
 python3 infra/dokploy/deploy.py deploy      # démarrage
-python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
+python3 infra/dokploy/deploy.py redeploy    # cpi-go seul, refusé sans sauvegarde de moins de 26 h
 python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne, voir plus bas
 python3 infra/dokploy/deploy.py status      # état courant, sauvegardes comprises
 ```
 
 `provision`, `configure` et `deploy` s'enchaînent avec `deploy.py all`.
 `backup` en est volontairement exclu : il réclame les coordonnées d'un stockage
-S3 que l'opérateur seul détient, et un `all` qui échouerait faute de bucket
-ferait échouer un déploiement par ailleurs correct.
+S3 que l'opérateur seul détient. `redeploy` refuse de partir tant que la
+dernière sauvegarde réussie a plus de 26 h : le binaire applique ses migrations
+au démarrage, et certaines suppriment des données.
+
+`configure` lit l'environnement déjà posé sur `cpi-go` et le complète : une
+variable posée à la main (`GLPI_*`, `KAIRO_*`, `BREVO_WEBHOOK_SECRET`,
+`PLATEFORME_WEBHOOK_SECRET`, `SUPPORT_AI_*`, `DATABASE_URL_<NOM>`…) reste en
+place, et un défaut du script ne remplace jamais une valeur existante. Seules
+les intégrations exportées pour la session (`BREVO_API_KEY`, `TURNSTILE_*`,
+`PLATEFORME_*_URL/TOKEN`, `IMPORT_LEADS_URL`) écrasent la valeur en place.
 
 La clé n'est **jamais** écrite dans un fichier : elle ne vit que dans la variable
 d'environnement, le temps de la session.
 
-## Déploiement automatique sur `prod`
+## Mise en ligne de `prod`
 
-Ce paragraphe affirmait le contraire, et l'affirmation était fausse dans ses
-conséquences. Le raisonnement — « Dokploy possède déjà le dépôt, un workflow ne
-ferait que dupliquer un secret » — oubliait un fait : Dokploy est branché en
-**custom git** (`application.saveGitProvider`), pas via l'intégration GitHub.
-Il ne reçoit donc AUCUN crochet quand `prod` bouge. Une fusion vers `prod` avait
-toutes les apparences d'une mise en ligne sans en produire une seule, et
-personne ne le voyait avant d'aller regarder la version servie.
-
-Depuis le 16 septembre 2026, GitHub ne déploie plus rien et ne teste pas
-`prod` : la CI ne tourne que sur `dev`. La mise en ligne passe par Dokploy en
-git, qui construit le Dockerfile. Tant que l'application reste en « custom
-git », il faut soit activer l'intégration GitHub de Dokploy (auto-déploiement
-sur `prod`), soit lancer le déploiement à la main, soit
-`python3 infra/dokploy/deploy.py redeploy cpi-go` (`redeploy` et **pas**
-`deploy`, voir la docstring de `cmd_redeploy`).
-
-### Le seul réglage à faire
-
-```bash
-gh secret set DOKPLOY_KEY --repo Compagnie-Prestige-Immobilier/crm-monorepo
-```
-
-`DOKPLOY_URL` peut être posée en variable de dépôt pour viser un autre hôte ;
-absente, le script retombe sur sa valeur par défaut. Toutes les autres valeurs
-(`PROJECT_ID`, `ENVIRONMENT_ID`, les domaines) sont dans le script.
-
-### Le lancer à la main reste possible
+Dokploy est branché en **custom git** (`application.saveGitProvider`), pas par
+l'intégration GitHub : il ne reçoit aucun crochet quand `prod` bouge, et aucun
+workflow ne déploie. La CI tourne sur `dev` et sur les pull requests vers
+`prod` ; la fusion ne met rien en ligne. Il faut ensuite soit activer
+l'intégration GitHub de Dokploy (auto-déploiement sur `prod`), soit lancer le
+déploiement à la main, soit :
 
 ```bash
 export DOKPLOY_KEY='…'
-python3 infra/dokploy/deploy.py redeploy   # applications seules
+python3 infra/dokploy/deploy.py redeploy   # cpi-go seul
 python3 infra/dokploy/deploy.py deploy     # première mise en route, Postgres compris
 ```
 
-Le script configure aussi le volume Dokploy `cpi-go-releases`, monté sur
-`/repo/storage/releases`. Les APK publiés depuis **Paramètres → Release Android**
-survivent ainsi aux reconstructions et redéploiements de l'API. Même chose pour
-`cpi-go-db-dumps` sur `/repo/storage/db-dumps`, qui porte les exports à la
-demande. Ces deux volumes **ne sont pas des sauvegardes** : ils vivent sur le
-disque du VPS, et le second est vidé dès le téléchargement de l'export. Les
-sauvegardes sont un dispositif à part, décrit plus bas.
+`redeploy` et **pas** `deploy` pour une mise à jour (voir la docstring de
+`cmd_redeploy`) : seule cette voie vérifie la sauvegarde avant de déployer.
+`DOKPLOY_URL` vise un autre hôte ; toutes les autres valeurs (`PROJECT_ID`,
+`ENVIRONMENT_ID`, les domaines) sont dans le script.
 
-Un workflow SSH lançant `docker-compose.prod.yml` sur ce VPS serait pire que
-rien : il démarrerait Caddy sur les ports 80 et 443, déjà tenus par le Traefik
-de Dokploy, et l'un des deux ne monterait pas.
+Le script monte aussi `cpi-go-db-dumps` sur `/repo/storage/db-dumps`, qui porte
+les exports à la demande, et `cpi-go-imports` sur `/repo/storage/imports`. Ces
+volumes **ne sont pas des sauvegardes** : ils vivent sur le disque du VPS, et le
+premier est vidé dès le téléchargement de l'export. Les sauvegardes sont un
+dispositif à part, décrit plus bas.
 
-## v2, le binaire Go
+## Le binaire Go
 
-`provision` et `configure` créent et règlent une **troisième** application,
-`cpi-go` (`Dockerfile` à la racine, port 4000, volumes `cpi-go-db-dumps`
-partagé avec la v1, et `cpi-go-imports`). Elle ne
-reçoit que l'hôte d'essai `go-v2.cpi-chues.com` : les deux domaines de
-production restent sur `cpi-go-api` et `cpi-go-web`. Ajoutez l'enregistrement A
-`go-v2` et couvrez ce nom par le certificat d'origine, sinon l'essai répond 526.
+Une seule application, `cpi-go` (`Dockerfile` à la racine, port 4000), sert
+l'API et le panneau sur `go.cpi-chues.com` et `go-admin.cpi-chues.com`.
 
-Une seconde base (démo, client) se crée sur le conteneur Postgres existant,
-puis se déclare dans l'environnement Dokploy de `cpi-go` par
-`DATABASE_URL_<NOM>` ; la page de connexion la propose derrière `Ctrl+Shift+D` :
+Une base de démonstration se crée depuis le panneau, **Administration → Bases
+de démonstration** (`POST /api/v1/admin/bases`, trois au plus) : le binaire crée
+`cpi_demo_<nom>`, y pose le schéma et les migrations, puis la sème sous son nom
+avec les comptes de démonstration, sans l'administrateur de production
+(`SEED_ADMIN_*`). La page de connexion la propose derrière `Ctrl+Shift+D`.
 
-```bash
-docker exec -i <postgres> psql -U crm -d crm -c 'CREATE DATABASE crm_demo'
-docker exec -i <postgres> psql -U crm -d crm_demo -v ON_ERROR_STOP=1 -q < sql/schema.sql
-docker exec -e DATABASE_URL=postgresql://crm:<mdp>@<postgres>:5432/crm_demo <cpi-go> /cpi-go -seed
-```
-
-```bash
-python3 infra/dokploy/deploy.py redeploy cpi-go   # mise en scène sur go-v2
-python3 infra/dokploy/deploy.py bascule --oui     # jour J
-python3 infra/dokploy/deploy.py retour --oui      # retour arrière
-```
-
-`bascule` arrête la v1, déplace `go.cpi-chues.com` et `go-admin.cpi-chues.com`
-sur `cpi-go`, puis la déploie ; `retour` fait l'inverse. Les applications v1
-restent définies, arrêtées, **jusqu'à J+7** : passé la migration de nettoyage
-(`plan.md` §7) elles ne redémarrent plus, et le job CI `deploy` doit alors
-lancer `redeploy cpi-go` au lieu de `redeploy`.
-
-## Pourquoi pas `docker-compose.prod.yml`
-
-Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte
-Dokploy ces ports appartiennent à Traefik : les deux entreraient en collision et
-l'un ne démarrerait pas. La forme retenue est native, un service Postgres, un
-service Redis (cache sans persistance, borné à 128 Mo par l'API), deux
-applications construites depuis leurs Dockerfile, et laisse à Traefik le
-domaine et le TLS, qui lui reviennent.
-
-`docker-compose.prod.yml` reste valable pour un VPS nu, sans Dokploy.
+Prérequis dans l'environnement Dokploy de `cpi-go` : `SEED_FIXTURE_PASSWORD`,
+12 caractères au minimum (`deploy.py configure` le pose s'il manque), et le
+droit `CREATEDB` du rôle de `DATABASE_URL`. Ne pas lancer `/cpi-go -seed` avec
+`DATABASE_URL` sur une base de démonstration : elle serait semée comme base
+principale, compte administrateur de production compris et sans comptes de
+démonstration.
 
 ## À faire avant le premier déploiement
 
@@ -155,26 +117,77 @@ partie privée dans Dokploy → **SSH Keys**.
 | A    | `go.cpi-chues.com`       | `72.61.198.237` | orange |
 | A    | `go-admin.cpi-chues.com` | `72.61.198.237` | orange |
 
+### 4. Bloquer l'accès direct au VPS
+
+Avec `API_TRUST_PROXY_HEADERS=true`, le serveur Go fait confiance à l'en-tête
+`CF-Connecting-IP` pour la limite de connexions par IP. Si le VPS reste
+joignable directement (son IP est publiée dans ce fichier), n'importe qui peut
+poser cet en-tête lui-même et contourner la limite.
+
+Choisir l'une des deux protections, avant la mise en production :
+
+- **Pare-feu aux plages Cloudflare** : n'autoriser le trafic entrant sur 80/443
+  que depuis les [plages IP publiées par Cloudflare](https://www.cloudflare.com/ips/).
+  `ufw` ne suffit pas : Docker route les ports publiés de Traefik hors de ses
+  règles. Le script `infra/dokploy/pare-feu-cloudflare.sh`, lancé en root sur
+  le VPS, télécharge et vérifie les plages avant toute modification, puis
+  filtre 80 et 443 dans `DOCKER-USER` et `INPUT`, en IPv4 et IPv6, sans toucher
+  à `ufw` ni à SSH. Relancé, il remplace les plages. Ces règles ne survivent pas
+  à un redémarrage : le relancer une fois Docker démarré. L'équivalent existe
+  dans hPanel Hostinger (VPS → Pare-feu) avec les mêmes plages.
+
+  Vérification depuis un poste hors Cloudflare, en visant l'IP du VPS : la
+  première commande doit expirer, la seconde répondre `401`.
+
+  ```bash
+  curl -m 10 -sk -o /dev/null -w '%{http_code}\n' --resolve go.cpi-chues.com:443:72.61.198.237 \
+    https://go.cpi-chues.com/api/v1/referentiels/banques
+  curl -m 10 -s -o /dev/null -w '%{http_code}\n' https://go.cpi-chues.com/api/v1/referentiels/banques
+  ```
+
+- **Authenticated Origin Pulls** : Cloudflare → **SSL/TLS → Origin Server**,
+  activer _Authenticated Origin Pulls_ et faire vérifier par Traefik le
+  certificat client `cloudflare.crt` que Cloudflare présente à chaque requête.
+
 ## Après le déploiement
 
-Depuis un terminal du conteneur API, **une seule fois** :
+Depuis un terminal du conteneur `cpi-go`, **une seule fois** :
 
 ```bash
-pnpm --filter @crm/database db:seed     # référentiels + compte administrateur
-pnpm --filter @crm/database db:seed:demo # espace démo, via la factory
+/cpi-go -seed   # référentiels, workflow bancaire et compte administrateur
 ```
 
 Sans le seed, aucune saisie n'est possible : les banques, syndicats et
 départements sont des clés étrangères obligatoires.
 
-L'espace démo peut ensuite être réinitialisé depuis le panel web.
+## Migrations d'index `CONCURRENTLY`
+
+`20260925230100` et `20260925230200` créent leurs index sans bloquer les
+écritures, mais le binaire migre avec `lock_timeout=5s`. Derrière une
+transaction longue (export, tirage de campagne : jusqu'à 120 s), l'attente
+dépasse ce délai : la migration échoue, le conteneur sort en 1 et Dokploy le
+relance jusqu'à ce que la base soit calme.
+
+- Déployer ces versions hors pointe, sans export en cours.
+- `20260925230100` retire d'abord les fiches en double dans un lot (la plus
+  petite position reste). Pour les compter avant, lancer
+  `tools/dev/audit-coherence.sql` sur une copie de la base.
+- En cas d'échec, le journal de démarrage nomme la migration. Un
+  `CONCURRENTLY` interrompu laisse un index `INVALID` : le supprimer avant de
+  relancer.
+
+```bash
+docker exec -i <postgres> psql -U crm -d crm -Atc \
+  'select indexrelid::regclass from pg_index where not indisvalid'
+docker exec -i <postgres> psql -U crm -d crm -c 'DROP INDEX CONCURRENTLY IF EXISTS public."<index>"'
+```
 
 ## Fichiers engendrés, jamais commités
 
-| Fichier              | Contenu                                                |
-| -------------------- | ------------------------------------------------------ |
-| `.secrets.generated` | mot de passe Postgres, secrets JWT, mot de passe admin |
-| `.ids.generated`     | identifiants Dokploy des trois services                |
+| Fichier              | Contenu                                     |
+| -------------------- | ------------------------------------------- |
+| `.secrets.generated` | mot de passe Postgres, mot de passe admin   |
+| `.ids.generated`     | identifiants Dokploy de la base et de l'app |
 
 Les deux sont en `chmod 600` et listés dans le `.gitignore` local. Les secrets
 sont engendrés une seule fois : une relance les relit, sinon les mots de passe
@@ -194,14 +207,13 @@ d'origine n'est pas en place.
 
 ## Sauvegardes
 
-> **État actuel : à activer.** Tant que `deploy.py backup` n'a pas été lancé,
-> cet hôte n'a **aucune** sauvegarde automatique, et `deploy.py status` l'affiche
-> en rouge. Le service `backup` de `docker-compose.prod.yml` n'y change rien :
-> ce compose ne tourne pas ici, pour la raison expliquée plus haut.
+> Tant que `deploy.py backup` n'a pas été lancé, cet hôte n'a **aucune**
+> sauvegarde automatique, `deploy.py status` l'affiche en rouge et
+> `deploy.py redeploy` refuse de déployer.
 
 Le dispositif retenu est le routeur `backup` natif de Dokploy : `pg_dump -Fc`
-dans le conteneur de la base, poussé par `rclone` vers un stockage S3, donc
-**hors du VPS**. Le raisonnement complet, et les deux solutions écartées, sont
+dans le conteneur de la base, compressé par `gzip` et poussé par `rclone` vers
+un stockage S3, donc **hors du VPS**. Le raisonnement complet, et les deux solutions écartées, sont
 en tête de `deploy.py`.
 
 ### 1. Un bucket, chez un tiers
@@ -268,15 +280,139 @@ message du tout est donc le signal le plus grave, pas le plus rassurant.
 python3 infra/dokploy/deploy.py status   # entrée, horaire, dernière exécution
 ```
 
-**La procédure de restauration, avec les commandes exactes, est dans
-`../README.md`, section 4.2.** Elle utilise `pg_restore` et non `psql` : les
-dumps Dokploy sont au format `custom`, pas du SQL en clair.
+## Restaurer
+
+Le fichier `<appName de la base>/cpi-go/postgres/<horodatage>.sql.gz` est un
+dump au format `custom` compressé par `gzip` : il se relit avec `pg_restore`, pas
+avec `psql`. Il ne couvre que la base `crm` ; une seconde base (`crm_demo`) n'est
+pas sauvegardée par cette entrée.
+
+On restaure dans une base **neuve**, à côté de celle en service, puis on échange
+les noms : la base abîmée reste disponible tant que la restauration n'est pas
+vérifiée.
+
+```bash
+# 1. Récupérer le dump voulu depuis le bucket (console S3, rclone ou aws s3 cp).
+# 2. Arrêter cpi-go dans Dokploy : plus aucune écriture ni connexion à `crm`.
+docker exec -i <postgres> psql -U crm -d postgres -c 'CREATE DATABASE crm_restauree'
+gunzip -c <horodatage>.sql.gz \
+  | docker exec -i <postgres> pg_restore -U crm -d crm_restauree --no-owner --no-acl --exit-on-error
+
+# 3. Vérifier avant d'échanger : volumes des tables clés et dernière migration.
+docker exec -i <postgres> psql -U crm -d crm_restauree -Atc \
+  'select count(*) from prospects; select count(*) from ventes; select max(version_id) from goose_db_version'
+
+# 4. Les dumps Dokploy sont pris sans droits (--no-acl) : rejouer ceux de l'assistant.
+sed -n '/+goose Up/,/+goose Down/p' sql/migrations/20260925220000_assistant_lecture.sql \
+  | docker exec -i <postgres> psql -U crm -d crm_restauree -v ON_ERROR_STOP=1
+
+# 5. Échanger les noms, puis redémarrer cpi-go : goose applique les migrations postérieures au dump.
+docker exec -i <postgres> psql -U crm -d postgres \
+  -c 'ALTER DATABASE crm RENAME TO crm_avant_restauration' \
+  -c 'ALTER DATABASE crm_restauree RENAME TO crm'
+```
+
+`crm_avant_restauration` se supprime une fois le service vérifié.
+
+Une fois le rôle `crm_app` en place (section suivante), créer la base par
+`CREATE DATABASE crm_restauree OWNER crm_app` et ajouter `--role=crm_app` à
+`pg_restore` : restaurées par `crm` sans droits, les tables seraient
+inaccessibles au service.
+
+Exercice du 26 septembre 2026, sur la base locale : dump `-Fc` gzippé de 1,4 Mo,
+restauration dans une base neuve avec les options ci-dessus, mêmes 77 tables,
+même dernière migration et même nombre de fiches, rejeu des droits de l'assistant
+sans erreur. À refaire sur un dump de production dès que le canal S3 est actif.
+
+## Rôle Postgres sans superutilisateur
+
+L'image `postgres` fait de `crm` son superutilisateur d'amorçage : une injection
+SQL y obtiendrait `COPY … PROGRAM`, et ce rôle ne peut pas être rétrogradé. Le
+binaire l'écrit en avertissement au démarrage tant qu'il s'y connecte. On crée
+donc un rôle applicatif neuf, `crm_app`, propriétaire des objets ; `crm` reste
+le superutilisateur des sauvegardes Dokploy, des extensions et des réparations.
+
+Ordre imposé : d'abord déployer la version qui porte
+`20260925220000_assistant_lecture.sql`, appliquée par `crm` au démarrage (elle
+crée `assistant_lecture` et retire `set_config` à `PUBLIC`, ce qu'un rôle
+ordinaire ne peut pas faire). Ensuite seulement, application arrêtée :
+
+```bash
+# 1. Le rôle, autorisé à créer les bases de démonstration et à endosser assistant_lecture.
+docker exec -i <postgres> psql -U crm -d postgres -v ON_ERROR_STOP=1 \
+  -c "CREATE ROLE crm_app LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD '<secret gardé dans .secrets.generated>'" \
+  -c "GRANT assistant_lecture TO crm_app"
+
+# 2. Dans chaque base servie, puis dans template1, modèle des bases de démonstration créées ensuite.
+for base in crm crm_demo template1; do
+  docker exec -i <postgres> psql -U crm -d "$base" -v ON_ERROR_STOP=1 \
+    -c 'REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM PUBLIC' \
+    -c 'GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO crm_app'
+done
+
+# 3. Dans chaque base servie : la base, le schéma et ses objets passent à crm_app.
+#    REASSIGN OWNED BY crm est refusé : crm, rôle d'amorçage, possède le catalogue.
+for base in crm crm_demo; do
+  docker exec -i <postgres> psql -U crm -d "$base" -v ON_ERROR_STOP=1 <<'SQL'
+ALTER DATABASE :"DBNAME" OWNER TO crm_app;
+ALTER SCHEMA public OWNER TO crm_app;
+DO $$
+DECLARE
+  ordre text;
+BEGIN
+  FOR ordre IN
+    SELECT format('ALTER %s %s OWNER TO crm_app', CASE c.relkind WHEN 'v' THEN 'VIEW'
+             WHEN 'm' THEN 'MATERIALIZED VIEW' WHEN 'S' THEN 'SEQUENCE' ELSE 'TABLE' END, c.oid::regclass)
+    FROM pg_class c
+    WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm', 'S')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+                        AND (d.deptype = 'e' OR (c.relkind = 'S' AND d.deptype IN ('a', 'i'))))
+    UNION ALL
+    SELECT format('ALTER TYPE %s OWNER TO crm_app', t.oid::regtype)
+    FROM pg_type t
+    WHERE t.typnamespace = 'public'::regnamespace AND t.typtype IN ('e', 'd')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid AND d.deptype = 'e')
+    UNION ALL
+    SELECT format('ALTER ROUTINE %s OWNER TO crm_app', p.oid::regprocedure)
+    FROM pg_proc p
+    WHERE p.pronamespace = 'public'::regnamespace
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
+  LOOP
+    EXECUTE ordre;
+  END LOOP;
+END $$;
+SQL
+done
+```
+
+4. Dans Dokploy, remplacer `crm:<mdp>` par `crm_app:<secret>` dans `DATABASE_URL`
+   et dans chaque `DATABASE_URL_<NOM>` de `cpi-go` (le service Postgres garde
+   `crm`), puis redéployer.
+5. Vérifier : l'avertissement de démarrage a disparu, une question à l'assistant
+   répond, l'export de la base aboutit, et :
+
+```bash
+docker exec -i <postgres> psql -U crm_app -d crm -Atc 'select rolsuper from pg_roles where rolname = current_user'   # f
+docker exec -i <postgres> pg_dump -U crm_app -d crm --schema=public -f /dev/null && echo pg_dump ok
+```
+
+Toute migration postérieure tourne sous `crm_app` : une extension non
+approuvée (`trusted`) ou un droit sur `pg_catalog` se pose à la main avec `crm`.
+
+Exercice du 26 septembre 2026, Postgres 16 local, base jetable migrée par `crm`
+puis passée à `crm_app` : avant l'étape 2, `pg_dump` sous `crm_app` échoue sur
+`set_config` ; après, il réussit, `SET ROLE assistant_lecture` lit `prospects`
+et se voit refuser `users` et `set_config`, `CREATE DATABASE` réussit et
+`-seed` passe sous `crm_app`. Une base créée par `crm_app` puis migrée par lui
+reçoit toutes les migrations ; sans l'étape 2 sur son modèle, `set_config`
+y reste ouvert à `assistant_lecture`, d'où `template1` dans la boucle.
 
 ## Après la mise en ligne
 
-- Lancer `deploy.py backup`. Sans lui, la perte du VPS est définitive.
-- Éprouver la restauration une première fois (`../README.md`, section 4.3), puis
-  chaque trimestre. Une sauvegarde non testée n'est pas une sauvegarde.
+- Lancer `deploy.py backup`. Sans lui, la perte du VPS est définitive, et
+  `redeploy` refuse de déployer.
+- Éprouver la restauration ci-dessus une première fois sur une base jetable,
+  puis chaque trimestre. Une sauvegarde non testée n'est pas une sauvegarde.
 - Régénérer la clé d'API Dokploy : elle a circulé en clair.
 - Changer le mot de passe administrateur à la première connexion.
 

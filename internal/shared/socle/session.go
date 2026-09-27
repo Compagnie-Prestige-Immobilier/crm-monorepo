@@ -24,12 +24,17 @@ func ConnexionSecurisee(ctx context.Context) bool {
 	return v
 }
 
-// JetonSession lit le cookie de session sous l'un ou l'autre nom.
+// JetonSession lit le cookie sécurisé, et le cookie en clair seulement hors
+// TLS : en TLS, l'accepter laisserait un jeton non chiffré traverser le réseau.
 func JetonSession(r *http.Request) string {
-	for _, nom := range []string{NomCookie, NomCookieClair} {
-		if c, err := r.Cookie(nom); err == nil && c.Value != "" {
-			return c.Value
-		}
+	if c, err := r.Cookie(NomCookie); err == nil && c.Value != "" {
+		return c.Value
+	}
+	if ConnexionSecurisee(r.Context()) {
+		return ""
+	}
+	if c, err := r.Cookie(NomCookieClair); err == nil && c.Value != "" {
+		return c.Value
 	}
 	return ""
 }

@@ -30,7 +30,7 @@ export function RattraperFeuilles() {
         description:
           refus.length === 0
             ? undefined
-            : refus.map((c) => `${c.fileName} : ${c.motif}`).join(' — '),
+            : refus.map((c) => `${c.fileName} : ${c.motif}`).join(' – '),
       });
     },
     onError: (erreur) => {

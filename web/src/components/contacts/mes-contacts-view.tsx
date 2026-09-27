@@ -15,17 +15,19 @@ import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { ListeCartes, NumeroAppel } from '@/components/ui/liste-cartes';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { useTriLocal } from '@/components/ui/tri-local';
-import { callbackKeys } from '@/lib/data/console';
 import { fetchProspectsAppeles } from '@/lib/data/prospects';
-import { SUIVI_PAGE_SIZE, fetchRepresentantsAppeles } from '@/lib/data/representants';
+import { fetchRepresentantsAppeles } from '@/lib/data/representants';
 import { fetchUsers } from '@/lib/data/users';
-import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { queryKeys } from '@/lib/query-keys';
+import { matchesSearch } from '@/lib/search';
 import {
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
@@ -34,7 +36,10 @@ import {
   type ProspectRow,
   type RepresentantRow,
 } from '@/lib/types';
-import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
+
+// Comptes fermés et rôles changés compris : leurs appels restent lisibles.
+const TOUS_LES_COMPTES: UserFilters = { ...EMPTY_USER_FILTERS, pageSize: 200 };
 
 type Onglet = 'PROSPECTS' | 'REPRESENTANTS' | 'CLIENTS';
 
@@ -93,12 +98,6 @@ function LigneVersFiche({ href, children }: { href: string; children: ReactNode 
   );
 }
 
-function matchesSearch(nom: string, phone: string, search: string): boolean {
-  if (search.trim() === '') return true;
-  const q = search.trim().toLowerCase();
-  return nom.toLowerCase().includes(q) || phone.toLowerCase().includes(q);
-}
-
 function filterProspectItem(
   item: ProspectRow,
   search: string,
@@ -106,7 +105,7 @@ function filterProspectItem(
   issueFiltre: string | null,
   statutFiltre: string | null,
 ): boolean {
-  if (!matchesSearch(`${item.prenom} ${item.nom}`, item.phoneE164 ?? '', search)) return false;
+  if (!matchesSearch(`${item.prenom} ${item.nom} ${item.phoneE164 ?? ''}`, search)) return false;
   if (targetProjet !== null && item.projet !== targetProjet) return false;
   if (issueFiltre === 'JOIGNABLE' && item.lastJoignable !== true) return false;
   if (issueFiltre === 'INJOIGNABLE' && item.lastJoignable !== false) return false;
@@ -119,7 +118,7 @@ function filterRepresentantItem(
   issueFiltre: string | null,
   statutFiltre: string | null,
 ): boolean {
-  if (!matchesSearch(item.fullName, item.phoneE164 ?? '', search)) return false;
+  if (!matchesSearch(`${item.fullName} ${item.phoneE164 ?? ''}`, search)) return false;
   const joignable =
     item.statutQualificationEffect !== null && item.statutQualificationEffect !== 'UNREACHABLE';
   if (issueFiltre === 'JOIGNABLE' && !joignable) return false;
@@ -377,9 +376,8 @@ export function MesContactsView({
   });
 
   const teleconseillers = useQuery({
-    queryKey: callbackKeys.teleconseillers,
-    // Comptes fermés et rôles changés compris : leurs appels restent lisibles.
-    queryFn: () => fetchUsers({ ...EMPTY_USER_FILTERS, pageSize: 200 }),
+    queryKey: queryKeys.commerciaux(TOUS_LES_COMPTES),
+    queryFn: () => fetchUsers(TOUS_LES_COMPTES),
     enabled: canFilter,
     staleTime: 300_000,
   });
@@ -465,7 +463,8 @@ function suiviTextLabel<T>(hasFilters: boolean, itemsFiltered: T[], data: Pagina
     return `${formatNumber(itemsFiltered.length)} affiché${itemsFiltered.length > 1 ? 's' : ''} sur ${formatNumber(data.items.length)}`;
   }
   if (data.total > data.items.length) {
-    return `${formatNumber(data.total)} au total, les ${formatNumber(SUIVI_PAGE_SIZE)} plus récents sont affichés.`;
+    const premier = (data.page - 1) * data.pageSize + 1;
+    return `${formatNumber(data.total)} contacts, ${formatNumber(premier)} à ${formatNumber(premier + data.items.length - 1)} affichés.`;
   }
   return `${formatNumber(data.items.length)} contact${data.items.length > 1 ? 's' : ''}`;
 }
@@ -537,7 +536,7 @@ function Liste<T>({
       {data.pageCount > 1 ? (
         <div className="flex items-center justify-between text-sm">
           <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-            Précédente
+            Précédents
           </Button>
           <span>
             Page {data.page} sur {data.pageCount}
@@ -548,7 +547,7 @@ function Liste<T>({
             disabled={page >= data.pageCount}
             onClick={() => onPage(page + 1)}
           >
-            Suivante
+            Suivants
           </Button>
         </div>
       ) : null}
@@ -598,110 +597,159 @@ function Quand({ at }: { at: string | null }) {
 function TableRepresentants({ items }: { items: RepresentantRow[] }) {
   const tri = useTriLocal(items, COLONNES_REPRESENTANTS_CONTACTS);
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {ENTETES_REPRESENTANTS_CONTACTS.map((colonne) => (
-            <SortableTableHead
-              key={colonne.id}
-              column={colonne}
-              sortBy={tri.sortBy}
-              sortDir={tri.sortDir}
-              onToggle={tri.toggle}
+    <>
+      <ListeCartes
+        items={tri.lignes}
+        libelle="Représentants appelés"
+        cle={(representant) => representant.id}
+        titre={(representant) => representant.fullName}
+        sousTitre={(representant) => (
+          <>
+            <RelationBadge
+              status={representant.relationStatus}
+              label={representant.statutQualificationLabel}
+              effect={representant.statutQualificationEffect}
             />
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tri.lignes.map((representant) => (
-          <LigneVersFiche key={representant.id} href={ficheRepresentant(representant.id)}>
-            <TableCell>
-              <Link
-                href={ficheRepresentant(representant.id)}
-                className="font-[600] underline underline-offset-4"
-              >
-                {representant.fullName}
-              </Link>
-            </TableCell>
-            <TableCell className="tabular-nums">{formatPhone(representant.phoneE164)}</TableCell>
-            <TableCell>
-              <Quand at={representant.lastCallAt} />
-            </TableCell>
-            <TableCell>
-              {representant.statutQualificationLabel === null ? (
-                SANS_VALEUR
-              ) : (
-                <Badge
-                  variant={
-                    representant.statutQualificationEffect === 'UNREACHABLE' ? 'warning' : 'info'
-                  }
-                >
-                  {representant.statutQualificationLabel}
-                </Badge>
-              )}
-            </TableCell>
-            <TableCell>
-              <RelationBadge
-                status={representant.relationStatus}
-                label={representant.statutQualificationLabel}
-                effect={representant.statutQualificationEffect}
+            <Quand at={representant.lastCallAt} />
+          </>
+        )}
+        numero={(representant) => representant.phoneE164}
+        action={(representant) => <OuvrirFiche href={ficheRepresentant(representant.id)} />}
+      />
+      <Table containerClassName="hidden md:block">
+        <TableHeader>
+          <TableRow>
+            {ENTETES_REPRESENTANTS_CONTACTS.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
               />
-            </TableCell>
-          </LigneVersFiche>
-        ))}
-      </TableBody>
-    </Table>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tri.lignes.map((representant) => (
+            <LigneVersFiche key={representant.id} href={ficheRepresentant(representant.id)}>
+              <TableCell>
+                <Link
+                  href={ficheRepresentant(representant.id)}
+                  className="font-[600] underline underline-offset-4"
+                >
+                  {representant.fullName}
+                </Link>
+              </TableCell>
+              <TableCell>
+                <NumeroAppel phoneE164={representant.phoneE164} />
+              </TableCell>
+              <TableCell>
+                <Quand at={representant.lastCallAt} />
+              </TableCell>
+              <TableCell>
+                {representant.statutQualificationLabel === null ? (
+                  SANS_VALEUR
+                ) : (
+                  <Badge
+                    variant={
+                      representant.statutQualificationEffect === 'UNREACHABLE' ? 'warning' : 'info'
+                    }
+                  >
+                    {representant.statutQualificationLabel}
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                <RelationBadge
+                  status={representant.relationStatus}
+                  label={representant.statutQualificationLabel}
+                  effect={representant.statutQualificationEffect}
+                />
+              </TableCell>
+            </LigneVersFiche>
+          ))}
+        </TableBody>
+      </Table>
+    </>
+  );
+}
+
+function OuvrirFiche({ href }: { href: string }) {
+  return (
+    <Link href={href} className={buttonVariants({ variant: 'default', size: 'sm' })}>
+      Ouvrir la fiche
+    </Link>
   );
 }
 
 function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Projet | null }) {
   const tri = useTriLocal(items, COLONNES_PROSPECTS_CONTACTS);
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {ENTETES_PROSPECTS_CONTACTS.map((colonne) => (
-            <SortableTableHead
-              key={colonne.id}
-              column={colonne}
-              sortBy={tri.sortBy}
-              sortDir={tri.sortDir}
-              onToggle={tri.toggle}
-            />
+    <>
+      <ListeCartes
+        items={tri.lignes}
+        libelle="Prospects appelés"
+        cle={(prospect) => prospect.id}
+        titre={(prospect) => `${prospect.prenom} ${prospect.nom}`}
+        sousTitre={(prospect) => (
+          <>
+            <ProjetBadge projet={prospect.projet} />
+            <span>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</span>
+            <Quand at={prospect.lastCallAt} />
+          </>
+        )}
+        numero={(prospect) => prospect.phoneE164}
+        action={(prospect) => <OuvrirFiche href={ficheProspect(projet, prospect)} />}
+      />
+      <Table containerClassName="hidden md:block">
+        <TableHeader>
+          <TableRow>
+            {ENTETES_PROSPECTS_CONTACTS.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tri.lignes.map((prospect) => (
+            <LigneVersFiche key={prospect.id} href={ficheProspect(projet, prospect)}>
+              <TableCell>
+                <ProjetBadge projet={prospect.projet} />
+              </TableCell>
+              <TableCell>
+                <Link
+                  href={ficheProspect(projet, prospect)}
+                  className="font-[600] underline underline-offset-4"
+                >
+                  {prospect.prenom} {prospect.nom}
+                </Link>
+              </TableCell>
+              <TableCell>
+                <NumeroAppel phoneE164={prospect.phoneE164} />
+              </TableCell>
+              <TableCell>
+                <Quand at={prospect.lastCallAt} />
+              </TableCell>
+              <TableCell>
+                {prospect.lastReasonLabel === null ? (
+                  SANS_VALEUR
+                ) : (
+                  <Badge variant={prospect.lastJoignable === false ? 'warning' : 'info'}>
+                    {prospect.lastReasonLabel}
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</TableCell>
+            </LigneVersFiche>
           ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tri.lignes.map((prospect) => (
-          <LigneVersFiche key={prospect.id} href={ficheProspect(projet, prospect)}>
-            <TableCell>
-              <ProjetBadge projet={prospect.projet} />
-            </TableCell>
-            <TableCell>
-              <Link
-                href={ficheProspect(projet, prospect)}
-                className="font-[600] underline underline-offset-4"
-              >
-                {prospect.prenom} {prospect.nom}
-              </Link>
-            </TableCell>
-            <TableCell className="tabular-nums">{formatPhone(prospect.phoneE164)}</TableCell>
-            <TableCell>
-              <Quand at={prospect.lastCallAt} />
-            </TableCell>
-            <TableCell>
-              {prospect.lastReasonLabel === null ? (
-                SANS_VALEUR
-              ) : (
-                <Badge variant={prospect.lastJoignable === false ? 'warning' : 'info'}>
-                  {prospect.lastReasonLabel}
-                </Badge>
-              )}
-            </TableCell>
-            <TableCell>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</TableCell>
-          </LigneVersFiche>
-        ))}
-      </TableBody>
-    </Table>
+        </TableBody>
+      </Table>
+    </>
   );
 }

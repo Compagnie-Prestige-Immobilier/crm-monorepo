@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,6 +69,12 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 			exportCelluleTexte(ligne.PhoneE164), ligne.Type, venues[ligne.Issue],
 			c.horodate(ligne.LastCallAt), ligne.PrisPar, ligne.Site, ligne.PointRencontre,
 			ligne.PointRencontreCommentaire); err != nil {
+			return nil, err
+		}
+	}
+	if len(lignes) >= rendezVousExportMax {
+		avis := "Export limité aux " + strconv.Itoa(rendezVousExportMax) + " premiers rendez-vous. Réduire la période pour voir les suivants."
+		if err := f.ecrire(avis); err != nil {
 			return nil, err
 		}
 	}

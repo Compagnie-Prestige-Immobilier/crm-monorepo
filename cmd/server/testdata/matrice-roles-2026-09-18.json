@@ -1,6 +1,51 @@
 {
+  "GET /api/v1/phase2/rv-site": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/phase2/rv-site/creneaux": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/parrainage/classement": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/prospects/{id}/rendez-vous": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PUT /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/prospects/{id}/parrainage": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "PUT /api/v1/prospects/{id}/methode": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/admin/kairo/reglages/reparation-base/activer": ["ADMIN"],
+  "POST /api/v1/admin/kairo/reglages/reparation-base/desactiver": ["ADMIN"],
+  "POST /api/v1/ventes": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/{id}/versements": ["ADMIN", "DIRECTION"],
+  "DELETE /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/{id}/restaurer": ["ADMIN", "DIRECTION"],
+  "GET /api/v1/ventes/configuration": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/sites": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/sites/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/sites/{id}/active": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/canaux": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/canaux/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/canaux/{id}/active": ["ADMIN", "DIRECTION"],
   "DELETE /api/v1/admin/bases/{nom}": ["ADMIN"],
-  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"],
   "DELETE /api/v1/enrolement/{projet}/inscriptions": ["ADMIN"],
   "DELETE /api/v1/enrolement/{projet}/inscriptions/{id}": ["ADMIN"],
   "DELETE /api/v1/lots-export/{id}": ["ADMIN"],
@@ -27,7 +72,6 @@
     "SUPERVISEUR"
   ],
   "DELETE /api/v1/users/{id}": ["ADMIN"],
-  "DELETE /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
   "DELETE /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "DELETE /api/v1/visites/{id}/definitif": ["DIRECTION"],
   "GET /api/v1/admin/bases": ["ADMIN"],
@@ -88,7 +132,6 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/assistant/questions-enregistrees": ["ADMIN"],
   "GET /api/v1/auth/bases": ["PUBLIC"],
   "GET /api/v1/auth/glpi/autoriser": ["PUBLIC"],
   "GET /api/v1/auth/glpi/ouvrir": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
@@ -156,7 +199,6 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/export/rendez-vous.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/export/representants-modele.xlsx": ["ADMIN"],
   "GET /api/v1/export/representants.xlsx": [
     "ADMIN",
@@ -252,28 +294,7 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/phase2/rv-site": [
-    "ADMIN",
-    "CHARGE_CLIENTELE",
-    "COMMERCIAL",
-    "DIRECTION",
-    "SUPERVISEUR"
-  ],
   "GET /api/v1/prospects": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
-  "GET /api/v1/prospects/clients": [
-    "ADMIN",
-    "CHARGE_CLIENTELE",
-    "COMMERCIAL",
-    "DIRECTION",
-    "SUPERVISEUR"
-  ],
-  "GET /api/v1/prospects/pipeline": [
-    "ADMIN",
-    "CHARGE_CLIENTELE",
-    "COMMERCIAL",
-    "DIRECTION",
-    "SUPERVISEUR"
-  ],
   "GET /api/v1/prospects/{id}": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -295,14 +316,14 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/prospects/{id}/parrainage": [
+  "GET /api/v1/prospects/clients": [
     "ADMIN",
     "CHARGE_CLIENTELE",
     "COMMERCIAL",
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/prospects/{id}/rendez-vous": [
+  "GET /api/v1/prospects/pipeline": [
     "ADMIN",
     "CHARGE_CLIENTELE",
     "COMMERCIAL",
@@ -341,7 +362,6 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/representants": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -392,7 +412,6 @@
     "SUPERVISEUR"
   ],
   "GET /api/v1/roles": ["ADMIN"],
-  "GET /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/statuts-qualification": [
     "ACCUEIL",
     "ADMIN",
@@ -418,20 +437,19 @@
   "GET /api/v1/supervision/prospects/marketing": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/supervision/representants": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/supervision/representants/qualite": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "GET /api/v1/support/categories": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "GET /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "GET /api/v1/support/tickets/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/tableaux-de-bord/amorces": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/tableaux-de-bord/{ecran}/disposition": [
     "ACCUEIL",
     "ADMIN",
     "DIRECTION",
     "SUPERVISEUR"
   ],
+  "GET /api/v1/support/categories": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/users": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/users/{id}": ["ADMIN"],
   "GET /api/v1/ventes": ["ADMIN", "DIRECTION"],
+  "GET /api/v1/ventes/echeances-en-retard": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/classeur/fichier": ["ADMIN", "DIRECTION"],
-  "GET /api/v1/ventes/configuration": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/visites/import/{id}": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
@@ -497,24 +515,17 @@
     "SUPERVISEUR"
   ],
   "PATCH /api/v1/users/{id}": ["ADMIN"],
-  "PATCH /api/v1/ventes/canaux/{id}": ["ADMIN", "DIRECTION"],
-  "PATCH /api/v1/ventes/sites/{id}": ["ADMIN", "DIRECTION"],
-  "PATCH /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/referentiels/{kind}/{id}": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/admin/bases": ["ADMIN"],
-  "POST /api/v1/admin/bases/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/bases/{nom}/rafraichir": ["ADMIN"],
+  "POST /api/v1/admin/bases/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/database-dump": ["ADMIN"],
   "POST /api/v1/admin/kairo/pause": ["ADMIN"],
-  "POST /api/v1/admin/kairo/reglages/reparation-base/activer": ["ADMIN"],
-  "POST /api/v1/admin/kairo/reglages/reparation-base/desactiver": ["ADMIN"],
   "POST /api/v1/admin/kairo/reprise": ["ADMIN"],
   "POST /api/v1/admin/kairo/tickets/{id}/relance": ["ADMIN"],
   "POST /api/v1/admin/purge": ["ADMIN"],
-  "POST /api/v1/assistant/questions": ["ADMIN"],
-  "POST /api/v1/assistant/questions-enregistrees": ["ADMIN"],
   "POST /api/v1/auth/demo-login": ["PUBLIC"],
   "POST /api/v1/auth/glpi/jeton": ["PUBLIC"],
   "POST /api/v1/auth/login": ["PUBLIC"],
@@ -600,6 +611,7 @@
   ],
   "POST /api/v1/phase2/callbacks/{id}/cancel": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
   "POST /api/v1/phase2/callbacks/{id}/snooze": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
+  "POST /api/v1/phase2/callbacks/{id}/retablir": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
   "POST /api/v1/presence/beat": [
     "ACCUEIL",
     "ADMIN",
@@ -612,7 +624,6 @@
   "POST /api/v1/prospects": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/prospects/merge": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
   "POST /api/v1/prospects/reassign": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/parcours/grand-public/conversion": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -621,14 +632,17 @@
     "SUPERVISEUR"
   ],
   "POST /api/v1/prospects/{id}/requalifier": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/suivi-rendez-vous": [
     "ACCUEIL",
     "ADMIN",
     "CHARGE_CLIENTELE",
     "DIRECTION"
   ],
+  "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/vendre": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -652,7 +666,6 @@
     "SUPERVISEUR"
   ],
   "POST /api/v1/representants/import": ["ADMIN"],
-  "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/representants/{id}/comments": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -660,23 +673,17 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/roles": ["ADMIN"],
   "POST /api/v1/statuts-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/statuts-qualification/{id}/active": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "POST /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "POST /api/v1/support/tickets/{id}/rattacher": ["ADMIN"],
-  "POST /api/v1/support/tickets/{id}/reprendre": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/sync/push": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/support/tickets/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets/{id}/reprendre": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets/{id}/rattacher": ["ADMIN"],
   "POST /api/v1/users": ["ADMIN"],
-  "POST /api/v1/ventes": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/canaux": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/canaux/{id}/active": ["ADMIN", "DIRECTION"],
   "POST /api/v1/ventes/classeur": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/sites": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/sites/{id}/active": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/{id}/restaurer": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/ventes/{id}/versements": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/visites/import": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites/import/{id}/apply": ["ADMIN", "DIRECTION"],
@@ -704,9 +711,7 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "PUT /api/v1/prospects/{id}/methode": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PUT /api/v1/roles/{id}/permissions": ["ADMIN"],
-  "PUT /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PUT /api/v1/supervision/creneaux": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition": [
     "ACCUEIL",
@@ -716,5 +721,30 @@
   ],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": ["ADMIN"],
   "PUT /api/v1/users/{id}/active": ["ADMIN"],
-  "PUT /api/v1/users/{id}/password": ["ADMIN"]
+  "PUT /api/v1/users/{id}/password": ["ADMIN"],
+  "POST /api/v1/assistant/questions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/suggestions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/questions-enregistrees": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/assistant/questions-enregistrees": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PATCH /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/questions-enregistrees/{id}/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/tableaux-de-bord/calculs": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/tableaux-de-bord/{ecran}/construire": [
+    "ACCUEIL",
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "POST /api/v1/prospects/{id}/resume": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/export/rendez-vous.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/export/ventes-sommes-dues.xlsx": ["ADMIN", "DIRECTION"]
 }

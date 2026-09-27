@@ -234,7 +234,8 @@ func TestAnalyticsEntonnoirEtFinance(t *testing.T) {
 	b := analyticsConnexion(t, "DIRECTION")
 	jeu := analyticsSemer(b)
 	analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
-	analyticsProspect(b, &jeu, b.userID, instantAnalytics, true)
+	avecDossiers := analyticsProspect(b, &jeu, b.userID, instantAnalytics, true)
+	analyticsDeuxDossiers(b, &jeu, avecDossiers)
 	portee := "?commercialId=" + b.userID + "&departementId=" + jeu.departement
 
 	statut, body := b.appel(http.MethodGet, "/api/v1/analytics/funnel"+portee, nil, false)
@@ -243,14 +244,32 @@ func TestAnalyticsEntonnoirEtFinance(t *testing.T) {
 	sommet := analyticsObjet(b, "sommet", etapes[0])
 	methode := analyticsObjet(b, "méthode obtenue", etapes[1])
 	dossier := analyticsObjet(b, "dossier ouvert", etapes[2])
-	analyticsEgal(b, "prospects saisis", sommet["count"], 2)
+	analyticsEgal(b, "prospects saisis, deux dossiers sur l'un d'eux", sommet["count"], 2)
 	analyticsEgal(b, "méthodes obtenues", methode["count"], 1)
+	analyticsEgal(b, "prospects au dossier ouvert", dossier["count"], 1)
 	analyticsEgal(b, "taux global de la deuxième étape", methode["tauxGlobal"], 50)
 	analyticsNonNul(b, "taux d'une étape précédente non vide", dossier["tauxEtapePrecedente"])
 
 	finance := analyticsObjet(b, "finance", body["finance"])
-	analyticsTexte(b, "montant encaissé sans dossier", finance["montantEncaisse"], "0")
+	analyticsTexte(b, "montant encaissé sans dossier encaissé", finance["montantEncaisse"], "0")
 	analyticsNul(b, "délai moyen sans dossier clos", finance["delaiMoyenJours"])
+}
+
+func analyticsDeuxDossiers(b *banc, jeu *jeuAnalytics, prospect string) {
+	b.t.Helper()
+	etape := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "bank_case_stages" ("id","code","label","position","color","type","updatedAt")
+		VALUES ($1,$1,'Étude test',50,'info','OPEN',now())`, etape)
+	for range 2 {
+		id := uuid.NewString()
+		analyticsExec(b, `INSERT INTO "bank_cases" ("id","reference","referenceKey","customerName","customerPhoneE164",
+			"processingBankId","currentStageId","createdById","prospectId","updatedAt")
+			VALUES ($1,$1,$1,'Nom Prenom','+221770000000',$2,$3,$4,$5,now())`, id, jeu.banque, etape, b.userID, prospect)
+	}
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bank_cases" WHERE "currentStageId" = $1`, etape)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bank_case_stages" WHERE "id" = $1`, etape)
+	})
 }
 
 func TestAnalyticsDelaisEtRendement(t *testing.T) {
@@ -546,9 +565,8 @@ func TestSupervisionActiviteParCampagneRepresentants(t *testing.T) {
 	analyticsEgal(b, "fiches représentants de la campagne regardée", totaux["repFiches"], 1)
 }
 
-// Les appels d'avant le référentiel du 7 septembre 2026 n'ont posé aucun
-// statut : la qualité de la base lit alors l'issue de l'appel, sinon elle
-// compte un représentant joint comme jamais atteint.
+// Un appel d'avant le référentiel du 7 septembre 2026 n'a pas de statut : son
+// issue fait foi, sinon un représentant joint compte comme jamais atteint.
 func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
 	b := analyticsConnexion(t, "SUPERVISEUR")
 	jeu := analyticsSemer(b)
@@ -566,4 +584,49 @@ func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
 	statut, body = b.appel(http.MethodGet, chemin, nil, false)
 	b.attend(statut, http.StatusOK, "qualité après l'appel", body)
 	analyticsEgal(b, "un appel abouti sans statut compte comme joint", body["joints"], avant+1)
+}
+
+func analyticsCompte(b *banc, role string, actif bool) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","isActive","updatedAt")
+		VALUES ($1,$1 || '@cpi.sn',$1,'x','Compte equipe',$2::"Role",$3,now())`, id, role, actif)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "performedById" = $1`, id)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, id)
+	})
+	return id
+}
+
+// Un compte désactivé reste au tableau d'équipe s'il a agi dans la période,
+// sinon ses actes compteraient au total sans ligne qui les porte.
+func TestSupervisionEquipeSansComptesHorsPlateau(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	enPoste := analyticsCompte(b, "COMMERCIAL", true)
+	parti := analyticsCompte(b, "COMMERCIAL", false)
+	partiApresAvoirAppele := analyticsCompte(b, "COMMERCIAL", false)
+	direction := analyticsCompte(b, "DIRECTION", true)
+	prospect := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",$4::timestamp FROM "call_outcome_reasons" WHERE "code" = 'PAS_DE_REPONSE'`,
+		uuid.NewString(), prospect, partiApresAvoirAppele, instantAnalytics)
+	analyticsViderCache()
+
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite?actFrom="+jourAnalytics+"&actTo="+jourAnalytics, nil, false)
+	b.attend(statut, http.StatusOK, "activité de l'équipe", body)
+	membres, ok := body["teleconseillers"].([]any)
+	if !ok {
+		t.Fatalf("liste des téléconseillers attendue, %v reçu", body["teleconseillers"])
+	}
+	listes := map[any]bool{}
+	for _, membre := range membres {
+		listes[analyticsObjet(b, "membre", membre)["id"]] = true
+	}
+	attendus := map[string]bool{enPoste: true, parti: false, partiApresAvoirAppele: true, direction: false, b.userID: false}
+	for id, attendu := range attendus {
+		if listes[id] != attendu {
+			t.Fatalf("compte %s listé=%v, attendu %v", id, listes[id], attendu)
+		}
+	}
 }

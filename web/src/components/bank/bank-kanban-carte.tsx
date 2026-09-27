@@ -152,7 +152,7 @@ export function ContenuInscription({
         className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 font-semibold text-[0.75rem] text-primary transition-colors hover:bg-primary/15"
       >
         <FolderPlusIcon className="size-3.5" aria-hidden="true" />
-        Ouvrir le dossier
+        Créer le dossier
       </Link>
     </div>
   );

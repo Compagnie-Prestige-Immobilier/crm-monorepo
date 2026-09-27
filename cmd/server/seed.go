@@ -8,12 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const nodeEnvDevelopment = "development"
 
 // Même forme que le seed Prisma de la v1 : 20 upsert de référentiels dans
 // une transaction, contrôle bloquant sur le nombre de départements, admin et
@@ -41,10 +44,16 @@ func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 		seedSemerCallOutcomeReasons,
 		seedSemerStatutsQualification,
 		seedSemerVisiteReferentiels,
-		seedSemerAdmin,
 	}
 	for _, etape := range etapes {
 		if err := etape(ctx, q); err != nil {
+			return err
+		}
+	}
+	// L'admin de production n'a rien à faire sur une base de démonstration :
+	// son hachage part dans le dump partagé, semé avec les mêmes identifiants.
+	if cfg.Base == socle.BasePublique {
+		if err := seedSemerAdmin(ctx, q); err != nil {
 			return err
 		}
 	}
@@ -53,7 +62,7 @@ func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 	// production, et les sept comptes y sont restés ouverts avec un mot de passe
 	// écrit dans ce dépôt. Ici il faut une raison POSITIVE de les semer, une base
 	// de démonstration ou un poste de développement déclaré.
-	demonstration := cfg.Base != socle.BasePublique || socle.Env("NODE_ENV", "") == "development"
+	demonstration := cfg.Base != socle.BasePublique || socle.Env("NODE_ENV", "") == nodeEnvDevelopment
 	if err := seedSemerFixtures(ctx, q, tx, demonstration); err != nil {
 		return err
 	}
@@ -276,7 +285,7 @@ func seedDefautDev(nom string, autoriseDefaut bool, defaut string) string {
 }
 
 func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
-	autoriseDefaut := socle.Env("NODE_ENV", "") == "development"
+	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
 	email := seedDefautDev("SEED_ADMIN_EMAIL", autoriseDefaut, "admin@cpi.sn")
 	username := seedDefautDev("SEED_ADMIN_USERNAME", autoriseDefaut, "admin")
 	password := seedDefautDev("SEED_ADMIN_PASSWORD", autoriseDefaut, "ChangeMoiEnProd2026")
@@ -309,6 +318,16 @@ func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
 	return nil
 }
 
+func motDePasseFixtures() (string, error) {
+	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
+	password := seedDefautDev("SEED_FIXTURE_PASSWORD", autoriseDefaut, "ChangeMoi123456")
+	if len(password) < 12 {
+		return "", socle.Problem(http.StatusServiceUnavailable, "SEED_FIXTURE_PASSWORD_MANQUANT",
+			"SEED_FIXTURE_PASSWORD (12 caractères minimum) manque sur le serveur : renseignez-le sur Dokploy pour semer une base de démonstration.")
+	}
+	return password, nil
+}
+
 // Jamais sur la base principale d'une production : elle les voit fermés. Ils ne
 // se suppriment pas, des fiches peuvent les citer.
 func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstration bool) error {
@@ -324,9 +343,9 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstrat
 		slog.Info("seed fixtures", "statut", "aucune sur la base principale", "désactivés", desactives)
 		return nil
 	}
-	password := socle.Env("SEED_FIXTURE_PASSWORD", "ChangeMoi123456")
-	if len(password) < 12 {
-		return errors.New("SEED_FIXTURE_PASSWORD doit faire au moins 12 caractères")
+	password, err := motDePasseFixtures()
+	if err != nil {
+		return err
 	}
 	condensat, err := database.HacherMotDePasse(password)
 	if err != nil {
