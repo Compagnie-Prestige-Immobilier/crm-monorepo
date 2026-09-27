@@ -16,6 +16,7 @@ interface BaseLue {
 // un préfixe, pour qu'un test interrompu n'emporte pas la base d'un autre.
 test.afterAll(async () => {
   await ecrire(`DELETE FROM bases_demonstration WHERE nom = $1`, [NOM]);
+  await ecrire(`DROP DATABASE IF EXISTS "${BASE_SQL}" WITH (FORCE)`);
 });
 
 test.describe('Bases de démonstration', () => {

@@ -6,14 +6,14 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchProspect } from '@/lib/data/prospects';
 import { fetchOffers } from '@/lib/data/reference';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import type { Offer, ProspectRow } from '@/lib/types';
 
 type Chargement =
   { statut: 'ok'; prospect: ProspectRow; offers: Offer[] } | { statut: 'panne'; error: unknown };
 
 export const Route = createFileRoute('/_panneau/teleconseil/prospects/$id')({
-  beforeLoad: guardRoles(['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardPermission('prospects.lire'),
   loader: async ({ params }): Promise<Chargement> => {
     try {
       const [prospect, offers] = await Promise.all([fetchProspect(params.id), fetchOffers()]);

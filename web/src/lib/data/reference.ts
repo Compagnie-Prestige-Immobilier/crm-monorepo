@@ -1,8 +1,9 @@
 import type { ApiClient } from '@crm/api-client';
 import { ApiError, unwrap } from '@crm/api-client/query';
+import { toast } from 'sonner';
 
 import { getApiClient } from '@/lib/api/browser';
-import { formatPhone } from '@/lib/format';
+import { formatNumber, formatPhone } from '@/lib/format';
 import type {
   Banque,
   Departement,
@@ -23,7 +24,7 @@ import type {
  * COMMERCIAL n'avait alors ni banque ni syndicat dans ses listes déroulantes, en
  * permanence et sans un message, et enregistrait des fiches sans segment.
  *
- * Un refus de rôle rend donc une liste vide — c'est ce que ce rôle est censé
+ * Un refus de rôle rend donc une liste vide, c'est ce que ce rôle est censé
  * voir. Toute autre panne continue de remonter.
  */
 interface CompteFiltre {
@@ -43,12 +44,19 @@ function optionCompte(compte: CompteFiltre): FilterOption {
 }
 
 function comptesFacultatifs(result: {
-  data?: { items: CompteFiltre[] };
+  data?: { items: CompteFiltre[]; meta: { total: number } };
   error?: unknown;
   response: Response;
 }): CompteFiltre[] {
   try {
-    return unwrap(result).items;
+    const page = unwrap(result);
+    if (page.meta.total > page.items.length) {
+      toast.warning(
+        `Seuls les ${formatNumber(page.items.length)} premiers comptes sont proposés dans les filtres. Signalez-le à l’administrateur.`,
+        { id: 'plafond-comptes' },
+      );
+    }
+    return page.items;
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) return [];
     throw error;
@@ -68,6 +76,8 @@ function listeFacultative<TItem>(
 }
 
 const REPRESENTANTS_PAR_PAGE = 200;
+const REPRESENTANTS_PAGES_MAX = 25;
+const PLAFOND_REPRESENTANTS = REPRESENTANTS_PAR_PAGE * REPRESENTANTS_PAGES_MAX;
 
 const optionRepresentant = (representant: {
   id: string;
@@ -89,7 +99,13 @@ async function representantsComplets(client: ApiClient): Promise<FilterOption[]>
     params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: 1 } },
   });
   const options = listeFacultative(premiere, optionRepresentant);
-  const pageCount = premiere.data?.meta.pageCount ?? 1;
+  const pageCount = Math.min(premiere.data?.meta.pageCount ?? 1, REPRESENTANTS_PAGES_MAX);
+  if ((premiere.data?.meta.pageCount ?? 1) > REPRESENTANTS_PAGES_MAX) {
+    toast.warning(
+      `Seuls les ${formatNumber(PLAFOND_REPRESENTANTS)} premiers représentants sont proposés dans les listes. Signalez-le à l’administrateur.`,
+      { id: 'plafond-representants' },
+    );
+  }
   const suites = await Promise.all(
     Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
       client.GET('/api/v1/representants', {

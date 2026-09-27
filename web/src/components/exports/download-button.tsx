@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
+import { redirectToLogin } from '@/lib/api/session-expiry';
 import { isDemoExport, withDemoSuffix } from '@/lib/demo-marking';
 import { apiErrorMessage } from '@/lib/utils';
 
@@ -18,6 +19,10 @@ export function useFileDownload(): {
       try {
         const response = await fetch(input.url);
 
+        if (response.status === 401) {
+          redirectToLogin();
+          return;
+        }
         if (!response.ok) {
           const payload: unknown = await response.json().catch(() => null);
           toast.error(apiErrorMessage(payload, input.failureMessage));
@@ -34,7 +39,8 @@ export function useFileDownload(): {
         document.body.append(anchor);
         anchor.click();
         anchor.remove();
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+        // Aucun événement ne signale la fin du téléchargement : délai repris de FileSaver.js.
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 40_000);
         toast.success('Fichier généré.');
       } catch {
         toast.error('Le serveur est injoignable.');

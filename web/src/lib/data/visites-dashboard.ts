@@ -4,15 +4,6 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import type { VisiteStats } from '@/components/accueil/tableau-de-bord/sources';
 
-export {
-  fetchDisposition,
-  resetDisposition,
-  saveDefaultDisposition,
-  saveDisposition,
-  serializeDisposition,
-  type DashboardWidget,
-} from '@/lib/data/disposition';
-
 export async function fetchVisiteDashboardStats(
   du: string,
   au: string,

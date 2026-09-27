@@ -4,10 +4,10 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/exports"
+	"cpi-go/internal/prospects"
 	"cpi-go/internal/representants"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
@@ -34,10 +34,12 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/phase2/callbacks":                         socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/directory":                         socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/rv-site":                           socle.PermissionFichesTenir,
+	"GET " + cheminCreneauxRvSite:                          socle.PermissionFichesTenir,
 	"GET /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"PUT /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"POST /api/v1/phase2/callbacks/{id}/cancel":            socle.PermissionQualificationRappels,
 	"POST /api/v1/phase2/callbacks/{id}/snooze":            socle.PermissionQualificationRappels,
+	"POST /api/v1/phase2/callbacks/{id}/retablir":          socle.PermissionQualificationRappels,
 	"POST /api/v1/ouvertures":                              socle.PermissionFichesTenir,
 	"GET /api/v1/ouvertures/courante":                      socle.PermissionFichesTenir,
 	"PUT /api/v1/ouvertures/{id}/brouillon":                socle.PermissionFichesTenir,
@@ -61,6 +63,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("listScheduledCallbacks", http.MethodGet, "/api/v1/phase2/callbacks"), s.qualificationListerRappels)
 	huma.Register(api, qualificationRoute("cancelScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/cancel"), s.qualificationAnnulerRappel)
 	huma.Register(api, qualificationRoute("snoozeScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/snooze"), s.qualificationReporterRappel)
+	huma.Register(api, qualificationRoute("retablirScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/retablir"), s.qualificationRetablirRappel)
 	huma.Register(api, qualificationRoute("ouvrirFiche", http.MethodPost, "/api/v1/ouvertures"), s.qualificationOuvrirFiche)
 	huma.Register(api, qualificationRoute("ouvertureCourante", http.MethodGet, "/api/v1/ouvertures/courante"), s.qualificationOuvertureCourante)
 	huma.Register(api, qualificationRoute("enregistrerBrouillonOuverture", http.MethodPut, "/api/v1/ouvertures/{id}/brouillon"), s.qualificationEnregistrerBrouillon)
@@ -376,6 +379,9 @@ func (s *service) qualificationEcrireContactsRecommandes(ctx context.Context, q 
 		}
 		var resolu *string
 		existantID, err := q.ProspectIdParTelephoneExact(ctx, &e164)
+		if err == nil && existantID == b.ProspectID {
+			continue
+		}
 		if err == nil {
 			resolu = &existantID
 		} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -833,10 +839,13 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 	return t, err
 }
 
-// L'adhésion se consigne par le formulaire : une méthode d'enrôlement sur un
-// appel joint clôt la fiche sur la méthode obtenue, quel que soit le statut
-// choisi, qui reste le motif de la tentative. Un appel non joint la refuse.
+// Une méthode d'enrôlement sur un appel joint clôt la fiche sur la méthode obtenue,
+// quel que soit le statut choisi ; un appel non joint la refuse.
 func qualificationAdhesionParFormulaire(b *QualificationCallAttemptBody, t *qualificationTentative) error {
+	if b.Method == nil && t.regle.exigeMethode {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_REQUIRED",
+			"L’issue « "+t.motif.label+" » exige la méthode d’enrôlement obtenue.")
+	}
 	if b.Method == nil || t.regle.exigeMethode {
 		return nil
 	}
@@ -958,6 +967,10 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 		return "", vide, socle.Problem(http.StatusUnprocessableEntity, "VALIDATION_FAILED",
 			"L’identifiant de la tentative est obligatoire.")
 	}
+	// Un poste en avance figerait le dernier appel de la fiche pour tous les appels suivants.
+	if maintenant := time.Now(); b.ClientCreatedAt.After(maintenant.Add(qualificationToleranceHorloge)) {
+		b.ClientCreatedAt = maintenant
+	}
 	motif, err := s.qualificationMotifDeLIssue(ctx, b.ReasonCode)
 	if err != nil {
 		return "", vide, err
@@ -966,15 +979,15 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	if err != nil {
 		return "", vide, err
 	}
-	if err := s.rvSiteVerifier(ctx, b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); err != nil {
-		return "", vide, err
-	}
 	if err := s.qualificationProspectAttribue(ctx, u, b.ProspectID); err != nil {
 		return "", vide, err
 	}
 	var statut string
 	var etat QualificationProspectPhase2StateDTO
 	err = qualificationTx(ctx, s, func(q *db.Queries) error {
+		if e := s.rvSiteVerifier(ctx, q, b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); e != nil {
+			return e
+		}
 		var e error
 		statut, etat, e = s.qualificationAppliquerTentative(ctx, q, u, b, &tentative)
 		return e
@@ -1005,9 +1018,8 @@ func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Ut
 	return nil
 }
 
-// Tout ce qui refuse la tentative avant la moindre écriture. Le rejeu n'est PAS
-// revérifié : le verdict d'une tentative déjà admise se redemande sans que
-// l'état du prospect puisse le retirer.
+// Refus avant toute écriture. Le rejeu n'est PAS revérifié : le verdict d'une
+// tentative admise ne dépend plus de l'état du prospect.
 func qualificationPreVol(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody) (prospect db.ProspectPourTentativeRow, parcours db.ParcoursDuProspectRow, duplicate bool, err error) {
 	if prospect, err = q.ProspectPourTentative(ctx, b.ProspectID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1020,6 +1032,11 @@ func qualificationPreVol(ctx context.Context, q *db.Queries, b *QualificationCal
 	}
 	if duplicate, err = q.CallAttemptExiste(ctx, b.ID); err != nil || duplicate {
 		return prospect, parcours, duplicate, err
+	}
+	// Consigner sur une fiche vendue ou convertie ferait régresser son statut.
+	if prospect.Statut == db.ProspectStatutCONVERTI || prospect.Statut == db.ProspectStatutVENDU {
+		return prospect, parcours, false, socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI",
+			"Une fiche convertie ou vendue ne se consigne plus.")
 	}
 	if b.ExpectedRev != nil && *b.ExpectedRev != prospect.Rev {
 		return prospect, parcours, false, socle.Problem(http.StatusConflict, "REV_CONFLICT",
@@ -1146,9 +1163,8 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 	return err
 }
 
-// Un premier appel sort la fiche et son parcours de « Nouveau » : c'est
-// l'appel qui fait progresser le statut, pas une saisie manuelle. Le journal
-// de la fiche le dit.
+// Un premier appel sort la fiche et son parcours de « Nouveau », et le journal de
+// la fiche le dit.
 func qualificationMarquerContacte(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID, journeyID string) error {
 	rangs, err := q.MarquerProspectContacte(ctx, prospectID)
 	if err != nil {
@@ -1201,13 +1217,11 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	if err != nil {
 		return db.CorrigerProspectParTentativeRow{}, err
 	}
-	if len(b.ChampsLibres) > 0 {
-		brut, erreur := json.Marshal(b.ChampsLibres)
-		if erreur != nil {
-			return db.CorrigerProspectParTentativeRow{}, erreur
-		}
-		p.MajChampsLibres, p.ChampsLibres = true, brut
+	libres, err := prospects.ChampsLibresRetenus(ctx, q, courant.Projet, b.ChampsLibres)
+	if err != nil {
+		return db.CorrigerProspectParTentativeRow{}, err
 	}
+	p.MajChampsLibres, p.ChampsLibres = libres != nil, libres
 	p.MajFiche = qualificationFicheModifiee(&p)
 	p.MajDernierAppel = courant.LastCallAt == nil || !b.ClientCreatedAt.Before(*courant.LastCallAt)
 	if p.MajDernierAppel {
@@ -1217,9 +1231,8 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	return q.CorrigerProspectParTentative(ctx, p)
 }
 
-// EB-23 côté prospect : la contradiction ne lève pas. AUTRE_NUMERO sans numéro
-// retombe sur AUCUN, ce que dit la réponse « non » quand aucun second numéro ne
-// suit. Seul un numéro illisible refuse la tentative.
+// La contradiction ne lève pas : AUTRE_NUMERO sans numéro retombe sur AUCUN.
+// Seul un numéro illisible refuse la tentative.
 func qualificationWhatsappProspect(b *QualificationCallAttemptBody, courant *db.ProspectPourTentativeRow, region string) (statut *string, majNumero bool, numero *string, err error) {
 	if b.WhatsappStatus == nil && b.WhatsappE164 == nil {
 		return nil, false, nil, nil
@@ -1264,7 +1277,6 @@ func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, i *qualifi
 	if quand == nil && !i.regle.accepteCallbackAt {
 		// L'appel a tenu la promesse sans en prendre une nouvelle : le rappel
 		// promis se clôt sur cette tentative au lieu de rester en retard.
-		// (La clôture de parcours, plus bas, referme ce qui s'y ajoute.)
 		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: i.attemptID, ProspectID: i.prospectID})
 	}
 	if quand == nil {

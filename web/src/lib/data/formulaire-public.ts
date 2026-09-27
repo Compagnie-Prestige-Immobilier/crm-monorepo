@@ -127,7 +127,7 @@ function champMasque(champ: string, saisie: Saisie): boolean {
   return false;
 }
 
-const lire = (saisie: Saisie, cle: string): string => (saisie[cle] ?? '').trim();
+export const lire = (saisie: Saisie, cle: string): string => (saisie[cle] ?? '').trim();
 
 export function champsRendus(
   champs: readonly ReglageChampPublic[],

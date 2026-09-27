@@ -195,6 +195,11 @@ func inscriptionIntrouvable() error {
 	return socle.Problem(http.StatusNotFound, "INSCRIPTION_INTROUVABLE", "Cette inscription n’existe pas pour ce projet.")
 }
 
+func inscriptionLieeAUnDossier() error {
+	return socle.Problem(http.StatusConflict, "INSCRIPTION_LIEE_A_UN_DOSSIER",
+		"Cette inscription porte un dossier bancaire ouvert : elle ne peut pas être supprimée.")
+}
+
 func (s *service) lireInscription(ctx context.Context, in *InscriptionInput) (*InscriptionOutput, error) {
 	row, err := s.Q.GetInscription(ctx, db.GetInscriptionParams{ID: in.ID, Projet: db.Projet(in.Projet)})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -271,7 +276,7 @@ func (s *service) supprimerInscription(ctx context.Context, in *InscriptionInput
 			return err
 		}
 		if supprimees == 0 {
-			return inscriptionIntrouvable()
+			return inscriptionLieeAUnDossier()
 		}
 		n = supprimees
 		return database.Auditer(ctx, q, acteur.ID, "enrolement.inscription_delete", "inscription", in.ID, avant, nil)

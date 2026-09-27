@@ -180,9 +180,8 @@ func exportSegmentSQL(segment string) string {
 	return "(" + syndicat + " AND " + banque + ")"
 }
 
-// Portée, filtres et suppression logique, partagés par les lignes et par la
-// feuille Synthèse : deux clauses distinctes feraient diverger le total du
-// tableau de bord et le nombre de lignes du classeur.
+// Partagé par les lignes et la feuille Synthèse : deux clauses distinctes feraient
+// diverger le total du tableau de bord et le nombre de lignes.
 func exportConditionsProspects(u *socle.Utilisateur, in *ExportProspectsInput, segment string) (*exportPredicat, error) {
 	p := &exportPredicat{}
 	exportPorteeDeLecture(p, u)
@@ -330,7 +329,7 @@ func exportSegmentDuProspect(l *exportLigneProspect) string {
 var ExportEntetesProspects = []string{
 	ExportEnteteNom, ExportEntetePrenom, ExportEnteteTelephone, "Projets", "Statut",
 	exportEnteteBanque, ExportEnteteSyndicat, ExportEnteteRepresentant,
-	"Tél. représentant", ExportEnteteDepartement, exportEnteteCommercial, ExportEnteteDateSaisie,
+	"Tél. représentant", ExportEnteteDepartement, ExportEnteteTeleconseiller, ExportEnteteDateSaisie,
 	"Secteur", ExportEnteteProfession, ExportEnteteCanalProvenance, "Durée du système (mois)",
 	FormulaireLibelleEmployeur, "Type de contrat", ExportEnteteAnciennete, "Lieu d’activité", "Mode d’épargne",
 	"Pays de résidence", "Ville de résidence", ExportEnteteWhatsapp, "Relais au Sénégal",
@@ -580,7 +579,7 @@ func exportEcrireFeuilleRepresentants(c *exportClasseur, representants map[strin
 	f, err := c.nouvelleFeuille(exportNomFeuilleRepresentants,
 		[]string{
 			ExportEnteteRepresentant, ExportEnteteTelephone, ExportEnteteDepartement,
-			exportEnteteCommercial, exportEnteteProspects, ExportEnteteDateSaisie,
+			ExportEnteteTeleconseiller, exportEnteteProspects, ExportEnteteDateSaisie,
 		},
 		[]float64{28, 18, 22, 26, 12, 20}, nil)
 	if err != nil {
@@ -768,7 +767,7 @@ func (s *service) exportVueDEnsemble(ctx context.Context, p *exportPredicat, in 
 		return nil, err
 	}
 	libelles := []string{
-		"Commerciaux actifs", "Départements couverts", "Nouveaux", "Contactés",
+		"Téléconseillers actifs", "Départements couverts", "Nouveaux", "Contactés",
 		"Convertis", "Vendus", "Perdus", "Saisis sur 7 jours", "Saisis sur 30 jours",
 	}
 	lignes := make([]exportLigneSynthese, 0, len(libelles))

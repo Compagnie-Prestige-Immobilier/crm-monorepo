@@ -9,18 +9,10 @@ import {
   signalementActif,
   type Signalement,
 } from '@/lib/data/support';
+import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
 const CLE = ['support', 'signalements'] as const;
-
-function dateCourte(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function details(signalement: Signalement): string[] {
   const lignes = [libelleEtat(signalement)];
@@ -42,7 +34,7 @@ function Ligne({ signalement, reprendre }: { signalement: Signalement; reprendre
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-[0.8125rem]">{signalement.description}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {dateCourte(signalement.creeLe)}
+          {formatDateTime(signalement.creeLe)}
         </span>
       </div>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">

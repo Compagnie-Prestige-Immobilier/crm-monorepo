@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
@@ -11,11 +11,18 @@ import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { LiveStream } from '@/components/live/live-stream';
 import { RappelPopUpIntrusif } from '@/components/rappels/rappel-pop-up-intrusif';
+import { peut, peutTenirUneFiche } from '@/lib/types';
+
+const chargerCoqueAssistant = () => import('@/components/assistant/coque-assistant');
+const CoqueAssistant = lazy(chargerCoqueAssistant);
+
+const PRESENCE_INTERVALLE_MS = 60_000;
 
 export const Route = createFileRoute('/_panneau')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions);
     if (user === null) throw redirect({ to: '/connexion', search: { suite: location.href } });
+    if (peut(user, 'assistant.utiliser')) await chargerCoqueAssistant();
     return { user };
   },
   component: Panneau,
@@ -39,19 +46,38 @@ function Panneau() {
     document.title = `${navTitle(user, pathname)} · CPI GO`;
   }, [user, pathname]);
 
-  return (
+  useEffect(() => {
+    if (!peutTenirUneFiche(user)) return;
+    const battre = (): void => {
+      fetch('/api/v1/presence/beat', { method: 'POST', credentials: 'same-origin' }).catch(
+        () => undefined,
+      );
+    };
+    battre();
+    const id = window.setInterval(battre, PRESENCE_INTERVALLE_MS);
+    return () => window.clearInterval(id);
+  }, [user]);
+
+  const assistant = peut(user, 'assistant.utiliser');
+  const coque = (
     <CoqueShell>
       <LiveStream />
-      <RappelPopUpIntrusif userId={user.id} />
+      {peutTenirUneFiche(user) ? <RappelPopUpIntrusif userId={user.id} /> : null}
       <SidebarShell visiteur={user} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <DemoBanner user={user} />
-        <Topbar user={user} demoEnabled={false} />
+        <Topbar user={user} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           <Outlet />
         </main>
       </div>
     </CoqueShell>
+  );
+  if (!assistant) return coque;
+  return (
+    <Suspense fallback={null}>
+      <CoqueAssistant>{coque}</CoqueAssistant>
+    </Suspense>
   );
 }

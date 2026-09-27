@@ -40,8 +40,6 @@ type AnnuaireOutput struct {
 	}
 }
 
-// Curseur keyset sur (updatedAt, id) : une pagination par décalage reverrait ou
-// sauterait des fiches dès qu'une seule est modifiée pendant le parcours.
 // `AnnuairePhase2` écarte les fiches sans numéro : la valeur lue n'est jamais nulle.
 func qualificationNumero(valeur *string) string {
 	if valeur == nil {

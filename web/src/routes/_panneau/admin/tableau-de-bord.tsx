@@ -1,25 +1,15 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { AdminTableauDeBordView } from '@/components/admin/tableau-de-bord-view';
-import { Skeleton } from '@/components/ui/skeleton';
-import { guardPermission } from '@/lib/guard';
+const VOLETS: Readonly<Record<string, string>> = {
+  enrolement: '/admin/enrolement',
+  deploiement: '/teleconseil/pole-deploiement',
+  marketing: '/teleconseil/pole-marketing',
+};
 
+/** L'ancien tableau de bord admin : ses liens partagés mènent aux écrans qui le composaient. */
 export const Route = createFileRoute('/_panneau/admin/tableau-de-bord')({
-  beforeLoad: guardPermission('parametres.administrer'),
-  component: AdminTableauDeBordPage,
-  pendingComponent: Loading,
+  beforeLoad: ({ location }) => {
+    const volet = new URLSearchParams(location.searchStr).get('volet') ?? '';
+    throw redirect({ href: VOLETS[volet] ?? '/teleconseil/tableau-de-bord', replace: true });
+  },
 });
-
-function Loading() {
-  return (
-    <div className="flex flex-col gap-6" role="status" aria-label="Chargement du tableau de bord">
-      <Skeleton className="h-10 w-72" />
-      <Skeleton className="h-12 w-96 rounded-lg" />
-      <Skeleton className="h-80 w-full rounded-lg" />
-    </div>
-  );
-}
-
-function AdminTableauDeBordPage() {
-  return <AdminTableauDeBordView />;
-}

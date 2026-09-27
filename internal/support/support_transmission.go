@@ -55,6 +55,7 @@ func (s *service) balayerSignalements(ctx context.Context) error {
 }
 
 func (s *service) transmettre(ctx context.Context, id string) {
+	defer func() { socle.JournaliserPanique("transmission du signalement", recover()) }()
 	if err := s.transmettreUn(ctx, id); err != nil {
 		slog.Error("signalement non transmis", "signalement", id, "err", err)
 	}

@@ -317,9 +317,8 @@ func representantTri(sortBy, sortOrder, suivi string) (champ, sens string) {
 	return champ, sens
 }
 
-// Les deux filtres WhatsApp se composent par INTERSECTION : envoyer les deux et
-// n'en voir appliquer qu'un rendrait une liste dont personne ne peut dire ce
-// qu'elle montre.
+// Les deux filtres WhatsApp se composent par INTERSECTION : n'en appliquer qu'un
+// rendrait une liste dont personne ne peut dire ce qu'elle montre.
 func representantWhatsappFiltre(statut string, joignable *bool) []string {
 	if statut == "" && joignable == nil {
 		return nil
@@ -498,9 +497,8 @@ type RepresentantLookupOutput struct {
 	}
 }
 
-// Rend la fiche entière quel qu'en soit le créateur : l'annuaire est commun, et
-// c'est ainsi qu'on qualifie un représentant trouvé au numéro sans le ressaisir
-// en double. Le propriétaire reste nommé, pour savoir vers qui se tourner.
+// Fiche entière quel qu'en soit le créateur : l'annuaire est commun, un représentant trouvé au numéro
+// se qualifie sans ressaisie. Le propriétaire reste nommé, pour savoir vers qui se tourner.
 func (s *service) chercherRepresentant(ctx context.Context, in *RepresentantLookupInput) (*RepresentantLookupOutput, error) {
 	phone, err := database.NormaliserTelephone(in.Phone, s.Cfg.PhoneRegion)
 	if err != nil {
@@ -522,9 +520,8 @@ func (s *service) chercherRepresentant(ctx context.Context, in *RepresentantLook
 	out.Body.Found = true
 	out.Body.OwnedByCommercialID = &dto.CreatedByID
 	out.Body.OwnedByCommercialName = &dto.CreatedByName
-	// La recherche reste globale, sinon le doublon d'un collègue échappe au
-	// contrôle. La fiche elle-même ne part qu'à qui a le droit de la lire : le
-	// nom du propriétaire suffit à dire « ce numéro est déjà pris ».
+	// Recherche globale, sinon le doublon d'un collègue échappe au contrôle ; la fiche ne part qu'à
+	// qui peut la lire, le nom du propriétaire suffit à dire « ce numéro est déjà pris ».
 	if u := socle.UtilisateurCourant(ctx); representantLitTout(&u, false) || dto.CreatedByID == u.ID {
 		out.Body.Representant = &dto
 	}
@@ -752,9 +749,8 @@ func representantVerifierWhatsapp(statut db.WhatsappStatus, numero, actuel *stri
 	return nil
 }
 
-// CHAQUE CHAMP EST INDÉPENDAMMENT FACULTATIF : un appel interrompu ne doit rien
-// perdre de ce qui a été dit avant. Seule une incohérence que le CHECK refuse
-// aussi fait échouer le recueil.
+// CHAQUE CHAMP EST INDÉPENDAMMENT FACULTATIF : un appel interrompu ne perd rien de ce qui a été dit.
+// Seule une incohérence que le CHECK refuse aussi fait échouer le recueil.
 func representantPatchWhatsapp(cible *db.Representant, in *representantPatch, region string) error {
 	if in.Body.Profession != nil {
 		cible.Profession = representantNonVide(in.Body.Profession)
@@ -795,10 +791,8 @@ var representantTransitions = map[db.RepresentantRelation][]db.RepresentantRelat
 	db.RepresentantRelationREFUS:       {db.RepresentantRelationAMBASSADEUR},
 }
 
-// La garde porte sur le statut de DÉPART et vit dans la mise à jour elle-même :
-// deux appels concurrents la passeraient tous les deux sur une lecture
-// préalable, et le second écrirait une transition partant d'un statut déjà
-// quitté. Un geste qui ne change rien n'écrit rien.
+// Garde sur le statut de DÉPART dans la mise à jour elle-même : sur une lecture préalable, deux appels
+// concurrents passeraient tous deux. Un geste qui ne change rien n'écrit rien.
 func representantBasculerRelation(ctx context.Context, q *db.Queries, id, userID string, de, vers db.RepresentantRelation, motif *string) error {
 	if de == vers {
 		return nil
@@ -884,9 +878,8 @@ func representantAppliquerPatch(cible *db.Representant, in *representantPatch, r
 	return representantPatchWhatsapp(cible, in, region)
 }
 
-// La bascule de relation part APRÈS la mise à jour ordinaire : elle porte sa
-// propre garde sur le statut de départ, et le trigger
-// `representants_ambassadeur_vaut_accepte` ne doit s'armer que sur elle.
+// La bascule de relation part APRÈS la mise à jour ordinaire : elle porte sa propre garde, et le
+// trigger `representants_ambassadeur_vaut_accepte` ne doit s'armer que sur elle.
 func representantEcrireModification(ctx context.Context, q *db.Queries, userID string, existant, modifie *db.Representant, in *representantPatch) error {
 	ecrites, err := q.UpdateRepresentant(ctx, db.UpdateRepresentantParams{
 		ID: existant.ID, Rev: in.Body.Rev,
@@ -952,18 +945,16 @@ type RepresentantRelationHistoryOutput struct {
 	}
 }
 
-// Vérifier la seule existence donnait à tout téléconseiller l'accès aux
-// sous-ressources d'un représentant d'un collègue, dont `fiche-history` qui rend
-// le nom et le téléphone de la fiche. La portée du lecteur s'applique ici.
+// La portée du lecteur s'applique aux sous-ressources : `fiche-history` rend le nom et le
+// téléphone de la fiche, la seule existence ne suffit pas.
 func (s *service) exigerRepresentant(ctx context.Context, id string) error {
 	u := socle.UtilisateurCourant(ctx)
 	_, err := representantFicheLue(ctx, s.Q, id, representantLitTout(&u, false), u.ID)
 	return err
 }
 
-// Lecture GLOBALE délibérée : une trace suit toujours la fiche, déjà résolue
-// ci-dessus. Rejouer le filtre ici priverait une fiche de son histoire, ce qui
-// se lit à l'écran comme une relation jamais entamée.
+// Lecture GLOBALE délibérée : la trace suit la fiche, déjà résolue ci-dessus ; rejouer le filtre
+// la priverait de son histoire, lue à l'écran comme une relation jamais entamée.
 func (s *service) historiqueRelationRepresentant(ctx context.Context, in *RepresentantIDInput) (*RepresentantRelationHistoryOutput, error) {
 	if err := s.exigerRepresentant(ctx, in.ID); err != nil {
 		return nil, err
@@ -992,11 +983,14 @@ type RepresentantCallAttemptsOutput struct {
 	}
 }
 
-// Le chronomètre court de la première saisie à la qualification. Nul tant
-// qu'une borne manque, jamais zéro : une fiche seulement consultée tirerait la
-// durée moyenne de traitement vers le bas.
-func (s *service) dureesTraitementRepresentant(ctx context.Context, id string) (map[string]int32, error) {
-	rows, err := s.Q.DureesDeTraitement(ctx, &id)
+// De la première saisie à la qualification ; nul tant qu'une borne manque, jamais zéro : une fiche
+// seulement consultée tirerait la durée moyenne vers le bas.
+func (s *service) dureesTraitementRepresentant(ctx context.Context, tentatives []db.ListRepCallAttemptsRow) (map[string]int32, error) {
+	ids := make([]string, len(tentatives))
+	for i := range tentatives {
+		ids[i] = tentatives[i].ID
+	}
+	rows, err := s.Q.DureesDeTraitement(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -1018,7 +1012,7 @@ func (s *service) historiqueAppelsRepresentant(ctx context.Context, in *Represen
 	if err != nil {
 		return nil, err
 	}
-	durees, err := s.dureesTraitementRepresentant(ctx, in.ID)
+	durees, err := s.dureesTraitementRepresentant(ctx, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -1241,10 +1235,8 @@ type RepresentantCommentOutput struct {
 	Body RepresentantCommentDto
 }
 
-// Le fil est en AJOUT SEUL et suit l'ANNUAIRE : commenter n'importe quelle fiche
-// vivante est permis, modifier la fiche elle-même ne l'est pas. `ON CONFLICT DO
-// NOTHING` plutôt qu'une lecture préalable : le rejeu et la course se traitent
-// du même geste, c'est PostgreSQL qui arbitre la clé primaire.
+// Fil en AJOUT SEUL qui suit l'ANNUAIRE : toute fiche vivante se commente. `ON CONFLICT DO NOTHING`
+// traite rejeu et course d'un même geste, PostgreSQL arbitre la clé primaire.
 func (s *service) ajouterCommentaireRepresentant(ctx context.Context, in *RepresentantCommentInput) (*RepresentantCommentOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	if err := s.exigerRepresentant(ctx, in.ID); err != nil {
@@ -1320,9 +1312,8 @@ type RepresentantDeleteInput struct {
 	Cascade bool   `query:"cascade"`
 }
 
-// Refus explicite plutôt que cascade implicite : supprimer un représentant
-// emporte tous ses prospects, ce qui doit être une décision consciente et non
-// l'effet de bord d'un clic.
+// Refus explicite plutôt que cascade : supprimer un représentant emporte tous ses prospects,
+// une décision consciente et non l'effet de bord d'un clic.
 func (s *service) supprimerRepresentant(ctx context.Context, in *RepresentantDeleteInput) (*RepresentantOkOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	existant, err := s.Q.RepresentantPourEcriture(ctx, in.ID)

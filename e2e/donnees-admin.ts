@@ -77,7 +77,7 @@ export async function doterPortefeuille(
 
 /** Dépôt d'un classeur sur `/admin/imports`, en simulation d'abord. */
 export async function deposerClasseur(page: Page, entite: string, chemin: string): Promise<void> {
-  await page.getByRole('combobox', { name: 'Entité à importer' }).click();
+  await page.getByRole('combobox', { name: 'Classeur à importer' }).click();
   await page.getByRole('option', { name: entite, exact: true }).click();
   await page.getByLabel(/Glissez le classeur ici/u).setInputFiles(chemin);
 }
@@ -319,17 +319,17 @@ export async function effacerBanque(banqueId: string): Promise<void> {
     [banqueId],
   );
   await ecrire(
-    `DELETE FROM inscriptions_plateforme WHERE "prospectId" IN
-       (SELECT id FROM prospects WHERE "banqueId" = $1)
-       OR "phoneE164" IN (SELECT "phoneE164" FROM prospects WHERE "banqueId" = $1)`,
-    [banqueId],
-  );
-  await ecrire(
     `DELETE FROM bank_case_transitions WHERE "caseId" IN
        (SELECT id FROM bank_cases WHERE "processingBankId" = $1)`,
     [banqueId],
   );
   await ecrire(`DELETE FROM bank_cases WHERE "processingBankId" = $1`, [banqueId]);
+  await ecrire(
+    `DELETE FROM inscriptions_plateforme WHERE "prospectId" IN
+       (SELECT id FROM prospects WHERE "banqueId" = $1)
+       OR "phoneE164" IN (SELECT "phoneE164" FROM prospects WHERE "banqueId" = $1)`,
+    [banqueId],
+  );
   await ecrire(`DELETE FROM client_creation_requests WHERE "banqueId" = $1`, [banqueId]);
   await ecrire(
     `DELETE FROM prospect_journeys WHERE "prospectId" IN

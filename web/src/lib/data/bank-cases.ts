@@ -2,7 +2,7 @@ import type { ApiClient } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import { flattenPage } from '@/lib/api/query-params';
+import { estTronque, flattenPage, type ListeBornee } from '@/lib/api/query-params';
 import { toBankCaseQuery, toBankFilterQuery, type BankCaseFilters } from '@/lib/bank-filters';
 import type {
   BankCase,
@@ -95,7 +95,7 @@ export async function createBankCase(
 export async function fetchInscriptionsAOuvrir(
   projet?: Projet | null,
   client: ApiClient = getApiClient(),
-): Promise<InscriptionAOuvrir[]> {
+): Promise<ListeBornee<InscriptionAOuvrir>> {
   const projets: readonly Projet[] =
     projet === undefined || projet === null ? ['CHUES', 'GRAND_PUBLIC'] : [projet];
   const pages = await Promise.all(
@@ -105,7 +105,8 @@ export async function fetchInscriptionsAOuvrir(
       }),
     ),
   );
-  return pages.flatMap((page) => unwrap(page).items);
+  const listes = pages.map((page) => unwrap(page));
+  return { items: listes.flatMap((liste) => liste.items), tronque: listes.some(estTronque) };
 }
 
 export interface TransitionInput {

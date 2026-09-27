@@ -29,9 +29,8 @@ func provenanceEtDateGrandPublicImport(ligne *ligneGrandPublicImport, cellules m
 	ligne.plateforme = plateformeGrandPublicImport(canal)
 }
 
-// Le canal nomme le réseau, la règle nomme la campagne : elle seule sait à quel
-// projet le prospect répondait, et passe avant le libellé exact d'un canal.
-// Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
+// La règle de provenance nomme la campagne, donc le projet : elle passe avant le
+// canal. Sans l'une ni l'autre, le canal est deviné et le projet reste à vérifier.
 func provenanceGrandPublicImport(canal, provenance string, etat *etatGrandPublicImport) provenanceImport {
 	cle := cleImport(canal)
 	if cle != "" {
@@ -159,7 +158,7 @@ func lireDateBruteLeadImport(brut string) dateLueImport {
 
 func jourDeLaFeuilleImport(feuille string, maintenant time.Time) (time.Time, bool) {
 	jour, ok := socle.DateDuNomDeFeuille(feuille, maintenant)
-	if !ok || jour.After(maintenant) {
+	if !ok {
 		return time.Time{}, false
 	}
 	return jour, true
@@ -174,22 +173,22 @@ func echangerJourMoisImport(t time.Time) time.Time {
 
 func memeJourImport(a, b time.Time) bool { return a.Year() == b.Year() && a.YearDay() == b.YearDay() }
 
-// Le jour de l'onglet fait foi : Excel a rangé « 11/09/2026 » au 9 novembre.
-// Jamais de date à venir.
+// Le jour de l'onglet fait foi, même à venir : Excel a rangé « 11/09/2026 » au
+// 9 novembre, et l'onglet peut être relevé avant le jour qu'il annonce.
 func dateLeadImport(brut, feuille string, numero int, maintenant time.Time) (time.Time, *erreurLigneImport) {
 	date := lireDateBruteLeadImport(brut)
 	if jour, ok := jourDeLaFeuilleImport(feuille, maintenant); ok {
-		return dateAvecJourFeuilleImport(date, jour, maintenant, numero)
+		return dateAvecJourFeuilleImport(date, jour, numero)
 	}
 	return dateSansJourFeuilleImport(date, maintenant, numero)
 }
 
-func dateAvecJourFeuilleImport(date dateLueImport, jour, maintenant time.Time, numero int) (time.Time, *erreurLigneImport) {
+func dateAvecJourFeuilleImport(date dateLueImport, jour time.Time, numero int) (time.Time, *erreurLigneImport) {
 	inversee := echangerJourMoisImport(date.lue)
 	switch {
-	case date.lisible && memeJourImport(date.lue, jour) && !date.lue.After(maintenant):
+	case date.lisible && memeJourImport(date.lue, jour):
 		return date.lue, nil
-	case date.lisible && memeJourImport(inversee, jour) && !inversee.After(maintenant):
+	case date.lisible && memeJourImport(inversee, jour):
 		return inversee, refusImport(numero, enteteCreeLeImport, codeDateCorrigeeImport,
 			fmt.Sprintf("« %s » lu jour et mois inversés : la fiche prend le %s.", date.brut, jour.Format("02/01/2006")))
 	case date.lisible && !date.lue.After(jour):

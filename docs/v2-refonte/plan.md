@@ -103,7 +103,7 @@ prend dans le code : un handler pour les 13 listes, pas treize.
 | Intouchable | Les quatre espaces et les sept rôles | 7 septembre |
 | Infra conservée | SSE (4 topics) ; purge, dump par l'API ; import/export Excel complets ; export classeur du tableau de bord côté client | 7 septembre |
 | Redis | Supprimé, cache mémoire à version de groupe dans le binaire. À confirmer par le propriétaire | 8 septembre |
-| Abandonné | Espace de démonstration ; `dev-login` et `DevRoleSwitcher` ; 13 routes analytics sans écran ; import de représentants tout-ou-rien au profit du système à jobs | 8 septembre |
+| Abandonné | Espace de démonstration ; 13 routes analytics sans écran ; import de représentants tout-ou-rien au profit du système à jobs | 8 septembre |
 | Tableaux de bord | Disposition personnalisable conservée | 7 septembre |
 | Routes web | Un seul arbre, `projet` dans l'URL ; anciennes adresses en 301 côté Go | 7 septembre |
 | Tests | Quinze parcours métier + un seizième « matrice des rôles » généré depuis `roles.go` ; parcours 3 à 8 et 11 rejoués en 390 px ; tests d'intégration Go sous tag `integration` contre Postgres ; aucun test unitaire | 8 septembre |

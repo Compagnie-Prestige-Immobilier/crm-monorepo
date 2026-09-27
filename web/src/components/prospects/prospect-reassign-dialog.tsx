@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -21,6 +21,7 @@ import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { ProspectRow } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 function isReassignUnchanged(
   prospect: ProspectRow | null,
@@ -55,12 +56,11 @@ export function ProspectReassignDialog({
     staleTime: 5 * 60_000,
   });
 
-  useEffect(() => {
+  useRecalage([prospect], () => {
     if (prospect === null) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie recalée sur le prospect
     setRepresentantId(prospect.representantId);
     setCommercialId(prospect.ownedByCommercialId);
-  }, [prospect]);
+  });
 
   const mutation = useMutation({
     mutationFn: () => {

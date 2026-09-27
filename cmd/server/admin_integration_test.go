@@ -581,10 +581,10 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 	telephone := adminTelephone()
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.GRAND_PUBLIC'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 
 	recu := &appelPlateformeRecu{}
 	plateforme := adminPlateformeGrandPublic(telephone, recu)
@@ -702,10 +702,10 @@ func TestAdminTirageEnrolementChuesDemandeRejeteeSansCompteEstNegative(t *testin
 	b := adminConnecte(t)
 	demandeID := uuid.NewString()
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 
 	plateforme := adminPlateformeChuesAdhesionRejetee(demandeID)
 	t.Cleanup(plateforme.Close)
@@ -770,10 +770,10 @@ func TestAdminTirageEnrolementChuesFluxEtPurge(t *testing.T) {
 	b := adminConnecte(t)
 	compteID, purgeID := uuid.NewString(), uuid.NewString()
 	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
 	})
-	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'CHUES' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 	adminExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","chargeUtile","dernierTirageAt","updatedAt")
 		VALUES ($1,'CHUES',$2,'Purgé','Client','submitted','{"email":"purge@example.sn"}'::jsonb,now(),now())`, uuid.NewString(), purgeID)
 
@@ -926,6 +926,39 @@ func TestAdminCreationEtListeDesComptes(t *testing.T) {
 	if n := adminCompterAudit(b, "user.create", id); n != 1 {
 		t.Fatalf("%d traces user.create", n)
 	}
+}
+
+// La connexion compare sans casse, e-mail et identifiant confondus : l'unicité doit suivre.
+func TestAdminIdentifiantsUniquesSansCasse(t *testing.T) {
+	b := adminConnecte(t)
+	suffixe := strings.ReplaceAll(uuid.NewString()[:8], "-", "")
+	ancien, croise := uuid.NewString(), uuid.NewString()
+	b.exec(`INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","updatedAt")
+		VALUES ($1,$2,$3,'x','Compte ancien','COMMERCIAL',now()), ($4,$5,$6,'x','Compte croisé','COMMERCIAL',now())`,
+		ancien, "Ancien."+suffixe+"@CPI.sn", "Ancien."+suffixe, croise, "autre."+suffixe+"@cpi.sn", "Croise."+suffixe+"@cpi.sn")
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" IN ($1,$2)`, ancien, croise) })
+
+	essais := []struct{ nom, email, username, champ string }{
+		{"e-mail", "ancien." + suffixe + "@cpi.sn", "neuf1" + suffixe, "body.email"},
+		{"identifiant", "neuf2" + suffixe + "@cpi.sn", "ancien." + suffixe, "body.username"},
+		{"croisé", "croise." + suffixe + "@cpi.sn", "neuf3" + suffixe, "body.email"},
+	}
+	for _, essai := range essais {
+		statut, body := adminAppel(b, http.MethodPost, "/api/v1/users", map[string]any{
+			"email": essai.email, "username": essai.username, "fullName": "Doublon Casse", "password": "Mdp-" + uuid.NewString(),
+		})
+		if id := texteDe(body["id"]); id != "" {
+			t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, id) })
+		}
+		b.attend(statut, http.StatusConflict, "doublon "+essai.nom, body)
+		erreurs, _ := body["errors"].([]any)
+		if len(erreurs) != 1 || erreurs[0].(map[string]any)["location"] != essai.champ {
+			t.Fatalf("doublon %s : champ %s attendu, reçu %v", essai.nom, essai.champ, body)
+		}
+	}
+
+	statut, body := adminAppel(b, http.MethodPatch, "/api/v1/users/"+ancien, map[string]any{"email": "ancien." + suffixe + "@cpi.sn"})
+	b.attend(statut, http.StatusOK, "le compte ancien passe son e-mail en minuscules", body)
 }
 
 func TestAdminDispositionParEcranEtParCompte(t *testing.T) {

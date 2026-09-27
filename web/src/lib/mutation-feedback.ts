@@ -22,12 +22,17 @@ const REPLI_PAR_STATUT: Readonly<Record<number, string>> = {
   409: 'Un enregistrement existe déjà avec ces valeurs.',
 };
 
+function localErrorText(error: unknown, fallback: string): string {
+  // fetch ne rejette qu'avec un TypeError quand la requête n'atteint pas le serveur.
+  if (error instanceof TypeError)
+    return 'Serveur injoignable. Vérifiez la connexion, puis réessayez.';
+  if (error instanceof Error && error.message.trim() !== '') return error.message;
+  return fallback;
+}
+
 export function apiErrorText(error: unknown, fallback: string): string {
   if (error instanceof ApiConfigurationError) return error.message;
-
-  if (!(error instanceof ApiError)) {
-    return 'Serveur injoignable. Vérifiez la connexion, puis réessayez.';
-  }
+  if (!(error instanceof ApiError)) return localErrorText(error, fallback);
 
   const configuration = configErrorMessage(error.body);
   if (configuration !== null) return configuration;

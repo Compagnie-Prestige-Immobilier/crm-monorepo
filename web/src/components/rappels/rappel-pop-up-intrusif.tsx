@@ -1,11 +1,22 @@
 'use client';
 
+import { unwrap } from '@crm/api-client/query';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellIcon, CalendarClockIcon, ClockIcon, PhoneCallIcon, XCircleIcon } from 'lucide-react';
+import {
+  BellIcon,
+  CalendarClockIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  EllipsisIcon,
+  PhoneCallIcon,
+  XCircleIcon,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { sonActif } from '@/components/notifications/notification-signal';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -18,6 +29,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   callbackKeys,
   cancelCallback,
   fetchCallbacks,
@@ -25,13 +42,16 @@ import {
   formatDelay,
   snoozeCallback,
   type Callback,
+  type DureeReport,
 } from '@/lib/data/console';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
+import { getApiClient } from '@/lib/api/browser';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
 type Rappel = Callback;
 const EMPTY_CALLBACKS: Callback[] = [];
+const PAGE_INTRUSIF = 50;
 
 /** Synthétise un carillon sonore de rappel à trois notes via Web Audio API. */
 function jouerSonnerieRappel() {
@@ -69,13 +89,143 @@ function jouerSonnerieRappel() {
   }
 }
 
+async function retablirRappel(id: string): Promise<Rappel> {
+  return unwrap(
+    await getApiClient().POST('/api/v1/phase2/callbacks/{id}/retablir', {
+      params: { path: { id } },
+    }),
+  );
+}
+
+/** Un rendez-vous fixé ne se reporte ni ne s'annule d'ici ; un rendez-vous téléphonique reste un rappel. */
+export const rendezVousFixe = (callback: Rappel): boolean =>
+  callback.rendezVous && callback.reasonCode !== 'RDV_TELEPHONIQUE';
+
+export function useAnnulationRappel() {
+  const queryClient = useQueryClient();
+  const invalider = () => void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+  return useMutation({
+    mutationFn: (id: string) => cancelCallback(id),
+    onSuccess: (_rappel, id) => {
+      invalider();
+      toast.success('Rappel annulé.', {
+        duration: 10_000,
+        action: {
+          label: 'Rétablir',
+          onClick: () => {
+            retablirRappel(id).then(
+              () => {
+                toast.success('Rappel rétabli.');
+                invalider();
+              },
+              (error: unknown) => {
+                toastApiError(error, 'Le rappel n’a pas été rétabli.');
+              },
+            );
+          },
+        },
+      });
+    },
+    onError: (error) => {
+      toastApiError(error, 'Le rappel n’a pas été annulé.');
+    },
+  });
+}
+
+/** Annuler se range dans un menu, loin de l'action principale. */
+export function AnnulerRappel({
+  callback,
+  pending,
+  onAnnuler,
+}: {
+  callback: Rappel;
+  pending: boolean;
+  onAnnuler: () => void;
+}) {
+  const nom =
+    callback.prospectName === '' ? formatPhone(callback.phoneE164) : callback.prospectName;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={pending}
+            aria-label={`Autres actions pour ${nom}`}
+          />
+        }
+      >
+        <EllipsisIcon className="size-4" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem variant="destructive" onClick={onAnnuler}>
+          <XCircleIcon aria-hidden="true" />
+          Annuler le rappel
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const REPORTS: readonly { duree: DureeReport; libelle: string; annonce: string }[] = [
+  { duree: '15min', libelle: '15 min', annonce: 'de 15 minutes' },
+  { duree: '1h', libelle: '1 h', annonce: 'd’une heure' },
+  { duree: '2h', libelle: '2 h', annonce: 'de 2 heures' },
+  { duree: 'demain', libelle: 'Demain matin', annonce: 'à demain matin' },
+];
+
+export function useReportRappel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, duree }: { id: string; duree: DureeReport }) => snoozeCallback(id, duree),
+    onSuccess: (_rappel, { duree }) => {
+      const annonce = REPORTS.find((report) => report.duree === duree)?.annonce ?? '';
+      toast.success(`Rappel reporté ${annonce}.`);
+      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+    },
+    onError: (error) => {
+      toastApiError(error, 'Le rappel n’a pas pu être reporté.');
+    },
+  });
+}
+
+export function RappelerDans({
+  pending,
+  onReporter,
+  className,
+}: {
+  pending: boolean;
+  onReporter: (duree: DureeReport) => void;
+  className?: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="outline" size="sm" disabled={pending} className={className} />}
+      >
+        <ClockIcon className="size-4" aria-hidden="true" />
+        Rappeler dans
+        <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        {REPORTS.map((report) => (
+          <DropdownMenuItem key={report.duree} onClick={() => onReporter(report.duree)}>
+            {report.libelle}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ContenuRappelProps {
   readonly callback: Rappel;
   readonly serverTimeMs: number;
   readonly racine: string;
   readonly onIgnorer: () => void;
   readonly onAnnuler: (id: string) => void;
-  readonly onReporter: (id: string) => void;
+  readonly onReporter: (id: string, duree: DureeReport) => void;
   readonly isPendingCancel: boolean;
   readonly isPendingSnooze: boolean;
   readonly enAttente: number;
@@ -156,6 +306,17 @@ function ContenuRappelPopUp({
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          {rendezVousFixe(callback) ? null : (
+            <div className="order-last sm:order-first sm:mr-auto">
+              <AnnulerRappel
+                callback={callback}
+                pending={isPendingCancel}
+                onAnnuler={() => {
+                  onAnnuler(callback.id);
+                }}
+              />
+            </div>
+          )}
           <a
             href={`tel:${callback.phoneE164}`}
             className={buttonVariants({
@@ -177,27 +338,13 @@ function ContenuRappelPopUp({
             }}
           />
 
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isPendingSnooze}
-            onClick={() => onReporter(callback.id)}
-            className="w-full gap-1.5 sm:w-auto"
-          >
-            <ClockIcon className="h-4 w-4" />
-            Reporter de 15 min
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={isPendingCancel}
-            onClick={() => onAnnuler(callback.id)}
-            className="w-full gap-1.5 text-destructive hover:bg-destructive/10 sm:w-auto"
-          >
-            <XCircleIcon className="h-4 w-4" />
-            Annuler ce rappel
-          </Button>
+          {rendezVousFixe(callback) ? null : (
+            <RappelerDans
+              className="w-full sm:w-auto"
+              pending={isPendingSnooze}
+              onReporter={(duree) => onReporter(callback.id, duree)}
+            />
+          )}
 
           <Link
             href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
@@ -221,17 +368,22 @@ function ContenuRappelPopUp({
 export function RappelPopUpIntrusif({ userId }: { userId: string }) {
   const projet = undefined;
   const racine = '/teleconseil';
-  const queryClient = useQueryClient();
+  const ficheOuverte = useSearchParams().get('fiche') !== null;
 
   // Un rappel reporté change d'heure : c'est une nouvelle échéance, à signaler à son tour.
   const echeance = (callback: Rappel) => `${callback.id}@${callback.scheduledAt}`;
   const [aSignaler, setASignaler] = useState<Set<string>>(() => new Set());
   const [ecartees, setEcartees] = useState<Set<string>>(() => new Set());
-  const echeancesConnuesRef = useRef<Set<string> | null>(null);
+  const ouvertureRef = useRef<number | null>(null);
 
   const overdueQuery = useQuery({
     queryKey: [...callbackKeys.list('overdue', userId), projet, 'intrusif'],
-    queryFn: () => fetchCallbacks('overdue', userId, undefined, projet),
+    // La liste va du plus ancien au plus récent : une échéance qui vient de passer est sur la dernière page.
+    queryFn: async () => {
+      const compte = await fetchCallbacks('overdue', userId, undefined, projet, 1, 1);
+      const derniere = Math.max(1, Math.ceil((compte.total ?? 0) / PAGE_INTRUSIF));
+      return fetchCallbacks('overdue', userId, undefined, projet, derniere, PAGE_INTRUSIF);
+    },
     refetchInterval: 15_000,
   });
 
@@ -239,18 +391,20 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
   const serverTimeStr = overdueQuery.data?.serverTime ?? new Date().toISOString();
   const serverTimeMs = Date.parse(serverTimeStr);
 
-  // L'arriéré au chargement reste sur la page Rappels ; seule une échéance qui
-  // arrive pendant que le panneau est ouvert interrompt le téléconseiller.
+  // Seule une échéance dépassée depuis l'ouverture du panneau interrompt : l'arriéré, un rappel
+  // rétabli ou remonté d'une page gardent leur ancienne heure et restent sur la page Rappels.
   useEffect(() => {
     if (!overdueQuery.isSuccess) return;
-    const enRetard = new Set(callbacks.filter((callback) => callback.overdue).map(echeance));
-    const connues = echeancesConnuesRef.current;
-    echeancesConnuesRef.current = enRetard;
-    if (connues === null) return;
-    const nouvelles = [...enRetard].filter((cle) => !connues.has(cle));
+    ouvertureRef.current ??= serverTimeMs;
+    const ouverture = ouvertureRef.current;
+    const nouvelles = callbacks
+      .filter((callback) => callback.overdue && Date.parse(callback.scheduledAt) > ouverture)
+      .map(echeance);
     if (nouvelles.length === 0) return;
-    setASignaler((previous) => new Set([...previous, ...nouvelles]));
-  }, [callbacks, overdueQuery.isSuccess]);
+    setASignaler((previous) =>
+      nouvelles.every((cle) => previous.has(cle)) ? previous : new Set([...previous, ...nouvelles]),
+    );
+  }, [callbacks, overdueQuery.isSuccess, serverTimeMs]);
 
   const enAttente = callbacks.filter(
     (callback) =>
@@ -262,39 +416,19 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
     setEcartees((previous) => new Set([...previous, ...aSignaler]));
   };
 
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) => cancelCallback(id),
-    onSuccess: () => {
-      toast.success('Rappel annulé.');
-      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
-    },
-    onError: (error) => {
-      toastApiError(error, 'Le rappel n’a pas été annulé.');
-    },
-  });
+  const cancelMutation = useAnnulationRappel();
 
-  const snoozeMutation = useMutation({
-    mutationFn: (id: string) => snoozeCallback(id),
-    onSuccess: () => {
-      toast.success('Rappel reporté de 15 minutes.');
-      masquerRappelsEnAttente();
-      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
-    },
-    onError: (error) => {
-      toastApiError(error, 'Le rappel n’a pas pu être reporté.');
-    },
-  });
+  const snoozeMutation = useReportRappel();
 
   useEffect(() => {
-    if (activeCallback === null) return;
+    if (activeCallback === null || !sonActif()) return;
     jouerSonnerieRappel();
   }, [activeCallback]);
 
-  if (activeCallback === null) return null;
+  if (activeCallback === null || ficheOuverte) return null;
 
   const annulerRappel = (id: string) => {
-    cancelMutation.mutate(id);
-    masquerRappelsEnAttente();
+    cancelMutation.mutate(id, { onSuccess: masquerRappelsEnAttente });
   };
 
   return (
@@ -304,7 +438,9 @@ export function RappelPopUpIntrusif({ userId }: { userId: string }) {
       racine={racine}
       onIgnorer={masquerRappelsEnAttente}
       onAnnuler={annulerRappel}
-      onReporter={(id) => snoozeMutation.mutate(id)}
+      onReporter={(id, duree) =>
+        snoozeMutation.mutate({ id, duree }, { onSuccess: masquerRappelsEnAttente })
+      }
       isPendingCancel={cancelMutation.isPending}
       isPendingSnooze={snoozeMutation.isPending}
       enAttente={enAttente.length}

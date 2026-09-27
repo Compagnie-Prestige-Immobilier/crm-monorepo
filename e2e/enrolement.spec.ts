@@ -34,10 +34,14 @@ test.afterAll(async () => {
 test.describe('parcours enrôlement', () => {
   test.use({ storageState: administrateur.etat });
 
-  test('une inscription tirée se lit, se détaille, puis se retire du miroir', async ({ page }) => {
+  test('une inscription lue se détaille, puis se retire de l’écran', async ({ page }) => {
     await page.goto('/admin/enrolement');
     // L'écran ouvre sur la synthèse : le miroir vit dans l'onglet du projet.
+    await expect(
+      page.getByText(/Adresse et jeton se règlent sur le serveur : prévenez l’équipe technique/u),
+    ).toHaveCount(2);
     await page.getByRole('tab', { name: 'CHUES' }).click();
+    await expect(page.getByRole('button', { name: 'Relire la plateforme' })).toBeDisabled();
 
     const ligne = page.getByRole('row').filter({ hasText: NOM });
     await expect(ligne).toBeVisible();
@@ -50,7 +54,7 @@ test.describe('parcours enrôlement', () => {
     await expect(page.getByText(`${DISTANT}@example.sn`).first()).toBeVisible();
     await page.keyboard.press('Escape');
 
-    await ligne.getByRole('button', { name: `Retirer ${PRENOM} ${NOM} du miroir` }).click();
+    await ligne.getByRole('button', { name: `Retirer ${PRENOM} ${NOM} de cet écran` }).click();
     await expect(page.getByText(/La plateforme n’est pas touchée/u)).toBeVisible();
     await page.getByRole('button', { name: 'Retirer', exact: true }).click();
 

@@ -35,7 +35,6 @@ function roleOf(payload: unknown): Role {
 const COOKIE_BASE = 'cpi_base';
 const BASE_PUBLIQUE = 'public';
 const DEMO_ROLES = [
-  'ADMIN',
   'SUPERVISEUR',
   'COMMERCIAL',
   'BANQUE_FINANCE',
@@ -131,8 +130,8 @@ function DemoProfileField({ role, onChange }: { role: Role; onChange: (role: Rol
       <Select
         value={role}
         onValueChange={(value) => {
-          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role))
-            onChange(value as Role);
+          const demoRole = DEMO_ROLES.find((candidat) => candidat === value);
+          if (demoRole !== undefined) onChange(demoRole);
         }}
         items={DEMO_ROLES.map((demoRole) => ({ value: demoRole, label: ROLE_LABELS[demoRole] }))}
       >
@@ -157,7 +156,8 @@ export function LoginForm({ next }: { next?: string | null }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [bases, setBases] = useState<string[] | null>(null);
   const [base, setBase] = useState(baseCourante);
-  const [demoRole, setDemoRole] = useState<Role>('ADMIN');
+  const [demoRole, setDemoRole] = useState<Role>(DEMO_ROLES[0]);
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
 
   useEffect(() => {
     resetSessionExpiryGuard();
@@ -212,6 +212,7 @@ export function LoginForm({ next }: { next?: string | null }) {
       }
 
       const payload: unknown = await response.json().catch(() => null);
+      queryClient.clear();
       queryClient.setQueryData(
         meQueryOptions.queryKey,
         ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
@@ -228,6 +229,8 @@ export function LoginForm({ next }: { next?: string | null }) {
   }
 
   async function onDemoSubmit(): Promise<void> {
+    if (demoSubmitting) return;
+    setDemoSubmitting(true);
     setServerError(null);
     try {
       const response = await fetch('/api/v1/auth/demo-login', {
@@ -244,6 +247,7 @@ export function LoginForm({ next }: { next?: string | null }) {
       }
 
       const payload: unknown = await response.json().catch(() => null);
+      queryClient.clear();
       queryClient.setQueryData(
         meQueryOptions.queryKey,
         ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
@@ -251,6 +255,8 @@ export function LoginForm({ next }: { next?: string | null }) {
       router.replace(next != null && next !== '' ? next : homePathForRole(demoRole));
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');
+    } finally {
+      setDemoSubmitting(false);
     }
   }
 
@@ -310,8 +316,8 @@ export function LoginForm({ next }: { next?: string | null }) {
         </div>
       )}
 
-      <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? (
+      <Button type="submit" size="lg" disabled={isSubmitting || demoSubmitting} className="w-full">
+        {isSubmitting || demoSubmitting ? (
           <>
             <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
             Connexion…

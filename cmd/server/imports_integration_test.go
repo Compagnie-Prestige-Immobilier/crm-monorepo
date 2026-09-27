@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"cpi-go/internal/imports"
 	"cpi-go/internal/shared/socle"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,20 +145,20 @@ func (b *banc) deposerClasseur(chemin, nom string, contenu []byte) (statut int, 
 	return reponseHTTP.StatusCode, corpsLu
 }
 
-func (b *banc) attendreImport(identifiant, attendu string) map[string]any {
+func (b *banc) attendreImportReussi(identifiant string) map[string]any {
 	b.t.Helper()
 	for range 400 {
 		statut, body := b.appel(http.MethodGet, "/api/v1/imports/"+identifiant, nil, false)
 		b.attend(statut, http.StatusOK, "état de l’import", body)
-		if body["status"] == attendu {
+		if body["status"] == "succeeded" {
 			return body
 		}
-		if body["status"] == "failed" && attendu != "failed" {
+		if body["status"] == "failed" {
 			b.t.Fatalf("import échoué : %v %v", body["failureCode"], body["failureMsg"])
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	b.t.Fatalf("l’import n’a pas atteint l’état %q", attendu)
+	b.t.Fatalf("l’import %s n’a pas abouti", identifiant)
 	return nil
 }
 
@@ -229,7 +231,7 @@ func TestImportRepresentantsCompteLesDoublonsDuFichier(t *testing.T) {
 		t.Fatalf("un import naît en simulation : %v", body["mode"])
 	}
 
-	final := b.attendreImport(body["id"].(string), "succeeded")
+	final := b.attendreImportReussi(body["id"].(string))
 	if final["createdRows"] != float64(1_197) || final["skippedRows"] != float64(3) || final["processedRows"] != float64(1_200) {
 		t.Fatalf("compteurs : créées %v, ignorées %v, traitées %v", final["createdRows"], final["skippedRows"], final["processedRows"])
 	}
@@ -487,9 +489,8 @@ func classeurLeads(t *testing.T, telephone string) []byte {
 	return buf.Bytes()
 }
 
-// Le lien SharePoint, joué en local : une redirection qui pose un cookie, puis
-// le classeur, comme le vrai. Le nom du classeur est propre au test : le vrai
-// relevé écrit dans la même base.
+// Le lien SharePoint joué en local : une redirection qui pose un cookie, puis le
+// classeur. Le nom est propre au test, le vrai relevé écrit dans la même base.
 func (b *banc) lienDesLeads(classeur []byte, nomFichier string) string {
 	b.t.Helper()
 	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -748,10 +749,8 @@ const (
 	libelleMetaTest    = "Meta (Facebook et Instagram)"
 )
 
-// La codification du classeur des leads (docs/decisions/import-leads.md) : le
-// jour de l'onglet corrige la date, « Canal » décide du projet, une ligne sans
-// identité se signale, le classeur relu met la fiche à jour sans toucher à son
-// projet ni à sa campagne.
+// docs/decisions/import-leads.md : l'onglet corrige la date, « Canal » décide du
+// projet, le classeur relu met la fiche à jour sans toucher projet ni campagne.
 func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -800,6 +799,73 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 		t.Fatalf("le rappel promis doit rester ouvrable par le téléconseiller : %d %v", statut, body)
 	}
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
+}
+
+// « oct », « nov » et « déc » font reconnaître l'onglet, qui corrige alors l'inversion jour/mois.
+func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	anPasse := time.Now().UTC().Year() - 1
+	base := time.Now().UnixNano() % 10_000_000
+	telephone := fmt.Sprintf("+22177%07d", base)
+	nomClasseur := fmt.Sprintf("Leads du 1 oct %d %d.xlsx", anPasse, base)
+	b.nettoyerLeadsTest([]string{telephone}, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	nomOnglet := fmt.Sprintf("Leads 1 oct %d", anPasse)
+	// Excel a rangé « 01/10 » au 10 janvier : jour et mois inversés.
+	premierOctobre := ongletLeadsBrutTest{nom: nomOnglet, lignes: [][]any{
+		{rangExcelTest(time.Date(anPasse, time.January, 10, 9, 0, 0, 0, time.UTC)), "Aminata Diop", "aminata." + telephone[5:] + "@example.sn", "Payé", telephone, canalMetaChuesTest, "à rappeler"},
+	}}
+
+	travail := b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{premierOctobre}), nomClasseur)
+	a := b.ficheLeadTest(telephone)
+	if !a.creeLe.UTC().Equal(time.Date(anPasse, time.October, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Fatalf("date corrigée sur l'onglet d'octobre : %v", a.creeLe.UTC())
+	}
+	b.attendRapportTest(travail, "total=1 created=1 updated=0 skipped=0 errors=0 warnings=1", map[string]float64{
+		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1,
+	})
+}
+
+// Un onglet sans année relevé avant le jour qu'il annonce garde l'année courante.
+func TestImportLeadsOngletSansAnneeGardeLAnneeCourante(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	maintenant := time.Now().UTC()
+	annee := maintenant.Year()
+	demain := maintenant.AddDate(0, 0, 1)
+	anneeOctobre := annee
+	if time.Date(annee, time.October, 1, 0, 0, 0, 0, time.UTC).After(maintenant.AddDate(0, 6, 0)) {
+		anneeOctobre--
+	}
+	base := time.Now().UnixNano() % 10_000_000
+	tels := []string{fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22177%07d", (base+1)%10_000_000)}
+	nomClasseur := fmt.Sprintf("Leads sans année %d.xlsx", base)
+	b.nettoyerLeadsTest(tels, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	onglets := []ongletLeadsBrutTest{
+		{nom: fmt.Sprintf("Leads %d %s", demain.Day(), socle.MoisEnLettres[demain.Month()-1]), lignes: [][]any{
+			{"", "Aminata Diop", "", "Payé", tels[0], canalMetaChuesTest, ""},
+		}},
+		{nom: "Leads 1 oct", lignes: [][]any{
+			{"", "Moussa Ndiaye", "", "Payé", tels[1], canalMetaChuesTest, ""},
+		}},
+	}
+
+	b.releverLeadsTest(classeurLeadsBrut(t, entete, onglets), nomClasseur)
+	attendus := []time.Time{
+		time.Date(annee, demain.Month(), demain.Day(), 0, 0, 0, 0, time.UTC),
+		time.Date(anneeOctobre, time.October, 1, 0, 0, 0, 0, time.UTC),
+	}
+	for i, telephone := range tels {
+		if lue := b.ficheLeadTest(telephone).creeLe.UTC(); !lue.Equal(attendus[i]) {
+			t.Fatalf("onglet « %s » : %v, attendu %v", onglets[i].nom, lue, attendus[i])
+		}
+	}
 }
 
 // « projet | canal | créée le | note », lisible d'un coup dans l'échec.
@@ -892,8 +958,7 @@ func projetsDesParcoursTest(b *banc, prospectID string) []string {
 	return parcours
 }
 
-// Une ligne de lead sans téléphone n'écrit aucune fiche : personne ne pourrait
-// l'appeler, et le relevé horaire la recréait à chaque passage. Le rapport la dit.
+// Une ligne de lead sans téléphone n'écrit aucune fiche, et le rapport la signale.
 func TestImportLeadsIgnoreEtSignaleUneLigneSansTelephone(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -948,5 +1013,189 @@ func TestProspectSansNumeroUneSeuleFicheParAdresseEtProjet(t *testing.T) {
 	}
 	if err := ecrire(); err == nil {
 		t.Fatal("la seconde fiche sans numéro au même courriel doit être refusée")
+	}
+}
+
+// Le modèle rempli avec ses propres listes se relit sans perte ; une banque ou
+// une méthode hors liste refuse la ligne au lieu d'être effacée en silence.
+func TestImportProspectsRelitLeModele(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	b.connecterImport()
+	b.purgerTravauxImport()
+	debut := time.Now()
+	banque := uuid.NewString()
+	sigle := "BT" + strings.ToUpper(banque[:6])
+	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
+	base := time.Now().UnixNano() % 10_000_000
+	telephones := []string{fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22176%07d", base), fmt.Sprintf("+22178%07d", base)}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = ANY($1))`, telephones)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "banques" WHERE "id" = $1`, banque)
+	})
+
+	classeur := b.modeleProspectsRempli([][]string{
+		{"Ndiaye", "Awa", telephones[0], "", sigle, "", "Enrôlement sur place"},
+		{"Sow", "Binta", telephones[1], "", "BANQUE-INCONNUE", "", ""},
+		{"Fall", "Modou", telephones[2], "", sigle, "", "Pigeon voyageur"},
+	})
+
+	statut, body := b.deposerClasseur("/api/v1/imports/prospects", "prospects.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
+	simulation := b.attendreImportReussi(body["id"].(string))
+	rapport, _ := simulation["report"].(map[string]any)
+	if total := entierDuRapport(rapport, "totalRows"); total != 3 {
+		t.Fatalf("la ligne d'exemple du modèle ne se lit pas : %d lignes au lieu de 3", total)
+	}
+	erreurs, _ := rapport["errors"].([]any)
+	codes := map[string]bool{}
+	for _, brute := range erreurs {
+		codes[texteDe(brute.(map[string]any)["code"])] = true
+	}
+	if len(erreurs) != 2 || !codes["PROSPECT_IMPORT_BANQUE_INCONNUE"] || !codes["PROSPECT_IMPORT_METHODE_INCONNUE"] {
+		t.Fatalf("banque et méthode inconnues doivent refuser leur ligne : %v", erreurs)
+	}
+
+	statut, body = b.appel(http.MethodPost, "/api/v1/imports/"+texteDe(body["id"])+"/apply", nil, true)
+	b.attend(statut, http.StatusOK, "application", body)
+	b.attendreImportReussi(texteDe(body["id"]))
+	var phase, methode, banqueLue string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "phase2Status"::text, "enrollmentMethod"::text, "banqueId" FROM "prospects" WHERE "phoneE164" = $1`,
+		telephones[0]).Scan(&phase, &methode, &banqueLue); err != nil {
+		t.Fatal(err)
+	}
+	if phase != "METHOD_OBTAINED" || methode != "APPOINTMENT" || banqueLue != banque {
+		t.Fatalf("« Enrôlement sur place » relu : %s, %s, banque %s", phase, methode, banqueLue)
+	}
+	if refusees := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = ANY($1)`, telephones[1:]); refusees != 0 {
+		t.Fatalf("les lignes refusées ne s'écrivent pas : %d fiches", refusees)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = '+221771234567' AND "createdAt" >= $1`, debut); n != 0 {
+		t.Fatalf("la ligne d'exemple a créé %d fiche(s)", n)
+	}
+}
+
+func (b *banc) modeleProspectsRempli(lignes [][]string) []byte {
+	statut, _, modele := b.classeur("/api/v1/export/prospects-modele.xlsx")
+	b.attend(statut, http.StatusOK, "modèle prospects", nil)
+	for index, ligne := range lignes {
+		for rang, valeur := range ligne {
+			cellule, _ := excelize.CoordinatesToCellName(rang+1, index+imports.PremiereLigneImport)
+			if err := modele.SetCellStr("Prospects", cellule, valeur); err != nil {
+				b.t.Fatal(err)
+			}
+		}
+	}
+	var tampon bytes.Buffer
+	if err := modele.Write(&tampon); err != nil {
+		b.t.Fatal(err)
+	}
+	return tampon.Bytes()
+}
+
+// Chaque ligne porte une note aléatoire pour dépasser 1 Mo sans se compresser :
+// c'est ce dépassement qui fait écrire le multipart sur le disque temporaire.
+func classeurRepresentantsVolumineux(t *testing.T, departement string, lignes int) []byte {
+	t.Helper()
+	fichier := excelize.NewFile()
+	defer func() { _ = fichier.Close() }()
+	feuille := fichier.GetSheetName(0)
+	for rang := range imports.ColonnesRepresentantsImport {
+		cellule, _ := excelize.CoordinatesToCellName(rang+1, 1)
+		if err := fichier.SetCellStr(feuille, cellule, imports.EnteteRepresentantImport(rang)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index := range lignes {
+		ligne := index + imports.PremiereLigneImport
+		valeurs := []string{
+			fmt.Sprintf("Représentant %04d", index),
+			fmt.Sprintf("77%07d", 1_000_000+index),
+			departement,
+		}
+		for rang, valeur := range valeurs {
+			cellule, _ := excelize.CoordinatesToCellName(rang+1, ligne)
+			if err := fichier.SetCellStr(feuille, cellule, valeur); err != nil {
+				t.Fatal(err)
+			}
+		}
+		bourrage := make([]byte, 24_000)
+		if _, err := rand.Read(bourrage); err != nil {
+			t.Fatal(err)
+		}
+		noteCellule, _ := excelize.CoordinatesToCellName(5, ligne)
+		if err := fichier.SetCellStr(feuille, noteCellule, base64.StdEncoding.EncodeToString(bourrage)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var tampon bytes.Buffer
+	if err := fichier.Write(&tampon); err != nil {
+		t.Fatal(err)
+	}
+	return tampon.Bytes()
+}
+
+// Au-delà de 1 Mo, `ParseMultipartForm` écrit sur le disque : le dépôt ne doit
+// laisser aucun `multipart-*` derrière lui.
+func TestImportNeLaissePasDeFichierTemporaire(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	dossierTemporaire := t.TempDir()
+	t.Setenv("TMPDIR", dossierTemporaire)
+	b.connecterImport()
+	b.purgerTravauxImport()
+	_, departement := b.departementImport()
+
+	classeur := classeurRepresentantsVolumineux(t, departement, 100)
+	if len(classeur) <= 1<<20 {
+		t.Fatalf("le classeur de test doit dépasser 1 Mo pour forcer l'écriture sur disque, %d octets produits", len(classeur))
+	}
+	statut, body := b.deposerClasseur("/api/v1/imports/representants", "gros-classeur.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt d’un classeur de plus de 1 Mo", body)
+	b.attendreImportReussi(body["id"].(string))
+
+	restes, err := os.ReadDir(dossierTemporaire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entree := range restes {
+		if strings.HasPrefix(entree.Name(), "multipart-") {
+			t.Fatalf("fichier temporaire du dépôt jamais supprimé : %s", entree.Name())
+		}
+	}
+}
+
+// Une banque ou une méthode mal saisie propose la valeur la plus proche du
+// référentiel, comparée sans accents : l'utilisateur corrige sans chercher.
+func TestImportProspectsSuggereLaValeurProche(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	b.connecterImport()
+	b.purgerTravauxImport()
+	banque := uuid.NewString()
+	sigle := "BQ" + strings.ToUpper(banque[:4]) + "XY"
+	b.exec(`INSERT INTO "banques" ("id","name","shortName","updatedAt") VALUES ($1,$2,$3,now())`, banque, "Banque "+sigle, sigle)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "banques" WHERE "id" = $1`, banque) })
+	base := time.Now().UnixNano() % 10_000_000
+
+	classeur := b.modeleProspectsRempli([][]string{
+		{"Ndiaye", "Awa", fmt.Sprintf("+22177%07d", base), "", "BQ" + strings.ToUpper(banque[:4]) + "YX", "", ""},
+		{"Sow", "Binta", fmt.Sprintf("+22176%07d", base), "", sigle, "", "Enrolement sur plase"},
+	})
+	statut, body := b.deposerClasseur("/api/v1/imports/prospects", "prospects.xlsx", classeur)
+	b.attend(statut, http.StatusCreated, "dépôt du modèle rempli", body)
+	rapport, _ := b.attendreImportReussi(body["id"].(string))["report"].(map[string]any)
+	erreurs, _ := rapport["errors"].([]any)
+	messages := map[string]string{}
+	for _, brute := range erreurs {
+		erreur := brute.(map[string]any)
+		messages[texteDe(erreur["code"])] = texteDe(erreur["message"])
+	}
+	if !strings.Contains(messages["PROSPECT_IMPORT_BANQUE_INCONNUE"], "Vouliez-vous dire « "+sigle+" » ?") {
+		t.Fatalf("la banque la plus proche doit être proposée : %v", messages)
+	}
+	if !strings.Contains(messages["PROSPECT_IMPORT_METHODE_INCONNUE"], "Vouliez-vous dire « Enrôlement sur place » ?") {
+		t.Fatalf("la méthode la plus proche doit être proposée : %v", messages)
 	}
 }

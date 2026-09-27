@@ -50,6 +50,7 @@ function RendezVousAccueilPage() {
         type={type}
         peutNoter={peut(user, 'rendez_vous.suivre')}
         peutExporter={peut(user, 'rendez_vous.exporter')}
+        peutEnregistrerVisite={peut(user, 'accueil.registre')}
       />
     </div>
   );

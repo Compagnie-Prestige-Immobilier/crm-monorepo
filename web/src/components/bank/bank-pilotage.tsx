@@ -6,7 +6,7 @@ import { Kpi } from '@/components/bank/bank-kpi';
 import { MoneyText } from '@/components/money/exact-amounts';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
-import { formatDecimal, formatNumber } from '@/lib/format';
+import { compte, formatDecimal, formatNumber } from '@/lib/format';
 import type { PilotageBanque } from '@/lib/types';
 
 function jours(heures: number | null): string {
@@ -39,7 +39,7 @@ export function BankPilotage({ pilotage }: { pilotage: PilotageBanque }) {
           index={5}
           label="En retard"
           value={formatNumber(pilotage.overdue)}
-          hint={`Ouverts depuis plus de ${String(pilotage.overdueDays)} jours`}
+          hint={`Ouverts depuis plus de ${compte(pilotage.overdueDays, 'jour')}`}
           icon={AlertTriangleIcon}
         />
         <Kpi
@@ -109,11 +109,11 @@ export function BankPilotage({ pilotage }: { pilotage: PilotageBanque }) {
                     {agent.label}
                     <span className="text-muted-foreground">
                       {' '}
-                      · {formatNumber(agent.cases)} dossiers
+                      · {compte(agent.cases, 'dossier')}
                     </span>
                   </span>
                   <span className="shrink-0 font-[600] tabular-nums">
-                    {formatNumber(agent.cashed)} encaissés,{' '}
+                    {compte(agent.cashed, 'encaissé')},{' '}
                     <MoneyText value={agent.amountXof} placeholder="0 FCFA" />
                   </span>
                 </li>

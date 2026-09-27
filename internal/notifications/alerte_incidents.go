@@ -9,9 +9,8 @@ import (
 
 const CourrielIncident = "INCIDENT"
 
-// Rien ne prévenait personne : une tâche en échec ou un courriel définitivement
-// refusé n'existaient que dans l'écran Exploitation, qu'il faut penser à ouvrir.
-// Les destinataires sont les comptes ADMIN actifs, pas un réglage de plus.
+// Tâches en échec et courriels définitivement refusés, envoyés aux comptes ADMIN
+// actifs : sinon ils ne se lisent que dans l'écran Exploitation.
 func (s *service) alerterIncidents(ctx context.Context) error {
 	incidents, err := s.Q.IncidentsDesDernieresHeures(ctx, tentativesCourrielMax)
 	if err != nil || len(incidents) == 0 {

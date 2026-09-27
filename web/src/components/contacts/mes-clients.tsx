@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { EmptyState } from '@/components/empty-state';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
+import { NumeroAppel } from '@/components/ui/liste-cartes';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -17,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchClientsContacts, type ClientContact } from '@/lib/data/prospects';
-import { formatDate, formatNumber, formatPhone } from '@/lib/format';
+import { formatDate, formatNumber } from '@/lib/format';
 import type { Projet } from '@/lib/types';
 
 const SANS_VALEUR = <span className="text-muted-foreground">–</span>;
@@ -31,9 +32,12 @@ function LigneClient({ client }: { client: ClientContact }) {
         <Link href={`/teleconseil/prospects/${client.id}`} className="font-medium hover:underline">
           {client.prenom} {client.nom}
         </Link>
-        <p className="text-[0.75rem] text-muted-foreground">
-          {client.phoneE164 === null ? '' : formatPhone(client.phoneE164)}
-        </p>
+        {client.phoneE164 === null ? null : (
+          <NumeroAppel
+            phoneE164={client.phoneE164}
+            className="block w-fit text-[0.75rem] text-muted-foreground"
+          />
+        )}
       </TableCell>
       <TableCell>
         <ProjetBadge projet={client.projet} />

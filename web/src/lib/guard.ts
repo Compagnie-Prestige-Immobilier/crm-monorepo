@@ -20,9 +20,3 @@ export function guardPermission(permission: Permission) {
     if (!peut(context.user, permission)) throw new RefusPermission(context.user.role);
   };
 }
-
-export function guardRoles(roles: readonly Role[]) {
-  return ({ context }: Contexte): void => {
-    if (!roles.includes(context.user.role)) throw new RefusPermission(context.user.role);
-  };
-}

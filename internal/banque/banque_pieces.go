@@ -1,16 +1,21 @@
 package banque
 
 import (
+	"bytes"
 	"context"
+	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
+	neturl "net/url"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -24,7 +29,70 @@ const (
 	piecesMessageIndispo = "Les pièces de ce dossier ne sont pas disponibles sur la plateforme."
 )
 
-var clientPieces = &http.Client{Timeout: piecesDelaiLecture}
+var (
+	clientPieces = &http.Client{Timeout: piecesDelaiLecture, Transport: transportPieces(), CheckRedirect: redirectionAdmise}
+	partageCGNAT = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+	errURLPiece  = errors.New("pièce plateforme : URL refusée")
+)
+
+// L'URL d'une pièce vient de la plateforme : elle ne doit pas atteindre le réseau interne.
+func transportPieces() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = (&net.Dialer{Timeout: piecesDelaiLecture, Control: adresseAdmise}).DialContext
+	return transport
+}
+
+func adresseAdmise(_, adresse string, _ syscall.RawConn) error {
+	hote, _, err := net.SplitHostPort(adresse)
+	if err != nil {
+		return err
+	}
+	if ip := net.ParseIP(hote); ip != nil && (ipPublique(ip) || plateformeLocale(hote)) {
+		return nil
+	}
+	return fmt.Errorf("pièce plateforme : adresse %s refusée", hote)
+}
+
+func ipPublique(ip net.IP) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !partageCGNAT.Contains(ip)
+}
+
+func urlAdmise(url *neturl.URL) bool {
+	return url.Scheme == "https" || (url.Scheme == "http" && plateformeLocale(url.Hostname()))
+}
+
+func redirectionAdmise(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 || !urlAdmise(req.URL) {
+		return errURLPiece
+	}
+	return nil
+}
+
+// Seule une plateforme configurée sur une adresse privée ouvre cette adresse, et
+// elle seule ; en développement, tout le réseau local.
+func plateformeLocale(hote string) bool {
+	if socle.Env("NODE_ENV", "") == "development" {
+		return true
+	}
+	for _, projet := range []db.Projet{db.ProjetCHUES, db.ProjetGRANDPUBLIC} {
+		base, _ := socle.PlateformeConfiguree(string(projet))
+		configuree, err := neturl.Parse(base)
+		if err == nil && memeHotePrive(configuree.Hostname(), hote) {
+			return true
+		}
+	}
+	return false
+}
+
+func memeHotePrive(configure, hote string) bool {
+	if configure == "localhost" {
+		ip := net.ParseIP(hote)
+		return hote == configure || (ip != nil && ip.IsLoopback())
+	}
+	ip := net.ParseIP(configure)
+	return ip != nil && !ipPublique(ip) && ip.Equal(net.ParseIP(hote))
+}
 
 type PieceDeposee struct {
 	Code   string `json:"code"`
@@ -50,12 +118,12 @@ type PiecesOutput struct {
 }
 
 func piecesIndisponibles(raison string) error {
-	return huma.Error404NotFound(piecesMessageIndispo, errors.New(raison))
+	slog.Warn("pièces de plateforme indisponibles", "raison", raison)
+	return huma.Error404NotFound(piecesMessageIndispo)
 }
 
-// Où lire les pièces d'une inscription. L'inscription, et non le dossier
-// bancaire : la banque doit pouvoir lire les justificatifs pour décider
-// d'ouvrir, pas seulement après avoir ouvert.
+// Les pièces se lisent depuis l'inscription, pas le dossier : la banque lit les
+// justificatifs pour décider d'ouvrir.
 type sourceDesPieces struct {
 	projet  string
 	base    string
@@ -137,15 +205,24 @@ func (s *service) archiveDesPieces(ctx context.Context, in *piecesInput) (*huma.
 	return reponseFichier(corps, nom, piecesTypeMimeZip, true), nil
 }
 
-func toutesLesPieces(ctx context.Context, source *sourceDesPieces) ([]byte, error) {
+func toutesLesPieces(ctx context.Context, source *sourceDesPieces) (io.ReadCloser, error) {
 	if !source.grandPublic() {
-		return archiveChues(ctx, source.base, source.jeton, source.charge)
+		adresse, err := adresseArchiveChues(source.base, source.charge)
+		if err != nil {
+			return nil, err
+		}
+		corps, _, err := ouvrirPlateforme(ctx, adresse, source.jeton)
+		return corps, err
 	}
 	docs, err := docsGrandPublic(ctx, source.base, source.jeton, source.distant)
 	if err != nil {
 		return nil, err
 	}
-	return empaqueter(ctx, docs)
+	paquet, err := empaqueter(ctx, docs)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(paquet)), nil
 }
 
 func monterPieces(api huma.API, s *service) {
@@ -163,45 +240,96 @@ func monterPieces(api huma.API, s *service) {
 	}, s.archiveDesPieces)
 }
 
-func reponseFichier(corps []byte, nom, typeMime string, telecharger bool) *huma.StreamResponse {
+func reponseFichier(corps io.ReadCloser, nom, typeMime string, telecharger bool) *huma.StreamResponse {
 	disposition := "inline"
 	if telecharger || typeMime == piecesTypeMimeDefaut {
 		disposition = "attachment"
 	}
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
+		defer func() { _ = corps.Close() }()
 		ctx.SetHeader("Content-Type", typeMime)
 		ctx.SetHeader("Content-Disposition", disposition+`; filename="`+strings.ReplaceAll(nom, `"`, "")+`"`)
 		ctx.SetHeader("Cache-Control", "no-store")
-		if _, err := ctx.BodyWriter().Write(corps); err != nil {
+		ecrits, err := io.Copy(ctx.BodyWriter(), io.LimitReader(corps, piecesTailleMax))
+		if err != nil {
 			slog.Error("écriture d’une pièce", "fichier", nom, "err", err)
+		} else if ecrits == piecesTailleMax {
+			slog.Error("pièce tronquée à la taille maximale", "fichier", nom)
 		}
 	}}
 }
 
 // Une URL signée n'accepte pas l'en-tête d'autorisation : un jeton vide la laisse passer.
-func lirePlateformeBrut(ctx context.Context, url, jeton string) (corps []byte, typeMime string, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+// Les erreurs ne citent que l'hôte et le chemin : la requête d'une URL signée vaut un accès.
+func ouvrirPlateforme(ctx context.Context, brute, jeton string) (corps io.ReadCloser, typeMime string, err error) {
+	url, err := neturl.Parse(brute)
+	if err != nil || !urlAdmise(url) {
+		return nil, "", errURLPiece
+	}
+	lieu := url.Host + url.Path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), http.NoBody)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("pièce plateforme : requête invalide vers %s", lieu)
 	}
 	if jeton != "" {
 		req.Header.Set("Authorization", "Bearer "+jeton)
 	}
 	resp, err := clientPieces.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("plateforme injoignable sur %s : %w", lieu, sansURL(err))
 	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("plateforme %d sur %s", resp.StatusCode, url)
+	switch {
+	case resp.StatusCode != http.StatusOK:
+		_ = resp.Body.Close()
+		return nil, "", fmt.Errorf("plateforme %d sur %s", resp.StatusCode, lieu)
+	case resp.ContentLength > piecesTailleMax:
+		_ = resp.Body.Close()
+		return nil, "", errPieceTropLourde
+	case resp.ContentLength < 0:
+		corps, err = lireSansTailleAnnoncee(resp.Body, lieu)
+		return corps, resp.Header.Get("Content-Type"), err
 	}
-	lu, err := io.ReadAll(io.LimitReader(resp.Body, piecesTailleMax))
-	return lu, resp.Header.Get("Content-Type"), err
+	return resp.Body, resp.Header.Get("Content-Type"), nil
 }
 
-// La plateforme est une source distante : réémettre son `Content-Type` tel quel
-// afficherait un `text/html` qu'elle rendrait dans l'origine du panneau. Seuls
-// les types que la visionneuse sait afficher passent, le reste est téléchargé.
+// Sans Content-Length, la pièce est lue avant tout en-tête : au-delà du plafond, un 200 servirait un fichier tronqué.
+func lireSansTailleAnnoncee(corps io.ReadCloser, lieu string) (io.ReadCloser, error) {
+	defer func() { _ = corps.Close() }()
+	lu, err := io.ReadAll(io.LimitReader(corps, piecesTailleMax+1))
+	if err != nil {
+		return nil, fmt.Errorf("lecture interrompue sur %s : %w", lieu, sansURL(err))
+	}
+	if len(lu) > piecesTailleMax {
+		return nil, errPieceTropLourde
+	}
+	return io.NopCloser(bytes.NewReader(lu)), nil
+}
+
+func sansURL(err error) error {
+	var erreurURL *neturl.Error
+	if errors.As(err, &erreurURL) {
+		return erreurURL.Err
+	}
+	return err
+}
+
+var errPieceTropLourde = fmt.Errorf("pièce plateforme : plus de %d Mo", piecesTailleMax>>20)
+
+func lirePlateformeBrut(ctx context.Context, url, jeton string) (lu []byte, typeMime string, err error) {
+	corps, typeMime, err := ouvrirPlateforme(ctx, url, jeton)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = corps.Close() }()
+	lu, err = io.ReadAll(io.LimitReader(corps, piecesTailleMax+1))
+	if err == nil && len(lu) > piecesTailleMax {
+		return nil, "", errPieceTropLourde
+	}
+	return lu, typeMime, err
+}
+
+// Un `Content-Type` distant réémis tel quel afficherait un `text/html` dans l'origine
+// du panneau : seuls ces types s'affichent, le reste se télécharge.
 var typesPieceAffichables = map[string]bool{
 	"application/pdf": true, "image/jpeg": true, "image/png": true, "image/webp": true,
 }

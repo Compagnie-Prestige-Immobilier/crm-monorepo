@@ -3,10 +3,23 @@
 import { LayoutGridIcon, MenuIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
-import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
-import { coqueOf, hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
+// Absent du bundle de production : seuls `vite dev` et `make build` l'incluent.
+const DevRoleSwitcher =
+  import.meta.env.DEV || import.meta.env.VITE_BASCULE_ROLES === '1'
+    ? lazy(() =>
+        import('@/components/auth/dev-role-switcher').then((m) => ({ default: m.DevRoleSwitcher })),
+      )
+    : null;
+import {
+  aPlusieursEspaces,
+  coqueOf,
+  hasInbox,
+  HUB_PATH,
+  inboxPathFor,
+  navTitle,
+} from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { SignalerProbleme } from '@/components/layout/signaler-probleme';
 import { GlobalExportButton } from '@/components/exports/global-export-button';
@@ -18,12 +31,14 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { peut, type SessionUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
+export function Topbar({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const accueil = coqueOf(pathname) === 'accueil';
 
   const title = navTitle(user, pathname);
+  const plusieursEspaces = aPlusieursEspaces(user);
+  const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;
 
   return (
     <header
@@ -36,7 +51,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
     >
       {accueil ? (
         <Link
-          href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
+          href={plusieursEspaces ? hubHref : '/accueil'}
           className="hidden items-center gap-2 md:flex"
         >
           <img src="/brand/cpi-header.webp" alt="CPI" className="h-10 w-auto" />
@@ -81,7 +96,11 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         {title}
       </h1>
 
-      <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
+      {DevRoleSwitcher ? (
+        <Suspense fallback={null}>
+          <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
+        </Suspense>
+      ) : null}
 
       {/* Sous 768 px, la barre n'a plus la place pour ces actions secondaires :
           « Tous les espaces » reste joignable par le pied de la navigation
@@ -93,18 +112,20 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         </div>
       ) : null}
 
-      <div className="hidden md:block">
-        <Link
-          href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
-          className={buttonVariants({
-            variant: 'ghost',
-            className: 'cpi-nav-action h-11 gap-2 px-3',
-          })}
-        >
-          <LayoutGridIcon className="size-5" aria-hidden="true" />
-          <span className="sr-only sm:not-sr-only">Espaces</span>
-        </Link>
-      </div>
+      {plusieursEspaces ? (
+        <div className="hidden md:block">
+          <Link
+            href={hubHref}
+            className={buttonVariants({
+              variant: 'ghost',
+              className: 'cpi-nav-action h-11 gap-2 px-3',
+            })}
+          >
+            <LayoutGridIcon className="size-5" aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Espaces</span>
+          </Link>
+        </div>
+      ) : null}
 
       {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à
           ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
@@ -116,7 +137,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
       ) : null}
       {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
       <ThemeToggle />
-      <UserMenu user={user} demoEnabled={demoEnabled} />
+      <UserMenu user={user} />
     </header>
   );
 }

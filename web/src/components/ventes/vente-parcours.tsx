@@ -28,6 +28,8 @@ import {
   createVente,
   fetchVentesConfiguration,
   formatFcfa,
+  lotsRestants,
+  stockEpuise,
   type SiteVente,
   type Vente,
   type VenteInput,
@@ -271,6 +273,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
   const queryClient = useQueryClient();
   const [pas, setPas] = useState(vente === null ? 0 : RECAP);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [erreurLots, setErreurLots] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => brouillonDe(vente));
   const [callingCode, setCallingCode] = useState(
     () => fromE164(vente?.telephone ?? '').callingCode,
@@ -305,11 +308,20 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
       toast.success(vente === null ? 'Vente enregistrée.' : 'Vente mise à jour.');
       onFermer();
     },
-    onError: (error) => toastApiError(error, 'La vente n’a pas pu être enregistrée.'),
+    onError: (error) => {
+      const stock = stockEpuise(error);
+      if (stock === null) {
+        toastApiError(error, 'La vente n’a pas pu être enregistrée.');
+        return;
+      }
+      setErreurLots(stock);
+      setPas(rang('lots'));
+    },
   });
 
   const changer = (patch: Patch) => {
     setErreur(null);
+    setErreurLots(null);
     setDraft((d) => comptantSolde(d, patch));
   };
   const aller = (cible: number) => {
@@ -340,6 +352,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
         changer={changer}
         sites={sites}
         site={siteChoisi}
+        erreurLots={erreurLots}
         canaux={canaux}
         fiches={fiches.data?.items ?? []}
         countries={callingCountriesFrom(reference.data?.pays ?? [])}
@@ -373,6 +386,7 @@ function EcranCourant({
   changer,
   sites,
   site,
+  erreurLots,
   canaux,
   fiches,
   countries,
@@ -385,6 +399,7 @@ function EcranCourant({
   ecran: Ecran;
   sites: readonly SiteVente[];
   site: SiteVente | undefined;
+  erreurLots: string | null;
   canaux: readonly string[];
   fiches: readonly Fiche[];
   countries: readonly { code: string; label: string }[];
@@ -456,7 +471,7 @@ function EcranCourant({
         </Question>
       );
     case 'lots':
-      return <EcranLots draft={draft} changer={changer} site={site} />;
+      return <EcranLots draft={draft} changer={changer} site={site} erreur={erreurLots} />;
     case 'paiement':
       return <EcranPaiement draft={draft} changer={changer} />;
     default:
@@ -785,11 +800,20 @@ function ChoixPersonne({
 }
 
 function prixAffiche(site: SiteVente): string {
-  if (site.superficies.length === 0) return formatFcfa(site.prixUnitaireDefaut);
-  return formatFcfa(Math.min(...site.superficies.map((s) => s.prix)));
+  const prix =
+    site.superficies.length === 0
+      ? site.prixUnitaireDefaut
+      : Math.min(...site.superficies.map((s) => s.prix));
+  const stock = lotsRestants(site);
+  return stock === null ? formatFcfa(prix) : `${formatFcfa(prix)} · ${stock}`;
 }
 
-function EcranLots({ draft, changer, site }: EcranProps & { site: SiteVente | undefined }) {
+function EcranLots({
+  draft,
+  changer,
+  site,
+  erreur,
+}: EcranProps & { site: SiteVente | undefined; erreur: string | null }) {
   const superficies = site?.superficies ?? [];
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
   const parSuperficie = new Map(superficies.map((s) => [s.superficie, s.prix]));
@@ -819,6 +843,8 @@ function EcranLots({ draft, changer, site }: EcranProps & { site: SiteVente | un
         <Input
           inputMode="numeric"
           aria-label="Nombre de lots"
+          aria-invalid={erreur !== null}
+          aria-describedby={erreur === null ? undefined : 'parcours-lots-erreur'}
           className="h-14 w-24 text-center text-[1.75rem] tabular-nums"
           value={draft.nombreLots}
           onChange={(e) =>
@@ -836,6 +862,11 @@ function EcranLots({ draft, changer, site }: EcranProps & { site: SiteVente | un
           <PlusIcon className="size-6" aria-hidden="true" />
         </Button>
       </div>
+      {erreur === null ? null : (
+        <p id="parcours-lots-erreur" role="alert" className="font-[600] text-destructive">
+          {erreur}
+        </p>
+      )}
       <Montant
         id="parcours-prix"
         label="Prix d'un lot"

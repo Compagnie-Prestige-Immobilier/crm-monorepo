@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { QueryErrorState } from '@/components/query-error-state';
+import { MeilleursParrains } from '@/components/suggestions/meilleurs-parrains';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -164,10 +165,10 @@ export function SuggestionsView() {
 
   return (
     <div className="flex flex-col gap-6">
+      <MeilleursParrains />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Ce sont des contacts recommandés par un représentant, pas encore des prospects. Les fiches
-          suspectes ou invalides sont automatiquement détectées pour vous éviter de perdre du temps.
+          Ce sont des contacts recommandés par un représentant, pas encore des prospects.
         </p>
 
         {suspiciousItems.length > 0 ? (
@@ -324,6 +325,13 @@ export function SuggestionsView() {
   );
 }
 
+function nomDuParrain(suggestion: {
+  sourceRepresentantName: string;
+  sourceRepresentantShortCode: string;
+}) {
+  return suggestion.sourceRepresentantName || suggestion.sourceRepresentantShortCode;
+}
+
 function SuggestionCard({
   suggestion,
   sameNumberCount,
@@ -412,7 +420,7 @@ function SuggestionCard({
           onClick={onToggleParrain}
           className="inline-flex items-center gap-1 font-[600] text-foreground underline decoration-dashed underline-offset-4 hover:text-primary transition-colors cursor-pointer"
         >
-          {suggestion.sourceRepresentantShortCode}
+          {nomDuParrain(suggestion)}
           <InfoIcon className="size-3 text-muted-foreground" aria-hidden="true" />
         </button>
         <span> · recueilli par {suggestion.suggestedByName} · </span>
@@ -482,7 +490,7 @@ function BulleParrain({ suggestion, onFermer }: { suggestion: Suggestion; onFerm
     <div className="absolute left-0 top-6 z-20 w-80 rounded-lg border border-border bg-card p-3 shadow-lg flex flex-col gap-2 text-[0.8125rem] text-foreground animate-in fade-in zoom-in-95 duration-150">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-[600]">
         <span className="flex items-center gap-1.5">
-          👤 Représentant Parrain ({suggestion.sourceRepresentantShortCode})
+          👤 Représentant parrain : {nomDuParrain(suggestion)}
         </span>
         <button
           type="button"
@@ -494,8 +502,7 @@ function BulleParrain({ suggestion, onFermer }: { suggestion: Suggestion; onFerm
       </div>
       <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
         <p>
-          <strong className="text-foreground">Code court :</strong>{' '}
-          {suggestion.sourceRepresentantShortCode}
+          <strong className="text-foreground">Code court :</strong> {nomDuParrain(suggestion)}
         </p>
         <p>
           <strong className="text-foreground">Recueilli par :</strong> {suggestion.suggestedByName}

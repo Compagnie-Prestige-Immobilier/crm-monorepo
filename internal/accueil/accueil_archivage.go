@@ -12,9 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Une visite saisie par erreur restait au registre pour toujours. L'archivage
-// est immédiat et réversible en base ; la destruction est définitive, donc
-// réservée à la direction et refusée tant que l'archive n'a pas vieilli.
+// L'archivage est immédiat et réversible ; la destruction, définitive, est réservée à la direction
+// et refusée tant que l'archive n'a pas vieilli.
 const (
 	delaiDestructionVisite = 30
 	cheminVisite           = "/api/v1/visites/{id}"
@@ -32,16 +31,19 @@ func (s *service) archiverVisite(ctx context.Context, in *VisiteIDInput) (*struc
 	if err != nil {
 		return nil, err
 	}
-	lignes, err := s.Q.ArchiverVisite(ctx, db.ArchiverVisiteParams{ID: in.ID, DeletedById: pointeurID(ctx)})
-	if err != nil {
-		return nil, err
-	}
-	if lignes == 0 {
-		return nil, socle.Problem(http.StatusNotFound, "VISITE_NOT_FOUND", "Visite introuvable.")
-	}
 	acteur := socle.UtilisateurCourant(ctx).ID
-	if err := database.Auditer(ctx, s.Q, acteur, "visite.archive", "visite", in.ID,
-		map[string]any{"reference": avant.Reference, "visiteur": avant.VisitorName}, nil); err != nil {
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		lignes, err := q.ArchiverVisite(ctx, db.ArchiverVisiteParams{ID: in.ID, DeletedById: &acteur})
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return socle.Problem(http.StatusNotFound, "VISITE_NOT_FOUND", "Visite introuvable.")
+		}
+		return database.Auditer(ctx, q, acteur, "visite.archive", "visite", in.ID,
+			map[string]any{"reference": avant.Reference, "visiteur": avant.VisitorName}, nil)
+	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("visites")
@@ -57,26 +59,24 @@ func (s *service) detruireVisite(ctx context.Context, in *VisiteIDInput) (*struc
 	if err != nil {
 		return nil, err
 	}
-	lignes, err := s.Q.DetruireVisite(ctx, db.DetruireVisiteParams{ID: in.ID, DelaiJours: delaiDestructionVisite})
-	if err != nil {
-		return nil, err
-	}
-	if lignes == 0 {
-		return nil, socle.Problem(http.StatusConflict, "ARCHIVE_TROP_RECENTE",
-			"Une archive ne se détruit qu'au bout de trente jours.")
-	}
 	acteur := socle.UtilisateurCourant(ctx).ID
-	if err := database.Auditer(ctx, s.Q, acteur, "visite.destruction", "visite", in.ID,
-		map[string]any{"reference": archive.Reference, "visiteur": archive.VisitorName}, nil); err != nil {
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		lignes, err := q.DetruireVisite(ctx, db.DetruireVisiteParams{ID: in.ID, DelaiJours: delaiDestructionVisite})
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return socle.Problem(http.StatusConflict, "ARCHIVE_TROP_RECENTE",
+				"Une archive ne se détruit qu'au bout de trente jours.")
+		}
+		return database.Auditer(ctx, q, acteur, "visite.destruction", "visite", in.ID,
+			map[string]any{"reference": archive.Reference, "visiteur": archive.VisitorName}, nil)
+	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("visites")
 	return &struct{}{}, nil
-}
-
-func pointeurID(ctx context.Context) *string {
-	id := socle.UtilisateurCourant(ctx).ID
-	return &id
 }
 
 func monterArchivageVisites(api huma.API, s *service) {

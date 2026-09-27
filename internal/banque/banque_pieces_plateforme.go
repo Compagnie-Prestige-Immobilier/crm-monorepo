@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"path"
 	"strings"
@@ -65,7 +64,7 @@ func pieceDuGrandPublic(ctx context.Context, source *sourceDesPieces, code strin
 		if doc.DocID != code || doc.FileURL == "" {
 			continue
 		}
-		corps, typeMime, errLecture := lirePlateformeBrut(ctx, doc.FileURL, "")
+		corps, typeMime, errLecture := ouvrirPlateforme(ctx, doc.FileURL, "")
 		if errLecture != nil {
 			return nil, piecesIndisponibles(errLecture.Error())
 		}
@@ -76,21 +75,28 @@ func pieceDuGrandPublic(ctx context.Context, source *sourceDesPieces, code strin
 }
 
 // CHUES refuse le téléchargement pièce par pièce au compte machine, mais lui
-// ouvre l'archive du dossier : on l'ouvre ici plutôt que de demander un droit
-// de plus à la plateforme.
+// ouvre l'archive du dossier.
 func archiveChues(ctx context.Context, base, jeton string, charge []byte) ([]byte, error) {
+	adresse, err := adresseArchiveChues(base, charge)
+	if err != nil {
+		return nil, err
+	}
+	corps, _, err := lirePlateformeBrut(ctx, adresse, jeton)
+	return corps, err
+}
+
+func adresseArchiveChues(base string, charge []byte) (string, error) {
 	var distant struct {
 		Dossier *struct {
 			ID json.RawMessage `json:"id"`
 		} `json:"dossier"`
 	}
 	if json.Unmarshal(charge, &distant) != nil || distant.Dossier == nil {
-		return nil, errors.New("aucun dossier ouvert sur la plateforme CHUES")
+		return "", errors.New("aucun dossier ouvert sur la plateforme CHUES")
 	}
 	// Le flux d'intégration rend l'identifiant en chaîne, l'ancienne route en nombre.
 	dossier := strings.Trim(string(distant.Dossier.ID), `"`)
-	corps, _, err := lirePlateformeBrut(ctx, base+"/dossiers/"+dossier+"/archive", jeton)
-	return corps, err
+	return base + "/dossiers/" + dossier + "/archive", nil
 }
 
 func piecesDeLArchive(archive []byte) ([]PieceDeposee, error) {
@@ -126,22 +132,16 @@ func pieceDeLArchive(ctx context.Context, source *sourceDesPieces, code string) 
 		if entree.Name != code {
 			continue
 		}
-		corps, errLecture := contenuDeLEntree(entree)
+		if entree.UncompressedSize64 > piecesTailleMax {
+			return nil, piecesIndisponibles(errPieceTropLourde.Error())
+		}
+		corps, errLecture := entree.Open()
 		if errLecture != nil {
 			return nil, piecesIndisponibles(errLecture.Error())
 		}
 		return reponseFichier(corps, path.Base(entree.Name), typeDeNom(entree.Name), false), nil
 	}
 	return nil, piecesIndisponibles("pièce inconnue")
-}
-
-func contenuDeLEntree(entree *zip.File) ([]byte, error) {
-	ouvert, err := entree.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = ouvert.Close() }()
-	return io.ReadAll(io.LimitReader(ouvert, piecesTailleMax))
 }
 
 func empaqueter(ctx context.Context, docs []pieceDistante) ([]byte, error) {

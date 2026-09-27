@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
 
 import { DatePicker } from '@/components/filters/date-picker';
@@ -10,7 +10,6 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   VISITE_COLONNES,
@@ -29,7 +28,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import type { FilterOption } from '@/lib/types';
 
 type Errors = Partial<
-  Record<'visitorName' | 'phone' | 'comment' | 'entrepriseId' | 'objetId' | 'date', string>
+  Record<'visitorName' | 'phone' | 'comment' | 'entrepriseId' | 'objetId' | 'date' | 'time', string>
 >;
 
 /** Bornes de `CreateVisiteDto` : dépassées, l'API rend un 400 qui ne nomme aucun champ. */
@@ -67,6 +66,18 @@ function validatePhone(value: string): string | undefined {
   return undefined;
 }
 
+// Saisie libre plutôt que `type="time"`, qui s'affiche en 12 h selon la langue du navigateur.
+function heureSaisie(value: string): string | null {
+  const trouve = /^([01]?\d|2[0-3])\s*[:hH]?\s*([0-5]\d)$/.exec(value.trim());
+  if (trouve === null) return null;
+  return `${(trouve[1] ?? '').padStart(2, '0')}:${trouve[2] ?? ''}`;
+}
+
+function validateTime(value: string): string | undefined {
+  if (value.trim() === '' || heureSaisie(value) !== null) return undefined;
+  return 'Heure sur 24 h, par exemple 14:30.';
+}
+
 function validateComment(value: string): string | undefined {
   if (value.trim().length > COMMENTAIRE_MAX) {
     return `${String(COMMENTAIRE_MAX)} caractères au maximum.`;
@@ -81,6 +92,7 @@ function validerVisiteForm({
   entrepriseId,
   objetId,
   date,
+  time,
 }: {
   visitorName: string;
   phone: string;
@@ -88,8 +100,11 @@ function validerVisiteForm({
   entrepriseId: string | null;
   objetId: string | null;
   date: string | null;
+  time: string;
 }): Errors {
   const found: Errors = {};
+  const timeErreur = validateTime(time);
+  if (timeErreur !== undefined) found.time = timeErreur;
   const nomErreur = validateNom(visitorName);
   if (nomErreur !== undefined) found.visitorName = nomErreur;
   const phoneErreur = validatePhone(phone);
@@ -131,7 +146,8 @@ function construireVisiteInput({
     entrepriseId,
     objetId,
   };
-  if (time !== '') input.time = time;
+  const heure = heureSaisie(time);
+  if (heure !== null) input.time = heure;
   if (phone.trim() !== '') input.phone = phone.trim();
   if (directionId !== null) input.directionId = directionId;
   if (destinataireId !== null) input.destinataireId = destinataireId;
@@ -186,19 +202,26 @@ function ChoiceError({ message }: { message: string | undefined }): ReactNode {
   );
 }
 
-function valeursInitiales(visite: Visite | null) {
+interface VisitePreremplie {
+  visitorName: string;
+  phone: string;
+  comment: string;
+}
+
+function valeursInitiales(visite: Visite | null, preremplie: VisitePreremplie | null) {
   const maintenant = dakarNow();
   if (visite === null) {
+    const saisie = preremplie ?? { visitorName: '', phone: '', comment: '' };
     return {
       date: maintenant.date as string | null,
       time: maintenant.time,
-      visitorName: '',
-      phone: '',
+      visitorName: saisie.visitorName,
+      phone: saisie.phone,
       entrepriseId: null as string | null,
       directionId: null as string | null,
       destinataireId: null as string | null,
       objetId: null as string | null,
-      comment: '',
+      comment: saisie.comment,
     };
   }
 
@@ -234,7 +257,7 @@ function ChampDate({
   if (correction) {
     return (
       <div className="flex flex-col gap-1.5">
-        <Label>{VISITE_COLONNES.date}</Label>
+        <p className="text-[0.9375rem] font-[600] leading-none">{VISITE_COLONNES.date}</p>
         <p className="py-2 text-[0.9375rem] font-[600]">{date === null ? '' : formatDate(date)}</p>
       </div>
     );
@@ -255,18 +278,23 @@ function ChampDate({
 export function VisiteForm({
   referentiels,
   visite = null,
+  preremplie = null,
+  nomRef: nomRefDuDialogue,
   onSaved,
   onCancel,
 }: {
   referentiels: VisiteReferentiels | undefined;
   visite?: Visite | null;
+  preremplie?: VisitePreremplie | null;
+  nomRef?: RefObject<HTMLInputElement | null> | undefined;
   onSaved: (visite: Visite) => void;
   onCancel?: (() => void) | undefined;
 }) {
   const dateId = useId();
-  const nomRef = useRef<HTMLInputElement>(null);
+  const nomRefLocal = useRef<HTMLInputElement>(null);
+  const nomRef = nomRefDuDialogue ?? nomRefLocal;
 
-  const depart = valeursInitiales(visite);
+  const depart = valeursInitiales(visite, preremplie);
   const [date, setDate] = useState<string | null>(depart.date);
   const [time, setTime] = useState(depart.time);
   const [visitorName, setVisitorName] = useState(depart.visitorName);
@@ -314,7 +342,15 @@ export function VisiteForm({
   function submit(): void {
     if (save.isPending) return;
 
-    const found = validerVisiteForm({ visitorName, phone, comment, entrepriseId, objetId, date });
+    const found = validerVisiteForm({
+      visitorName,
+      phone,
+      comment,
+      entrepriseId,
+      objetId,
+      date,
+      time,
+    });
     setErrors(found);
     if (entrepriseId === null || objetId === null || date === null) return;
     if (Object.keys(found).length > 0) return;
@@ -345,7 +381,7 @@ export function VisiteForm({
     >
       {/* Deux colonnes au maximum : le dialogue est plafonné à `max-w-4xl`, et
           `xl:grid-cols-4` se déclenche sur la largeur de l'écran, pas celle du
-          dialogue — quatre colonnes y tronquaient chaque valeur choisie. */}
+          dialogue, quatre colonnes y tronquaient chaque valeur choisie. */}
       <div className="grid gap-4 md:grid-cols-2">
         <ChampDate
           correction={correction}
@@ -355,14 +391,20 @@ export function VisiteForm({
           onChange={setDate}
         />
 
-        <Field label={VISITE_COLONNES.time}>
+        <Field label={VISITE_COLONNES.time} error={errors.time}>
           {(props) => (
             <Input
               {...props}
-              type="time"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="ex. 14:30"
+              maxLength={7}
               value={time}
               onChange={(event) => {
                 setTime(event.target.value);
+              }}
+              onBlur={() => {
+                setErrors((prev) => withFieldError(prev, 'time', validateTime(time)));
               }}
             />
           )}
@@ -374,8 +416,6 @@ export function VisiteForm({
               {...props}
               ref={nomRef}
               maxLength={NOM_MAX}
-              // oxlint-disable-next-line jsx-a11y/no-autofocus -- saisie au comptoir, champ premier
-              autoFocus={!correction}
               autoComplete="off"
               value={visitorName}
               onChange={(event) => {

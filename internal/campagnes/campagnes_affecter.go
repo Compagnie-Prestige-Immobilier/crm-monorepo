@@ -137,25 +137,18 @@ func (s *service) campagneTitulaireVise(ctx context.Context, in *CampagneAffecte
 	if row.PausedAt != nil {
 		return "", socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EN_PAUSE", "Cette campagne est en pause.")
 	}
-	if lotSurRepresentants(string(row.Cible)) != surRepresentants {
+	if lotSurRepresentants(string(row.Cible), row.Projet) != surRepresentants {
 		return "", socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_CIBLE", "Cette campagne ne vise pas ce type de fiche.")
 	}
 	membre, err := s.campagneMembreLeMoinsCharge(ctx, row)
 	if err != nil {
 		return "", err
 	}
-	items, err := s.Q.LotsActifsDeLaFiche(ctx, fiche)
-	if err != nil {
-		return "", err
-	}
-	if slices.ContainsFunc(items, func(item db.LotsActifsDeLaFicheRow) bool { return item.LotId == row.ID }) {
-		return membre, nil
-	}
 	return membre, s.campagneAjouterFiche(ctx, row, fiche, membre)
 }
 
 func (s *service) campagneMembreLeMoinsCharge(ctx context.Context, row *db.LotParIdRow) (string, error) {
-	equipe, err := s.lotEquipeRestante(ctx, lotLireFiltres(row.Filters).Distribution.TeleconseillerIds)
+	equipe, err := lotEquipeRestante(ctx, s.Q, lotLireFiltres(row.Filters).Distribution.TeleconseillerIds)
 	if err != nil {
 		return "", err
 	}
@@ -183,6 +176,16 @@ func (s *service) campagneAjouterFiche(ctx context.Context, row *db.LotParIdRow,
 	auteur := socle.UtilisateurCourant(ctx).ID
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if _, err := lotFiltresVerrouilles(ctx, q, row.ID); err != nil {
+			return err
+		}
+		items, err := q.LotsActifsDeLaFiche(ctx, fiche)
+		if err != nil {
+			return err
+		}
+		if slices.ContainsFunc(items, func(item db.LotsActifsDeLaFicheRow) bool { return item.LotId == row.ID }) {
+			return nil
+		}
 		position, err := q.AjouterFicheAuLot(ctx, db.AjouterFicheAuLotParams{
 			LotID: row.ID, RepresentantID: fiche.RepresentantID, ProspectID: fiche.ProspectID, AssigneeID: &membre,
 		})
@@ -210,19 +213,15 @@ func (s *service) campagneSuivreLaFiche(ctx context.Context, fiche db.LotsActifs
 		if err != nil {
 			return suivies, err
 		}
-		mouvements, err := s.lotMouvementsVers(ctx, row, []int{int(item.Position)}, vers, true)
-		if err != nil {
-			return suivies, err
-		}
-		if len(mouvements) == 0 {
+		err = s.lotAppliquerMouvements(ctx, row, vers, "", "lot_export.reaffectation", map[string]any{lotCleVers: vers, "fiche": "affectation"},
+			func(q *db.Queries, _ *lotFiltres) ([]lotMouvement, error) {
+				return lotMouvementsExiges(lotMouvementsVers(ctx, q, row, []int{int(item.Position)}, vers, true))
+			})
+		var probleme *socle.ProblemError
+		if errors.As(err, &probleme) && probleme.Code == codeReaffectationVide {
 			continue
 		}
-		equipe := lotLireFiltres(row.Filters).Distribution.TeleconseillerIds
-		if !slices.Contains(equipe, vers) {
-			equipe = append(equipe, vers)
-		}
-		if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.reaffectation",
-			map[string]any{lotCleVers: vers, "fiche": "affectation"}); err != nil {
+		if err != nil {
 			return suivies, err
 		}
 		suivies++

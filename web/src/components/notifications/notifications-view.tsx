@@ -47,6 +47,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
+import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import {
   countActiveNotificationFilters,
@@ -113,8 +114,7 @@ const CATEGORY_ITEMS = [
   })),
 ];
 
-const dateTime = (value: string | null): string =>
-  value === null ? '–' : new Date(value).toLocaleString('fr-SN');
+const dateTime = (value: string | null): string => (value === null ? '–' : formatDateTime(value));
 
 function buildListQuery(filters: Pick<NotificationFiltersState, 'page' | 'status' | 'category'>) {
   return {

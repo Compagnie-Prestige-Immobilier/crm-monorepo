@@ -75,9 +75,8 @@ func (s *service) cleDeCacheSupervision(ctx context.Context, route string, f *Fi
 	}, "|")
 }
 
-// La fenêtre porte sur la date de l'ACTE, pas sur celle de la fiche : un
-// téléconseiller resté hors ligne trois semaines verrait sinon ses appels du
-// lundi comptés le jeudi de la synchronisation.
+// La fenêtre porte sur la date de l'ACTE, pas de la fiche : un appel du lundi
+// synchronisé le jeudi compte le lundi.
 type perimetreSupervision struct {
 	filtre *FiltreDeSupervision
 	unite  string
@@ -329,9 +328,8 @@ type StockDesRepresentants struct {
 
 type StockOutput struct{ Body StockDesRepresentants }
 
-// Le stock, sans fenêtre : ce qu'il y a à appeler, pas ce qui a été fait.
-// « Injoignable » se lit sur le statut porté par la fiche, hors « Injoignable
-// définitif » qui ne repasse jamais (EB-06).
+// Le stock à appeler, sans fenêtre. « Injoignable » se lit sur la fiche, hors
+// « Injoignable définitif » qui ne repasse jamais.
 func (s *service) stockDesRepresentants(ctx context.Context, _ *struct{}) (*StockOutput, error) {
 	cle := s.Cfg.Base + ":supervision/representants:" + porteeDeCache(ctx)
 	corps, err := avecCache(cle, ttlAnalyses, func() (StockDesRepresentants, error) {
@@ -412,9 +410,8 @@ type ligneDeCampagne struct {
 	Traitees           int32
 }
 
-// Une campagne est un lot d'export ; le dénominateur est ce qui a été confié pour
-// les jours de programme de la fenêtre. Jour 1 du programme = journée de création
-// du lot. `granularity`, `timeFrom` et `timeTo` sont ignorés.
+// Dénominateur : ce qui a été confié pour les jours de programme de la fenêtre, le
+// jour 1 étant la création du lot. `granularity`, `timeFrom`, `timeTo` ignorés.
 func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) string {
 	projet := clauseToujoursVraie
 	if perimetre.filtre.Projet != "" {
@@ -444,9 +441,8 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 		avantLaFin = `t."clientCreatedAt" <= ` + p.marque(*perimetre.jusqua)
 	}
 	depuisLaCampagne := `t."clientCreatedAt" >= l."createdAt" AND ` + avantLaFin
-	// Deux EXISTS sur les tables sources, jamais sur une CTE : sans index, le
-	// balayage se répétait pour chacune des 3 700 lignes de lot (1,25 s mesuré
-	// sur la base du 18 septembre 2026, 79 ms sous cette forme).
+	// EXISTS sur les tables sources, jamais sur une CTE sans index : 79 ms au lieu de
+	// 1,25 s mesurés pour 3 700 lignes de lot.
 	aEteAppelee := `EXISTS (SELECT 1 FROM "rep_call_attempts" t
 	      WHERE i."representantId" IS NOT NULL AND t."representantId" = i."representantId"
 	        AND ` + depuisLaCampagne + `)

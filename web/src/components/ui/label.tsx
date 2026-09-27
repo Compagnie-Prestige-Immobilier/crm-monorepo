@@ -4,10 +4,14 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Label({ className, ...props }: React.ComponentProps<'label'>) {
+function Label({
+  className,
+  htmlFor,
+  ...props
+}: React.ComponentProps<'label'> & { htmlFor: string }) {
   return (
-    // oxlint-disable-next-line jsx-a11y/label-has-associated-control -- primitive, association chez l'appelant
     <label
+      htmlFor={htmlFor}
       data-slot="label"
       className={cn(
         'flex select-none items-center gap-2 text-[0.9375rem] font-[600] leading-none text-foreground',

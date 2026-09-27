@@ -24,32 +24,34 @@ const echellesIdentifiant = 3
 type service struct {
 	*socle.Deps
 	leurre string
-	// Deux compteurs : par adresse contre un seul attaquant, par identifiant
-	// contre une attaque distribuée qui, sans lui, a un budget illimité sur un
-	// compte donné.
+	// Par adresse contre un seul attaquant, par identifiant contre une attaque
+	// distribuée qui aurait sinon un budget illimité sur un compte.
 	tentatives   *socle.Limiteur
 	parIdentifie *socle.Limiteur
 }
 
-// `maxAge` en secondes ; -1 efface le cookie (Max-Age=0), ce qu'une durée négative
-// convertie en secondes n'obtenait pas.
-func cookieSession(ctx context.Context, jeton string, maxAge int) http.Cookie {
-	c := http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge} //nolint:gosec // G124 : hors TLS (poste de développement, téléphone sur le réseau local) un cookie Secure serait jeté par le navigateur ; choix du propriétaire du 10 septembre 2026
-	if !socle.ConnexionSecurisee(ctx) {
-		c.Name, c.Secure = socle.NomCookieClair, false
+// `maxAge` en secondes ; -1 efface le cookie (Max-Age=0). Hors TLS, un cookie
+// Secure serait jeté par le navigateur : le cookie clair change de nom.
+func cookieSession(ctx context.Context, jeton string, maxAge int) string {
+	if socle.ConnexionSecurisee(ctx) {
+		c := http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge}
+		return c.String()
 	}
-	return c
+	return fmt.Sprintf("%s=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax", socle.NomCookieClair, jeton, max(maxAge, 0))
 }
 
-// La session arrive sous l'un ou l'autre nom de cookie selon le transport.
+// Même règle que `socle.JetonSession` : en TLS, le cookie clair ne vaut rien.
 type CookieInput struct {
 	Session      string `cookie:"__Host-cpi_session"`
 	SessionClair string `cookie:"cpi_session"`
 }
 
-func (in *CookieInput) jeton() string {
+func (in *CookieInput) jeton(ctx context.Context) string {
 	if in.Session != "" {
 		return in.Session
+	}
+	if socle.ConnexionSecurisee(ctx) {
+		return ""
 	}
 	return in.SessionClair
 }
@@ -73,7 +75,6 @@ var demoProfiles = map[string]struct {
 	email string
 	role  db.Role
 }{
-	"ADMIN":            {email: "admin@cpi.sn", role: db.RoleADMIN},
 	"COMMERCIAL":       {email: "fixture.awa@cpi.sn", role: db.RoleCOMMERCIAL},
 	"BANQUE_FINANCE":   {email: "fixture.banque@cpi.sn", role: db.RoleBANQUEFINANCE},
 	"SUPERVISEUR":      {email: "fixture.superviseur@cpi.sn", role: db.RoleSUPERVISEUR},
@@ -93,7 +94,7 @@ type CompteConnecte struct {
 }
 
 type SessionOutput struct {
-	SetCookie http.Cookie `header:"Set-Cookie"`
+	SetCookie string `header:"Set-Cookie"`
 	Body      struct {
 		User CompteConnecte `json:"user"`
 	}
@@ -214,11 +215,11 @@ func (s *service) bases(context.Context, *struct{}) (*BasesOutput, error) {
 }
 
 type LogoutOutput struct {
-	SetCookie http.Cookie `header:"Set-Cookie"`
+	SetCookie string `header:"Set-Cookie"`
 }
 
 func (s *service) logout(ctx context.Context, in *CookieInput) (*LogoutOutput, error) {
-	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton())); err != nil {
+	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton(ctx))); err != nil {
 		return nil, err
 	}
 	return &LogoutOutput{SetCookie: cookieSession(ctx, "", -1)}, nil
@@ -238,10 +239,8 @@ func Monter(api huma.API, d *socle.Deps) error {
 	if err != nil {
 		return err
 	}
-	// Le seau par identifiant est PLUS large que celui par adresse. Il vise une
-	// attaque distribuée, que le seau par adresse laisse passer ; serré, il
-	// gênerait d'abord la personne qui se trompe de mot de passe depuis son
-	// poste, et elle est déjà tenue par son adresse.
+	// Seau par identifiant plus large : serré, il gênerait d'abord la personne
+	// qui se trompe de mot de passe, déjà tenue par son adresse.
 	s := &service{
 		Deps:         d,
 		leurre:       leurre,
@@ -291,15 +290,14 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 	if err != nil {
 		return nil, err
 	}
-	// Le condensat, la révocation des autres sessions et la trace dans la même
-	// transaction. La trace ne porte aucune valeur : un mot de passe, même
-	// ancien, ne s'écrit pas dans le journal.
+	// La trace ne porte aucune valeur : un mot de passe, même ancien, ne s'écrit
+	// pas dans le journal.
 	return nil, pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
 		if err := q.UpdatePassword(ctx, db.UpdatePasswordParams{ID: u.ID, PasswordHash: condensat}); err != nil {
 			return err
 		}
-		if err := q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.jeton())}); err != nil {
+		if err := q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.jeton(ctx))}); err != nil {
 			return err
 		}
 		return database.Auditer(ctx, q, u.ID, "user.password_change", "user", u.ID, nil, nil)

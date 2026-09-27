@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -445,8 +446,13 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 				banqueCleBanque: banqueID, "inscriptionId": inscriptionID,
 			})
 	})
-	if banqueConflitUnicite(err) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == "bank_cases_referenceKey_key" {
 		return "", s.banqueReferenceDejaPrise(ctx, banqueReferenceCle(reference))
+	}
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == "bank_cases_inscription_unique" {
+		return "", socle.Problem(http.StatusConflict, "BANK_CASE_INSCRIPTION_ALREADY_OPEN",
+			"Un dossier bancaire existe déjà pour cette inscription.")
 	}
 	return id.String(), err
 }
@@ -611,10 +617,8 @@ func banquePlanTransition(cible *EtapeBanque, corps *CorpsTransitionBanque, code
 	return banquePlanOuverture(corps)
 }
 
-// Depuis une étape ouverte, toute étape active se rejoint dans les deux sens :
-// l'ordre du flux guide, il n'enferme pas. Seul le rejet exige une prise en
-// traitement préalable ; l'encaissement et le rejet se confirment par leur
-// montant ou leur motif (banquePlanTransition).
+// Depuis une étape ouverte, toute étape active se rejoint dans les deux sens ;
+// seul le rejet exige une prise en traitement préalable.
 func banqueAtteignable(courante, cible *EtapeBanque) error {
 	if !cible.IsActive {
 		return banqueEtapeInactive(cible)
@@ -754,7 +758,17 @@ func (s *service) avancerDossier(ctx context.Context, in *TransitionBanqueInput)
 
 func (s *service) corrigerDossier(ctx context.Context, in *CorrectionBanqueInput) (*DetailDossierOutput, error) {
 	justification := strings.TrimSpace(in.Body.Reason)
+	if err := banqueMotifRenseigne(justification); err != nil {
+		return nil, err
+	}
 	return s.banqueAppliquerTransition(ctx, in.ID, &in.Body.CorpsTransitionBanque, &justification)
+}
+
+func banqueMotifRenseigne(motif string) error {
+	if utf8.RuneCountInString(motif) < 3 {
+		return socle.Problem(http.StatusUnprocessableEntity, "BANK_REASON_REQUIRED", "Le motif doit compter au moins 3 caractères.")
+	}
+	return nil
 }
 
 type InclureInactifsBanqueInput struct {
@@ -1175,8 +1189,12 @@ func (s *service) banqueDemandeEnAttente(ctx context.Context, phone string) erro
 	if err != nil {
 		return err
 	}
-	return problemBanque(http.StatusConflict, banqueCodeDemandeAttente,
-		"Une demande est déjà en attente pour ce numéro.", map[string]any{"existingId": rival})
+	const message = "Une demande est déjà en attente pour ce numéro."
+	u := socle.UtilisateurCourant(ctx)
+	if _, err := s.banqueDemande(ctx, rival, banquePortefeuilleDemandes(&u)); err != nil {
+		return socle.Problem(http.StatusConflict, banqueCodeDemandeAttente, message)
+	}
+	return problemBanque(http.StatusConflict, banqueCodeDemandeAttente, message, map[string]any{"existingId": rival})
 }
 
 type ListeDemandesBanqueInput struct {
@@ -1339,9 +1357,8 @@ func (s *service) banqueEcrireApprobation(ctx context.Context, u *socle.Utilisat
 		}); err != nil {
 			return err
 		}
-		// L'arbitrage se gagne par cette écriture CONDITIONNELLE : sur
-		// `status = PENDING`, le second arbitre ne met rien à jour et sa
-		// transaction avorte, ce qui défait le prospect qu'il venait de créer.
+		// Écriture conditionnelle sur `status = PENDING` : le second arbitre ne met rien
+		// à jour et sa transaction avorte, défaisant le prospect qu'il venait de créer.
 		nouveau := prospectID.String()
 		lignes, err := q.ClientRequestApprove(ctx, db.ClientRequestApproveParams{
 			ID: demande.ID, ReviewedById: &u.ID, ReviewedAt: &maintenant, CreatedProspectId: &nouveau,
@@ -1373,10 +1390,13 @@ type RefusBanqueInput struct {
 // que ce module existe pour lever.
 func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput) (*DemandeBanqueOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
+	motif := strings.TrimSpace(in.Body.Reason)
+	if err := banqueMotifRenseigne(motif); err != nil {
+		return nil, err
+	}
 	if _, err := s.banqueDemandePendante(ctx, in.ID); err != nil {
 		return nil, err
 	}
-	motif := strings.TrimSpace(in.Body.Reason)
 	maintenant := time.Now()
 	if err := s.transactionBanque(ctx, func(q *db.Queries) error {
 		lignes, err := q.ClientRequestReject(ctx, db.ClientRequestRejectParams{

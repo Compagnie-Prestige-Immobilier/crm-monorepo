@@ -96,9 +96,7 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	}
 	maintenant := time.Now()
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
-		if err := q.ConvertirJourney(ctx, db.ConvertirJourneyParams{
-			ID: journey.ID, ConvertedAt: &maintenant, ConvertedById: &u.ID,
-		}); err != nil {
+		if err := prospectMarquerJourneyConverti(ctx, q, journey.ID, u.ID, maintenant); err != nil {
 			return err
 		}
 		if err := q.UpsertConversion(ctx, db.UpsertConversionParams{
@@ -121,6 +119,17 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	// défaire une adhésion déjà acquise.
 	s.prospectAviserAdhesion(ctx, &u, item, &corps, maintenant)
 	return &ProspectOutput{Body: *item}, nil
+}
+
+func prospectMarquerJourneyConverti(ctx context.Context, q *db.Queries, journeyID, convertisseurID string, quand time.Time) error {
+	modifiees, err := q.ConvertirJourney(ctx, db.ConvertirJourneyParams{ID: journeyID, ConvertedAt: &quand, ConvertedById: &convertisseurID})
+	if err != nil {
+		return err
+	}
+	if modifiees == 0 {
+		return socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI", "Cette fiche est déjà convertie.")
+	}
+	return nil
 }
 
 // L'avis d'adhésion aux adresses réglées par l'administrateur. Sans destinataire
@@ -197,7 +206,8 @@ type ProspectVendreInput struct {
 // Seule une fiche convertie devient vendue ; le dépôt du classeur fait le même geste.
 func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	if _, err := s.prospectModifiable(ctx, &u, in.ID); err != nil {
+	existant, err := s.prospectModifiable(ctx, &u, in.ID)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
@@ -210,7 +220,7 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 				"Seule une fiche convertie peut être marquée vendue.")
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.vendre", prospectEntite, in.ID,
-			map[string]any{prospectChampStatut: string(db.ProspectStatutCONVERTI)},
+			map[string]any{prospectChampStatut: string(existant.Statut)},
 			map[string]any{prospectChampStatut: string(db.ProspectStatutVENDU)})
 	}); err != nil {
 		return nil, err
@@ -222,12 +232,24 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 	return &ProspectOutput{Body: *item}, nil
 }
 
-// TOUT ce qui pend à la source suit : un parcours resté sur une fiche supprimée
-// fait disparaître la personne des listes de son projet, et un dossier encaissé
-// pointerait vers une fiche qu'aucun écran ne montre plus.
+// TOUT ce qui pend à la source suit : un parcours ou un dossier resté sur la fiche
+// supprimée disparaîtrait des listes et des écrans.
 func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, sourceID, targetID string, preferSource bool) error {
-	if err := q.SoftDeleteProspect(ctx, sourceID); err != nil {
+	disparue := socle.Problem(http.StatusConflict, "MERGE_PROSPECT_GONE",
+		"L’une des deux fiches vient d’être fusionnée ou supprimée. Rechargez la page.")
+	verrouillees, err := q.VerrouillerFichesAFusionner(ctx, []string{sourceID, targetID})
+	if err != nil {
 		return err
+	}
+	if len(verrouillees) < 2 {
+		return disparue
+	}
+	supprimees, err := q.SoftDeleteProspect(ctx, sourceID)
+	if err != nil {
+		return err
+	}
+	if supprimees == 0 {
+		return disparue
 	}
 	if err := prospectDeplacerParcours(ctx, q, sourceID, targetID); err != nil {
 		return err
@@ -246,19 +268,22 @@ func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, so
 	if err := q.DeplacerDemandesClient(ctx, db.DeplacerDemandesClientParams{CreatedProspectId: &sourceID, CreatedProspectId_2: &targetID}); err != nil {
 		return err
 	}
-	if err := q.FusionnerProspect(ctx, db.FusionnerProspectParams{
+	fusionnees, err := q.FusionnerProspect(ctx, db.FusionnerProspectParams{
 		PreferSource: preferSource, SourceID: sourceID, TargetID: targetID,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
+	}
+	if fusionnees == 0 {
+		return disparue
 	}
 	return database.Auditer(ctx, q, u.ID, "prospect.merge", prospectEntite, targetID,
 		map[string]string{"sourceId": sourceID},
 		map[string]any{"targetId": targetID, "preferSource": preferSource})
 }
 
-// `@@unique(prospectId, projet)` interdit le simple déplacement : quand les deux
-// fiches suivent le même projet il faut choisir, et le parcours PORTEUR de la
-// conversion survit toujours.
+// L'unicité (prospectId, projet) interdit le simple déplacement : sur un même projet,
+// le parcours PORTEUR de la conversion survit toujours.
 func prospectDeplacerParcours(ctx context.Context, q *db.Queries, sourceID, targetID string) error {
 	depart, err := q.JourneysAFusionner(ctx, sourceID)
 	if err != nil {
@@ -497,6 +522,36 @@ func (s *service) prospectReglages(ctx context.Context, projet db.Projet) (Prosp
 	return reglages, nil
 }
 
+// Consignation : une réponse vidée part en null, que la requête retire de la fiche ; un champ non déclaré tombe.
+func ChampsLibresRetenus(ctx context.Context, q *db.Queries, projet db.Projet, envoyes map[string]string) ([]byte, error) {
+	if len(envoyes) == 0 {
+		return nil, nil
+	}
+	ligne, err := q.AppSettingParCle(ctx, prospectCleChamps(projet))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	retenus := map[string]*string{}
+	for _, libre := range prospectLireReglages(ligne.Value).Libres {
+		valeur, envoye := envoyes[libre.ID]
+		if !envoye {
+			continue
+		}
+		retenus[libre.ID] = nil
+		if texte := strings.TrimSpace(valeur); texte != "" {
+			tronque := prospectTronquer(texte, prospectReponseMax)
+			retenus[libre.ID] = &tronque
+		}
+	}
+	if len(retenus) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(retenus)
+}
+
 type ProspectProjetInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 }
@@ -639,10 +694,7 @@ type ProspectParametresChues struct {
 	AccuseReceptionCorps     string   `json:"accuseReceptionCorps"`
 	AdhesionObjet            string   `json:"adhesionObjet"`
 	AdhesionCorps            string   `json:"adhesionCorps"`
-	DestinatairesEnrolement  []string `json:"destinatairesEnrolement"`
-	DestinatairesBpe         []string `json:"destinatairesBpe"`
 	DestinatairesSupervision []string `json:"destinatairesSupervision"`
-	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	DestinatairesAdhesion    []string `json:"destinatairesAdhesion"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
 	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
@@ -655,9 +707,8 @@ type ProspectTextesUsine struct {
 	AccuseReceptionCorps string `json:"accuseReceptionCorps"`
 }
 
-// Les deux textes viennent mot pour mot de l'expression de besoins ; les liens,
-// l'adresse et le numéro naissent VIDES : inventer une URL enverrait les
-// prospects nulle part sans que personne ne s'en aperçoive.
+// Textes repris mot pour mot de l'expression de besoins ; liens, adresse et numéro
+// naissent VIDES : une URL inventée enverrait les prospects nulle part.
 var prospectParametresUsine = ProspectParametresChues{
 	MessageWhatsapp: "Bonjour {prenom}, suite à notre échange, voici le lien pour compléter votre demande " +
 		"d’adhésion CPI CHUES : {lien}. Je reste joignable au {telephoneTeleconseiller}. " +
@@ -670,10 +721,7 @@ var prospectParametresUsine = ProspectParametresChues{
 	AdhesionCorps: "Bonjour, {prenomNom} ({telephone}) a adhéré le {date}. " +
 		"Offre : {offre}. Paiement : {paiement}. Montant : {montant}. " +
 		"Conversion enregistrée par {teleconseiller}. CPI.",
-	DestinatairesEnrolement:  []string{},
-	DestinatairesBpe:         []string{},
 	DestinatairesSupervision: []string{},
-	DestinatairesDirection:   []string{},
 	CodificationProvenances:  []string{},
 	DestinatairesAdhesion:    []string{},
 }
@@ -689,25 +737,20 @@ const (
 	prospectCleAdhesionObjet = "adhesionObjet"
 	prospectCleAdhesionCorps = "adhesionCorps"
 	prospectCleAdhesionDest  = "destinatairesAdhesion"
-	prospectCleEnrolement    = "destinatairesEnrolement"
-	prospectCleBpe           = "destinatairesBpe"
 	prospectCleSupervision   = "destinatairesSupervision"
-	prospectCleDirection     = "destinatairesDirection"
 	prospectCleCodification  = "codificationProvenances"
 	prospectPrefixeParametre = "chues."
 )
 
-// Les deux textes que la supervision et la direction écrivent aussi. Tout le
-// reste engage l'entreprise au-delà d'un message : un lien faux détourne des
-// inscriptions, et la liste des destinataires décide qui lit les demandes.
+// Seuls textes que la supervision et la direction écrivent aussi : liens et
+// destinataires engagent l'entreprise au-delà d'un message.
 var prospectTextesPartages = []string{prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps}
 
 var prospectClesParametres = []string{
 	prospectCleLienChues, prospectCleLienGP, prospectCleEmail, prospectCleWhatsapp,
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
 	prospectCleAdhesionObjet, prospectCleAdhesionCorps,
-	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleCodification, prospectCleAdhesionDest,
+	prospectCleSupervision, prospectCleCodification, prospectCleAdhesionDest,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -755,8 +798,7 @@ func (p *ProspectParametresChues) textes() map[string]*string {
 
 func (p *ProspectParametresChues) listes() map[string]*[]string {
 	return map[string]*[]string{
-		prospectCleEnrolement: &p.DestinatairesEnrolement, prospectCleBpe: &p.DestinatairesBpe,
-		prospectCleSupervision: &p.DestinatairesSupervision, prospectCleDirection: &p.DestinatairesDirection,
+		prospectCleSupervision:  &p.DestinatairesSupervision,
 		prospectCleCodification: &p.CodificationProvenances,
 		prospectCleAdhesionDest: &p.DestinatairesAdhesion,
 	}
@@ -832,10 +874,7 @@ type ProspectMajParametresInput struct {
 		AccuseReceptionCorps     *string   `json:"accuseReceptionCorps,omitempty" maxLength:"4000" required:"false"`
 		AdhesionObjet            *string   `json:"adhesionObjet,omitempty" maxLength:"200" required:"false"`
 		AdhesionCorps            *string   `json:"adhesionCorps,omitempty" maxLength:"4000" required:"false"`
-		DestinatairesEnrolement  *[]string `json:"destinatairesEnrolement,omitempty" maxItems:"50" required:"false"`
-		DestinatairesBpe         *[]string `json:"destinatairesBpe,omitempty" maxItems:"50" required:"false"`
 		DestinatairesSupervision *[]string `json:"destinatairesSupervision,omitempty" maxItems:"50" required:"false"`
-		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
 		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
 		DestinatairesAdhesion    *[]string `json:"destinatairesAdhesion,omitempty" maxItems:"50" required:"false"`
 	}
@@ -856,8 +895,7 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		}
 	}
 	listes := map[string]*[]string{
-		prospectCleEnrolement: in.Body.DestinatairesEnrolement, prospectCleBpe: in.Body.DestinatairesBpe,
-		prospectCleSupervision: in.Body.DestinatairesSupervision, prospectCleDirection: in.Body.DestinatairesDirection,
+		prospectCleSupervision:  in.Body.DestinatairesSupervision,
 		prospectCleCodification: in.Body.CodificationProvenances,
 		prospectCleAdhesionDest: in.Body.DestinatairesAdhesion,
 	}
@@ -970,6 +1008,33 @@ func (s *service) prospectJournal(ctx context.Context, in *ProspectJournalInput)
 		})
 	}
 	return out, nil
+}
+
+// `WHERE revueAt IS NULL` et non un simple UPDATE : deux revues simultanées
+// écriraient deux auteurs, et c'est le PREMIER qui a relu la demande.
+func (s *service) prospectRevue(ctx context.Context, in *ProspectIDInput) (*ProspectOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	existant, err := s.Q.ProspectVivant(ctx, in.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusNotFound, prospectCodeIntrouvable, prospectIntrouvable)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
+		return nil, err
+	}
+	if existant.Statut != db.ProspectStatutCONVERTI && existant.Statut != db.ProspectStatutVENDU {
+		return nil, socle.Problem(http.StatusBadRequest, "PROSPECT_REVUE_REQUIRES_CONVERSION", "Seule une demande convertie se revoit.")
+	}
+	if err := s.Q.MarquerProspectRevue(ctx, db.MarquerProspectRevueParams{ID: in.ID, RevueById: &u.ID}); err != nil {
+		return nil, err
+	}
+	item, err := s.prospectLire(ctx, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ProspectOutput{Body: *item}, nil
 }
 
 func prospectMonterConversion(api huma.API, s *service) {
