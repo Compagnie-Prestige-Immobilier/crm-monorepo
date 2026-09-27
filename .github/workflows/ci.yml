@@ -44,6 +44,12 @@ jobs:
           done
           unitaires=$(git ls-files '*.test.ts' '*.test.tsx')
           [ -z "$unitaires" ] || { echo "::error::tests unitaires TypeScript :"; echo "$unitaires"; exit 1; }
+      - name: Nom de l'espace Commercial imposé par le propriétaire
+        run: |
+          grep -Fq "label: 'Commercial'," web/src/components/layout/nav-items.ts || {
+            echo "::error::L'espace doit conserver le nom Commercial, jamais Téléconseil."
+            exit 1
+          }
       # Littéral affiché : entre guillemets, avec une espace ou une majuscule initiale ; 'COMMERCIAL' et 'commercialId' restent des identifiants.
       # Les suppressions déjà présentes attendent une refonte : seule une ligne ajoutée est refusée.
       - name: Aucune suppression de lint ajoutée, ni « commercial » ni tiret cadratin dans le panneau
