@@ -279,3 +279,24 @@ dumps Dokploy sont au format `custom`, pas du SQL en clair.
   chaque trimestre. Une sauvegarde non testée n'est pas une sauvegarde.
 - Régénérer la clé d'API Dokploy : elle a circulé en clair.
 - Changer le mot de passe administrateur à la première connexion.
+
+## IA du CRM servie par Kairos
+
+L'assistant, les résumés, tableaux, rappels et reformulations de support appellent
+`POST /v1/sdk/taches`. Le CRM conserve `KAIRO_URL` et `KAIRO_ADMIN_TOKEN` et
+reçoit `KAIRO_WORKSPACE_ID`, `KAIRO_APPLICATION` et `KAIRO_SDK_SECRET` depuis
+l'amorçage de son application dans un espace Kairos interne. Le secret SDK est
+propre à cette application ; les appels sont signés et expirent après une minute.
+Les images du support et les consignes métier sont transmises à Kairos.
+
+Les clés Gemini, Groq, Cerebras et OpenRouter et les listes `*_AI_PROVIDERS`
+ne sont plus lues par le CRM. Transférer les clés utiles dans Kairos, valider les
+parcours, puis les retirer des variables Dokploy du CRM. Une panne de Kairos
+conserve le repli du support sur le texte original et des rappels sur les
+agrégats calculés. Les erreurs de l'assistant gardent leurs codes actuels.
+
+Déployer cette version du CRM seulement après validation du service Kairos :
+son runtime PostgreSQL doit aussi servir les commandes Admin > Kairo et les
+tickets d'ingénierie. Le plan de bascule est dans le dépôt `kairo`,
+`docs/plan-fusion-main-et-crm.md`. La nouvelle base `kairos` a sa propre
+sauvegarde ; la sauvegarde de `crm` ne la couvre pas.

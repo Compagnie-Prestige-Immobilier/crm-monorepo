@@ -4,7 +4,6 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -257,34 +256,16 @@ func parametresDeLaQuestion(u *socle.Utilisateur, c *choix, aujourdhui time.Time
 	return p
 }
 
-var errAucunModele = errors.New("aucun modèle n'a répondu")
-
 func demander(ctx context.Context, consigne string, entree map[string]any, cible any) (string, error) {
-	fournisseurs := socle.FournisseursIA("ASSISTANT_AI_PROVIDERS", "gemini,groq")
-	if len(fournisseurs) == 0 {
-		return "", socle.Problem(http.StatusServiceUnavailable, "ASSISTANT_NON_CONFIGURE",
-			"L'assistant n'a pas de clé Groq ni Gemini. Demandez à l'administrateur de la renseigner.")
+	utilisateur := socle.UtilisateurCourant(ctx)
+	auteur, err := socle.DemanderKairo(ctx, &utilisateur, "classement", consigne, entree, cible, nil)
+	if errors.Is(err, socle.ErrIANonConfiguree) {
+		return "", socle.Problem(http.StatusServiceUnavailable, "ASSISTANT_NON_CONFIGURE", "L'assistant n'est pas configuré. Contactez l'administrateur.")
 	}
-	donnees, err := json.Marshal(entree)
 	if err != nil {
-		return "", err
+		return "", indisponible(err)
 	}
-	for _, f := range fournisseurs {
-		for _, modele := range f.Modeles {
-			if ctx.Err() != nil {
-				return "", indisponible(ctx.Err())
-			}
-			brut, err := f.DemanderJSON(ctx, modele, consigne, string(donnees), nil)
-			if err == nil {
-				err = json.Unmarshal(brut, cible)
-			}
-			if err == nil {
-				return f.Nom + "/" + modele, nil
-			}
-			slog.Warn("modèle IA écarté par l'assistant", "fournisseur", f.Nom, "modele", modele, "err", err)
-		}
-	}
-	return "", indisponible(errAucunModele)
+	return auteur, nil
 }
 
 func indisponible(cause error) error {

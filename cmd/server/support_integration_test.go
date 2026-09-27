@@ -320,27 +320,42 @@ func TestSupportRepriseReconciliationEtCloisonnementDesAuteurs(t *testing.T) {
 	}
 }
 
-func fournisseurIAFactice(t *testing.T, enPanne *atomic.Bool, appels *atomic.Int32) {
+func fournisseurIAFactice(t *testing.T, enPanne *atomic.Bool, appels *atomic.Int32) *atomic.Int32 {
+	var imagesRecues atomic.Int32
 	t.Helper()
 	ia := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		appels.Add(1)
-		var requete struct {
-			Model string `json:"model"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&requete)
-		if enPanne.Load() || requete.Model == "modele-en-panne" || r.Header.Get("Authorization") != "Bearer cle-essai" {
+		if enPanne.Load() || !verifierIdentiteKairo(t, r) || r.URL.Path != "/v1/sdk/taches" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		var requete struct {
+			Images   []socle.ImageIA
+			Consigne string
+			Genre    string
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requete); err != nil {
+			t.Error(err)
+		}
+		if requete.Genre != "reformulation" || requete.Consigne == "" {
+			t.Error("consigne de reformulation absente")
+		}
+		for _, image := range requete.Images {
+			if image.TypeMime != "image/png" || !bytes.HasPrefix(image.Contenu, []byte("\x89PNG\r\n\x1a\n")) {
+				t.Error("capture altérée")
+			}
+		}
+		imagesRecues.Store(int32(len(requete.Images)))
 		contenu := `{"description": "Le bouton Enregistrer reste sans effet.", "contexte": ""}`
-		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"role": "assistant", "content": contenu}}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"resultat": contenu, "modele": "openrouter/modele-disponible"})
 	}))
 	t.Cleanup(ia.Close)
 	t.Setenv("SUPPORT_AI_ENABLED", "true")
-	t.Setenv("SUPPORT_AI_PROVIDERS", "openrouter")
-	t.Setenv("OPENROUTER_API_KEY", "cle-essai")
-	t.Setenv("OPENROUTER_URL", ia.URL)
-	t.Setenv("OPENROUTER_MODELS", "modele-en-panne,modele-disponible")
+	t.Setenv("KAIRO_URL", ia.URL)
+	t.Setenv("KAIRO_SDK_SECRET", "secret-essai")
+	t.Setenv("KAIRO_WORKSPACE_ID", "1")
+	t.Setenv("KAIRO_APPLICATION", "crm")
+	return &imagesRecues
 }
 
 func (b *banc) textesSignalement(id string) (description, contexte string, transmise, contexteTransmis *string) {
@@ -357,26 +372,20 @@ func (b *banc) textesSignalement(id string) (description, contexte string, trans
 func TestSupportReformuleApresReceptionSansToucherAuTexteDuSignalant(t *testing.T) {
 	var enPanne atomic.Bool
 	var appels atomic.Int32
-	fournisseurIAFactice(t, &enPanne, &appels)
+	imagesRecues := fournisseurIAFactice(t, &enPanne, &appels)
 	b := bancSupport(t, "SUPERVISEUR")
 	cle, saisie := uuid.NewString(), "bouton enregistrer marche pas"
 
-	statut, body := b.signaler(cle, saisie, 0)
+	statut, body := b.signaler(cle, saisie, 1)
 	b.attend(statut, http.StatusAccepted, "signalement reçu", body)
 	id, _ := body["id"].(string)
 	if body["description"] != saisie {
 		t.Fatalf("le signalant doit relire son propre texte : %v", body["description"])
 	}
 	b.attendEtat(id, "reessai_planifie")
-	description, contexte, transmise, contexteTransmis := b.textesSignalement(id)
-	if description != saisie || contexte != "Écran : essai" {
-		t.Fatalf("texte d'origine modifié : %q / %q", description, contexte)
-	}
-	if transmise == nil || *transmise != "Le bouton Enregistrer reste sans effet." || contexteTransmis == nil || *contexteTransmis != contexte {
-		t.Fatalf("texte transmis : %v / %v", transmise, contexteTransmis)
-	}
+	verifierReformulationTransmise(b, id, saisie, imagesRecues.Load())
 
-	statut, body = b.signaler(cle, saisie, 0)
+	statut, body = b.signaler(cle, saisie, 1)
 	b.attend(statut, http.StatusAccepted, "renvoi après coupure réseau", body)
 	if body["id"] != id {
 		t.Fatalf("le renvoi doit retrouver le même signalement : %v", body)
@@ -391,6 +400,17 @@ func TestSupportReformuleApresReceptionSansToucherAuTexteDuSignalant(t *testing.
 	}
 	if appels.Load() != avant {
 		t.Fatalf("une reprise ne doit pas rappeler l'IA : %d appels de plus", appels.Load()-avant)
+	}
+}
+
+func verifierReformulationTransmise(b *banc, id, saisie string, images int32) {
+	b.t.Helper()
+	description, contexte, transmise, contexteTransmis := b.textesSignalement(id)
+	if description != saisie || contexte != "Écran : essai" {
+		b.t.Fatalf("texte d'origine modifié : %q / %q", description, contexte)
+	}
+	if transmise == nil || *transmise != "Le bouton Enregistrer reste sans effet." || contexteTransmis == nil || *contexteTransmis != contexte || images != 1 {
+		b.t.Fatalf("texte transmis : %v / %v", transmise, contexteTransmis)
 	}
 }
 
