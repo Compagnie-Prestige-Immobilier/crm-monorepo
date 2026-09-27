@@ -1,7 +1,6 @@
 name: ci
 
-# La PR dev→prod doit passer la même CI que dev : une fusion directe sans
-# vérification a déjà atteint `prod` (voir l'audit du 25 septembre 2026, B54).
+# Les PR de production passent les mêmes contrôles que celles de développement.
 on:
   pull_request:
     branches: [dev, prod]
@@ -45,6 +44,12 @@ jobs:
           done
           unitaires=$(git ls-files '*.test.ts' '*.test.tsx')
           [ -z "$unitaires" ] || { echo "::error::tests unitaires TypeScript :"; echo "$unitaires"; exit 1; }
+      - name: Nom de l'espace Commercial imposé par le propriétaire
+        run: |
+          grep -Fq "label: 'Commercial'," web/src/components/layout/nav-items.ts || {
+            echo "::error::L'espace doit conserver le nom Commercial, jamais Téléconseil."
+            exit 1
+          }
       # Littéral affiché : entre guillemets, avec une espace ou une majuscule initiale ; 'COMMERCIAL' et 'commercialId' restent des identifiants.
       # Les suppressions déjà présentes attendent une refonte : seule une ligne ajoutée est refusée.
       - name: Aucune suppression de lint ajoutée, ni « commercial » ni tiret cadratin dans le panneau
@@ -268,8 +273,6 @@ jobs:
       - run: pnpm test --shard=${{ matrix.part }}/4
         working-directory: e2e
 
-  # Le Dockerfile de production n'était jamais construit avant la fusion : une
-  # étape de sa chaîne pouvait casser sans que rien ne le voie ici.
   docker:
     name: image Docker, sans publication
     runs-on: ubuntu-latest

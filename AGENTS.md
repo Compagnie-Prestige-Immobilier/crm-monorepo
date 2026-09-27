@@ -63,8 +63,15 @@ Un etat vide dit quoi faire ensuite, pas seulement que la liste est vide. Une
 erreur dit ce qui s'est passe et ce que le lecteur peut faire.
 
 Le vocabulaire est FIGE: `teleconseiller`, `Banque & Finance`, `campagne
-d'appels prospects`, `campagne d'appels representants`. Les mots `commercial` et ses
-declinaisons sont interdits dans une chaine affichee.
+d'appels prospects`, `campagne d'appels representants`.
+
+Decision explicite du proprietaire du 27 septembre 2026 : l'espace de prospection
+s'appelle **Commercial** dans le selecteur d'espaces et la navigation. Un agent
+ne doit jamais le renommer « Téléconseil » ni « Teleconseil ». Le libelle canonique
+est `COQUES` dans `web/src/components/layout/nav-items.ts` ; conserver les chemins
+techniques `/teleconseil`. Cette decision prime sur les anciennes consignes de
+vocabulaire. Le nom du role reste `Téléconseiller`. Ailleurs, les mots `commercial`
+et ses declinaisons restent interdits dans une chaine affichee.
 
 Pas de tiret cadratin. Il ne se saisit pas au clavier et se lit mal en
 terminal.

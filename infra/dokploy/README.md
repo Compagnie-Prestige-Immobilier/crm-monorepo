@@ -436,3 +436,10 @@ son runtime PostgreSQL doit aussi servir les commandes Admin > Kairo et les
 tickets d'ingénierie. Le plan de bascule est dans le dépôt `kairo`,
 `docs/plan-fusion-main-et-crm.md`. La nouvelle base `kairos` a sa propre
 sauvegarde ; la sauvegarde de `crm` ne la couvre pas.
+
+### Disponibilité de Kairos pendant les sauvegardes
+
+Kairos stocke ses tickets dans PostgreSQL. La sauvegarde horaire du volume
+`kairo-work` conserve `turnOff=false` : arrêter le service pendant cette copie
+coupait son accès depuis le CRM pendant plusieurs minutes. La sauvegarde
+PostgreSQL de la base `kairos` reste distincte et assure la cohérence des tickets.
