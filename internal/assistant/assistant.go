@@ -534,10 +534,11 @@ func texteParDefaut(texte string) string {
 }
 
 func demander(ctx context.Context, consigne string, entree, cible any) (string, error) {
-	auteur, err := socle.DemanderIA(ctx, socle.FournisseursAssistant, socle.FournisseursAssistantDefaut, consigne, entree, cible)
+	utilisateur := socle.UtilisateurCourant(ctx)
+	auteur, err := socle.DemanderKairo(ctx, &utilisateur, "classement", consigne, entree, cible, nil)
 	if errors.Is(err, socle.ErrIANonConfiguree) {
 		return "", socle.Problem(http.StatusServiceUnavailable, "ASSISTANT_NON_CONFIGURE",
-			"L'assistant n'a pas de clé Groq ni Gemini. Demandez à l'administrateur de la renseigner.")
+			"L'assistant n'est pas configuré. Contactez l'administrateur.")
 	}
 	if err != nil {
 		slog.Warn("assistant sans réponse", "err", err)

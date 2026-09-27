@@ -286,7 +286,8 @@ func rediger(ctx context.Context, agregats *agregatsDuJour) string {
 	}
 	ctx, annuler := context.WithTimeout(ctx, redactionMax)
 	defer annuler()
-	if _, err := socle.DemanderIA(ctx, socle.FournisseursAssistant, socle.FournisseursAssistantDefaut, consigneChangements, agregats, &redige); err != nil {
+	utilisateur := socle.UtilisateurCourant(ctx)
+	if _, err := socle.DemanderKairo(ctx, &utilisateur, "resume", consigneChangements, agregats, &redige, nil); err != nil {
 		return ""
 	}
 	paragraphe := strings.TrimSpace(redige.Paragraphe)

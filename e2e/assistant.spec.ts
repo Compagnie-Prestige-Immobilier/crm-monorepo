@@ -8,9 +8,9 @@ import { effacerFiches, marque, semerProspect, type FicheSemee } from './donnees
 const admin = compteDe('ADMIN');
 const teleconseiller = compteDe('COMMERCIAL');
 
-// Le serveur de parcours n'a aucune clé de modèle : chaque question reçoit le
+// Le serveur de parcours n'est pas relié à Kairos : chaque question reçoit le
 // refus 503, qui doit se lire en français dans la conversation.
-const REFUS = /pas de clé Groq ni Gemini|ne répond pas pour le moment/;
+const REFUS = /n'est pas configuré|ne répond pas pour le moment/;
 
 test.describe('assistant', () => {
   test.describe('administrateur', () => {

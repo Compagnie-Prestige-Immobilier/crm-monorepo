@@ -3,16 +3,63 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
 
+func verifierIdentiteKairo(t *testing.T, r *http.Request) bool {
+	t.Helper()
+	charge, signature, ok := strings.Cut(r.Header.Get("X-Kairos-Identite"), ".")
+	mac := hmac.New(sha256.New, []byte("secret-essai"))
+	_, _ = mac.Write([]byte(charge))
+	sig, err := hex.DecodeString(signature)
+	if !ok || err != nil || !hmac.Equal(sig, mac.Sum(nil)) {
+		t.Error("signature Kairos invalide")
+		return false
+	}
+	brut, err := base64.RawURLEncoding.DecodeString(charge)
+	if err != nil {
+		t.Error(err)
+		return false
+	}
+	var id struct {
+		Sub         string
+		App         string
+		WorkspaceID int64 `json:"workspaceId"`
+		Exp         int64
+	}
+	if err := json.Unmarshal(brut, &id); err != nil {
+		t.Error(err)
+		return false
+	}
+	if id.Sub == "" || id.App != "crm" || id.WorkspaceID != 1 || id.Exp <= time.Now().Unix() || id.Exp > time.Now().Add(2*time.Minute).Unix() {
+		t.Error("identité Kairos incorrecte")
+		return false
+	}
+	return true
+}
+
 func kairoFactice(t *testing.T, recues *[]string) {
 	kairo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/sdk/taches" {
+			if !verifierIdentiteKairo(t, r) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"resultat": `{"description":"Le bouton Enregistrer reste sans effet.","contexte":""}`, "modele": "openrouter/modele-disponible"})
+			return
+		}
 		if r.Header.Get("Authorization") != "Bearer jeton-kairo" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return

@@ -397,7 +397,8 @@ func (*service) construire(ctx context.Context, in *ConstruireInput) (*Construir
 	ctx, annuler := context.WithTimeout(ctx, reponseMax)
 	defer annuler()
 	var choix choixConstructeur
-	if _, err := socle.DemanderIA(ctx, socle.FournisseursAssistant, socle.FournisseursAssistantDefaut, consigneConstructeur, entree, &choix); err != nil {
+	utilisateur := socle.UtilisateurCourant(ctx)
+	if _, err := socle.DemanderKairo(ctx, &utilisateur, "classement", consigneConstructeur, entree, &choix, nil); err != nil {
 		if !errors.Is(err, socle.ErrIANonConfiguree) {
 			slog.Warn("constructeur sans modèle, recherche par mots", "err", err)
 		}
