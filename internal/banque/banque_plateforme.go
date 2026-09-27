@@ -100,14 +100,14 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 	if err != nil {
 		return insc, err
 	}
+	completes, err := s.inscriptionsCompletes(ctx, string(insc.Projet), false, &insc.ID)
+	if err != nil {
+		return insc, err
+	}
 	if existant, err := s.Q.BankCaseParInscription(ctx, &insc.ID); err == nil {
 		return insc, problemBanque(http.StatusConflict, "BANK_CASE_INSCRIPTION_ALREADY_OPEN",
 			"Un dossier bancaire existe déjà pour cette inscription.", map[string]any{"bankCaseId": existant})
 	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return insc, err
-	}
-	completes, err := s.inscriptionsCompletes(ctx, string(insc.Projet), false, &insc.ID)
-	if err != nil {
 		return insc, err
 	}
 	if len(completes) == 0 {
