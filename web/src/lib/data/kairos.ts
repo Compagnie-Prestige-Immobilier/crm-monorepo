@@ -2,6 +2,7 @@ import { texteErreurAssistant, type ReponseAssistant } from '@/lib/data/assistan
 
 const URL_CONVERSATION = '/api/v1/assistant/kairos/conversation';
 const URL_CLIENT = '/api/v1/assistant/kairos/client.js';
+let tentativeChargement = 0;
 
 export const CAPACITES_ASSISTANT = { voix: false } as const;
 
@@ -53,8 +54,10 @@ export async function envoyerRetour(conversation: string, resolu: boolean): Prom
 
 async function chargerClient(): Promise<Client> {
   try {
-    return await import(/* @vite-ignore */ URL_CLIENT);
+    const url = `${URL_CLIENT}?tentative=${String(tentativeChargement)}`;
+    return await import(/* @vite-ignore */ url);
   } catch (error) {
+    tentativeChargement += 1;
     throw new Error('Kairos ne répond pas pour le moment. Réessayez.', { cause: error });
   }
 }
