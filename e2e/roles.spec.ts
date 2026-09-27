@@ -41,6 +41,15 @@ test.describe('parcours 16, matrice des roles', () => {
     const methode = cle.slice(0, espace);
     const chemin = cle.slice(espace + 1).replaceAll(/\{[^}]+\}/g, UUID_NUL);
 
+    if (cle === 'POST /api/v1/assistant/kairos/lire') {
+      test(`${cle} exige une signature Kairos`, async () => {
+        const { statut, message } = await appeler(methode, chemin);
+        expect(statut).toBe(401);
+        expect(message).toContain('KAIROS_REFUSE');
+      });
+      continue;
+    }
+
     if (autorises.includes('PUBLIC')) {
       test(`${cle} reste ouverte sans session`, async () => {
         const { statut } = await appeler(methode, chemin);
