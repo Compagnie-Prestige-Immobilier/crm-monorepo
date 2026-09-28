@@ -303,6 +303,13 @@ func etapeDuRendezVous(b *banc, fiche string) map[string]any {
 	return rdv
 }
 
+func attendreEtape(b *banc, fiche, etape string) {
+	b.t.Helper()
+	if rdv := etapeDuRendezVous(b, fiche); rdv["etape"] != etape {
+		b.t.Fatalf("étape %s attendue : %v", etape, rdv)
+	}
+}
+
 // Le chargé de clientèle mène le rendez-vous du report au closing ; le comptoir note la venue sans closer.
 func TestRendezVousDuReportAuClosing(t *testing.T) {
 	_, fiches, quandRV := rendezVousPoses(t)
@@ -333,9 +340,7 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 
 	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "CONFIRME"})
 	cc.attend(statut, http.StatusOK, "confirmation", body)
-	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "CONFIRMES" {
-		t.Fatalf("étape après confirmation : %v", rdv)
-	}
+	attendreEtape(cc, fiche, "CONFIRMES")
 
 	corps := map[string]any{}
 	vides := []string{
@@ -351,16 +356,20 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 
 	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi, map[string]any{"issue": "HONORE"})
 	accueil.attend(statut, http.StatusOK, "le comptoir note la venue", body)
-	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CLOSER" {
-		t.Fatalf("étape après la venue : %v", rdv)
-	}
+	attendreEtape(cc, fiche, "A_CLOSER")
 	statut, body = qualificationEnvoi(accueil, http.MethodPut, closing, corps)
 	accueil.attend(statut, http.StatusForbidden, "le comptoir ne close pas", body)
 
-	sansRelance := maps.Clone(corps)
-	sansRelance["dateRelance"] = ""
-	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, sansRelance)
-	cc.attend(statut, http.StatusUnprocessableEntity, "closing sans date de relance", body)
+	statut, body = qualificationEnvoi(cc, http.MethodGet, listeRendezVous+"&etape=A_TRAITER", nil)
+	cc.attend(statut, http.StatusOK, "rendez-vous à traiter", body)
+	if !contientFiche(body, fiche) {
+		t.Fatal("un rendez-vous à closer reste à traiter")
+	}
+
+	partiel := maps.Clone(corps)
+	partiel["prochaineAction"], partiel["dateRelance"] = "", ""
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, partiel)
+	cc.attend(statut, http.StatusOK, "closing partiel, rien n'est obligatoire", body)
 	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
 	cc.attend(statut, http.StatusOK, "closing enregistré", body)
 	statut, body = qualificationEnvoi(cc, http.MethodGet, closing, nil)
@@ -368,7 +377,10 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	if relu, _ := body["closing"].(map[string]any); relu["superficie"] != "300 m²" || relu["dateRelance"] != "2026-10-15" {
 		t.Fatalf("closing relu : %v", body)
 	}
-	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "HISTORIQUE" {
-		t.Fatalf("un rendez-vous closé passe à l'historique : %v", rdv)
+	attendreEtape(cc, fiche, "HISTORIQUE")
+	statut, body = qualificationEnvoi(cc, http.MethodGet, listeRendezVous+"&etape=A_TRAITER", nil)
+	cc.attend(statut, http.StatusOK, "rendez-vous à traiter après closing", body)
+	if contientFiche(body, fiche) {
+		t.Fatal("un rendez-vous closé quitte « À traiter »")
 	}
 }

@@ -27,6 +27,7 @@ type QualiteDuMarketing struct {
 	AvecCanal     int                 `json:"avecCanal"`
 	Eprouves      int                 `json:"eprouves"`
 	NonDistribues int                 `json:"nonDistribues"`
+	SurPlateforme int                 `json:"surPlateforme" doc:"Jamais appelées ici : la personne s'est inscrite sur une plateforme d'enrôlement, qui la suit."`
 	Joints        int                 `json:"joints"`
 	Convertis     int                 `json:"convertis"`
 	Score         *int                `json:"score"`
@@ -78,6 +79,7 @@ func (s *service) lireMarketing(ctx context.Context) (QualiteDuMarketing, error)
 		AvecCanal:     int(compte.AvecCanal),
 		Eprouves:      int(compte.Eprouves),
 		NonDistribues: int(compte.NonDistribues),
+		SurPlateforme: int(compte.SurPlateforme),
 		Joints:        int(compte.Joints),
 		Convertis:     int(compte.Convertis),
 		Score:         scoreMarketing(compte),

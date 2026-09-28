@@ -160,12 +160,17 @@ SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE p."canalProvenanceId" IS NOT NULL)::int AS avec_canal,
   COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS eprouves,
-  COUNT(*) FILTER (WHERE p."lastCallAt" IS NULL
+  COUNT(*) FILTER (WHERE p."lastCallAt" IS NULL AND ip."prospectId" IS NULL
     AND NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id"))::int AS non_distribues,
+  COUNT(*) FILTER (WHERE p."lastCallAt" IS NULL AND ip."prospectId" IS NOT NULL)::int AS sur_plateforme,
   COUNT(*) FILTER (WHERE lr."countsAsReached")::int AS joints,
   COUNT(*) FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "prospects" p
 LEFT JOIN "call_outcome_reasons" lr ON lr."id" = p."lastReasonId"
+LEFT JOIN LATERAL (
+  SELECT i."prospectId" FROM "inscriptions_plateforme" i
+  WHERE i."prospectId" = p."id" AND i."disparueLe" IS NULL LIMIT 1
+) ip ON true
 WHERE p."deletedAt" IS NULL
   AND (p."canalProvenanceId" IS NOT NULL
        OR EXISTS (SELECT 1 FROM "import_jobs" j WHERE j."id" = p."importJobId" AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'));
@@ -188,8 +193,11 @@ ORDER BY prospects DESC, c."position";
 -- Le motif du dernier appel, tel que défini dans les listes de référence ; une fiche
 -- jamais appelée n'en a pas.
 SELECT
-  COALESCE(r."label", CASE WHEN EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
-    THEN 'Jamais appelé' ELSE 'Pas encore distribué' END)::text AS label,
+  COALESCE(r."label", CASE
+    WHEN EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
+      THEN 'Suivi sur la plateforme'
+    WHEN EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
+      THEN 'Jamais appelé' ELSE 'Pas encore distribué' END)::text AS label,
   COALESCE(r."effect"::text, '')::text AS effect,
   COUNT(*)::int AS count
 FROM "prospects" p
