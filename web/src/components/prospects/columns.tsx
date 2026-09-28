@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
+import { ISSUES, SUITES } from '@/components/prospects/suivi-rendez-vous';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,11 +23,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
+import { compte, formatDate, formatDateTime, formatPhone } from '@/lib/format';
+import { PROSPECT_TYPE_LABELS } from '@/lib/data/grand-public';
 import {
   enrollmentMethodLabel,
+  MODE_EPARGNE_LABELS,
+  PAYMENT_MODE_LABELS,
+  PROSPECT_ORIGIN_LABELS,
   PROSPECT_STATUT_LABELS,
+  RENDEZ_VOUS_ISSUE_LABELS,
   statutForProjet,
+  TYPE_BIEN_LABELS,
+  TYPE_CONTRAT_LABELS,
   type Projet,
   type ProspectRow,
   type ProspectStatut,
@@ -208,6 +216,322 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'syndicatSigle',
       header: 'Syndicat',
       cell: ({ row }) => <span className="truncate">{row.original.syndicatSigle}</span>,
+    },
+    {
+      id: 'campagne',
+      accessorKey: 'campagne',
+      header: 'Campagne',
+      cell: ({ row }) =>
+        row.original.campagne === null ? (
+          <Empty />
+        ) : (
+          <span className="block max-w-44 truncate" title={row.original.campagne}>
+            {row.original.campagne}
+          </span>
+        ),
+    },
+    {
+      id: 'commentaire',
+      accessorKey: 'lastComment',
+      header: 'Commentaire',
+      cell: ({ row }) => {
+        const { lastComment, remarqueImport } = row.original;
+        if ((lastComment === null || lastComment === '') && remarqueImport === null)
+          return <Empty />;
+        return (
+          <div className="min-w-0 max-w-56">
+            {lastComment !== null && lastComment !== '' ? (
+              <p className="truncate" title={lastComment}>
+                {lastComment}
+              </p>
+            ) : null}
+            {remarqueImport !== null ? (
+              <p className="truncate text-[0.75rem] text-muted-foreground" title={remarqueImport}>
+                Classeur : {remarqueImport}
+              </p>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'rendezVousAt',
+      accessorKey: 'rendezVousAt',
+      header: 'RDV posé',
+      cell: ({ row }) =>
+        row.original.rendezVousAt === null ? (
+          <Empty />
+        ) : (
+          <time
+            dateTime={row.original.rendezVousAt}
+            className="whitespace-nowrap tabular-nums"
+            title={formatDateTime(row.original.rendezVousAt)}
+          >
+            {formatDateTime(row.original.rendezVousAt)}
+          </time>
+        ),
+    },
+    {
+      id: 'type',
+      accessorKey: 'type',
+      header: 'Secteur',
+      cell: ({ row }) =>
+        row.original.type === null ? (
+          <Empty />
+        ) : (
+          <span>{PROSPECT_TYPE_LABELS[row.original.type]}</span>
+        ),
+    },
+    {
+      id: 'profession',
+      accessorKey: 'profession',
+      header: 'Profession',
+      cell: ({ row }) =>
+        row.original.profession === null ? (
+          <Empty />
+        ) : (
+          <span className="block max-w-40 truncate" title={row.original.profession}>
+            {row.original.profession}
+          </span>
+        ),
+    },
+    {
+      id: 'canal',
+      accessorKey: 'canalProvenanceLabel',
+      header: 'Canal',
+      cell: ({ row }) =>
+        row.original.canalProvenanceLabel === null ? (
+          <Empty />
+        ) : (
+          <span className="block max-w-40 truncate" title={row.original.canalProvenanceLabel}>
+            {row.original.canalProvenanceLabel}
+          </span>
+        ),
+    },
+    {
+      id: 'employeur',
+      accessorKey: 'employeur',
+      header: 'Employeur',
+      cell: ({ row }) => {
+        const { employeur, ancienneteMois, lieuActivite, etablissement } = row.original;
+        if (
+          employeur === null &&
+          ancienneteMois === null &&
+          lieuActivite === null &&
+          etablissement === null
+        )
+          return <Empty />;
+        const details = [
+          ancienneteMois === null ? null : `${String(ancienneteMois)} mois`,
+          lieuActivite,
+          etablissement,
+        ].filter((detail) => detail !== null && detail !== '');
+        return (
+          <div className="min-w-0 max-w-48">
+            {employeur !== null ? (
+              <p className="truncate font-[600]" title={employeur}>
+                {employeur}
+              </p>
+            ) : null}
+            {details.length === 0 ? null : (
+              <p
+                className="truncate text-[0.75rem] text-muted-foreground"
+                title={details.join(' · ')}
+              >
+                {details.join(' · ')}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'typeContrat',
+      accessorKey: 'typeContrat',
+      header: 'Contrat',
+      cell: ({ row }) =>
+        row.original.typeContrat === null ? (
+          <Empty />
+        ) : (
+          <span>{TYPE_CONTRAT_LABELS[row.original.typeContrat]}</span>
+        ),
+    },
+    {
+      id: 'paiement',
+      accessorKey: 'paymentMode',
+      header: 'Paiement',
+      cell: ({ row }) => {
+        const { paymentMode, dureeSystemeMois } = row.original;
+        if (paymentMode === null && dureeSystemeMois === null) return <Empty />;
+        return (
+          <div className="min-w-0">
+            {paymentMode === null ? null : <p>{PAYMENT_MODE_LABELS[paymentMode]}</p>}
+            {dureeSystemeMois === null ? null : (
+              <p className="text-[0.75rem] text-muted-foreground tabular-nums">
+                {String(dureeSystemeMois)} mois
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'typeBien',
+      accessorKey: 'typeBien',
+      header: 'Bien',
+      cell: ({ row }) =>
+        row.original.typeBien === null ? (
+          <Empty />
+        ) : (
+          <span>{TYPE_BIEN_LABELS[row.original.typeBien]}</span>
+        ),
+    },
+    {
+      id: 'revenu',
+      accessorKey: 'incomeBandLabel',
+      header: 'Revenu',
+      cell: ({ row }) =>
+        row.original.incomeBandLabel === null ? (
+          <Empty />
+        ) : (
+          <span className="block max-w-40 truncate" title={row.original.incomeBandLabel}>
+            {row.original.incomeBandLabel}
+          </span>
+        ),
+    },
+    {
+      id: 'epargne',
+      accessorKey: 'modeEpargne',
+      header: 'Épargne',
+      cell: ({ row }) =>
+        row.original.modeEpargne === null ? (
+          <Empty />
+        ) : (
+          <span>{MODE_EPARGNE_LABELS[row.original.modeEpargne]}</span>
+        ),
+    },
+    {
+      id: 'pays',
+      accessorKey: 'paysResidenceLabel',
+      header: 'Résidence',
+      cell: ({ row }) => {
+        const { paysResidenceLabel, villeResidence } = row.original;
+        if (paysResidenceLabel === null && villeResidence === null) return <Empty />;
+        return (
+          <div className="min-w-0 max-w-40">
+            {paysResidenceLabel === null ? null : (
+              <p className="truncate" title={paysResidenceLabel}>
+                {paysResidenceLabel}
+              </p>
+            )}
+            {villeResidence === null ? null : (
+              <p className="truncate text-[0.75rem] text-muted-foreground" title={villeResidence}>
+                {villeResidence}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'contacts',
+      header: 'Contacts',
+      cell: ({ row }) => {
+        const { whatsappNumber, relaisNom, relaisPhoneE164, email } = row.original;
+        const relais = [relaisNom, relaisPhoneE164].filter((part) => part !== null && part !== '');
+        if (whatsappNumber === null && relais.length === 0 && email === null) return <Empty />;
+        return (
+          <div className="min-w-0 max-w-52">
+            {whatsappNumber === null ? null : (
+              <p className="truncate font-mono text-[0.8125rem] tabular-nums">
+                WA {formatPhone(whatsappNumber)}
+              </p>
+            )}
+            {relais.length === 0 ? null : (
+              <p
+                className="truncate text-[0.75rem] text-muted-foreground"
+                title={relais.join(' · ')}
+              >
+                Relais : {relais.join(' · ')}
+              </p>
+            )}
+            {email === null ? null : (
+              <p className="truncate text-[0.75rem] text-muted-foreground" title={email}>
+                {email}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'origine',
+      accessorKey: 'origin',
+      header: 'Origine',
+      cell: ({ row }) => {
+        const { origin, originLabel } = row.original;
+        if (origin === null) return <Empty />;
+        return (
+          <div className="min-w-0 max-w-40">
+            <p className="truncate">{PROSPECT_ORIGIN_LABELS[origin] ?? origin}</p>
+            {originLabel === null || originLabel === '' ? null : (
+              <p className="truncate text-[0.75rem] text-muted-foreground" title={originLabel}>
+                {originLabel}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'suivi',
+      accessorKey: 'rendezVousIssue',
+      header: 'Suivi',
+      cell: ({ row }) => {
+        const {
+          rendezVousIssue,
+          rendezVousReporteAt,
+          suiteRencontre,
+          aRevoirAt,
+          revueAt,
+          revueByName,
+          callAttemptCount,
+        } = row.original;
+        if (
+          rendezVousIssue === null &&
+          aRevoirAt === null &&
+          revueAt === null &&
+          callAttemptCount === 0
+        )
+          return <Empty />;
+        return (
+          <div className="min-w-0 max-w-52">
+            {rendezVousIssue === null ? null : (
+              <p
+                className="truncate font-[600]"
+                title={RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue}
+              >
+                {RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue}
+                {rendezVousReporteAt === null ? '' : ` au ${formatDate(rendezVousReporteAt)}`}
+                {suiteRencontre === null ? '' : ` · ${SUITES[suiteRencontre]}`}
+              </p>
+            )}
+            {aRevoirAt === null ? null : (
+              <p className="text-[0.75rem] text-muted-foreground tabular-nums">
+                À revoir {formatDate(aRevoirAt)}
+              </p>
+            )}
+            {revueAt === null ? null : (
+              <p className="truncate text-[0.75rem] text-muted-foreground">
+                Revue{revueByName === null ? '' : ` par ${revueByName}`} {formatDate(revueAt)}
+              </p>
+            )}
+            <p className="text-[0.75rem] text-muted-foreground tabular-nums">
+              {compte(callAttemptCount, 'appel')}
+            </p>
+          </div>
+        );
+      },
     },
     {
       id: 'ownedByCommercialName',

@@ -27,13 +27,13 @@ import { peut, type ProspectRow } from '@/lib/types';
 type Issue = NonNullable<ProspectRow['rendezVousIssue']>;
 type Suite = NonNullable<ProspectRow['suiteRencontre']>;
 
-const ISSUES: Record<Issue, string> = {
+export const ISSUES: Record<Issue, string> = {
   HONORE: 'Honoré',
   NON_HONORE: 'Non honoré',
   REPORTE: 'Reporté',
 };
 
-const SUITES: Record<Suite, string> = {
+export const SUITES: Record<Suite, string> = {
   TRES_CHAUD: 'Très chaud',
   CHAUD: 'Chaud',
   A_SUIVRE: 'À suivre',

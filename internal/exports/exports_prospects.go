@@ -36,6 +36,20 @@ type ExportProspectsInput struct {
 	LastCallById           string `query:"lastCallById"`
 	EnrollmentCapturedById string `query:"enrollmentCapturedById"`
 	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	CampagneId             string `query:"campagneId"`
+	ProfessionId           string `query:"professionId"`
+	IncomeBandId           string `query:"incomeBandId"`
+	EmployeurId            string `query:"employeurId"`
+	PaysResidenceId        string `query:"paysResidenceId"`
+	PaymentMode            string `query:"paymentMode"`
+	TypeBien               string `query:"typeBien"`
+	TypeContrat            string `query:"typeContrat"`
+	ModeEpargne            string `query:"modeEpargne"`
+	RendezVousIssue        string `query:"rendezVousIssue"`
+	AvecRdv                string `query:"avecRdv" enum:"true,false"`
+	AvecCommentaire        string `query:"avecCommentaire" enum:"true,false"`
+	RdvFrom                string `query:"rdvFrom"`
+	RdvTo                  string `query:"rdvTo"`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
 	Revue                  string `query:"revue" enum:"true,false"`
@@ -82,6 +96,14 @@ func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {
 		{`p."origin"`, in.Origin, ""},
 		{`p."type"`, in.Type, `::"ProspectType"`},
 		{`p."enrollmentMethod"`, in.EnrollmentMethod, `::"EnrollmentMethod"`},
+		{`p."professionId"`, in.ProfessionId, ""},
+		{`p."incomeBandId"`, in.IncomeBandId, ""},
+		{`p."employeurId"`, in.EmployeurId, ""},
+		{`p."paysResidenceId"`, in.PaysResidenceId, ""},
+		{`p."paymentMode"`, in.PaymentMode, `::"PaymentMode"`},
+		{`p."typeBien"`, in.TypeBien, `::"TypeBien"`},
+		{`p."typeContrat"`, in.TypeContrat, `::"TypeContrat"`},
+		{`p."modeEpargne"`, in.ModeEpargne, `::"ModeEpargne"`},
 	}
 	for _, d := range directs {
 		if d.valeur == "" {
@@ -136,7 +158,64 @@ func exportFiltresDerives(p *exportPredicat, in *ExportProspectsInput, segment s
 	if in.AppelePar != "" {
 		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = `+p.valeur(in.AppelePar)+")")
 	}
+	if err := exportFiltresFiche(p, in); err != nil {
+		return err
+	}
 	return exportBornesEtRecherche(p, in)
+}
+
+// La fiche elle-même : campagne qui l'a confiée, rendez-vous posé et suivi,
+// commentaire du dernier appel. Séparé de `exportFiltresDerives` pour garder
+// chaque fonction sous le seuil de complexité.
+func exportFiltresFiche(p *exportPredicat, in *ExportProspectsInput) error {
+	if in.CampagneId != "" {
+		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id" AND li."lotId" = `+p.valeur(in.CampagneId)+")")
+	}
+	if in.RendezVousIssue != "" {
+		if in.RendezVousIssue == "SANS" {
+			p.clauses = append(p.clauses, `p."rendezVousIssue" IS NULL`)
+		} else {
+			p.clauses = append(p.clauses, `p."rendezVousIssue" = `+p.valeur(in.RendezVousIssue))
+		}
+	}
+	exportFiltreAvec(p, in.AvecRdv, `EXISTS (SELECT 1 FROM "call_attempts" ar WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)`)
+	// Comme la liste : le DERNIER appel porte le commentaire, pas un ancien.
+	exportFiltreAvec(p, in.AvecCommentaire, `EXISTS (SELECT 1 FROM "call_attempts" ac WHERE ac."prospectId" = p."id"
+		AND ac."id" = (SELECT ac2."id" FROM "call_attempts" ac2 WHERE ac2."prospectId" = p."id"
+			ORDER BY ac2."clientCreatedAt" DESC, ac2."id" DESC LIMIT 1)
+		AND NULLIF(btrim(ac."comment"), '') IS NOT NULL)`)
+	return exportBornesRendezVous(p, in)
+}
+
+// Un filtre « avec / sans » : une seule clause, niée ou non.
+func exportFiltreAvec(p *exportPredicat, valeur, clause string) {
+	if valeur != exportFiltreVrai && valeur != exportFiltreFaux {
+		return
+	}
+	if valeur == exportFiltreFaux {
+		clause = "NOT " + clause
+	}
+	p.clauses = append(p.clauses, clause)
+}
+
+// Les bornes portent sur le rendez-vous posé, pas sur la saisie : un RDV de
+// décembre sur une fiche de novembre se retrouve depuis décembre.
+func exportBornesRendezVous(p *exportPredicat, in *ExportProspectsInput) error {
+	if in.RdvFrom != "" {
+		du, err := exportBorneDeJournee(in.RdvFrom, false)
+		if err != nil {
+			return err
+		}
+		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "call_attempts" rf WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= `+p.valeur(du)+")")
+	}
+	if in.RdvTo != "" {
+		au, err := exportBorneDeJournee(in.RdvTo, true)
+		if err != nil {
+			return err
+		}
+		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "call_attempts" rt WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= `+p.valeur(au)+")")
+	}
+	return nil
 }
 
 func exportBornesEtRecherche(p *exportPredicat, in *ExportProspectsInput) error {
@@ -249,7 +328,15 @@ SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
   COALESCE(ib."label", '')::text, COALESCE(p."paymentMode"::text, '')::text, p."whatsappStatus"::text,
   COALESCE(p."origin", '')::text, COALESCE(p."originLabel", '')::text,
   p."aRevoirAt", p."revueAt", COALESCE(rv."fullName", '')::text, p."createdAt", p."updatedAt",
-  COALESCE(p."typeBien"::text, '')::text`
+  COALESCE(p."typeBien"::text, '')::text,
+  COALESCE((SELECT string_agg(l."name", ' · ' ORDER BY l."createdAt" DESC, l."id" DESC)
+   FROM "lot_export_items" li JOIN "lots_export" l ON l."id" = li."lotId"
+   WHERE li."prospectId" = p."id"), '')::text,
+  (SELECT a."rendezVousAt" FROM "call_attempts" a
+   WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
+   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1),
+  p."remarqueImport", p."rendezVousIssue", p."rendezVousReporteAt", p."suiteRencontre",
+  (SELECT count(*)::int FROM "call_attempts" ca WHERE ca."prospectId" = p."id")`
 
 type exportLigneProspect struct {
 	ID                string
@@ -306,6 +393,40 @@ type exportLigneProspect struct {
 	CreeLe            time.Time
 	ModifieLe         time.Time
 	TypeBien          string
+	Campagne          string
+	RendezVousAt      *time.Time
+	RemarqueImport    *string
+	SuiviIssue        *string
+	ReporteAu         *time.Time
+	SuiteRencontre    *string
+	NbAppels          int32
+}
+
+// Le suivi ne vit que sur un rendez-vous : hors RDV la colonne reste vide,
+// même si un libellé traîne en base.
+func exportSuiviRendezVous(issue *string) string {
+	switch exportChaineOuVide(issue) {
+	case "HONORE":
+		return "Honoré"
+	case "NON_HONORE":
+		return "Non honoré"
+	case "REPORTE":
+		return "Reporté"
+	default:
+		return ""
+	}
+}
+
+// L'origine tient en une colonne : le détail du formulaire public suit le code.
+func exportOrigineProspect(l *exportLigneProspect) string {
+	origine := map[string]string{"BANQUE": "Banque", "FORMULAIRE_PUBLIC": "Formulaire public"}[l.Origine]
+	if origine == "" {
+		origine = l.Origine
+	}
+	if l.OrigineDetail == "" {
+		return origine
+	}
+	return origine + " : " + l.OrigineDetail
 }
 
 // Le segment n'est pas stocké : il se recalcule sur les deux axes, sinon
@@ -336,6 +457,9 @@ var ExportEntetesProspects = []string{
 	"Tél. relais", "Segment", "Méthode d’enrôlement", "Statut phase 3 (conversion)",
 	exportEnteteDernierResultat, "Dernier commentaire", exportEnteteDernierAppel,
 	"Méthode obtenue par", "Date d’obtention",
+	"Campagne", "RDV posé", "Note du classeur", "Suivi du RDV", "Reporté au", "Suite rencontre",
+	"Nb appels", "Email", ExportEnteteEtablissement, "Revenu", "Paiement", "Type de bien",
+	"Origine", "À revoir", "Revue le", "Revue par",
 }
 
 type exportChampLibre struct {
@@ -388,6 +512,11 @@ func exportValeursProspect(c *exportClasseur, l *exportLigneProspect, libres []e
 		exportSegmentDuProspect(l), exportLibelle(ExportLibellesMethode, l.Methode), exportLibelle(exportLibellesPhase2, l.Phase2),
 		l.DerniereIssue, l.DernierCommentair, c.horodate(l.DernierAppel),
 		l.MethodePar, c.horodate(l.MethodeLe),
+		l.Campagne, c.horodate(l.RendezVousAt), exportChaineOuVide(l.RemarqueImport),
+		exportSuiviRendezVous(l.SuiviIssue), c.horodate(l.ReporteAu), exportChaineOuVide(l.SuiteRencontre),
+		l.NbAppels, l.Email, l.Etablissement, l.Revenu,
+		exportLibelle(exportLibellesPaiement, l.Paiement), exportLibelle(exportLibellesTypeBien, l.TypeBien),
+		exportOrigineProspect(l), c.horodate(l.ARevoirDepuis), c.horodate(l.RevuLe), l.RevuPar,
 	}
 	if len(libres) == 0 {
 		return valeurs

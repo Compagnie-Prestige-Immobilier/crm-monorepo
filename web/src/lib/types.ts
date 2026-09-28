@@ -105,6 +105,57 @@ export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
 
 export type Projet = Schemas['Prospect']['projet'];
 
+export const PROSPECT_TYPES = [
+  'FONCTIONNAIRE',
+  'SECTEUR_PRIVE',
+  'INFORMEL',
+  'DIASPORA',
+] as const satisfies readonly ProspectType[];
+
+export const PROSPECT_TYPE_LABELS: Record<ProspectType, string> = {
+  FONCTIONNAIRE: 'Fonctionnaire',
+  SECTEUR_PRIVE: 'Secteur privé',
+  INFORMEL: 'Informel',
+  DIASPORA: 'Diaspora',
+};
+
+export type ProspectOrigin = NonNullable<Schemas['Prospect']['origin']>;
+
+export const PROSPECT_ORIGINS = [
+  'BANQUE',
+  'FORMULAIRE_PUBLIC',
+] as const satisfies readonly ProspectOrigin[];
+
+export const PROSPECT_ORIGIN_LABELS: Record<ProspectOrigin, string> = {
+  BANQUE: 'Banque',
+  FORMULAIRE_PUBLIC: 'Formulaire public',
+};
+
+export type RendezVousIssue = NonNullable<Schemas['Prospect']['rendezVousIssue']>;
+
+export const RENDEZ_VOUS_ISSUES = [
+  'HONORE',
+  'NON_HONORE',
+  'REPORTE',
+  'SANS',
+] as const satisfies readonly (RendezVousIssue | 'SANS')[];
+
+export const RENDEZ_VOUS_ISSUE_LABELS: Record<RendezVousIssue | 'SANS', string> = {
+  HONORE: 'Honoré',
+  NON_HONORE: 'Non honoré',
+  REPORTE: 'Reporté',
+  SANS: 'Sans suivi',
+};
+
+export const TYPE_CONTRATS = ['CDI', 'CDD', 'AUTRE'] as const satisfies readonly TypeContrat[];
+
+export const MODE_EPARGNES = [
+  'TONTINE',
+  'MOBILE_MONEY',
+  'BANQUE',
+  'AUCUN',
+] as const satisfies readonly ModeEpargne[];
+
 /**
  * Le statut du PARCOURS demandé, et non celui du point d'entrée.
  *
@@ -285,8 +336,30 @@ export interface ProspectFilters {
   enrollmentCapturedById: string | null;
   /** Revue du closing : `false` isole les demandes converties qui restent à revoir. */
   revue: boolean | null;
+  campagneId: string | null;
+  type: ProspectType | null;
+  canalProvenanceId: string | null;
+  origin: ProspectOrigin | null;
+  professionId: string | null;
+  incomeBandId: string | null;
+  employeurId: string | null;
+  paysResidenceId: string | null;
+  paymentMode: PaymentMode | null;
+  typeBien: TypeBien | null;
+  typeContrat: TypeContrat | null;
+  modeEpargne: ModeEpargne | null;
+  /** `SANS` isole les rendez-vous sans suivi. */
+  rendezVousIssue: RendezVousIssue | 'SANS' | null;
+  /** Un rendez-vous a été posé en appel. */
+  avecRdv: boolean | null;
+  /** Le dernier appel porte un commentaire. */
+  avecCommentaire: boolean | null;
+  appelePar: string | null;
+  lastCallById: string | null;
   dateFrom: string | null;
   dateTo: string | null;
+  rdvFrom: string | null;
+  rdvTo: string | null;
   page: number;
   pageSize: number;
   sortBy: ProspectSortField;

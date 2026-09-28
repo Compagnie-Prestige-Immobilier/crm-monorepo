@@ -72,6 +72,7 @@ import {
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
   clearAdvancedFilters,
+  EMPTY_FILTERS,
   GRAND_PUBLIC_ADVANCED_KEYS,
   PAGE_SIZE_OPTIONS,
   type AdvancedFilterKey,
@@ -244,27 +245,14 @@ export function GrandPublicProspectsView({
   const activeCount = countGrandPublicFilters(filters);
   const advancedChips = buildAdvancedChips(
     {
+      ...EMPTY_FILTERS,
       projet: 'GRAND_PUBLIC',
       search: '',
-      commercialId: null,
       representantId: filters.representantId,
       departementId: filters.departementId,
       banqueId: filters.banqueId,
       syndicatId: filters.syndicatId,
       statut: filters.statut,
-      segment: null,
-      phase2Status: null,
-      sansMotif: null,
-      motif: null,
-      enrollmentMethod: null,
-      enrollmentCapturedById: null,
-      revue: null,
-      dateFrom: null,
-      dateTo: null,
-      page: 1,
-      pageSize: 25,
-      sortBy: 'clientCreatedAt',
-      sortDir: 'desc',
     },
     reference.data,
     GRAND_PUBLIC_ADVANCED_KEYS,

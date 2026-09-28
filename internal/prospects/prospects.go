@@ -7,7 +7,6 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
-	"maps"
 	"net/http"
 	"reflect"
 	"slices"
@@ -146,15 +145,6 @@ func prospectTronquer(texte string, maximum int) string {
 	return string([]rune(texte)[:maximum])
 }
 
-type ProspectJourney struct {
-	ID          string  `json:"id"`
-	Projet      string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-	Statut      string  `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
-	Consent     string  `json:"consent" enum:"NON_DEMANDE,INTERESSE,REFUSE"`
-	ConsentAt   *string `json:"consentAt"`
-	ConvertedAt *string `json:"convertedAt"`
-}
-
 type Prospect struct {
 	ID                       string            `json:"id"`
 	Nom                      string            `json:"nom"`
@@ -192,6 +182,7 @@ type Prospect struct {
 	PaysResidenceLabel       *string           `json:"paysResidenceLabel"`
 	VilleResidence           *string           `json:"villeResidence"`
 	Etablissement            *string           `json:"etablissement"`
+	Email                    *string           `json:"email"`
 	WhatsappStatus           string            `json:"whatsappStatus" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
 	WhatsappE164             *string           `json:"whatsappE164"`
 	WhatsappNumber           *string           `json:"whatsappNumber"`
@@ -224,137 +215,18 @@ type Prospect struct {
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
 	RepresentantAppelePar    *string           `json:"representantAppelePar" doc:"Auteur de ce dernier appel au représentant."`
-	Origin                   *string           `json:"origin"`
+	Origin                   *string           `json:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
+	Campagne                 *string           `json:"campagne" doc:"Campagnes d'appels qui ont confié la fiche, dernières d'abord."`
+	RendezVousAt             *string           `json:"rendezVousAt" doc:"Dernier rendez-vous posé en appel, tous motifs."`
 	ClientCreatedAt          string            `json:"clientCreatedAt"`
 	CreatedAt                string            `json:"createdAt"`
 	UpdatedAt                string            `json:"updatedAt"`
 	DeletedAt                *string           `json:"deletedAt"`
-}
-
-// Croisement syndicat x banque, jamais stocké : NUL dès qu'un axe manque, sinon
-// une fiche Grand Public tomberait dans un segment CHUES.
-func prospectSegment(sigle, banqueCourte *string) *string {
-	if sigle == nil || banqueCourte == nil {
-		return nil
-	}
-	chues, cbao := *sigle == prospectSigleChues, *banqueCourte == prospectBanqueCbao
-	if chues && cbao {
-		return prospectPtr("BDD1")
-	}
-	if chues {
-		return prospectPtr("BDD2")
-	}
-	if cbao {
-		return prospectPtr("BDD3")
-	}
-	return prospectPtr("BDD4")
-}
-
-func prospectNumeroWhatsapp(statut db.WhatsappStatus, whatsappE164, phoneE164 *string) *string {
-	if statut == db.WhatsappStatusMEMENUMERO {
-		return phoneE164
-	}
-	if statut == db.WhatsappStatusAUTRENUMERO {
-		return whatsappE164
-	}
-	return nil
-}
-
-// Une clé qu'aucun champ ne définit plus reste inerte : la fiche se lit par les
-// définitions des champs, jamais par les clés stockées.
-func prospectReponses(brut []byte) map[string]string {
-	reponses := map[string]string{}
-	if len(brut) == 0 {
-		return reponses
-	}
-	var lu map[string]any
-	if err := json.Unmarshal(brut, &lu); err != nil {
-		return reponses
-	}
-	for _, id := range slices.Sorted(maps.Keys(lu)) {
-		texte, ok := lu[id].(string)
-		if !ok || len(id) > 60 || len(reponses) >= prospectChampsLibresMax {
-			continue
-		}
-		if texte = strings.TrimSpace(texte); texte != "" {
-			reponses[id] = prospectTronquer(texte, prospectReponseMax)
-		}
-	}
-	return reponses
-}
-
-func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, derniere *db.DernieresTentativesRow) Prospect {
-	p := l.Prospect
-	item := Prospect{
-		ID: p.ID, Nom: p.Nom, Prenom: p.Prenom, PhoneE164: p.PhoneE164, Rev: p.Rev,
-		Statut: string(p.Statut), Projet: string(p.Projet),
-		BanqueID: p.BanqueId, BanqueName: l.BanqueName,
-		SyndicatID: p.SyndicatId, SyndicatSigle: l.SyndicatSigle,
-		RepresentantID: p.RepresentantId, RepresentantName: l.RepresentantName,
-		RepresentantPhoneE164: l.RepresentantPhone,
-		DepartementID:         l.DepartementID, DepartementName: l.DepartementName,
-		OwnedByCommercialID: p.CreatedById, OwnedByCommercialName: l.OwnerName, Type: prospectEnum(p.Type),
-		Profession: prospectPremier(l.ProfessionLabel, p.Profession), ProfessionID: p.ProfessionId,
-		ProfessionIsTeaching: l.ProfessionIsTeaching,
-		IncomeBandID:         p.IncomeBandId, IncomeBandLabel: l.IncomeBandLabel,
-		PaymentMode: prospectEnum(p.PaymentMode), TypeBien: prospectEnum(p.TypeBien),
-		EmployeurID: p.EmployeurId, Employeur: prospectPremier(l.EmployeurLabel, p.Employeur),
-		TypeContrat: prospectEnum(p.TypeContrat), AncienneteMois: p.AncienneteMois,
-		LieuActivite: p.LieuActivite, ModeEpargne: prospectEnum(p.ModeEpargne),
-		PaysResidenceID: p.PaysResidenceId, PaysResidenceLabel: l.PaysLabel,
-		VilleResidence: p.VilleResidence, Etablissement: p.Etablissement,
-		WhatsappStatus: string(p.WhatsappStatus), WhatsappE164: p.WhatsappE164,
-		WhatsappNumber: prospectNumeroWhatsapp(p.WhatsappStatus, p.WhatsappE164, p.PhoneE164),
-		RelaisNom:      p.RelaisNom, RelaisPhoneE164: p.RelaisPhoneE164,
-		Journeys: journeys, ChampsLibres: prospectReponses(p.ChampsLibres),
-		DureeSystemeMois:  p.DureeSystemeMois,
-		CanalProvenanceID: p.CanalProvenanceId, CanalProvenanceLabel: l.CanalLabel,
-		Segment:      prospectSegment(l.SyndicatSigle, l.BanqueShortName),
-		Phase2Status: string(p.Phase2Status), EnrollmentMethod: prospectEnum(p.EnrollmentMethod),
-		EnrollmentCapturedByID: p.EnrollmentCapturedById, EnrollmentCapturedByName: l.EnrollmentCapturedByName,
-		EnrollmentCapturedAt: prospectISOPtr(p.EnrollmentCapturedAt), StatutQualification: l.StatutQualification,
-		RevueAt: prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName, RemarqueImport: p.RemarqueImport,
-		LastCallAt: prospectISOPtr(p.LastCallAt), LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
-		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
-		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
-		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
-		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
-		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
-	}
-	if item.Journeys == nil {
-		item.Journeys = []ProspectJourney{}
-	}
-	if derniere != nil {
-		item.LastReasonLabel = &derniere.ReasonLabel
-		item.LastJoignable = &derniere.CountsAsReached
-		item.LastComment = derniere.Comment
-		item.LastAttemptAt = prospectPtr(prospectISO(derniere.At))
-		item.CallAttemptCount = derniere.Nombre
-	}
-	return item
-}
-
-type prospectPortee struct {
-	tout       bool
-	converti   bool
-	rendezVous bool
-	userID     string
-}
-
-// Le chargé de clientèle voit TOUTE demande convertie : c'est lui qui la relit
-// avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait.
-func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
-	return prospectPortee{
-		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout),
-		converti:   u.Peut(socle.PermissionFichesVoirConverties),
-		rendezVous: u.Peut(socle.PermissionRendezVousSuivre),
-		userID:     u.ID,
-	}
 }
 
 func (s *service) prospectTx(ctx context.Context, geste func(*db.Queries) error) error {
@@ -367,68 +239,6 @@ func (s *service) prospectTx(ctx context.Context, geste func(*db.Queries) error)
 		return err
 	}
 	return tx.Commit(ctx)
-}
-
-func (s *service) prospectCharger(ctx context.Context, arg *db.ListProspectsParams) ([]Prospect, error) {
-	lignes, err := s.Q.ListProspects(ctx, *arg)
-	if err != nil || len(lignes) == 0 {
-		return nil, err
-	}
-	ids := make([]string, 0, len(lignes))
-	for i := range lignes {
-		ids = append(ids, lignes[i].Prospect.ID)
-	}
-	parcours, err := s.Q.JourneysDesProspects(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	// UNE requête pour toute la page : lire les tentatives par ligne ferait un
-	// aller-retour par prospect affiché.
-	tentatives, err := s.Q.DernieresTentatives(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	parProspect := map[string][]ProspectJourney{}
-	for _, j := range parcours {
-		parProspect[j.ProspectId] = append(parProspect[j.ProspectId], ProspectJourney{
-			ID: j.ID, Projet: string(j.Projet), Statut: string(j.Statut), Consent: string(j.Consent),
-			ConsentAt: prospectISOPtr(j.ConsentAt), ConvertedAt: prospectISOPtr(j.ConvertedAt),
-		})
-	}
-	derniere := map[string]*db.DernieresTentativesRow{}
-	for i := range tentatives {
-		derniere[tentatives[i].ProspectID] = &tentatives[i]
-	}
-	items := make([]Prospect, 0, len(lignes))
-	for i := range lignes {
-		id := lignes[i].Prospect.ID
-		items = append(items, prospectDepuisLigne(&lignes[i], parProspect[id], derniere[id]))
-	}
-	return items, nil
-}
-
-// Deux requêtes seulement quand la lecture échoue : « pas à vous » ne se
-// confond pas avec « n'existe pas ».
-func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id string) (*Prospect, error) {
-	p := prospectPorteeDe(u)
-	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
-		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
-		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(items) == 1 {
-		return &items[0], nil
-	}
-	_, err = s.Q.ProspectVivant(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, prospectCodeIntrouvable, prospectIntrouvable)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 }
 
 func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, id string) (db.ProspectVivantRow, error) {
@@ -465,6 +275,20 @@ type ProspectListInput struct {
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById" format:"uuid"`
 	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	CampagneID             string `query:"campagneId" format:"uuid" doc:"Campagne d'appels qui a confié la fiche."`
+	ProfessionID           string `query:"professionId" format:"uuid"`
+	IncomeBandID           string `query:"incomeBandId" format:"uuid"`
+	EmployeurID            string `query:"employeurId" format:"uuid"`
+	PaysResidenceID        string `query:"paysResidenceId" format:"uuid"`
+	PaymentMode            string `query:"paymentMode" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
+	TypeBien               string `query:"typeBien" enum:"TERRAIN,VILLA"`
+	TypeContrat            string `query:"typeContrat" enum:"CDI,CDD,AUTRE"`
+	ModeEpargne            string `query:"modeEpargne" enum:"TONTINE,MOBILE_MONEY,BANQUE,AUCUN"`
+	RendezVousIssue        string `query:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE,SANS" doc:"SANS isole les rendez-vous sans suivi."`
+	AvecRdv                string `query:"avecRdv" enum:"true,false" doc:"Un rendez-vous a été posé en appel."`
+	AvecCommentaire        string `query:"avecCommentaire" enum:"true,false" doc:"Le dernier appel porte un commentaire."`
+	RdvFrom                string `query:"rdvFrom" doc:"Rendez-vous posé à partir de ce jour de Dakar."`
+	RdvTo                  string `query:"rdvTo" doc:"Rendez-vous posé jusqu'à ce jour de Dakar."`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
 	Revue                  string `query:"revue" enum:"true,false"`
@@ -551,17 +375,33 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		SansMotif:        prospectVide(in.SansMotif), Motif: prospectVide(in.Motif),
 		EnrollmentMethod:       prospectTypeEnum[db.EnrollmentMethod](in.EnrollmentMethod),
 		EnrollmentCapturedByID: prospectVide(in.EnrollmentCapturedByID), LastCallByID: prospectVide(in.LastCallByID),
-		DepartementID: prospectVide(in.DepartementID),
-		Projet:        prospectTypeEnum[db.Projet](in.Projet),
-		Statut:        prospectTypeEnum[db.ProspectStatut](in.Statut),
-		Segment:       prospectVide(in.Segment),
-		AppelePar:     prospectVide(in.AppelePar),
-		Search:        prospectVide(strings.TrimSpace(in.Search)),
-		Attribue:      in.Attribue,
-		ResteAAppeler: in.ResteAAppeler,
+		DepartementID:   prospectVide(in.DepartementID),
+		Projet:          prospectTypeEnum[db.Projet](in.Projet),
+		Statut:          prospectTypeEnum[db.ProspectStatut](in.Statut),
+		Segment:         prospectVide(in.Segment),
+		AppelePar:       prospectVide(in.AppelePar),
+		CampagneID:      prospectVide(in.CampagneID),
+		ProfessionID:    prospectVide(in.ProfessionID),
+		IncomeBandID:    prospectVide(in.IncomeBandID),
+		EmployeurID:     prospectVide(in.EmployeurID),
+		PaysResidenceID: prospectVide(in.PaysResidenceID),
+		PaymentMode:     prospectTypeEnum[db.PaymentMode](in.PaymentMode),
+		TypeBien:        prospectTypeEnum[db.TypeBien](in.TypeBien),
+		TypeContrat:     prospectTypeEnum[db.TypeContrat](in.TypeContrat),
+		ModeEpargne:     prospectTypeEnum[db.ModeEpargne](in.ModeEpargne),
+		RendezVousIssue: prospectVide(in.RendezVousIssue),
+		Search:          prospectVide(strings.TrimSpace(in.Search)),
+		Attribue:        in.Attribue,
+		ResteAAppeler:   in.ResteAAppeler,
 	}
 	if in.Revue != "" {
 		arg.Revue = prospectPtr(in.Revue == prospectVrai)
+	}
+	if in.AvecRdv != "" {
+		arg.AvecRdv = prospectPtr(in.AvecRdv == prospectVrai)
+	}
+	if in.AvecCommentaire != "" {
+		arg.AvecCommentaire = prospectPtr(in.AvecCommentaire == prospectVrai)
 	}
 	if arg.Search != nil {
 		arg.PhoneSearch = prospectRechercheTelephone(*arg.Search, s.Cfg.PhoneRegion)
@@ -570,7 +410,13 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	if arg.DateFrom, err = prospectBorneDate(in.DateFrom, s.Cfg.TimeZone, false); err != nil {
 		return arg, err
 	}
-	arg.DateTo, err = prospectBorneDate(in.DateTo, s.Cfg.TimeZone, true)
+	if arg.DateTo, err = prospectBorneDate(in.DateTo, s.Cfg.TimeZone, true); err != nil {
+		return arg, err
+	}
+	if arg.RdvFrom, err = prospectBorneDate(in.RdvFrom, s.Cfg.TimeZone, false); err != nil {
+		return arg, err
+	}
+	arg.RdvTo, err = prospectBorneDate(in.RdvTo, s.Cfg.TimeZone, true)
 	return arg, err
 }
 
@@ -585,6 +431,11 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		EnrollmentCapturedByID: arg.EnrollmentCapturedByID, LastCallByID: arg.LastCallByID,
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
+		CampagneID: arg.CampagneID, ProfessionID: arg.ProfessionID, IncomeBandID: arg.IncomeBandID,
+		EmployeurID: arg.EmployeurID, PaysResidenceID: arg.PaysResidenceID, PaymentMode: arg.PaymentMode,
+		TypeBien: arg.TypeBien, TypeContrat: arg.TypeContrat, ModeEpargne: arg.ModeEpargne,
+		RendezVousIssue: arg.RendezVousIssue, AvecRdv: arg.AvecRdv, AvecCommentaire: arg.AvecCommentaire,
+		RdvFrom: arg.RdvFrom, RdvTo: arg.RdvTo,
 		Search: arg.Search, PhoneSearch: arg.PhoneSearch, Attribue: arg.Attribue,
 		ResteAAppeler: arg.ResteAAppeler,
 	}
