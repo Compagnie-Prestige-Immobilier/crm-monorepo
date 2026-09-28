@@ -78,11 +78,12 @@ export function TransmissionAssistant() {
   return (
     <section className="space-y-3" aria-label="Transfert au support">
       <p>
-        Le support recevra cette conversation et l’adresse de l’écran actuel. Vérifiez les
-        informations avant l’envoi.
+        Le support recevra l’historique récent de cette conversation et l’adresse de l’écran actuel.
+        Des messages précédents peuvent aussi être transmis. Vérifiez les informations avant
+        l’envoi.
       </p>
       <details>
-        <summary>Voir la conversation transmise</summary>
+        <summary>Voir les messages actuellement affichés</summary>
         <div className="max-h-40 overflow-auto whitespace-pre-wrap">
           {messagesKairos(messages).map((m, i) => (
             <p key={`${String(i)}-${m.role}`} className="my-2">
