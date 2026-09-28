@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ClosingSheet } from '@/components/accueil/closing-sheet';
+import { ClosingDialog } from '@/components/accueil/closing-dialog';
 import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { BarreRendezVous } from '@/components/accueil/rendez-vous-filtres';
 import { VisiteDuRendezVous } from '@/components/accueil/visite-du-rendez-vous';
@@ -22,7 +22,7 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 
 type Ton = 'warning' | 'success' | 'destructive' | 'outline' | 'info';
 
-function etatDe(fiche: RendezVousObtenu): { texte: string; ton: Ton } {
+export function etatDe(fiche: RendezVousObtenu): { texte: string; ton: Ton } {
   switch (fiche.etape) {
     case 'A_CONFIRMER':
       return { texte: fiche.reporte ? 'Reporté, à confirmer' : 'À confirmer', ton: 'warning' };
@@ -239,7 +239,7 @@ export function RendezVousListe({
           }}
         />
       )}
-      <ClosingSheet
+      <ClosingDialog
         rendezVous={closingDe}
         onClose={() => {
           setClosingDe(null);

@@ -347,6 +347,7 @@ type prospectPortee struct {
 	tout       bool
 	converti   bool
 	rendezVous bool
+	suivi      bool
 	userID     string
 }
 
@@ -357,7 +358,9 @@ func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout),
 		converti:   u.Peut(socle.PermissionFichesVoirConverties),
 		rendezVous: u.Peut(socle.PermissionRendezVousSuivre),
-		userID:     u.ID,
+		// Qui tient les rendez-vous suit aussi les intéressés et hésitants de tous les téléconseillers.
+		suivi:  u.Peut(socle.PermissionRendezVousCloser),
+		userID: u.ID,
 	}
 }
 
@@ -416,7 +419,7 @@ func (s *service) prospectCharger(ctx context.Context, arg *db.ListProspectsPara
 func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id string) (*Prospect, error) {
 	p := prospectPorteeDe(u)
 	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
-		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
+		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous, ScopeSuivi: p.suivi,
 		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
 	})
 	if err != nil {
@@ -546,7 +549,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		p.tout, p.converti, p.rendezVous = false, false, false
 	}
 	arg := db.ListProspectsParams{
-		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
+		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous, ScopeSuivi: p.suivi,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
@@ -582,7 +585,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 // la pagination annoncerait des pages vides.
 func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 	return db.CountProspectsParams{
-		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti, ScopeRendezVous: arg.ScopeRendezVous,
+		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti, ScopeRendezVous: arg.ScopeRendezVous, ScopeSuivi: arg.ScopeSuivi,
 		CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
 		RepresentantID: arg.RepresentantID, BanqueID: arg.BanqueID, SyndicatID: arg.SyndicatID,
 		Origin: arg.Origin, Phase2Status: arg.Phase2Status, Phase2StatusTout: arg.Phase2StatusTout, SansMotif: arg.SansMotif, Motif: arg.Motif, EnrollmentMethod: arg.EnrollmentMethod,

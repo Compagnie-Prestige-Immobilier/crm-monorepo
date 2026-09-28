@@ -76,6 +76,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -231,6 +232,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL

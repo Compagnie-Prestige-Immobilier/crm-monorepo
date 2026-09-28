@@ -4,6 +4,7 @@ import {
   BellIcon,
   BotIcon,
   CalendarCheckIcon,
+  CalendarDaysIcon,
   HeartHandshakeIcon,
   ClipboardListIcon,
   ClockIcon,
@@ -13,7 +14,6 @@ import {
   FolderOpenIcon,
   GaugeIcon,
   HeadsetIcon,
-  HistoryIcon,
   HouseIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
@@ -75,7 +75,7 @@ export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
 export const inboxPathFor = (role: Role): string =>
   role === 'ADMIN' ? '/admin/notifications?onglet=reception' : INBOX_PATH;
 
-export type Coque = 'accueil' | 'rendezvous' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
+export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
 
 /**
  * La permission que garde la route ; une liste de rôles là où aucune
@@ -109,13 +109,6 @@ export const COQUES: readonly CoqueEntry[] = [
     path: '/accueil',
     description: 'Registre des visites du comptoir',
     acces: 'accueil.registre',
-  },
-  {
-    id: 'rendezvous',
-    label: 'Rendez-vous',
-    path: '/rendez-vous',
-    description: 'Confirmer, noter la présence, remplir le closing',
-    acces: 'rendez_vous.closer',
   },
   {
     id: 'teleconseil',
@@ -200,7 +193,15 @@ const SECTIONS: readonly NavSection[] = [
   {
     coque: 'accueil',
     title: null,
+    // Le chargé de clientèle arrive sur l'agenda, le comptoir sur le registre : la première entrée ouverte fait l'accueil.
     items: [
+      {
+        href: '/accueil/agenda',
+        label: 'Agenda',
+        icon: CalendarDaysIcon,
+        description: 'Les rendez-vous de la semaine, heure par heure',
+        acces: 'rendez_vous.closer',
+      },
       {
         href: '/accueil',
         label: 'Registre des visites',
@@ -211,9 +212,16 @@ const SECTIONS: readonly NavSection[] = [
       {
         href: '/accueil/rendez-vous',
         label: 'Rendez-vous',
-        icon: HeartHandshakeIcon,
-        description: 'Rendez-vous attendus au comptoir',
+        icon: CalendarCheckIcon,
+        description: 'Confirmer, noter la présence, remplir le closing',
         acces: 'rendez_vous.voir',
+      },
+      {
+        href: '/accueil/interesses',
+        label: 'Intéressés et hésitants',
+        icon: HeartHandshakeIcon,
+        description: 'Fiches à amener jusqu’au rendez-vous',
+        acces: 'rendez_vous.closer',
       },
       // Les trois écrans qui suivent sont les ONGLETS du registre
       // (`visites-tabs.tsx`, monté par `accueil/layout.tsx`) : les répéter dans
@@ -255,26 +263,6 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Retirées du registre, à détruire après trente jours',
         acces: 'visites.voir_archivees',
         hidden: true,
-      },
-    ],
-  },
-  {
-    coque: 'rendezvous',
-    title: null,
-    items: [
-      {
-        href: '/rendez-vous',
-        label: 'À traiter',
-        icon: CalendarCheckIcon,
-        description: 'Rendez-vous à confirmer, à tenir et à closer',
-        acces: 'rendez_vous.closer',
-      },
-      {
-        href: '/rendez-vous/historique',
-        label: 'Historique',
-        icon: HistoryIcon,
-        description: 'Rendez-vous annulés, absents ou closés',
-        acces: 'rendez_vous.closer',
       },
     ],
   },

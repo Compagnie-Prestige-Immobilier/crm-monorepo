@@ -34,6 +34,15 @@ export async function lireRendezVous(filtres: FiltresRendezVous): Promise<ListeR
   );
 }
 
+/** Une semaine d'agenda tient sous la borne de l'API ; `total` dit si elle déborde. */
+export async function lireRendezVousEntre(du: string, au: string): Promise<ListeRendezVous> {
+  return unwrap(
+    await getApiClient().GET('/api/v1/rendez-vous', {
+      params: { query: { du, au, page: 1, pageSize: 200 } },
+    }),
+  );
+}
+
 /** Le classeur se télécharge par le navigateur : la session voyage en cookie. */
 export function lienExportRendezVous(filtres: FiltresRendezVous): string {
   return `/api/v1/export/rendez-vous.xlsx?${new URLSearchParams(query(filtres)).toString()}`;

@@ -124,7 +124,7 @@ func (s *service) resumer(ctx context.Context, in *ResumeInput) (*ResumeOutput, 
 func (s *service) ficheLisible(ctx context.Context, u *socle.Utilisateur, id string) (db.Prospect, error) {
 	lignes, err := s.Q.ListProspects(ctx, db.ListProspectsParams{
 		ID: &id, ScopeUserID: u.ID, ScopeAll: u.Peut(socle.PermissionPortefeuilleVoirTout),
-		ScopeConverti: u.Peut(socle.PermissionFichesVoirConverties), ScopeRendezVous: u.Peut(socle.PermissionRendezVousSuivre),
+		ScopeConverti: u.Peut(socle.PermissionFichesVoirConverties), ScopeRendezVous: u.Peut(socle.PermissionRendezVousSuivre), ScopeSuivi: u.Peut(socle.PermissionRendezVousCloser),
 		SortBy: "clientCreatedAt", SortOrder: "desc", Taille: 1,
 	})
 	if err != nil {
