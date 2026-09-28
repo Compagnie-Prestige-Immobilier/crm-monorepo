@@ -5,6 +5,7 @@ import {
   CalendarClockIcon,
   CheckIcon,
   ClipboardPenIcon,
+  MoreHorizontalIcon,
   PlusIcon,
   UserCheckIcon,
   UserXIcon,
@@ -13,7 +14,6 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -23,6 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { suivreRendezVous } from '@/lib/data/prospects';
@@ -31,14 +37,33 @@ import { dakarLocalToIso } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
 type Geste = 'CONFIRME' | 'ANNULE' | 'HONORE' | 'NON_HONORE' | 'REPORTE';
+type Bouton = 'CONFIRME' | 'HONORE' | 'NON_HONORE' | 'REPORTER' | 'ANNULER';
 
 const MESSAGES: Record<Geste, string> = {
   CONFIRME: 'Rendez-vous confirmé.',
   ANNULE: 'Rendez-vous annulé.',
-  HONORE: 'Présence notée. Le closing peut être rempli.',
+  HONORE: 'Présence notée.',
   NON_HONORE: 'Absence notée.',
   REPORTE: 'Rendez-vous reporté. Il revient à confirmer.',
 };
+
+const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
+  CONFIRME: { label: 'Confirmer', Icon: CheckIcon },
+  HONORE: { label: 'Présent', Icon: UserCheckIcon },
+  NON_HONORE: { label: 'Absent', Icon: UserXIcon },
+  REPORTER: { label: 'Reporter', Icon: CalendarClockIcon },
+  ANNULER: { label: 'Annuler', Icon: XIcon },
+};
+
+/** Le geste attendu reste visible ; le reste passe dans le menu « … ». */
+function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[] } {
+  if (fiche.etape === 'A_CONFIRMER')
+    return { visibles: ['CONFIRME'], menu: ['REPORTER', 'ANNULER'] };
+  if (fiche.etape === 'CONFIRMES' || fiche.etape === 'EN_RETARD') {
+    return { visibles: ['HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
+  }
+  return { visibles: [], menu: [] };
+}
 
 function Reporter({
   fiche,
@@ -95,37 +120,6 @@ function Reporter({
   );
 }
 
-function Etat({ fiche }: { fiche: RendezVousObtenu }) {
-  if (fiche.etape === 'A_CONFIRMER' && fiche.reporte) {
-    return <Badge variant="warning">Reporté</Badge>;
-  }
-  if (fiche.etape !== 'HISTORIQUE') return null;
-  if (fiche.confirmation === 'ANNULE') return <Badge variant="destructive">Annulé</Badge>;
-  if (fiche.issue === 'NON_HONORE') return <Badge variant="destructive">Absent</Badge>;
-  return <Badge variant="success">Closing fait</Badge>;
-}
-
-type Bouton = Exclude<Geste, 'REPORTE' | 'ANNULE'> | 'REPORTER' | 'ANNULER';
-
-const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
-  CONFIRME: { label: 'Confirmer', Icon: CheckIcon },
-  HONORE: { label: 'Présent', Icon: UserCheckIcon },
-  NON_HONORE: { label: 'Absent', Icon: UserXIcon },
-  REPORTER: { label: 'Reporter', Icon: CalendarClockIcon },
-  ANNULER: { label: 'Annuler', Icon: XIcon },
-};
-
-// Un rendez-vous passé sans confirmation garde tous les gestes : le prospect a pu venir quand même.
-function boutonsDe(fiche: RendezVousObtenu): Bouton[] {
-  const nonConfirme = fiche.confirmation === '';
-  if (fiche.etape === 'A_CONFIRMER') return ['CONFIRME', 'REPORTER', 'ANNULER'];
-  if (fiche.etape === 'CONFIRMES') return ['HONORE', 'NON_HONORE', 'REPORTER'];
-  if (fiche.etape !== 'EN_RETARD') return [];
-  return nonConfirme
-    ? ['CONFIRME', 'HONORE', 'NON_HONORE', 'REPORTER', 'ANNULER']
-    : ['HONORE', 'NON_HONORE', 'REPORTER'];
-}
-
 function Suites({
   fiche,
   peutCloser,
@@ -144,7 +138,7 @@ function Suites({
       {peutCloser ? (
         <Button
           size="sm"
-          variant={aCloser ? 'default' : 'outline'}
+          variant={aCloser ? 'default' : 'ghost'}
           onClick={() => {
             toast.dismiss();
             onCloser(fiche);
@@ -152,7 +146,7 @@ function Suites({
           className="gap-1.5"
         >
           <ClipboardPenIcon className="size-3.5" aria-hidden="true" />
-          {aCloser ? 'Remplir le closing' : 'Voir le closing'}
+          {aCloser ? 'Compléter le closing' : 'Voir le closing'}
         </Button>
       ) : null}
       {onEnregistrerVisite === null ? null : (
@@ -193,7 +187,11 @@ export function ActionsRendezVous({
     onSuccess: (_, { issue }) => {
       void client.invalidateQueries({ queryKey: CLE_RENDEZ_VOUS });
       setDialogue(null);
-      toast.success(MESSAGES[issue]);
+      // Présent, le closing s'ouvre aussitôt : pas d'aller-retour dans la liste.
+      if (issue === 'HONORE' && peutCloser) {
+        toast.dismiss();
+        onCloser({ ...fiche, issue: 'HONORE', etape: 'A_CLOSER' });
+      } else toast.success(MESSAGES[issue]);
     },
     onError: (error) => toastApiError(error, 'Le rendez-vous n’a pas été mis à jour.'),
   });
@@ -202,19 +200,20 @@ export function ActionsRendezVous({
     else if (bouton === 'ANNULER') setDialogue('annuler');
     else noter.mutate({ issue: bouton });
   };
+  const { visibles, menu } = peutNoter ? gestesDe(fiche) : { visibles: [], menu: [] };
+  const nom = `${fiche.prenom} ${fiche.nom}`;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Etat fiche={fiche} />
-      {(peutNoter ? boutonsDe(fiche) : []).map((bouton) => {
+      {visibles.map((bouton) => {
         const { label, Icon } = BOUTONS[bouton];
         return (
           <Button
             key={bouton}
             size="sm"
-            variant="outline"
+            variant={bouton === 'NON_HONORE' ? 'outline' : 'default'}
             disabled={noter.isPending}
-            aria-label={`${label} : ${fiche.prenom} ${fiche.nom}`}
+            aria-label={`${label} : ${nom}`}
             onClick={() => {
               cliquer(bouton);
             }}
@@ -231,6 +230,31 @@ export function ActionsRendezVous({
         onCloser={onCloser}
         onEnregistrerVisite={onEnregistrerVisite}
       />
+      {menu.length === 0 ? null : (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon" aria-label={`Autres actions : ${nom}`} />}
+          >
+            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {menu.map((bouton) => {
+              const { label, Icon } = BOUTONS[bouton];
+              return (
+                <DropdownMenuItem
+                  key={bouton}
+                  onClick={() => {
+                    cliquer(bouton);
+                  }}
+                >
+                  <Icon aria-hidden="true" />
+                  {label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {dialogue === 'reporter' ? (
         <Reporter
           fiche={fiche}
@@ -248,7 +272,7 @@ export function ActionsRendezVous({
         onOpenChange={(ouvert) => {
           setDialogue(ouvert ? 'annuler' : null);
         }}
-        title={`Annuler le rendez-vous de ${fiche.prenom} ${fiche.nom} ?`}
+        title={`Annuler le rendez-vous de ${nom} ?`}
         description="Il passe dans l’historique. Un nouveau rendez-vous se reprend depuis la fiche."
         confirmLabel="Annuler le rendez-vous"
         pending={noter.isPending}

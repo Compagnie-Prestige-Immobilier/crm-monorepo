@@ -84,8 +84,8 @@ type Closing struct {
 	AutresPromoteurs      string `json:"autresPromoteurs" maxLength:"120"`
 	Parrain               string `json:"parrain" maxLength:"120"`
 	ChargeDeClientele     string `json:"chargeDeClientele" maxLength:"120"`
-	ProchaineAction       string `json:"prochaineAction" minLength:"1" maxLength:"120"`
-	DateRelance           string `json:"dateRelance" format:"date"`
+	ProchaineAction       string `json:"prochaineAction" maxLength:"120"`
+	DateRelance           string `json:"dateRelance" maxLength:"10" doc:"AAAA-MM-JJ, vide si aucune relance n'est prévue."`
 	CompteRendu           string `json:"compteRendu" maxLength:"4000"`
 }
 
@@ -141,12 +141,13 @@ func (s *service) closingEnregistrer(ctx context.Context, in *ClosingEnregistrer
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "CLOSING_SANS_PRESENCE", "Le closing se remplit après un rendez-vous où le prospect était présent.")
 	}
 	b := &in.Body
-	relance, err := time.Parse(formatJourRendezVous, b.DateRelance)
-	if err != nil {
-		return nil, socle.Problem(http.StatusBadRequest, "CLOSING_DATE_RELANCE", "La date de relance est obligatoire.")
-	}
-	if strings.TrimSpace(b.ProchaineAction) == "" {
-		return nil, socle.Problem(http.StatusBadRequest, "CLOSING_PROCHAINE_ACTION", "La prochaine action est obligatoire.")
+	relance := pgtype.Date{}
+	if b.DateRelance != "" {
+		jour, err := time.Parse(formatJourRendezVous, b.DateRelance)
+		if err != nil {
+			return nil, socle.Problem(http.StatusBadRequest, "CLOSING_DATE_RELANCE", "La date de relance n'est pas une date.")
+		}
+		relance = pgtype.Date{Time: jour, Valid: true}
 	}
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		if _, err := q.EnregistrerClosing(ctx, db.EnregistrerClosingParams{
@@ -154,7 +155,7 @@ func (s *service) closingEnregistrer(ctx context.Context, in *ClosingEnregistrer
 			EtatSite: b.EtatSite, Position: b.Position, AuNomDe: b.AuNomDe, PieceIdentiteVerifiee: b.PieceIdentiteVerifiee,
 			PaiementAcompte: b.PaiementAcompte, OrigineFondsJustifiee: b.OrigineFondsJustifiee, FreinPrincipal: b.FreinPrincipal,
 			AutresPromoteurs: b.AutresPromoteurs, Parrain: b.Parrain, ChargeDeClientele: b.ChargeDeClientele,
-			ProchaineAction: strings.TrimSpace(b.ProchaineAction), DateRelance: pgtype.Date{Time: relance, Valid: true}, CompteRendu: b.CompteRendu, AuteurID: u.ID,
+			ProchaineAction: strings.TrimSpace(b.ProchaineAction), DateRelance: relance, CompteRendu: b.CompteRendu, AuteurID: u.ID,
 		}); err != nil {
 			return err
 		}
@@ -172,8 +173,15 @@ func closingDe(l *db.RendezVousClosing) Closing {
 		Position: l.Position, AuNomDe: l.AuNomDe, PieceIdentiteVerifiee: l.PieceIdentiteVerifiee,
 		PaiementAcompte: l.PaiementAcompte, OrigineFondsJustifiee: l.OrigineFondsJustifiee, FreinPrincipal: l.FreinPrincipal,
 		AutresPromoteurs: l.AutresPromoteurs, Parrain: l.Parrain, ChargeDeClientele: l.ChargeDeClientele,
-		ProchaineAction: l.ProchaineAction, DateRelance: l.DateRelance.Time.Format(formatJourRendezVous), CompteRendu: l.CompteRendu,
+		ProchaineAction: l.ProchaineAction, DateRelance: jourOuVide(l.DateRelance), CompteRendu: l.CompteRendu,
 	}
+}
+
+func jourOuVide(jour pgtype.Date) string {
+	if !jour.Valid {
+		return ""
+	}
+	return jour.Time.Format(formatJourRendezVous)
 }
 
 func prospectMonterRendezVous(api huma.API, s *service) {

@@ -25,7 +25,7 @@ var entetesRendezVous = []string{
 type ExportRendezVousInput struct {
 	Type   string `query:"type" maxLength:"40"`
 	Search string `query:"search" maxLength:"120"`
-	Etape  string `query:"etape" enum:",A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE"`
+	Etape  string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
 	Du     string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
 	Au     string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 }

@@ -46,7 +46,7 @@ type RendezVousObtenu struct {
 type RendezVousListInput struct {
 	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE."`
 	Search   string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
-	Etape    string `query:"etape" enum:",A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE"`
+	Etape    string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
 	Du       string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
 	Au       string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 	Page     int32  `query:"page" minimum:"1" maximum:"10000"`

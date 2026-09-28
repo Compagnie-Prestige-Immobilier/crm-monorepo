@@ -73,12 +73,16 @@ test.describe('rendez-vous au comptoir', () => {
     await expect(onglet).toBeVisible();
 
     await onglet.click();
-    await expect(page.getByRole('tab', { name: /^À confirmer/u })).toHaveAttribute(
+    await expect(page.getByRole('tab', { name: 'À traiter' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    const ligne = page.getByRole('row').filter({ hasText: nom });
+    const ligne = page
+      .getByRole('region', { name: 'Demain' })
+      .getByRole('listitem')
+      .filter({ hasText: nom });
     await expect(ligne).toHaveCount(1);
+    await expect(ligne.getByText('À confirmer', { exact: true })).toBeVisible();
     await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
 
     // Le type filtre la file : un RV CPI ne s'affiche pas sous RV site.
@@ -89,15 +93,12 @@ test.describe('rendez-vous au comptoir', () => {
     await page.getByRole('option', { name: 'Tous les types', exact: true }).click();
     await expect(ligne).toHaveCount(1);
 
-    // Confirmé, il quitte « À confirmer » pour « Confirmés », où la venue se note.
+    // Chaque geste reste sur la même ligne : la suivante apparaît sans changer d'écran.
     await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
-    await expect(ligne).toHaveCount(0);
-    await page.getByRole('tab', { name: /^Confirmés/u }).click();
+    await expect(ligne.getByText('Confirmé', { exact: true })).toBeVisible();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
-    await expect(ligne).toHaveCount(0);
-    await page.getByRole('tab', { name: /^À closer/u }).click();
-    await expect(ligne).toHaveCount(1);
-    await expect(ligne.getByRole('button', { name: 'Remplir le closing' })).toHaveCount(0);
+    await expect(ligne.getByText('Présent, closing à compléter')).toBeVisible();
+    await expect(ligne.getByRole('button', { name: 'Compléter le closing' })).toHaveCount(0);
 
     // Venu, il passe au registre sans ressaisir son nom ni son numéro.
     await ligne.getByRole('button', { name: 'Enregistrer la visite' }).click();
@@ -130,14 +131,13 @@ test.describe('rendez-vous au comptoir', () => {
     // La recherche porte sur le nom comme sur le numéro.
     const recherche = page.getByLabel('Rechercher un rendez-vous');
     await recherche.fill(nom);
-    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(1);
+    await expect(ligne).toHaveCount(1);
     await recherche.fill('Personne qui n’existe pas');
     await expect(page.getByText('Aucun rendez-vous pour cette recherche')).toBeVisible();
     await recherche.fill('');
 
     await poserPermissions(permissionsAvant.filter((p) => !OUVERTURE.includes(p)));
     await page.reload();
-    await expect(page.getByRole('tab', { name: /^À closer/u })).toHaveCount(0);
     await expect(onglet).toHaveCount(0);
   });
 });
@@ -156,37 +156,42 @@ test.describe('closing par le chargé de clientèle', () => {
     await purger({ prospects: [convoque] });
   });
 
-  test('un report revient à confirmer, puis la venue ouvre le closing', async ({ page }) => {
-    await page.goto('/accueil/rendez-vous');
-    const ligne = page.getByRole('row').filter({ hasText: nom });
+  test('son espace : un report revient à confirmer, la venue ouvre le closing', async ({
+    page,
+  }) => {
+    await page.goto('/espaces');
+    await page
+      .getByRole('link', { name: /Rendez-vous/u })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/rendez-vous$/u);
+    const ligne = page.getByRole('listitem').filter({ hasText: nom });
 
-    await ligne.getByRole('button', { name: `Reporter : Awa ${nom}` }).click();
+    await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
+    await page.getByRole('menuitem', { name: 'Reporter' }).click();
     const report = page.getByRole('dialog', { name: /^Reporter le rendez-vous/u });
     const apres = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
     await report.getByLabel('Nouvelle date (heure de Dakar)').fill(`${apres}T10:00`);
     await report.getByRole('button', { name: 'Reporter' }).click();
-    await expect(ligne.getByText('Reporté', { exact: true })).toBeVisible();
+    await expect(ligne.getByText('Reporté, à confirmer')).toBeVisible();
 
+    // Présent : le closing s'ouvre de lui-même, en trois étapes, rien d'obligatoire.
     await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
-    await page.getByRole('tab', { name: /^Confirmés/u }).click();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
-    await page.getByRole('tab', { name: /^À closer/u }).click();
-    await ligne.getByRole('button', { name: 'Remplir le closing' }).click();
-
     const closing = page.getByRole('dialog', { name: `Closing de Awa ${nom}` });
-    const enregistrer = closing.getByRole('button', { name: 'Enregistrer le closing' });
-    await expect(enregistrer).toBeDisabled();
     await closing.getByRole('combobox', { name: 'Superficie du lot' }).click();
     await page.getByRole('option', { name: 'Autre, à préciser' }).click();
     await closing.getByLabel('Superficie du lot, précision').fill('400 m²');
-    await closing.getByRole('combobox', { name: 'Prochaine action *' }).click();
+    await closing.getByRole('button', { name: 'Suivant' }).click();
+    await closing.getByRole('button', { name: 'Suivant' }).click();
+    await closing.getByRole('combobox', { name: 'Prochaine action' }).click();
     await page.getByRole('option', { name: 'Signature du contrat' }).click();
-    await closing.getByLabel('Date de relance *').fill(apres);
-    await enregistrer.click();
+    await closing.getByRole('button', { name: 'Enregistrer et fermer' }).click();
     await expect(closing).toHaveCount(0);
+    await expect(ligne).toHaveCount(0);
 
-    await page.getByRole('tab', { name: /^Historique/u }).click();
-    await expect(ligne.getByText('Closing fait')).toBeVisible();
+    await page.getByRole('link', { name: 'Historique' }).click();
+    await expect(ligne.getByText('Closing enregistré')).toBeVisible();
     const [enregistre = { superficie: '' }] = await lire<{ superficie: string }>(
       'SELECT "superficie" FROM "rendez_vous_closings" WHERE "prospectId" = $1',
       [convoque],

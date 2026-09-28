@@ -47,7 +47,8 @@ LEFT JOIN "points_rencontre" pr ON pr."id" = dernier."pointRencontreId"
 WHERE (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT NULL)
   AND (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id')::text)
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
-  AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text)
+  AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text
+       OR (sqlc.narg('etape')::text = 'A_TRAITER' AND rdv."etape" <> 'HISTORIQUE'))
   AND (sqlc.narg('du')::timestamp IS NULL OR rdv."quand" >= sqlc.narg('du')::timestamp)
   AND (sqlc.narg('au')::timestamp IS NULL OR rdv."quand" < sqlc.narg('au')::timestamp)
   AND (sqlc.narg('recherche')::text IS NULL
@@ -58,8 +59,8 @@ WHERE (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT N
        -- Une recherche sans chiffre laisserait un motif vide, qui prend tout.
        OR (regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') <> ''
            AND p."phoneE164" LIKE '%' || regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') || '%'))
--- Le travail à venir se lit du plus proche au plus lointain ; le reste, du plus récent au plus ancien.
-ORDER BY CASE WHEN rdv."etape" IN ('A_CONFIRMER', 'CONFIRMES') THEN rdv."quand" END ASC NULLS LAST,
+-- Le travail se lit du plus ancien au plus lointain ; l'historique, du plus récent au plus ancien.
+ORDER BY CASE WHEN rdv."etape" <> 'HISTORIQUE' THEN rdv."quand" END ASC NULLS LAST,
   rdv."quand" DESC NULLS LAST, p."id"
 LIMIT @prendre::int OFFSET @sauter::int;
 
