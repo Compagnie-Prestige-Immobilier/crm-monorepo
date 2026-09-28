@@ -203,7 +203,8 @@ ORDER BY count DESC;
 
 -- name: LeadsImportesParImport :many
 -- Ce qu'a donne chaque classeur de leads : le motif du dernier appel dit si la
--- fiche vaut d'etre suivie.
+-- fiche vaut d'etre suivie. Seuls les releves du marketing sont des leads ; un
+-- classeur CHUES depose a la main vient du pole deploiement.
 SELECT
   j."id",
   j."fileName" AS fichier,
@@ -214,6 +215,7 @@ SELECT
   COUNT(p."id") FILTER (WHERE r."code" = ANY(@motifs::text[]))::int AS interesses
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
+  AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'
 LEFT JOIN LATERAL (
   SELECT c."reasonId"
   FROM "call_attempts" c
@@ -230,7 +232,7 @@ LIMIT 500;
 -- name: LeadsImportesInteressesTotal :one
 SELECT COUNT(*)::int
 FROM "prospects" p
-JOIN "import_jobs" j ON j."id" = p."importJobId"
+JOIN "import_jobs" j ON j."id" = p."importJobId" AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'
 JOIN LATERAL (
   SELECT c."reasonId"
   FROM "call_attempts" c
@@ -255,7 +257,7 @@ SELECT
   r."label" AS motif,
   dernier."comment" AS commentaire
 FROM "prospects" p
-JOIN "import_jobs" j ON j."id" = p."importJobId"
+JOIN "import_jobs" j ON j."id" = p."importJobId" AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'
 JOIN LATERAL (
   SELECT c."reasonId", c."createdAt", c."comment", c."performedById"
   FROM "call_attempts" c
