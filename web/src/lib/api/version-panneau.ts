@@ -44,6 +44,8 @@ export function installerRechargementPanneau(router: AnyRouter): void {
   document.addEventListener('visibilitychange', rechargerSiLibre);
   window.addEventListener('focus', rechargerSiLibre);
   window.addEventListener('vite:preloadError', (event) => {
+    const erreur = event as Event & { payload?: unknown };
+    if (!String(erreur.payload).includes('/assets/')) return;
     event.preventDefault();
     window.location.reload();
   });

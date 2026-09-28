@@ -60,18 +60,26 @@ Un outil ne se choisit que s'il répond vraiment. Une conversion de fiche n'est 
 var permission = socle.PermissionAssistantUtiliser
 
 var Garde = map[string]socle.Permission{
-	"POST " + cheminQuestions:             permission,
-	"GET " + cheminSuggestions:            permission,
-	"GET " + cheminExport:                 permission,
-	"GET " + cheminEnregistres:            permission,
-	"POST " + cheminEnregistres:           permission,
-	"PATCH " + cheminEnregistre:           permission,
-	"DELETE " + cheminEnregistre:          permission,
-	"GET " + cheminEnregistre + "/export": permission,
-	"POST " + cheminResume:                socle.PermissionProspectsLire,
-	"POST " + cheminCalculs:               permission,
-	"POST " + cheminConstruire:            socle.PermissionChiffresDisposer,
-	"GET " + cheminAmorces:                permission,
+	"POST " + cheminConversation:                      permission,
+	"POST " + cheminConversation + "/retour":          permission,
+	"POST /api/v1/assistant/kairos/transmission":      permission,
+	"POST /api/v1/assistant/kairos/actions/confirmer": permission,
+	"POST /api/v1/assistant/kairos/actions/refuser":   permission,
+	"POST /api/v1/assistant/kairos/actions/annuler":   permission,
+	"GET /api/v1/assistant/kairos/client.js":          permission,
+	"GET " + cheminLectureKairo:                       socle.Publique,
+	"POST " + cheminQuestions:                         permission,
+	"GET " + cheminSuggestions:                        permission,
+	"GET " + cheminExport:                             permission,
+	"GET " + cheminEnregistres:                        permission,
+	"POST " + cheminEnregistres:                       permission,
+	"PATCH " + cheminEnregistre:                       permission,
+	"DELETE " + cheminEnregistre:                      permission,
+	"GET " + cheminEnregistre + "/export":             permission,
+	"POST " + cheminResume:                            socle.PermissionProspectsLire,
+	"POST " + cheminCalculs:                           permission,
+	"POST " + cheminConstruire:                        socle.PermissionChiffresDisposer,
+	"GET " + cheminAmorces:                            permission,
 }
 
 type memoire[V any] struct {
@@ -734,6 +742,7 @@ func (s *service) supprimer(ctx context.Context, in *EnregistreeInput) (*struct{
 
 func Monter(api huma.API, d *socle.Deps) {
 	s := &service{Deps: d}
+	s.monterConversation(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "poserQuestionAssistant", Method: http.MethodPost, Path: cheminQuestions,
 		Summary: "Répond à une question sur les chiffres avec les seuls outils permis au rôle.",
