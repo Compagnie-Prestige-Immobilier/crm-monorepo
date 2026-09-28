@@ -124,7 +124,7 @@ func requeteLectureSignee(t *testing.T, b *banc, espace int, question string) *h
 	charge := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"sub":%q,"app":"crm","org":"crm","workspaceId":%d,"exp":%d}`, b.userID, espace, time.Now().Add(time.Minute).Unix())))
 	chemin := "/api/v1/assistant/kairos/lire?" + url.Values{"question": {question}}.Encode()
 	horodatage := strconv.FormatInt(time.Now().Unix(), 10)
-	req, err := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+chemin, nil)
+	req, err := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+chemin, http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}
