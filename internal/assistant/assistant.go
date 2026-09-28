@@ -60,6 +60,19 @@ Un outil ne se choisit que s'il répond vraiment. Une conversion de fiche n'est 
 var permission = socle.PermissionAssistantUtiliser
 
 var Garde = map[string]socle.Permission{
+	"POST /api/v1/assistant/kairos/conversation/annuler":           permission,
+	"GET /api/v1/assistant/kairos/browser.js":                      permission,
+	"GET /api/v1/assistant/kairos/assistant":                       permission,
+	"GET /api/v1/assistant/kairos/conversations":                   permission,
+	"GET /api/v1/assistant/kairos/conversations/{conversation}":    permission,
+	"DELETE /api/v1/assistant/kairos/conversations/{conversation}": permission,
+	"GET /api/v1/assistant/kairos/sdk/regles":                      permission,
+	"PUT /api/v1/assistant/kairos/sdk/regles":                      permission,
+	"GET /api/v1/assistant/kairos/sdk/traitements":                 permission,
+	"POST /api/v1/assistant/kairos/sdk/traitements":                permission,
+	"DELETE /api/v1/assistant/kairos/sdk/traitements/{id}":         permission,
+	"GET /api/v1/assistant/kairos/sdk/traitements/{id}/executions": permission,
+
 	"POST " + cheminConversation:                      permission,
 	"POST " + cheminConversation + "/retour":          permission,
 	"POST /api/v1/assistant/kairos/transmission":      permission,
