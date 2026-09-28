@@ -9,10 +9,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -75,7 +77,7 @@ func TestAssistantFluxProgressifEtAnnulation(t *testing.T) {
 
 func TestAssistantLectureKairosRefuseSignatureAbsente(t *testing.T) {
 	b := bancAssistant(t, "ADMIN")
-	statut, corps := b.appel(http.MethodPost, "/api/v1/assistant/kairos/lire", map[string]string{"question": "Combien d’appels hier ?"}, false)
+	statut, corps := b.appel(http.MethodGet, "/api/v1/assistant/kairos/lire", nil, false)
 	b.attend(statut, http.StatusUnauthorized, "signature requise même avec une session", corps)
 }
 
@@ -98,7 +100,7 @@ func TestAssistantLectureKairosRelitCompte(t *testing.T) {
 			if _, err := b.pool.Exec(b.ctx, `UPDATE users SET "isActive"=$1 WHERE id=$2`, essai.actif, b.userID); err != nil {
 				t.Fatal(err)
 			}
-			req := requeteLectureSignee(t, b, essai.espace)
+			req := requeteLectureSignee(t, b, essai.espace, "")
 			resp, err := b.client.Do(req)
 			if err != nil {
 				t.Fatal(err)
@@ -112,7 +114,7 @@ func TestAssistantLectureKairosRelitCompte(t *testing.T) {
 	}
 }
 
-func requeteLectureSignee(t *testing.T, b *banc, espace int) *http.Request {
+func requeteLectureSignee(t *testing.T, b *banc, espace int, question string) *http.Request {
 	t.Helper()
 	signer := func(texte string) string {
 		mac := hmac.New(sha256.New, []byte("secret-essai"))
@@ -120,16 +122,51 @@ func requeteLectureSignee(t *testing.T, b *banc, espace int) *http.Request {
 		return hex.EncodeToString(mac.Sum(nil))
 	}
 	charge := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"sub":%q,"app":"crm","org":"crm","workspaceId":%d,"exp":%d}`, b.userID, espace, time.Now().Add(time.Minute).Unix())))
-	corps := `{"question":""}`
-	chemin := "/api/v1/assistant/kairos/lire"
+	chemin := "/api/v1/assistant/kairos/lire?" + url.Values{"question": {question}}.Encode()
 	horodatage := strconv.FormatInt(time.Now().Unix(), 10)
-	req, err := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+chemin, strings.NewReader(corps))
+	req, err := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+chemin, http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Kairos-Identite", charge+"."+signer(charge))
 	req.Header.Set("X-Kairos-Horodatage", horodatage)
-	req.Header.Set("X-Kairos-Signature", signer(horodatage+"\nPOST\n"+chemin+"\n"+corps))
+	req.Header.Set("X-Kairos-Signature", signer(horodatage+"\nGET\n"+chemin+"\n"))
 	return req
+}
+
+func TestAssistantLectureKairosRendRapportEtRefuseQueryModifiee(t *testing.T) {
+	b := bancAssistant(t, "ADMIN")
+	f := demarrerFauxFournisseur(t, func(map[string]any) string { return `{"outil":"appels","periode":"hier"}` })
+	question := "Combien d’appels hier pour CHUES & Grand Public ?"
+	req := requeteLectureSignee(t, b, 1, question)
+	resp, err := b.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reponse map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&reponse); err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || reponse["outil"] != "appels" || reponse["resultat"] == nil {
+		t.Fatalf("rapport signé absent : statut=%d", resp.StatusCode)
+	}
+	var entree map[string]any
+	if err := json.Unmarshal([]byte(f.messages()[0]), &entree); err != nil {
+		t.Fatal(err)
+	}
+	if entree["question"] != question {
+		t.Fatal("question altérée lors du décodage")
+	}
+	req = requeteLectureSignee(t, b, 1, question)
+	req.URL.RawQuery += "&question=autre"
+	resp, err = b.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("query modifiée acceptée : HTTP %d", resp.StatusCode)
+	}
 }
