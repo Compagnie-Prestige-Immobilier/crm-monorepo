@@ -161,6 +161,33 @@ func analyticsTotalMarketing(b *banc, quoi string) float64 {
 	return analyticsNombre(b, body["total"], quoi)
 }
 
+// Un lead inscrit sur la plateforme n'attend pas de distribution : il se compte à part.
+func TestSupervisionMarketingCompteAPartLesInscritsDeLaPlateforme(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	releve := analyticsTravailImport(b, "PROSPECTS_GRAND_PUBLIC")
+	lire := func(quoi string) map[string]any {
+		analyticsViderCache()
+		statut, body := b.appel(http.MethodGet, "/api/v1/supervision/prospects/marketing", nil, false)
+		b.attend(statut, http.StatusOK, quoi, body)
+		return body
+	}
+	lead := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, lead, releve)
+	avant := lire("marketing avant l'inscription")
+
+	inscription := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$1,'Nom','Prenom','etape-0',$2,'{}'::jsonb,now(),now())`, inscription, lead)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+	apres := lire("marketing après l'inscription")
+	analyticsEgal(b, "pas encore distribuées", apres["nonDistribues"], analyticsNombre(b, avant["nonDistribues"], "avant")-1)
+	analyticsEgal(b, "suivies sur la plateforme", apres["surPlateforme"], analyticsNombre(b, avant["surPlateforme"], "avant")+1)
+	analyticsEgal(b, "total", apres["total"], analyticsNombre(b, avant["total"], "avant"))
+}
+
 // Le pôle marketing ne compte que les prospects qu'un canal amène ou qu'un relevé
 // a apportés. Une fiche remise par un représentant ou un classeur CHUES déposé par
 // le pôle déploiement reste hors du compte.
