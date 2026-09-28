@@ -198,7 +198,11 @@ func TestSupervisionMarketingIgnoreLesFichesDuDeploiement(t *testing.T) {
 
 	canal := uuid.NewString()
 	analyticsExec(b, `INSERT INTO "canaux_provenance" ("id","code","label","updatedAt") VALUES ($1,$1,'Canal test',now())`, canal)
-	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "canaux_provenance" WHERE "id" = $1`, canal) })
+	// Laissé en base, ce canal au code aléatoire capterait « fb » au relevé d'un autre test.
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `UPDATE "prospects" SET "canalProvenanceId" = NULL WHERE "canalProvenanceId" = $1`, canal)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "canaux_provenance" WHERE "id" = $1`, canal)
+	})
 	releve := analyticsTravailImport(b, "PROSPECTS_GRAND_PUBLIC")
 	classeurChues := analyticsTravailImport(b, "PROSPECTS")
 
