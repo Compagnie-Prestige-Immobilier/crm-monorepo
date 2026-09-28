@@ -264,6 +264,8 @@ JOIN "users" u ON u."id" = c."assignedToId"
 LEFT JOIN "call_attempts" a ON a."id" = c."sourceAttemptId"
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE c."status" = 'PENDING'
+  -- Un rendez-vous physique appartient au chargé de clientèle, pas au téléconseiller qui l'a pris.
+  AND (p."phase2Status" IS DISTINCT FROM 'APPOINTMENT' OR cr."code" = 'RDV_TELEPHONIQUE')
   AND (sqlc.narg('avant')::timestamp IS NULL
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
@@ -281,7 +283,10 @@ OFFSET sqlc.arg('page_offset');
 SELECT COUNT(*)::int
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
+LEFT JOIN "call_attempts" a ON a."id" = c."sourceAttemptId"
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE c."status" = 'PENDING'
+  AND (p."phase2Status" IS DISTINCT FROM 'APPOINTMENT' OR cr."code" = 'RDV_TELEPHONIQUE')
   AND (sqlc.narg('avant')::timestamp IS NULL
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
