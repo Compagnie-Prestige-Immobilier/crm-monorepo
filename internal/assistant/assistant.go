@@ -67,7 +67,7 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/assistant/kairos/actions/refuser":   permission,
 	"POST /api/v1/assistant/kairos/actions/annuler":   permission,
 	"GET /api/v1/assistant/kairos/client.js":          permission,
-	"POST " + cheminLectureKairo:                      socle.Publique,
+	"GET " + cheminLectureKairo:                       socle.Publique,
 	"POST " + cheminQuestions:                         permission,
 	"GET " + cheminSuggestions:                        permission,
 	"GET " + cheminExport:                             permission,

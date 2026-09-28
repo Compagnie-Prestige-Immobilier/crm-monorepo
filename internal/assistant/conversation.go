@@ -3,7 +3,6 @@ package assistant
 import (
 	"context"
 	"cpi-go/internal/shared/socle"
-	"encoding/json"
 	"io"
 	"net/http"
 	"time"
@@ -26,25 +25,28 @@ type LectureKairoInput struct {
 	Identite   string `header:"X-Kairos-Identite"`
 	Horodatage string `header:"X-Kairos-Horodatage"`
 	Signature  string `header:"X-Kairos-Signature"`
-	Body       map[string]any
-	RawBody    []byte
+	Question   string `query:"question" maxLength:"500"`
+	Chemin     string
+}
+
+func (in *LectureKairoInput) Resolve(ctx huma.Context) []error {
+	adresse := ctx.URL()
+	in.Chemin = adresse.RequestURI()
+	return nil
 }
 
 func (s *service) lirePourKairo(ctx context.Context, in *LectureKairoInput) (*ReponseOutput, error) {
 	if s.Cfg.Base != socle.BasePublique {
 		return nil, socle.Problem(http.StatusForbidden, "KAIROS_REFUSE", "Appel non autorisé.")
 	}
-	ctx, err := s.UtilisateurAppelKairo(ctx, in.Identite, in.Horodatage, in.Signature, cheminLectureKairo, in.RawBody)
+	ctx, err := s.UtilisateurAppelKairo(ctx, in.Identite, in.Horodatage, in.Signature, http.MethodGet, in.Chemin, nil)
 	if err != nil {
 		return nil, socle.Problem(http.StatusUnauthorized, "KAIROS_REFUSE", "Appel non autorisé.")
 	}
-	var question struct {
-		Question string `json:"question"`
-	}
-	if json.Unmarshal(in.RawBody, &question) != nil || len(question.Question) < 3 || len(question.Question) > 500 {
+	if len(in.Question) < 3 || len(in.Question) > 500 {
 		return nil, socle.Problem(http.StatusBadRequest, "KAIROS_QUESTION_INVALIDE", "Question invalide.")
 	}
-	sortie, err := s.repondreA(ctx, question.Question, nil)
+	sortie, err := s.repondreA(ctx, in.Question, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -141,5 +143,5 @@ func (s *service) monterConversation(api huma.API) {
 	huma.Register(api, huma.Operation{OperationID: "clientKairos", Method: http.MethodGet, Path: "/api/v1/assistant/kairos/client.js"}, func(ctx context.Context, _ *struct{}) (*huma.StreamResponse, error) {
 		return s.relayerKairo(ctx, &ConversationInput{}, "/kairos-client.js")
 	})
-	huma.Register(api, huma.Operation{OperationID: "lirePourKairos", Method: http.MethodPost, Path: cheminLectureKairo, MaxBodyBytes: 4096}, s.lirePourKairo)
+	huma.Register(api, huma.Operation{OperationID: "lirePourKairos", Method: http.MethodGet, Path: cheminLectureKairo, MaxBodyBytes: 4096}, s.lirePourKairo)
 }

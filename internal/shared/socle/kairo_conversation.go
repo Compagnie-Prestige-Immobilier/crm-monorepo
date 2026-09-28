@@ -35,7 +35,7 @@ func OuvrirKairo(ctx context.Context, u *Utilisateur, methode, chemin string, co
 	return clientTachesKairo.Do(req)
 }
 
-func (d *Deps) UtilisateurAppelKairo(ctx context.Context, identite, horodatage, signature, chemin string, corps []byte) (context.Context, error) {
+func (d *Deps) UtilisateurAppelKairo(ctx context.Context, identite, horodatage, signature, methode, chemin string, corps []byte) (context.Context, error) {
 	refus := errors.New("appel Kairos non autorisé")
 	secret := []byte(Env("KAIRO_SDK_SECRET", ""))
 	instant, err := strconv.ParseInt(horodatage, 10, 64)
@@ -43,7 +43,7 @@ func (d *Deps) UtilisateurAppelKairo(ctx context.Context, identite, horodatage, 
 		return ctx, refus
 	}
 	mac := hmac.New(sha256.New, secret)
-	_, _ = mac.Write([]byte(horodatage + "\nPOST\n" + chemin + "\n"))
+	_, _ = mac.Write([]byte(horodatage + "\n" + methode + "\n" + chemin + "\n"))
 	_, _ = mac.Write(corps)
 	if !hmac.Equal([]byte(signature), []byte(hex.EncodeToString(mac.Sum(nil)))) {
 		return ctx, refus

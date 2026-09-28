@@ -729,7 +729,7 @@
   "POST /api/v1/assistant/kairos/actions/refuser": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/assistant/kairos/actions/annuler": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/assistant/kairos/client.js": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
-  "POST /api/v1/assistant/kairos/lire": ["PUBLIC"],
+  "GET /api/v1/assistant/kairos/lire": ["PUBLIC"],
   "POST /api/v1/assistant/questions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/assistant/suggestions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/assistant/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
