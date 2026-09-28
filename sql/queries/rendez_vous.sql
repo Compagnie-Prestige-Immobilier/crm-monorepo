@@ -1,4 +1,18 @@
 -- name: RendezVousObtenus :many
+-- Un rappel annulé garde la date du rendez-vous ; un rappel supplanté ne la donne jamais. Un report la remplace.
+WITH dates AS (
+  SELECT p."id", COALESCE(p."rendezVousReporteAt", (
+    SELECT sc."scheduledAt" FROM "scheduled_callbacks" sc
+    WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
+    ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+  )) AS "quand"
+  FROM "prospects" p
+  WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+), rdv AS (
+  SELECT d."id", d."quand", public.rendez_vous_etape(d."quand", p."rendezVousConfirmation", p."rendezVousIssue",
+    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = d."id"), @debut_jour::timestamp)::text AS "etape"
+  FROM dates d JOIN "prospects" p ON p."id" = d."id"
+)
 SELECT
   p."id",
   p."prenom",
@@ -11,6 +25,9 @@ SELECT
   p."lastCallAt",
   COALESCE(u."fullName", '') AS "prisPar",
   COALESCE(p."rendezVousIssue", '') AS "issue",
+  COALESCE(p."rendezVousConfirmation", '') AS "confirmation",
+  (p."rendezVousReporteAt" IS NOT NULL)::boolean AS "reporte",
+  rdv."etape",
   COALESCE(vs."nom", '')::text AS "site",
   COALESCE(vs."prixUnitaireDefaut", 0)::bigint AS "sitePrix",
   COALESCE(pr."label", '')::text AS "pointRencontre",
@@ -18,28 +35,19 @@ SELECT
   count(*) OVER () AS "total"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+JOIN rdv ON rdv."id" = p."id"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
--- Un rappel annulé garde la date du rendez-vous ; un rappel supplanté ne la donne jamais.
-LEFT JOIN LATERAL (
-  SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-  WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
-  ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
-) rdv ON true
 LEFT JOIN LATERAL (
   SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
   WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
 ) dernier ON true
 LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
 LEFT JOIN "points_rencontre" pr ON pr."id" = dernier."pointRencontreId"
-WHERE p."deletedAt" IS NULL
-  AND p."phase2Status" = 'APPOINTMENT'
-  -- Le comptoir ne reçoit pas les rendez-vous téléphoniques ; la fiche, elle, les montre.
-  AND (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT NULL)
+-- Le comptoir ne reçoit pas les rendez-vous téléphoniques ; la fiche, elle, les montre.
+WHERE (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT NULL)
   AND (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id')::text)
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
-  AND (sqlc.narg('issue')::text IS NULL
-       OR (sqlc.narg('issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)
-       OR p."rendezVousIssue" = sqlc.narg('issue')::text)
+  AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text)
   AND (sqlc.narg('du')::timestamp IS NULL OR rdv."quand" >= sqlc.narg('du')::timestamp)
   AND (sqlc.narg('au')::timestamp IS NULL OR rdv."quand" < sqlc.narg('au')::timestamp)
   AND (sqlc.narg('recherche')::text IS NULL
@@ -50,5 +58,51 @@ WHERE p."deletedAt" IS NULL
        -- Une recherche sans chiffre laisserait un motif vide, qui prend tout.
        OR (regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') <> ''
            AND p."phoneE164" LIKE '%' || regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') || '%'))
-ORDER BY rdv."quand" DESC NULLS LAST, p."id"
+-- Le travail à venir se lit du plus proche au plus lointain ; le reste, du plus récent au plus ancien.
+ORDER BY CASE WHEN rdv."etape" IN ('A_CONFIRMER', 'CONFIRMES') THEN rdv."quand" END ASC NULLS LAST,
+  rdv."quand" DESC NULLS LAST, p."id"
 LIMIT @prendre::int OFFSET @sauter::int;
+
+-- name: RendezVousParEtape :many
+SELECT public.rendez_vous_etape(
+    COALESCE(p."rendezVousReporteAt", (
+      SELECT sc."scheduledAt" FROM "scheduled_callbacks" sc
+      WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
+      ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+    )),
+    p."rendezVousConfirmation", p."rendezVousIssue",
+    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id"), @debut_jour::timestamp
+  )::text AS "etape",
+  count(*)::bigint AS "nombre"
+FROM "prospects" p
+JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+WHERE p."deletedAt" IS NULL
+  AND p."phase2Status" = 'APPOINTMENT'
+  AND r."code" <> 'RDV_TELEPHONIQUE'
+  AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
+GROUP BY 1;
+
+-- name: LireClosing :one
+SELECT * FROM "rendez_vous_closings" WHERE "prospectId" = @prospect_id;
+
+-- name: EnregistrerClosing :one
+INSERT INTO "rendez_vous_closings" AS c (
+  "prospectId", "localite", "superficie", "natureJuridique", "etatSite", "position", "auNomDe",
+  "pieceIdentiteVerifiee", "paiementAcompte", "origineFondsJustifiee", "freinPrincipal", "autresPromoteurs",
+  "parrain", "chargeDeClientele", "prochaineAction", "dateRelance", "compteRendu", "auteurId"
+) VALUES (
+  @prospect_id, @localite, @superficie, @nature_juridique, @etat_site, @position, @au_nom_de,
+  @piece_identite_verifiee, @paiement_acompte, @origine_fonds_justifiee, @frein_principal, @autres_promoteurs,
+  @parrain, @charge_de_clientele, @prochaine_action, @date_relance, @compte_rendu, @auteur_id
+)
+ON CONFLICT ("prospectId") DO UPDATE SET
+  "localite" = EXCLUDED."localite", "superficie" = EXCLUDED."superficie",
+  "natureJuridique" = EXCLUDED."natureJuridique", "etatSite" = EXCLUDED."etatSite",
+  "position" = EXCLUDED."position", "auNomDe" = EXCLUDED."auNomDe",
+  "pieceIdentiteVerifiee" = EXCLUDED."pieceIdentiteVerifiee", "paiementAcompte" = EXCLUDED."paiementAcompte",
+  "origineFondsJustifiee" = EXCLUDED."origineFondsJustifiee", "freinPrincipal" = EXCLUDED."freinPrincipal",
+  "autresPromoteurs" = EXCLUDED."autresPromoteurs", "parrain" = EXCLUDED."parrain",
+  "chargeDeClientele" = EXCLUDED."chargeDeClientele", "prochaineAction" = EXCLUDED."prochaineAction",
+  "dateRelance" = EXCLUDED."dateRelance", "compteRendu" = EXCLUDED."compteRendu",
+  "auteurId" = EXCLUDED."auteurId", "updatedAt" = CURRENT_TIMESTAMP
+RETURNING *;

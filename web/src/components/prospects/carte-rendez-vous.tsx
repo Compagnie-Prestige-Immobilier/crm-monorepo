@@ -28,7 +28,6 @@ const TON = {
   anoter: 'border-l-warning bg-warning-surface',
   honore: 'border-l-success bg-success-surface',
   manque: 'border-l-destructive bg-destructive-surface',
-  reporte: 'border-l-border bg-card',
 } as const;
 
 async function lireRendezVous(id: string): Promise<RendezVous | null> {
@@ -46,13 +45,6 @@ function repere(quand: Date, now: number, prospect: ProspectRow) {
   const heure = quand.toISOString().slice(11, 16);
   if (prospect.rendezVousIssue === 'HONORE') return { ton: TON.honore, texte: 'Venu' };
   if (prospect.rendezVousIssue === 'NON_HONORE') return { ton: TON.manque, texte: 'Pas venu' };
-  if (prospect.rendezVousIssue === 'REPORTE') {
-    const au = prospect.rendezVousReporteAt;
-    return {
-      ton: TON.reporte,
-      texte: au === null ? 'Reporté' : `Reporté au ${formatDateTime(au)}`,
-    };
-  }
   const ecart = joursEntre(now, quand.getTime());
   if (ecart < 0) {
     const passe = ecart === -1 ? 'Hier' : `Il y a ${String(-ecart)} jours`;

@@ -66,31 +66,38 @@ func TestRappelAnnuleSeRetablit(t *testing.T) {
 	}
 }
 
-// Le panneau masque « Reporter » et « Annuler » sur un rendez-vous : la liste le lui dit.
-func TestRappelsDisentSiCEstUnRendezVous(t *testing.T) {
+// Un rendez-vous physique part au chargé de clientèle ; un RDV téléphonique reste un rappel du téléconseiller.
+func TestRappelsGardentSeulementLesRendezVousTelephoniques(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
-	fiche := qualificationProspect(b)
-	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
-	})
 	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
-		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}))
-	b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
-	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/callbacks?scope=all&pageSize=100", nil)
+	fiches := map[string]string{}
+	for _, motif := range []string{"RV_CPI", "RDV_TELEPHONIQUE"} {
+		fiche := qualificationProspect(b)
+		fiches[motif] = fiche
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": motif, "callbackAt": quand}))
+		b.attend(statut, http.StatusOK, motif+" consigné", body)
+	}
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/callbacks?scope=all&pageSize=100", nil)
 	b.attend(statut, http.StatusOK, "rappels", body)
+	lignes := map[string]map[string]any{}
 	items, _ := body["items"].([]any)
 	for _, item := range items {
 		ligne, _ := item.(map[string]any)
-		if ligne["prospectId"] == fiche {
-			if rendezVous, _ := ligne["rendezVous"].(bool); !rendezVous || ligne["reasonCode"] != "RV_CPI" {
-				t.Fatalf("rendez-vous et code attendus : %v", ligne)
-			}
-			return
-		}
+		id, _ := ligne["prospectId"].(string)
+		lignes[id] = ligne
 	}
-	t.Fatalf("le rendez-vous figure dans les rappels : %d ligne(s)", len(items))
+	if _, ok := lignes[fiches["RV_CPI"]]; ok {
+		t.Fatal("un RV CPI ne doit plus figurer dans les rappels du téléconseiller")
+	}
+	telephonique, ok := lignes[fiches["RDV_TELEPHONIQUE"]]
+	if rendezVous, _ := telephonique["rendezVous"].(bool); !ok || !rendezVous || telephonique["reasonCode"] != "RDV_TELEPHONIQUE" {
+		t.Fatalf("le RDV téléphonique reste un rappel marqué rendez-vous : %v", telephonique)
+	}
 }
 
 // Un poste en avance ne fige pas le dernier appel : on garde le dernier réellement passé.

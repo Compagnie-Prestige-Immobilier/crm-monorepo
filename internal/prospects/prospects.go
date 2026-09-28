@@ -227,7 +227,7 @@ type Prospect struct {
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
-	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
+	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
 	ClientCreatedAt          string            `json:"clientCreatedAt"`
@@ -1444,6 +1444,8 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
 	"PUT /api/v1/prospects/{id}/methode":                              socle.PermissionProspectsSuperviser,
 	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
+	"GET " + cheminClosing:                                            socle.PermissionRendezVousCloser,
+	"PUT " + cheminClosing:                                            socle.PermissionRendezVousCloser,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
 	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,

@@ -150,7 +150,7 @@ SELECT
   COUNT(*)::int AS obtenus,
   COUNT(*) FILTER (WHERE p."rendezVousIssue" = 'HONORE')::int AS honores,
   COUNT(*) FILTER (WHERE p."rendezVousIssue" = 'NON_HONORE')::int AS non_honores,
-  COUNT(*) FILTER (WHERE p."rendezVousIssue" = 'REPORTE')::int AS reportes
+  COUNT(*) FILTER (WHERE p."rendezVousReporteAt" IS NOT NULL)::int AS reportes
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 JOIN LATERAL (

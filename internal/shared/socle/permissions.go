@@ -73,6 +73,7 @@ const (
 	PermissionRendezVousSuivre         Permission = "rendez_vous.suivre"
 	PermissionRendezVousVoir           Permission = "rendez_vous.voir"
 	PermissionRendezVousExporter       Permission = "rendez_vous.exporter"
+	PermissionRendezVousCloser         Permission = "rendez_vous.closer"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
 
@@ -134,8 +135,9 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionVentesGerer:              {"Ventes", "Saisir les ventes, déposer le classeur, régler sites et canaux", []Role{Admin, Direction}},
 	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
 	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
-	PermissionRendezVousSuivre:         {domaineRendezVous, "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele, Accueil}},
-	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Accueil}},
+	PermissionRendezVousSuivre:         {domaineRendezVous, "Confirmer, reporter ou annuler un rendez-vous et noter la présence", []Role{Admin, Direction, ChargeClientele, Accueil}},
+	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, ChargeClientele, Accueil}},
+	PermissionRendezVousCloser:         {domaineRendezVous, "Remplir le formulaire de closing après un rendez-vous", []Role{Admin, Direction, ChargeClientele}},
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
@@ -240,18 +242,10 @@ func (u *Utilisateur) Peut(p Permission) bool {
 	if p == Publique {
 		return true
 	}
-	if p == PermissionRendezVousSuivre && !betaSuiviRendezVous() {
-		return false
-	}
 	if u.permissions != nil {
 		return u.permissions[p]
 	}
 	return attributionsParDefaut()[u.Role][p]
-}
-
-// Ouverte en développement local ; la production (NODE_ENV=production) attend la variable.
-func betaSuiviRendezVous() bool {
-	return Env("BETA_SUIVI_RENDEZ_VOUS", Faux) == Vrai || Env("NODE_ENV", "") == "development"
 }
 
 func (u *Utilisateur) Permissions() []string {

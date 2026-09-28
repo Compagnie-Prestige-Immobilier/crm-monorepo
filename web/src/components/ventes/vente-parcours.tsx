@@ -137,7 +137,7 @@ function jourVersementDe(jour: number | null): Patch {
 }
 
 function brouillonDe(vente: Vente | null): Draft {
-  if (vente === null) return { ...NOUVEAU, dateSouscription: aujourdhui() };
+  if (vente === null) return { ...NOUVEAU };
   const telephone = fromE164(vente.telephone);
   return {
     canal: vente.canal,
@@ -190,6 +190,7 @@ const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
     if (d.jourVersement === undefined) return 'Choisissez le jour de versement.';
     return d.premierVersement ? null : 'Indiquez la date du premier versement.';
   },
+  recap: (d) => (d.dateSouscription === '' ? 'Indiquez la date de la vente.' : null),
 };
 
 function actifs(configuration: VentesConfiguration | undefined) {
@@ -350,6 +351,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
         ecran={ecran}
         draft={draft}
         changer={changer}
+        estNouvelle={vente === null}
         sites={sites}
         site={siteChoisi}
         erreurLots={erreurLots}
@@ -384,6 +386,7 @@ function EcranCourant({
   ecran,
   draft,
   changer,
+  estNouvelle,
   sites,
   site,
   erreurLots,
@@ -397,6 +400,7 @@ function EcranCourant({
   onCanal,
 }: EcranProps & {
   ecran: Ecran;
+  estNouvelle: boolean;
   sites: readonly SiteVente[];
   site: SiteVente | undefined;
   erreurLots: string | null;
@@ -475,7 +479,7 @@ function EcranCourant({
     case 'paiement':
       return <EcranPaiement draft={draft} changer={changer} />;
     default:
-      return <EcranRecap draft={draft} changer={changer} />;
+      return <EcranRecap draft={draft} changer={changer} estNouvelle={estNouvelle} />;
   }
 }
 
@@ -1078,7 +1082,7 @@ function resumeCredit(draft: Draft): string {
   return `${draft.nombreEcheances ?? '?'} échéances ${rythme.toLowerCase()}${premier}`;
 }
 
-function EcranRecap({ draft, changer }: EcranProps) {
+function EcranRecap({ draft, changer, estNouvelle }: EcranProps & { estNouvelle: boolean }) {
   const [details, setDetails] = useState(false);
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
   const paiement = draft.modePaiement === 'CREDIT' ? resumeCredit(draft) : 'Au comptant';
@@ -1086,6 +1090,8 @@ function EcranRecap({ draft, changer }: EcranProps) {
   const lots = `${draft.nombreLots} lot${draft.nombreLots > 1 ? 's' : ''}`;
   const lignes = [
     ['Client', `${draft.client} · ${draft.telephone}`],
+    ['Date de vente', draft.dateSouscription === '' ? '' : formatDate(draft.dateSouscription)],
+    ...(estNouvelle ? [['Saisie', `${formatDate(aujourdhui())} (automatique)`]] : []),
     ['Site', `${draft.site} · ${lots} · ${draft.canal}`],
     ['Prix total', formatFcfa(prixTotal)],
     ['Acompte', `${formatFcfa(draft.acompte)} · ${paiement}`],
@@ -1096,6 +1102,21 @@ function EcranRecap({ draft, changer }: EcranProps) {
   ].filter((ligne): ligne is [string, string] => ligne[1] !== '');
   return (
     <Question titre="Tout est bon ?">
+      <label htmlFor="parcours-date-vente" className="flex flex-col gap-1.5">
+        <span className="text-[1rem] font-[600]">Date de vente</span>
+        <span className="text-[0.875rem] text-muted-foreground">
+          Jour où la vente a été conclue, même si vous la saisissez plus tard. La saisie est
+          horodatée automatiquement.
+        </span>
+        <Input
+          id="parcours-date-vente"
+          type="date"
+          className="h-14 max-w-64 text-[1.125rem]"
+          max={aujourdhui()}
+          value={draft.dateSouscription}
+          onChange={(e) => changer({ dateSouscription: e.target.value })}
+        />
+      </label>
       <dl className="divide-y divide-border rounded-md border border-border">
         {lignes.map(([label, valeur]) => (
           <div key={label} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
@@ -1105,16 +1126,7 @@ function EcranRecap({ draft, changer }: EcranProps) {
         ))}
       </dl>
       {details ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label htmlFor="parcours-date" className="flex flex-col gap-1 text-[0.875rem] font-[600]">
-            Date
-            <Input
-              id="parcours-date"
-              type="date"
-              value={draft.dateSouscription}
-              onChange={(e) => changer({ dateSouscription: e.target.value })}
-            />
-          </label>
+        <div className="grid gap-3 sm:grid-cols-2">
           <label
             htmlFor="parcours-numeros"
             className="flex flex-col gap-1 text-[0.875rem] font-[600]"
@@ -1147,7 +1159,7 @@ function EcranRecap({ draft, changer }: EcranProps) {
           className="self-start"
           onClick={() => setDetails(true)}
         >
-          Ajouter la date, les numéros de lots ou la superficie
+          Ajouter les numéros de lots ou la superficie
         </Button>
       )}
     </Question>

@@ -174,6 +174,7 @@ export const PERMISSIONS = [
   'rendez_vous.suivre',
   'rendez_vous.exporter',
   'rendez_vous.voir',
+  'rendez_vous.closer',
   'roles.administrer',
   'support.plateforme',
   'support.signaler',

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func TestSuiviRendezVousBetaParLaDirection(t *testing.T) {
+func TestSuiviRendezVousParLaDirection(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	direction := qualificationConnecte(t, "DIRECTION")
 	superviseur := qualificationConnecte(t, "SUPERVISEUR")
@@ -31,10 +31,6 @@ func TestSuiviRendezVousBetaParLaDirection(t *testing.T) {
 
 	chemin := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
 	honore := map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD"}
-	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, honore)
-	direction.attend(statut, http.StatusForbidden, "bêta coupée", body)
-
-	t.Setenv("BETA_SUIVI_RENDEZ_VOUS", "true")
 	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, honore)
 	superviseur.attend(statut, http.StatusForbidden, "le superviseur observe", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "REPORTE"})

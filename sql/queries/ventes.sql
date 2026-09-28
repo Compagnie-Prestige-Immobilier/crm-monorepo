@@ -108,6 +108,12 @@ SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL
 ORDER BY "dateSouscription" DESC NULLS LAST, "numero" DESC, "id" DESC
 LIMIT @limite;
 
+-- Lue par `lister` : la trace `vente.creer` date la saisie.
+-- name: SaisiesVentes :many
+SELECT "entityId", MIN("at")::timestamp AS "saisieLe" FROM "audit_logs"
+WHERE "entity" = 'vente' AND "action" = 'vente.creer' AND "entityId" = ANY(@ids::text[])
+GROUP BY "entityId";
+
 -- name: VenteParID :one
 SELECT * FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL;
 

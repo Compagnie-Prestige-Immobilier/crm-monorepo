@@ -60,8 +60,8 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'prospects.superviser': 'Régler les segments et paramètres CHUES, et requalifier une fiche.',
   'qualification.rappels': 'Reporter ou annuler ses propres rappels.',
   'referentiels.superviser': 'Modifier les listes de référence : motifs, statuts, départements.',
-  'rendez_vous.suivre':
-    'Noter l’issue d’un rendez-vous et la suite donnée après la rencontre (bêta).',
+  'rendez_vous.suivre': 'Confirmer, reporter ou annuler un rendez-vous et noter la présence.',
+  'rendez_vous.closer': 'Remplir le formulaire de closing après un rendez-vous honoré.',
   'rendez_vous.exporter':
     'Emporter les rendez-vous affichés dans un classeur Excel, filtres compris.',
   'rendez_vous.voir':

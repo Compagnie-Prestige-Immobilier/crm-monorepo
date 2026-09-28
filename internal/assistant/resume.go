@@ -182,7 +182,7 @@ func (s *service) faitsDeLaFiche(ctx context.Context, fiche *db.Prospect) (faits
 var issuesRendezVous = map[string]string{"HONORE": "honoré", "NON_HONORE": "non honoré", "REPORTE": "reporté", "": "sans issue notée"}
 
 func (s *service) rendezVousEtRappel(ctx context.Context, id string, f *faitsFiche) error {
-	rdv, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &id, Prendre: 1})
+	rdv, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &id, DebutJour: socle.DebutDuJour(s.Cfg.TimeZone), Prendre: 1})
 	if err != nil {
 		return err
 	}

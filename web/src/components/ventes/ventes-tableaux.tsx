@@ -25,7 +25,7 @@ import {
   type Vente,
   type VenteParTeleconseiller,
 } from '@/lib/data/ventes';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatDateTime } from '@/lib/format';
 
 const TABLE_CONTAINER = 'rounded-lg border border-border bg-card shadow-elev-xs';
 const TABLE_HEADER = 'bg-secondary/70 hover:bg-secondary/70';
@@ -197,7 +197,8 @@ export function TableVentes({
     <Table containerClassName={TABLE_CONTAINER}>
       <TableHeader>
         <TableRow className={TABLE_HEADER}>
-          <TableHead>Souscription</TableHead>
+          <TableHead>Date de vente</TableHead>
+          <TableHead>Saisie</TableHead>
           <TableHead>Client</TableHead>
           <TableHead>Téléconseiller</TableHead>
           <TableHead>Site</TableHead>
@@ -218,6 +219,9 @@ export function TableVentes({
           <LigneVente key={vente.id} vente={vente} onDetail={onDetail}>
             <TableCell className="whitespace-nowrap">
               {vente.dateSouscription === null ? 'Sans date' : formatDate(vente.dateSouscription)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap">
+              {vente.saisieLe === null ? '–' : formatDateTime(vente.saisieLe)}
             </TableCell>
             <TableCell>
               {onDetail === undefined ? (

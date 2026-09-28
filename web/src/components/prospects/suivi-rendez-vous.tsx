@@ -24,7 +24,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { peut, type ProspectRow } from '@/lib/types';
 
-type Issue = NonNullable<ProspectRow['rendezVousIssue']>;
+type Issue = NonNullable<ProspectRow['rendezVousIssue']> | 'REPORTE';
 type Suite = NonNullable<ProspectRow['suiteRencontre']>;
 
 const ISSUES: Record<Issue, string> = {
@@ -41,17 +41,15 @@ const SUITES: Record<Suite, string> = {
 
 /** Le résultat noté, lisible par tous ceux qui voient la fiche. */
 export function SuiviRendezVousBadges({ prospect }: { prospect: ProspectRow }) {
-  if (prospect.rendezVousIssue === null) return null;
-  const report =
-    prospect.rendezVousReporteAt === null
-      ? ''
-      : ` au ${formatDateTime(prospect.rendezVousReporteAt)}`;
+  if (prospect.rendezVousIssue === null) {
+    if (prospect.rendezVousReporteAt === null) return null;
+    return (
+      <Badge variant="outline">RV reporté au {formatDateTime(prospect.rendezVousReporteAt)}</Badge>
+    );
+  }
   return (
     <>
-      <Badge variant="outline">
-        RV {ISSUES[prospect.rendezVousIssue].toLowerCase()}
-        {report}
-      </Badge>
+      <Badge variant="outline">RV {ISSUES[prospect.rendezVousIssue].toLowerCase()}</Badge>
       {prospect.suiteRencontre === null ? null : (
         <Badge variant="outline">{SUITES[prospect.suiteRencontre]}</Badge>
       )}
