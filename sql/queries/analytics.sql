@@ -154,6 +154,8 @@ WHERE r."deletedAt" IS NULL;
 -- name: QualiteMarketing :one
 -- Ce que valent les prospects qu'un canal nous amene : ils repondent, et ils
 -- se convertissent. « Joint » exclut les deux issues qui ferment sans reponse.
+-- Un prospect est du marketing par son canal ou par le releve qui l'a apporte ;
+-- les fiches des representants et des classeurs CHUES du deploiement n'y sont pas.
 SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE p."canalProvenanceId" IS NOT NULL)::int AS avec_canal,
@@ -164,7 +166,9 @@ SELECT
   COUNT(*) FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "prospects" p
 LEFT JOIN "call_outcome_reasons" lr ON lr."id" = p."lastReasonId"
-WHERE p."deletedAt" IS NULL;
+WHERE p."deletedAt" IS NULL
+  AND (p."canalProvenanceId" IS NOT NULL
+       OR EXISTS (SELECT 1 FROM "import_jobs" j WHERE j."id" = p."importJobId" AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'));
 
 -- name: MarketingParCanal :many
 SELECT
@@ -198,6 +202,8 @@ LEFT JOIN LATERAL (
 ) dernier ON TRUE
 LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
 WHERE p."deletedAt" IS NULL
+  AND (p."canalProvenanceId" IS NOT NULL
+       OR EXISTS (SELECT 1 FROM "import_jobs" j WHERE j."id" = p."importJobId" AND j."kind" = 'PROSPECTS_GRAND_PUBLIC'))
 GROUP BY 1, 2, r."sortOrder"
 ORDER BY count DESC;
 
