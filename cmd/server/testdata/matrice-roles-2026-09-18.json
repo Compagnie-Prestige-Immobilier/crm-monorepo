@@ -728,6 +728,30 @@
   "POST /api/v1/assistant/kairos/actions/confirmer": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/assistant/kairos/actions/refuser": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/assistant/kairos/actions/annuler": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/browser.js": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/assistant": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/conversations": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/conversations/{conversation}": [
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "DELETE /api/v1/assistant/kairos/conversations/{conversation}": [
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "POST /api/v1/assistant/kairos/conversation/annuler": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/sdk/regles": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PUT /api/v1/assistant/kairos/sdk/regles": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/sdk/traitements": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/assistant/kairos/sdk/traitements": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "DELETE /api/v1/assistant/kairos/sdk/traitements/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/assistant/kairos/sdk/traitements/{id}/executions": [
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "GET /api/v1/assistant/kairos/client.js": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/assistant/kairos/lire": ["PUBLIC"],
   "POST /api/v1/assistant/questions": ["ADMIN", "DIRECTION", "SUPERVISEUR"],

@@ -29,8 +29,10 @@ func TestAssistantFluxProgressifEtAnnulation(t *testing.T) {
 			http.Error(w, "identité refusée", http.StatusUnauthorized)
 			return
 		}
-		if r.Header.Get("X-Kairos-Request-ID") != "requete-stable" {
-			t.Error("clé de rejeu perdue")
+		for nom, attendu := range map[string]string{"X-Kairos-Protocole": "1", "Last-Event-ID": "7", "X-Kairos-Request-ID": "requete-stable"} {
+			if r.Header.Get(nom) != attendu {
+				t.Errorf("en-tête de reprise perdu : %s", nom)
+			}
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte("event: texte\ndata: {\"texte\":\"Début\"}\n\n"))
@@ -55,6 +57,8 @@ func TestAssistantFluxProgressifEtAnnulation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", b.ts.URL)
 	req.Header.Set("X-Kairos-Request-ID", "requete-stable")
+	req.Header.Set("X-Kairos-Protocole", "1")
+	req.Header.Set("Last-Event-ID", "7")
 	resp, err := b.client.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -168,5 +172,46 @@ func TestAssistantLectureKairosRendRapportEtRefuseQueryModifiee(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("query modifiée acceptée : HTTP %d", resp.StatusCode)
+	}
+}
+
+func TestAssistantRelaisPersonnel(t *testing.T) {
+	b := bancAssistant(t, "ADMIN")
+	amont := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !verifierIdentiteKairo(t, r) {
+			http.Error(w, "identité refusée", http.StatusUnauthorized)
+			return
+		}
+		if r.Header.Get("Authorization") != "" {
+			t.Error("jeton administrateur transmis au SDK")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"methode": r.Method, "chemin": r.URL.RequestURI()})
+	}))
+	defer amont.Close()
+	t.Setenv("KAIRO_URL", amont.URL)
+	t.Setenv("KAIRO_SDK_SECRET", "secret-essai")
+	t.Setenv("KAIRO_WORKSPACE_ID", "1")
+	t.Setenv("KAIRO_APPLICATION", "crm")
+	for _, essai := range []struct{ methode, chemin, cible string }{
+		{"GET", "assistant", "/v1/assistant"},
+		{"GET", "conversations?avant=12", "/v1/conversations?avant=12"},
+		{"GET", "conversations/conversation-1?avant=tour-1", "/v1/conversations/conversation-1?avant=tour-1"},
+		{"DELETE", "conversations/conversation-1", "/v1/conversations/conversation-1"},
+		{"POST", "conversation/annuler", "/v1/conversation/annuler"},
+		{"GET", "sdk/regles", "/v1/sdk/regles"},
+		{"PUT", "sdk/regles", "/v1/sdk/regles"},
+		{"GET", "sdk/traitements", "/v1/sdk/traitements"},
+		{"POST", "sdk/traitements", "/v1/sdk/traitements"},
+		{"DELETE", "sdk/traitements/42", "/v1/sdk/traitements/42"},
+		{"GET", "sdk/traitements/42/executions", "/v1/sdk/traitements/42/executions"},
+	} {
+		t.Run(essai.methode+" "+essai.chemin, func(t *testing.T) {
+			statut, corps := b.appel(essai.methode, "/api/v1/assistant/kairos/"+essai.chemin, map[string]string{}, true)
+			b.attend(statut, http.StatusOK, "relais personnel", corps)
+			if corps["methode"] != essai.methode || corps["chemin"] != essai.cible {
+				t.Fatalf("relais altéré : %v", corps)
+			}
+		})
 	}
 }
