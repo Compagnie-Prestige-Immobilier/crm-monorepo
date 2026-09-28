@@ -30,10 +30,13 @@ type RendezVousObtenu struct {
 	PhoneE164                 *string `json:"phoneE164"`
 	Type                      string  `json:"type"`
 	TypeCode                  string  `json:"typeCode"`
-	Quand                     *string `json:"quand" doc:"Date du rendez-vous, telle que le rappel promis la porte."`
+	Quand                     *string `json:"quand" doc:"Date du rendez-vous : la date reportée, sinon celle du rappel promis."`
 	PrisLe                    *string `json:"prisLe"`
 	PrisPar                   string  `json:"prisPar"`
-	Issue                     string  `json:"issue" enum:",HONORE,NON_HONORE,REPORTE"`
+	Issue                     string  `json:"issue" enum:",HONORE,NON_HONORE"`
+	Confirmation              string  `json:"confirmation" enum:",CONFIRME,ANNULE"`
+	Reporte                   bool    `json:"reporte"`
+	Etape                     string  `json:"etape" enum:"A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE"`
 	Site                      string  `json:"site"`
 	SitePrix                  int64   `json:"sitePrix"`
 	PointRencontre            string  `json:"pointRencontre"`
@@ -43,7 +46,7 @@ type RendezVousObtenu struct {
 type RendezVousListInput struct {
 	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE."`
 	Search   string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
-	Issue    string `query:"issue" enum:",HONORE,NON_HONORE,REPORTE,SANS" doc:"SANS pour les rendez-vous dont la venue n'est pas encore notée."`
+	Etape    string `query:"etape" enum:",A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE"`
 	Du       string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
 	Au       string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 	Page     int32  `query:"page" minimum:"1" maximum:"10000"`
@@ -57,6 +60,7 @@ type RendezVousListOutput struct {
 		Page      int32              `json:"page"`
 		PageSize  int32              `json:"pageSize"`
 		PageCount int64              `json:"pageCount"`
+		ParEtape  map[string]int64   `json:"parEtape" doc:"Rendez-vous par étape, au type choisi, sans la recherche ni les dates."`
 	}
 }
 
@@ -75,7 +79,8 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{
 		TypeCode:  prospectVide(strings.TrimSpace(in.Type)),
 		Recherche: prospectVide(strings.TrimSpace(in.Search)),
-		Issue:     prospectVide(strings.TrimSpace(in.Issue)),
+		Etape:     prospectVide(in.Etape),
+		DebutJour: socle.DebutDuJour(s.Cfg.TimeZone),
 		Du:        du,
 		Au:        au,
 		Prendre:   taille,
@@ -93,6 +98,16 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 		}
 		out.Body.Items = append(out.Body.Items, rendezVousDe(ligne))
 	}
+	etapes, err := s.Q.RendezVousParEtape(ctx, db.RendezVousParEtapeParams{
+		DebutJour: socle.DebutDuJour(s.Cfg.TimeZone), TypeCode: prospectVide(strings.TrimSpace(in.Type)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out.Body.ParEtape = make(map[string]int64, len(etapes))
+	for _, etape := range etapes {
+		out.Body.ParEtape[etape.Etape] = etape.Nombre
+	}
 	out.Body.Page, out.Body.PageSize = page, taille
 	parPage := int64(taille)
 	out.Body.PageCount = (out.Body.Total + parPage - 1) / parPage
@@ -103,7 +118,7 @@ func rendezVousDe(l *db.RendezVousObtenusRow) RendezVousObtenu {
 	return RendezVousObtenu{
 		ID: l.ID, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: l.PhoneE164, Type: l.Type, TypeCode: l.TypeCode,
 		Quand: prospectVide(l.Quand), PrisLe: rendezVousInstant(l.LastCallAt), PrisPar: l.PrisPar,
-		Issue: l.Issue, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
+		Issue: l.Issue, Confirmation: l.Confirmation, Reporte: l.Reporte, Etape: l.Etape, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
 		PointRencontreCommentaire: l.PointRencontreCommentaire,
 	}
 }
@@ -138,7 +153,7 @@ func (s *service) rendezVousDeLaFiche(ctx context.Context, in *RendezVousFicheIn
 	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
 		return nil, err
 	}
-	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &in.ID, Prendre: 1})
+	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &in.ID, DebutJour: socle.DebutDuJour(s.Cfg.TimeZone), Prendre: 1})
 	if err != nil {
 		return nil, err
 	}

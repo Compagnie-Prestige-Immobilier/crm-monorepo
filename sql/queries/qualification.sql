@@ -246,6 +246,7 @@ UPDATE "prospects" SET
   "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
   "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById"), "rev" = "rev" + 1,
   "rendezVousIssue" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousIssue" END,
+  "rendezVousConfirmation" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousConfirmation" END,
   "rendezVousReporteAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousReporteAt" END,
   "suiteRencontre" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "suiteRencontre" END
 WHERE "id" = @id;

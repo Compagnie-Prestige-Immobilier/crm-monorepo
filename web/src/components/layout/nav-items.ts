@@ -103,9 +103,9 @@ export interface CoqueEntry {
 export const COQUES: readonly CoqueEntry[] = [
   {
     id: 'accueil',
-    label: 'Accueil',
+    label: 'Accueil & rendez-vous',
     path: '/accueil',
-    description: 'Registre des visites du comptoir',
+    description: 'Registre des visites, confirmation des rendez-vous et closing',
     acces: 'accueil.registre',
   },
   {
@@ -203,9 +203,8 @@ const SECTIONS: readonly NavSection[] = [
         href: '/accueil/rendez-vous',
         label: 'Rendez-vous',
         icon: HeartHandshakeIcon,
-        description: 'Rendez-vous obtenus au téléphone, à confirmer au comptoir',
+        description: 'Confirmer, noter la présence, remplir le closing',
         acces: 'rendez_vous.voir',
-        hidden: true,
       },
       // Les trois écrans qui suivent sont les ONGLETS du registre
       // (`visites-tabs.tsx`, monté par `accueil/layout.tsx`) : les répéter dans

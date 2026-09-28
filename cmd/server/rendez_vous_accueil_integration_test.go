@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"testing"
@@ -31,7 +32,6 @@ func prochainCreneauRvSite() time.Time {
 // Deux rendez-vous posés par un téléconseiller, un par type, au même créneau.
 func rendezVousPoses(t *testing.T) (teleconseiller *banc, fiches map[string]string, quandRV time.Time) {
 	t.Helper()
-	t.Setenv("BETA_SUIVI_RENDEZ_VOUS", "true")
 	teleconseiller = qualificationConnecte(t, "COMMERCIAL")
 	quandRV = prochainCreneauRvSite()
 	quand := quandRV.Format(time.RFC3339)
@@ -101,13 +101,13 @@ func TestRendezVousVenuesEtClasseur(t *testing.T) {
 		"/api/v1/prospects/"+fiches["RV_CPI"]+"/suivi-rendez-vous", map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD"})
 	accueil.attend(statut, http.StatusOK, "le comptoir confirme la venue", body)
 
-	// La venue notée, les deux filtres se séparent.
-	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&issue=HONORE", nil)
+	// La venue notée, les deux étapes se séparent.
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&etape=A_CLOSER", nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous honorés", body)
 	if !contientFiche(body, fiches["RV_CPI"]) || contientFiche(body, fiches["RV_SITE"]) {
-		t.Fatal("le filtre des venues ne sépare pas les fiches confirmées")
+		t.Fatal("l'étape « à closer » ne sépare pas les fiches venues")
 	}
-	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&issue=SANS", nil)
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&etape=A_CONFIRMER", nil)
 	accueil.attend(statut, http.StatusOK, "venue pas encore notée", body)
 	if contientFiche(body, fiches["RV_CPI"]) || !contientFiche(body, fiches["RV_SITE"]) {
 		t.Fatal("le filtre « à confirmer » garde une fiche déjà confirmée")
@@ -207,7 +207,6 @@ func TestRendezVousTelephoniqueSeReporte(t *testing.T) {
 // Un nouveau rendez-vous efface le sort du précédent : sinon un « Non honoré »
 // périmé continue d'exclure la fiche du filtre « à confirmer ».
 func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
-	t.Setenv("BETA_SUIVI_RENDEZ_VOUS", "true")
 	teleconseiller := qualificationConnecte(t, "COMMERCIAL")
 	accueil := qualificationConnecte(t, "ACCUEIL")
 	fiche := qualificationProspect(teleconseiller)
@@ -250,7 +249,7 @@ func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
 		t.Fatalf("un nouveau rendez-vous doit effacer l'issue précédente : issue %v, reporté %v, suite %v", issue, reporte, suite)
 	}
 
-	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&issue=SANS", nil)
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&etape=A_CONFIRMER", nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous à confirmer", body)
 	if !contientFiche(body, fiche) {
 		t.Fatal("le nouveau rendez-vous doit revenir dans le filtre « à confirmer »")
@@ -294,4 +293,82 @@ func TestReportRappelDurees(t *testing.T) {
 	b.attend(statut, http.StatusUnprocessableEntity, "durée hors liste", body)
 	statut, body = qualificationEnvoi(b, http.MethodPost, fiches["RV_CPI"]+"?duree=demain", nil)
 	b.attend(statut, http.StatusConflict, "un rendez-vous physique ne se reporte pas", body)
+}
+
+func etapeDuRendezVous(b *banc, fiche string) map[string]any {
+	b.t.Helper()
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/rendez-vous", nil)
+	b.attend(statut, http.StatusOK, "rendez-vous de la fiche", body)
+	rdv, _ := body["rendezVous"].(map[string]any)
+	return rdv
+}
+
+// Le chargé de clientèle mène le rendez-vous du report au closing ; le comptoir note la venue sans closer.
+func TestRendezVousDuReportAuClosing(t *testing.T) {
+	_, fiches, quandRV := rendezVousPoses(t)
+	fiche := fiches["RV_CPI"]
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	accueil := qualificationConnecte(t, "ACCUEIL")
+	t.Cleanup(func() {
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "rendez_vous_closings" WHERE "prospectId" = $1`, fiche)
+	})
+	suivi := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
+	closing := "/api/v1/prospects/" + fiche + "/closing"
+
+	statut, body := qualificationEnvoi(cc, http.MethodGet, listeRendezVous+"&etape=A_CONFIRMER", nil)
+	cc.attend(statut, http.StatusOK, "le CC lit les rendez-vous à confirmer", body)
+	if !contientFiche(body, fiche) {
+		t.Fatal("un rendez-vous tout juste pris doit être à confirmer")
+	}
+
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE"})
+	cc.attend(statut, http.StatusBadRequest, "report sans date", body)
+	nouvelle := quandRV.AddDate(0, 0, 3)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE", "reporteAt": nouvelle.Format(time.RFC3339)})
+	cc.attend(statut, http.StatusOK, "report daté", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CONFIRMER" || fmt.Sprint(rdv["reporte"]) != "true" ||
+		rdv["quand"] != nouvelle.Format("2006-01-02T15:04:05Z") {
+		t.Fatalf("un report renvoie à confirmer à la nouvelle date : %v", rdv)
+	}
+
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "CONFIRME"})
+	cc.attend(statut, http.StatusOK, "confirmation", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "CONFIRMES" {
+		t.Fatalf("étape après confirmation : %v", rdv)
+	}
+
+	corps := map[string]any{}
+	vides := []string{
+		"natureJuridique", "etatSite", "position", "auNomDe", "pieceIdentiteVerifiee", "paiementAcompte",
+		"origineFondsJustifiee", "freinPrincipal", "autresPromoteurs", "parrain", "chargeDeClientele", "compteRendu",
+	}
+	for _, champ := range vides {
+		corps[champ] = ""
+	}
+	corps["localite"], corps["superficie"], corps["prochaineAction"], corps["dateRelance"] = "Site test", "300 m²", "Signature du contrat", "2026-10-15"
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
+	cc.attend(statut, http.StatusUnprocessableEntity, "closing avant la venue", body)
+
+	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi, map[string]any{"issue": "HONORE"})
+	accueil.attend(statut, http.StatusOK, "le comptoir note la venue", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CLOSER" {
+		t.Fatalf("étape après la venue : %v", rdv)
+	}
+	statut, body = qualificationEnvoi(accueil, http.MethodPut, closing, corps)
+	accueil.attend(statut, http.StatusForbidden, "le comptoir ne close pas", body)
+
+	sansRelance := maps.Clone(corps)
+	sansRelance["dateRelance"] = ""
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, sansRelance)
+	cc.attend(statut, http.StatusUnprocessableEntity, "closing sans date de relance", body)
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
+	cc.attend(statut, http.StatusOK, "closing enregistré", body)
+	statut, body = qualificationEnvoi(cc, http.MethodGet, closing, nil)
+	cc.attend(statut, http.StatusOK, "closing relu", body)
+	if relu, _ := body["closing"].(map[string]any); relu["superficie"] != "300 m²" || relu["dateRelance"] != "2026-10-15" {
+		t.Fatalf("closing relu : %v", body)
+	}
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "HISTORIQUE" {
+		t.Fatalf("un rendez-vous closé passe à l'historique : %v", rdv)
+	}
 }

@@ -26,7 +26,7 @@ var (
 	Tous          = []Role{Admin, Commercial, BanqueFinance, Superviseur, Direction, Accueil, ChargeClientele}
 	Parcours      = []Role{Admin, Commercial, ChargeClientele, Superviseur, Direction}
 	Encadrement   = []Role{Admin, Superviseur, Direction}
-	Registre      = []Role{Admin, Direction, Accueil}
+	Registre      = []Role{Admin, Direction, Accueil, ChargeClientele}
 	Banque        = []Role{Admin, BanqueFinance}
 	BanqueLecture = []Role{Admin, BanqueFinance, Superviseur, Direction}
 	AdminSeul     = []Role{Admin}

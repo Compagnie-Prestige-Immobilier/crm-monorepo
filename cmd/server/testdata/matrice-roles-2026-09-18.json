@@ -72,7 +72,7 @@
     "SUPERVISEUR"
   ],
   "DELETE /api/v1/users/{id}": ["ADMIN"],
-  "DELETE /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "DELETE /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "DELETE /api/v1/visites/{id}/definitif": ["DIRECTION"],
   "GET /api/v1/admin/bases": ["ADMIN"],
   "GET /api/v1/admin/database-dump": ["ADMIN"],
@@ -207,7 +207,7 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/export/visites.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/export/visites.xlsx": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "GET /api/v1/formulaire-public/formulaire": ["PUBLIC"],
   "GET /api/v1/formulaire-public/mon-lien": [
     "ACCUEIL",
@@ -450,7 +450,7 @@
   "GET /api/v1/ventes": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/echeances-en-retard": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/classeur/fichier": ["ADMIN", "DIRECTION"],
-  "GET /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/visites": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "GET /api/v1/visites/import/{id}": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/referentiels": [
@@ -472,8 +472,8 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/visites/statistiques": ["ACCUEIL", "ADMIN", "DIRECTION"],
-  "GET /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/visites/statistiques": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
+  "GET /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "GET /health/live": ["PUBLIC"],
   "GET /health/ready": ["PUBLIC"],
   "PATCH /api/v1/bank-case-stages/{id}": ["ADMIN"],
@@ -517,7 +517,7 @@
   "PATCH /api/v1/users/{id}": ["ADMIN"],
   "PATCH /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/referentiels/{kind}/{id}": ["ADMIN", "DIRECTION"],
-  "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "POST /api/v1/admin/bases": ["ADMIN"],
   "POST /api/v1/admin/bases/{nom}/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/bases/rafraichir": ["ADMIN"],
@@ -684,7 +684,7 @@
   "POST /api/v1/support/tickets/{id}/rattacher": ["ADMIN"],
   "POST /api/v1/users": ["ADMIN"],
   "POST /api/v1/ventes/classeur": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "POST /api/v1/visites/import": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites/import/{id}/apply": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites/referentiels/{kind}": ["ADMIN", "DIRECTION"],
@@ -776,7 +776,9 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
-  "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "GET /api/v1/export/rendez-vous.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"],
-  "GET /api/v1/export/ventes-sommes-dues.xlsx": ["ADMIN", "DIRECTION"]
+  "GET /api/v1/export/ventes-sommes-dues.xlsx": ["ADMIN", "DIRECTION"],
+  "GET /api/v1/prospects/{id}/closing": ["ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
+  "PUT /api/v1/prospects/{id}/closing": ["ADMIN", "CHARGE_CLIENTELE", "DIRECTION"]
 }

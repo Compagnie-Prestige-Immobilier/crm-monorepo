@@ -784,13 +784,21 @@ WHERE "id" = @prospect_id;
 
 -- name: SuivreRendezVous :one
 UPDATE "prospects" p SET
-  "rendezVousIssue" = sqlc.arg('issue')::text,
-  "rendezVousReporteAt" = sqlc.narg('reporte_at')::timestamp,
-  "suiteRencontre" = sqlc.narg('suite')::text,
+  "rendezVousConfirmation" = CASE sqlc.arg('issue')::text
+    WHEN 'CONFIRME' THEN 'CONFIRME' WHEN 'ANNULE' THEN 'ANNULE' WHEN 'REPORTE' THEN NULL
+    ELSE p."rendezVousConfirmation" END,
+  "rendezVousIssue" = CASE
+    WHEN sqlc.arg('issue')::text IN ('HONORE', 'NON_HONORE') THEN sqlc.arg('issue')::text
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."rendezVousIssue" END,
+  "rendezVousReporteAt" = COALESCE(sqlc.narg('reporte_at')::timestamp, p."rendezVousReporteAt"),
+  "suiteRencontre" = CASE
+    WHEN sqlc.arg('issue')::text = 'HONORE' THEN sqlc.narg('suite')::text
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."suiteRencontre" END,
   "rev" = p."rev" + 1, "updatedAt" = now()
 FROM "prospects" avant
 WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
-RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant;
+RETURNING avant."rendezVousIssue" AS issue_avant, avant."rendezVousConfirmation" AS confirmation_avant,
+  avant."suiteRencontre" AS suite_avant;
 
 -- name: TelephonesDesVentes :many
 SELECT DISTINCT "telephone" FROM "ventes"
