@@ -939,6 +939,27 @@ func TestQualificationRemiseATraiterRameneLaFicheDansLaFile(t *testing.T) {
 	}
 }
 
+// Inscrite sur la plateforme après avoir été confiée, la fiche quitte la file : l'agent de la plateforme la suit.
+func TestQualificationInscritDeLaPlateformeQuitteLaFile(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); !slices.Contains(ids, fiche) {
+		t.Fatalf("avant l'inscription, la fiche est à appeler : %v", ids)
+	}
+	inscription := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		 VALUES ($1,'CHUES',$1,'Ba','Djibril','compte-adhesion-pending',$2,'{}'::jsonb,now(),now())`, inscription, fiche); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); slices.Contains(ids, fiche) {
+		t.Fatalf("inscrite sur la plateforme, la fiche sort de la file : %v", ids)
+	}
+}
+
 // Le dernier à avoir appelé requalifie depuis « Mes contacts », même quand la
 // campagne a confié la fiche à un collègue ; un tiers reste refusé.
 func TestQualificationLeDernierAppelantRequalifieSaFiche(t *testing.T) {

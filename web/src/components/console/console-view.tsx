@@ -1522,6 +1522,29 @@ function ChronoDemarre({ demarre }: { demarre: string | null }) {
   return <Chrono firstInputAt={demarre} />;
 }
 
+function AlertesDejaAppelee({ prospect }: { prospect: ProspectRow }) {
+  const classe =
+    'rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning';
+  return (
+    <>
+      {prospect.representantAppeleAt == null ? null : (
+        <div role="status" className={classe}>
+          Déjà appelée comme représentant le {formatDateTime(prospect.representantAppeleAt)}
+          {prospect.representantAppelePar == null ? '' : ` par ${prospect.representantAppelePar}`}.
+        </div>
+      )}
+      {prospect.homonymeAppeleAt == null ? null : (
+        <div role="status" className={classe}>
+          Une fiche au même nom ({formatPhone(prospect.homonymeTelephone ?? null)}) a été appelée le{' '}
+          {formatDateTime(prospect.homonymeAppeleAt)}
+          {prospect.homonymeAppelePar == null ? '' : ` par ${prospect.homonymeAppelePar}`}. Vérifiez
+          qu’il ne s’agit pas de la même personne.
+        </div>
+      )}
+    </>
+  );
+}
+
 /** L'identité de la fiche : qui on appelle, son numéro, et ce qu'on en sait. */
 function EnTeteFiche({
   prospect,
@@ -1575,15 +1598,7 @@ function EnTeteFiche({
         </p>
       )}
 
-      {prospect.representantAppeleAt == null ? null : (
-        <div
-          role="status"
-          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-        >
-          Déjà appelée comme représentant le {formatDateTime(prospect.representantAppeleAt)}
-          {prospect.representantAppelePar == null ? '' : ` par ${prospect.representantAppelePar}`}.
-        </div>
-      )}
+      <AlertesDejaAppelee prospect={prospect} />
 
       <CarteRendezVous prospect={prospect} compacte />
       {prospect.phase2Status !== 'PENDING' && prospect.phase2Status !== 'APPOINTMENT' ? (

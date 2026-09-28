@@ -153,6 +153,10 @@ SELECT "id", "phoneE164", "representantId", "projet",
 FROM "prospects" p
 WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
+-- name: ImportTelephonesInscritsPlateforme :many
+SELECT DISTINCT "phoneE164"::text FROM "inscriptions_plateforme"
+WHERE "phoneE164" = ANY(@phones::text[]) AND "disparueLe" IS NULL;
+
 -- Réglée dans Paramètres CHUES, d'où le préfixe : une liste JSON de règles.
 -- name: ImportReglesProvenance :many
 SELECT "value" FROM "app_settings" WHERE "key" = 'chues.codificationProvenances';

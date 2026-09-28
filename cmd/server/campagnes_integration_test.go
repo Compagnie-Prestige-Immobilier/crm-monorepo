@@ -537,6 +537,35 @@ func TestCampagnesSimultaneesSansFicheCommune(t *testing.T) {
 	}
 }
 
+// Inscrite sur la plateforme après sa création ici, la fiche y est suivie : aucune campagne ne la tire.
+func TestCampagneNeTirePasUnInscritDeLaPlateforme(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Feuille " + uuid.NewString()
+	libre := b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	inscrit := b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	inscription := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		 VALUES ($1,'CHUES',$1,'Sarr','Mame','compte-adhesion-pending',$2,'{}'::jsonb,now(),now())`, inscription, inscrit); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "createdById" = $1`, b.userID) })
+
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+		"name": "Campagne sans inscrit", "cible": "PROSPECTS", "prospects": map[string]any{"importFeuille": feuille},
+		"distribution": map[string]any{"teleconseillerIds": []string{b.agentA}, "fichesParJour": 10, "jours": 1},
+	})
+	b.attend(statut, http.StatusCreated, "création de la campagne", body)
+	tirees := b.compte(`SELECT count(*)::int FROM "lot_export_items" i JOIN "lots_export" l ON l."id" = i."lotId"
+		WHERE l."createdById" = $1 AND i."prospectId" = $2`, b.userID, libre)
+	if tirees != 1 || body["itemCount"] != float64(1) {
+		t.Fatalf("seule la fiche libre part en campagne : %d, itemCount %v", tirees, body["itemCount"])
+	}
+}
+
 func TestLotRefuseDoublonFiche(t *testing.T) {
 	b := nouveauBancCampagne(t, 3)
 	b.creer()

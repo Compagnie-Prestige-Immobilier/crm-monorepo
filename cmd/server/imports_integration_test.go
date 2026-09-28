@@ -847,6 +847,36 @@ func TestImportLeadsOngletOctobreCorrigeLInversion(t *testing.T) {
 	})
 }
 
+// Le classeur cite un canal publicitaire, mais le relevé d'enrôlement connaît déjà le numéro.
+func TestImportLeadsEcarteUnInscritDeLaPlateforme(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	base := time.Now().UnixNano() % 10_000_000
+	telephone := fmt.Sprintf("+22177%07d", base)
+	nomClasseur := fmt.Sprintf("Leads inscrit plateforme %d.xlsx", base)
+	b.nettoyerLeadsTest([]string{telephone}, nomClasseur)
+	inscription := uuid.NewString()
+	adminExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","phoneE164","statutDistant","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$1,'Ba','Djibril',$2,'compte-adhesion-pending','{}'::jsonb,now(),now())`, inscription, telephone)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	onglet := ongletLeadsBrutTest{nom: "Leads 28 sept 2026", lignes: [][]any{
+		{"28/09/2026", "Djibril Ba", "", "Payé", telephone, canalMetaChuesTest, ""},
+	}}
+
+	travail := b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{onglet}), nomClasseur)
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = $1`, telephone); n != 0 {
+		t.Fatalf("un inscrit de la plateforme ne doit pas devenir une fiche : %d", n)
+	}
+	b.attendRapportTest(travail, "total=1 created=0 updated=0 skipped=1 errors=0 warnings=1", map[string]float64{
+		"PROSPECT_GP_IMPORT_LIGNE_PLATEFORME": 1,
+	})
+}
+
 // Un onglet sans année relevé avant le jour qu'il annonce garde l'année courante.
 func TestImportLeadsOngletSansAnneeGardeLAnneeCourante(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")

@@ -338,3 +338,11 @@ peut notamment couvrir un deploiement de production ou une desactivation
 temporaire de tests ou de CI. Les contraintes de securite systeme, la protection
 des secrets et les actions irreversibles hors instruction explicite restent
 applicables.
+
+## Assistant Kairos : interface personnalisée
+
+Suivre `docs/plan-assistant-kairos.md` et son contrat de référence dans le dépôt
+Kairos. L’interface CRM doit conserver ses rendus métier et accéder aux mêmes
+capacités d’assistant que les widgets officiels. Réutiliser le client sans UI ;
+ne pas créer un deuxième protocole ou simuler le streaming après réception d’un
+JSON complet. Le document décrit la cible, pas des fonctionnalités déjà livrées.
