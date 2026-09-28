@@ -224,6 +224,9 @@ type Prospect struct {
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
 	RepresentantAppelePar    *string           `json:"representantAppelePar" doc:"Auteur de ce dernier appel au représentant."`
+	HomonymeTelephone        *string           `json:"homonymeTelephone" doc:"Numéro d'une autre fiche au même nom, déjà appelée."`
+	HomonymeAppeleAt         *string           `json:"homonymeAppeleAt" doc:"Dernier appel de cette fiche homonyme."`
+	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
@@ -321,6 +324,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RevueAt: prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName, RemarqueImport: p.RemarqueImport,
 		LastCallAt: prospectISOPtr(p.LastCallAt), LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
+		HomonymeTelephone: l.HomonymeTelephone, HomonymeAppeleAt: prospectISOPtr(l.HomonymeAppeleAt), HomonymeAppelePar: l.HomonymeAppelePar,
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),

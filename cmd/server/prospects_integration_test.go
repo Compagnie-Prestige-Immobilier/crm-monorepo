@@ -1055,3 +1055,22 @@ func parrainageEgal(suivi, attendu map[string]any) bool {
 	}
 	return true
 }
+
+// Une même personne a laissé deux numéros : la seconde fiche signale la première, déjà appelée.
+func TestProspectSignaleUnHomonymeDejaAppele(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	nom := "Homonyme" + uuid.NewString()[:8]
+	fiche, appelee, numero := uuid.NewString(), uuid.NewString(), qualificationNumero()
+	qualificationExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","updatedAt")
+	                      VALUES ($1,$2,'Aïssatou',$3,$4,now(),now())`, fiche, nom, qualificationNumero(), b.userID)
+	qualificationExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","updatedAt","lastCallAt","lastCallById")
+	                      VALUES ($1,'Aissatou',upper($2),$3,$4,now(),now(),now(),$4)`, appelee, nom, numero, b.userID)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" IN ($1, $2)`, fiche, appelee)
+	})
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+fiche, nil, nil)
+	b.attend(statut, http.StatusOK, "fiche", body)
+	if body["homonymeTelephone"] != numero || body["homonymeAppeleAt"] == nil {
+		t.Fatalf("l'homonyme déjà appelé doit paraître sur la fiche : %v %v", body["homonymeTelephone"], body["homonymeAppeleAt"])
+	}
+}

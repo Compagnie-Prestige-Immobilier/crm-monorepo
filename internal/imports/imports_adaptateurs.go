@@ -1124,7 +1124,11 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 	if err != nil {
 		return bilanTrancheImport{}, err
 	}
-	tri := trierGrandPublicImport(uniques, deja, dejaEmail, etat)
+	inscrits, err := inscritsPlateformeImport(ctx, q, uniques)
+	if err != nil {
+		return bilanTrancheImport{}, err
+	}
+	tri := trierGrandPublicImport(uniques, deja, dejaEmail, inscrits, etat)
 	compterFeuillesGrandPublicImport(c.feuilles, lignes, uniques, etat.premiereFeuille)
 	bilan := bilanTrancheImport{
 		ignorees: ignoreesDoublons + tri.ignorees, avertissements: append(erreursDoublons, tri.avertissements...),
@@ -1160,7 +1164,7 @@ func cleDoublonGrandPublicImport(ligne *ligneGrandPublicImport) string {
 // Sans identité ou adresse déjà prise : signalée, non écrite. Numéro connu : mis à
 // jour. Un numéro repris plus loin dans la tranche : la dernière ligne fait foi.
 func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
-	dejaEmail map[string]map[db.Projet]bool, etat *etatGrandPublicImport,
+	dejaEmail map[string]map[db.Projet]bool, inscrits map[string]bool, etat *etatGrandPublicImport,
 ) triGrandPublicImport {
 	var tri triGrandPublicImport
 	rangNouvelle := map[string]int{}
@@ -1175,7 +1179,7 @@ func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
 			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansTelephoneImport,
 				"Sans téléphone, personne ne peut appeler cette fiche : la ligne est ignorée."))
 			continue
-		case ligne.plateforme:
+		case ligne.plateforme || inscrits[telephoneConnuImport(ligne.telephone)]:
 			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(8), codePlateformeImport,
 				"Inscrit sur une plateforme d’enrôlement : le suivi s’y fait, la ligne n’entre pas dans les fiches."))
 			continue
@@ -1247,6 +1251,27 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 		}
 	}
 	return telephones, emails, nil
+}
+
+// Le classeur ne dit pas toujours qui s'est déjà inscrit : le relevé d'enrôlement le sait.
+func inscritsPlateformeImport(ctx context.Context, q *db.Queries, uniques []any) (map[string]bool, error) {
+	telephones := make([]string, 0, len(uniques))
+	for _, valeur := range uniques {
+		if ligne := valeur.(ligneGrandPublicImport); ligne.telephone != nil {
+			telephones = append(telephones, *ligne.telephone)
+		}
+	}
+	inscrits := map[string]bool{}
+	for _, lot := range lotsImport(telephones) {
+		trouves, err := q.ImportTelephonesInscritsPlateforme(ctx, lot)
+		if err != nil {
+			return nil, err
+		}
+		for _, telephone := range trouves {
+			inscrits[telephone] = true
+		}
+	}
+	return inscrits, nil
 }
 
 // Deux fiches peuvent partager une adresse, une par projet : les projets se

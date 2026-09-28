@@ -225,6 +225,11 @@ DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = $1
 DELETE FROM "inscriptions_plateforme" i WHERE i."id" = $1 AND i."projet" = $2
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id");
 
+-- name: AnnulerRappelsDesInscrits :exec
+UPDATE "scheduled_callbacks" sc SET "status" = 'CANCELLED', "updatedAt" = now()
+WHERE sc."status" = 'PENDING'
+  AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" i WHERE i."prospectId" = sc."prospectId" AND i."disparueLe" IS NULL);
+
 -- name: CandidatsParTelephone :many
 SELECT p."id", p."projet", p."phoneE164", p."whatsappE164", p."clientCreatedAt"
 FROM "prospects" p

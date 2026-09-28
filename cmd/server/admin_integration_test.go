@@ -580,6 +580,7 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 	b := adminConnecte(t)
 	telephone := adminTelephone()
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
+	rappelPromis(b, prospectID, b.userID)
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.GRAND_PUBLIC'`)
@@ -598,6 +599,9 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 		t.Fatalf("appel plateforme : jeton %q, limite %q", recu.jeton, recu.limite)
 	}
 	adminInscriptionEcrite(b, prospectID)
+	if n := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, prospectID); n != 0 {
+		t.Fatalf("la plateforme suit l'inscrit : son rappel promis ici est annulé, %d en attente", n)
+	}
 	// Rejeu : la même inscription est mise à jour, jamais redéposée.
 	adminTirage(b, 0, 1)
 
