@@ -2,86 +2,30 @@
 
 import {
   ActionBarPrimitive,
-  AssistantRuntimeProvider,
   AuiIf,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
   useAuiState,
-  useLocalRuntime,
-  type ChatModelAdapter,
-  type FeedbackAdapter,
-  type ThreadMessage,
   type ToolCallMessagePartComponent,
 } from '@assistant-ui/react';
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpIcon, SquareIcon, ThumbsUpIcon, ThumbsDownIcon } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { PucesQuestions } from '@/components/assistant/questions';
-import { ReponseRiche, type Echange } from '@/components/assistant/reponse-assistant';
+import { ReponseRiche } from '@/components/assistant/reponse-assistant';
 import { buttonVariants } from '@/components/ui/button';
 import { CLE_SUGGESTIONS, lireSuggestions } from '@/lib/data/assistant';
 
-import { CAPACITES_ASSISTANT, converser, envoyerRetour } from '@/lib/data/kairos';
+import { CAPACITES_ASSISTANT } from '@/lib/data/kairos';
+import { EvenementAssistant } from '@/components/assistant/evenements-assistant';
+import { MenuAssistant } from '@/components/assistant/menu-assistant';
 
 const APPARITION =
   'animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none';
-
-function derniereQuestion(messages: readonly ThreadMessage[]): string {
-  const partie = messages.at(-1)?.content.find((p) => p.type === 'text');
-  return partie?.type === 'text' ? partie.text.trim() : '';
-}
-
-function creerAdaptateur(conversation: string): ChatModelAdapter {
-  return {
-    async *run({ messages, abortSignal }) {
-      const question = derniereQuestion(messages);
-      const historique = messages
-        .filter((message) => message.role === 'user' || message.role === 'assistant')
-        .slice(-40)
-        .map((message) => ({
-          role: message.role as 'user' | 'assistant',
-          texte: message.content
-            .filter((partie) => partie.type === 'text')
-            .map((partie) => partie.text)
-            .join('\n'),
-        }));
-      let texte = '';
-      let echange: Echange | undefined;
-      const flux = converser(conversation, historique, abortSignal);
-      for await (const evenement of flux) {
-        if (evenement.type === 'texte') texte += evenement.texte;
-        if (evenement.type === 'resultat' && evenement.nom === 'crm_interroger') {
-          echange = { question, reponse: evenement.resultat };
-        }
-        yield {
-          content: [
-            { type: 'text' as const, text: texte },
-            ...(echange ? [{ type: 'data' as const, name: 'reponse', data: echange }] : []),
-          ],
-        };
-      }
-    },
-  };
-}
-
-export function FournisseurAssistant({ children }: { children: ReactNode }) {
-  const conversation = useMemo(() => crypto.randomUUID(), []);
-  const adaptateur = useMemo(() => creerAdaptateur(conversation), [conversation]);
-  const feedback = useMemo<FeedbackAdapter>(
-    () => ({
-      async submit({ type }) {
-        await envoyerRetour(conversation, type === 'positive');
-      },
-    }),
-    [conversation],
-  );
-  const runtime = useLocalRuntime(adaptateur, { adapters: { feedback } });
-  return <AssistantRuntimeProvider runtime={runtime}>{children}</AssistantRuntimeProvider>;
-}
 
 function Accueil() {
   const suggestions = useQuery({
@@ -147,7 +91,7 @@ function MessageAssistant({ outils }: { outils: Outils | undefined }) {
         <MessagePrimitive.Parts
           components={{
             Text: TexteAssistant,
-            data: { by_name: { reponse: ReponseRiche } },
+            data: { by_name: { reponse: ReponseRiche, kairos: EvenementAssistant } },
             tools: { by_name: outils ?? {} },
           }}
         />
@@ -200,6 +144,7 @@ export function Conversation({
       data-voix={CAPACITES_ASSISTANT.voix ? 'active' : 'desactivee'}
       className="flex h-full min-h-0 flex-col bg-background"
     >
+      {outils === undefined ? <MenuAssistant /> : null}
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         scrollToBottomOnInitialize={false}

@@ -1,6 +1,6 @@
 # CRM : interface personnalisée de l'assistant Kairos
 
-27 septembre 2026. Plan, pas implémentation livrée.
+28 septembre 2026. Implémentation en cours de réception ; mise en production à vérifier.
 
 Le contrat et la matrice de parité ont une source unique dans le dépôt Kairos :
 [`docs/plan-parite-assistant-sdk.md`](../../kairo/docs/plan-parite-assistant-sdk.md).
@@ -56,3 +56,35 @@ contexte, transmission, capture, voix ou feedback lorsqu'ils sont disponibles.
 
 L'exécution suit les six étapes du plan Kairos. La portée concerne l'assistant,
 pas une nouvelle refonte du CRM ou un remplacement de son design.
+
+## Contrat du client personnalisé
+
+La bulle charge les modules partagés `client.js` et `browser.js` au travers du
+relais authentifié du CRM. Le protocole durable v1 conserve la clé de requête et
+le curseur de reprise ; Stop appelle l’annulation explicite du tour. Une coupure
+réseau ne devient pas une seconde question. Après rechargement, l’historique
+permet de rouvrir la conversation et de reprendre son tour encore actif.
+
+Les actions proposées montrent leurs valeurs avant confirmation ; leurs états
+sont relus par Kairos. Les gestes et visites utilisent le module navigateur
+partagé. Une capture se vérifie et se masque avant le consentement au transfert.
+Les règles, tâches et journaux appartiennent à l’identité signée, sans jeton
+administrateur dans le navigateur. Les sorties de tâches restent consultables.
+
+Les options affichent les capacités et les raisons d’indisponibilité. La voix
+reste désactivée dans le CRM. Une application sans outil d’écriture ne propose
+pas de confirmation métier ; aucune écriture CRM n’est inventée pour cette UI.
+
+## Vérification reproductible
+
+Les tests Go `TestAssistantRelaisPersonnel` et
+`TestAssistantFluxProgressifEtAnnulation` vérifient méthodes, chemins, identité
+signée, protocole et curseur avec une vraie session PostgreSQL. Retirer le
+curseur fait échouer le second test.
+
+`e2e/assistant.spec.ts` couvre l’indisponibilité, les questions épinglées et les
+permissions. `e2e/assistant-kairos.spec.ts` s’active avec `KAIROS_E2E_PARITE=1`
+et un serveur Kairos de parcours PostgreSQL configuré dans l’environnement du
+serveur CRM. Il vérifie les résultats structurés, l’historique, les capacités
+et les tâches via les deux serveurs réels. Le serveur de parcours Kairos fournit
+un modèle déterministe ; aucun secret de production n’est nécessaire.

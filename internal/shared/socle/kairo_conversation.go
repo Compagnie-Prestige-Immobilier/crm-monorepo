@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func OuvrirKairo(ctx context.Context, u *Utilisateur, methode, chemin string, corps []byte, requete string) (*http.Response, error) {
+func OuvrirKairo(ctx context.Context, u *Utilisateur, methode, chemin string, corps []byte, entetes http.Header) (*http.Response, error) {
 	if !KairoConfigure() {
 		return nil, ErrIANonConfiguree
 	}
@@ -29,8 +29,10 @@ func OuvrirKairo(ctx context.Context, u *Utilisateur, methode, chemin string, co
 	}
 	req.Header.Set("X-Kairos-Identite", identite)
 	req.Header.Set("Content-Type", "application/json")
-	if requete != "" {
-		req.Header.Set("X-Kairos-Request-ID", requete)
+	for _, nom := range []string{"X-Kairos-Request-ID", "X-Kairos-Protocole", "Last-Event-ID"} {
+		if valeur := entetes.Get(nom); valeur != "" {
+			req.Header.Set(nom, valeur)
+		}
 	}
 	return clientTachesKairo.Do(req)
 }
