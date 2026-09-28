@@ -35,36 +35,35 @@ import { toastApiError } from '@/lib/mutation-feedback';
 
 const AUTRE = 'Autre, à préciser';
 
-const CHOIX = {
+const OUI_NON: readonly string[] = ['Oui', 'Non'];
+
+const CHOIX: Record<Exclude<ChampChoix, 'localite'>, readonly string[]> = {
   superficie: ['300 m²', '200 m²', '225 m²', '150 m²'],
   natureJuridique: ['Titre foncier', 'Bail', 'Notification de bail et délibération'],
   etatSite: ['Viabilisé complet', 'Viabilisé partiel', 'Loti'],
   position: ['Bordure route', 'Deuxième position', 'Angle', 'Double façade', 'Pas angle'],
-  auNomDe: ['Le prospect', 'Son conjoint', 'Un enfant', 'Un autre proche', 'Une société'],
-  pieceIdentiteVerifiee: ['Oui', 'Non'],
-  paiementAcompte: ['Payé', 'Promis', 'Non payé'],
-  origineFondsJustifiee: ['Oui', 'Non', 'En cours'],
-  freinPrincipal: [
-    'Aucun',
-    'Prix',
-    'Financement',
-    'Localisation',
-    'Nature juridique',
-    'Délai de livraison',
-    'Avis de la famille',
-  ],
-  autresPromoteurs: ['Oui', 'Non'],
-  prochaineAction: [
-    'Signature du contrat',
-    'Versement de l’acompte',
-    'Visite du site',
-    'Rappel',
-    'Dépôt du dossier bancaire',
-    'Abandon',
-  ],
-} as const;
+  auNomDe: ['Le prospect'],
+  pieceIdentiteVerifiee: OUI_NON,
+  paiementAcompte: OUI_NON,
+  origineFondsJustifiee: OUI_NON,
+  freinPrincipal: ['Prix', 'Financement'],
+  autresPromoteurs: OUI_NON,
+  prochaineAction: ['Signature du contrat', 'Rappel'],
+};
 
-type ChampChoix = keyof typeof CHOIX | 'localite';
+type ChampChoix =
+  | 'localite'
+  | 'superficie'
+  | 'natureJuridique'
+  | 'etatSite'
+  | 'position'
+  | 'auNomDe'
+  | 'pieceIdentiteVerifiee'
+  | 'paiementAcompte'
+  | 'origineFondsJustifiee'
+  | 'freinPrincipal'
+  | 'autresPromoteurs'
+  | 'prochaineAction';
 
 const SECTIONS: readonly { titre: string; champs: readonly [ChampChoix, string][] }[] = [
   {
@@ -114,7 +113,8 @@ function ChoixOuAutre({
 }) {
   const id = useId();
   const [autre, setAutre] = useState(value !== '' && !options.includes(value));
-  const items = [...options, AUTRE].map((option) => ({ value: option, label: option }));
+  const choix = options === OUI_NON ? options : [...options, AUTRE];
+  const items = choix.map((option) => ({ value: option, label: option }));
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{label}</Label>

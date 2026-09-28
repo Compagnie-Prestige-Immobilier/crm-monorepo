@@ -146,6 +146,7 @@ function Suites({
           size="sm"
           variant={aCloser ? 'default' : 'outline'}
           onClick={() => {
+            toast.dismiss();
             onCloser(fiche);
           }}
           className="gap-1.5"
