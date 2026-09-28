@@ -610,6 +610,8 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	if statut, creees, _ := b.etatTravailImport(travail); statut != "succeeded" || creees != 1 {
 		t.Fatalf("travail %s, %d créée(s)", statut, creees)
 	}
+	b.connecterImport()
+	b.exigerLeadsImportes(travail, true)
 	if courriels := b.courrielsDuBilanLeads(travail); courriels != 0 {
 		t.Fatalf("le relevé horaire doit rester silencieux : %d courriel(s)", courriels)
 	}
@@ -626,6 +628,22 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	b.releverLeadsTest(classeurLeads(t, telephone), nomClasseurLeads)
 	if travaux := b.travauxDuClasseur(nomClasseurLeads); travaux != 1 {
 		t.Fatalf("un classeur inchangé ne se rejoue pas : %d travaux", travaux)
+	}
+}
+
+// Seuls les relevés du marketing sont des leads : un classeur CHUES déposé à la
+// main vient du pôle déploiement et reste hors de la page.
+func (b *banc) exigerLeadsImportes(travail string, attendu bool) {
+	b.t.Helper()
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/leads-importes", nil, false)
+	b.attend(statut, http.StatusOK, "leads importés", body)
+	classeurs, _ := body["imports"].([]any)
+	present := false
+	for _, brut := range classeurs {
+		present = present || brut.(map[string]any)["id"] == travail
+	}
+	if present != attendu {
+		b.t.Fatalf("classeur %s parmi les leads importés : %v, attendu %v", travail, present, attendu)
 	}
 }
 
@@ -1060,6 +1078,7 @@ func TestImportProspectsRelitLeModele(t *testing.T) {
 	statut, body = b.appel(http.MethodPost, "/api/v1/imports/"+texteDe(body["id"])+"/apply", nil, true)
 	b.attend(statut, http.StatusOK, "application", body)
 	b.attendreImportReussi(texteDe(body["id"]))
+	b.exigerLeadsImportes(texteDe(body["id"]), false)
 	var phase, methode, banqueLue string
 	if err := b.pool.QueryRow(b.ctx, `SELECT "phase2Status"::text, "enrollmentMethod"::text, "banqueId" FROM "prospects" WHERE "phoneE164" = $1`,
 		telephones[0]).Scan(&phase, &methode, &banqueLue); err != nil {
