@@ -12,7 +12,13 @@ import { CheckIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Field } from '@/components/forms/field';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Pays } from '@/lib/types';
@@ -146,7 +152,10 @@ export function InternationalPhoneField({
                     >
                       <CheckIcon
                         aria-hidden="true"
-                        className={cn('size-4', country.code === callingCode ? 'opacity-100' : 'opacity-0')}
+                        className={cn(
+                          'size-4',
+                          country.code === callingCode ? 'opacity-100' : 'opacity-0',
+                        )}
                       />
                       {country.label}
                     </CommandItem>
