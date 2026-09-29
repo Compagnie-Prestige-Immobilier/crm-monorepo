@@ -22,22 +22,24 @@ import {
 } from '@/lib/data/rendez-vous';
 import { toastApiError } from '@/lib/mutation-feedback';
 
+type Listes = { sites: string[]; chargesDeClientele: string[] };
+
 function Saisie({
   question,
   value,
-  sites,
+  listes,
   autre,
   onChange,
 }: {
   question: Question;
   value: string;
-  sites: string[];
+  listes: Listes;
   autre: boolean;
   onChange: (value: string) => void;
 }) {
   const id = `closing-${question.champ}`;
   if (question.choix !== undefined) {
-    const options = question.choix === 'sites' ? sites : question.choix;
+    const options = typeof question.choix === 'string' ? listes[question.choix] : question.choix;
     return (
       <ChoixOuAutre
         label={question.label}
@@ -80,15 +82,15 @@ function Saisie({
 
 function Formulaire({
   rendezVous,
-  lu: { closing: depart, sites },
+  lu,
   onClose,
 }: {
   rendezVous: RendezVousObtenu;
-  lu: { closing: Closing; sites: string[] };
+  lu: Listes & { closing: Closing };
   onClose: () => void;
 }) {
   const client = useQueryClient();
-  const [closing, setClosing] = useState(depart);
+  const [closing, setClosing] = useState(lu.closing);
   const [etape, setEtape] = useState(0);
   const enregistrer = useMutation({
     mutationFn: () => enregistrerClosing(rendezVous.id, closing),
@@ -132,7 +134,7 @@ function Formulaire({
             key={question.champ}
             question={question}
             value={closing[question.champ]}
-            sites={sites}
+            listes={lu}
             autre={etape === 0}
             onChange={(valeur) => {
               setClosing((avant) => ({ ...avant, [question.champ]: valeur }));

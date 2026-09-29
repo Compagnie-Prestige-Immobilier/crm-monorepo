@@ -1,7 +1,13 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { flexRender, getCoreRowModel, useReactTable, type Row } from '@tanstack/react-table';
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type Row,
+} from '@tanstack/react-table';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -440,6 +446,25 @@ function filtresDesColonnes(
   );
 }
 
+// « Suivi » lit plusieurs champs : il reste affiché même sans issue de rendez-vous.
+const TOUJOURS_AFFICHEES = new Set(['nom', 'suivi']);
+
+/** Une colonne vide sur toute la page n'apporte rien : elle se masque. */
+function colonnesVides(
+  columns: readonly ColumnDef<ProspectRow>[],
+  items: readonly ProspectRow[],
+): Record<string, boolean> {
+  const masquees: Record<string, boolean> = {};
+  if (items.length === 0) return masquees;
+  for (const colonne of columns) {
+    if (colonne.id === undefined || TOUJOURS_AFFICHEES.has(colonne.id)) continue;
+    if (!('accessorKey' in colonne)) continue;
+    const cle = colonne.accessorKey as keyof ProspectRow;
+    if (items.every((item) => item[cle] === null || item[cle] === '')) masquees[colonne.id] = false;
+  }
+  return masquees;
+}
+
 function tableSourceData(data: Paginated<ProspectRow> | undefined): {
   items: ProspectRow[];
   pageCount: number;
@@ -628,6 +653,7 @@ export function ProspectsTable({
     pageCount: source.pageCount,
     state: {
       sorting: [{ id: filters.sortBy, desc: filters.sortDir === 'desc' }],
+      columnVisibility: colonnesVides(columns, source.items),
     },
   });
 
