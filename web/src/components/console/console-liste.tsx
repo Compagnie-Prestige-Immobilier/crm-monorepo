@@ -208,7 +208,7 @@ function TableauAnnuaire({
               {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
             </TableCell>
             <TableCell className="text-muted-foreground">
-              <DateRendezVous at={row.dateRendezVous} vide="—" />
+              <DateRendezVous at={row.dateRendezVous} vide="–" />
             </TableCell>
           </TableRow>
         ))}
