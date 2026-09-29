@@ -2,9 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlusIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions, usurper } from '@/api/auth';
 import { BarreSelection, FiltresComptes } from '@/components/commerciaux/commerciaux-filtres';
 import {
   type ActionsCompte,
@@ -20,6 +22,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { deleteUser, fetchUsers, setUserActive } from '@/lib/data/users';
 import { formatNumber } from '@/lib/format';
+import { homePathForRole } from '@/lib/nav';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { UserRow } from '@/lib/types';
@@ -39,6 +42,7 @@ const avecRepreneur = (handoverToId: string | undefined) =>
 
 export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { filters, setFilters } = useUserFilters();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -120,6 +124,18 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     onSettled: rafraichir,
   });
 
+  const usurpation = useMutation({
+    mutationFn: (user: UserRow) => usurper(user.id),
+    onSuccess: (compte) => {
+      queryClient.clear();
+      queryClient.setQueryData(meQueryOptions.queryKey, compte);
+      router.replace(homePathForRole(compte.role));
+    },
+    onError: (error) => {
+      toastApiError(error, 'Connexion à ce compte impossible. Réessayez.');
+    },
+  });
+
   const selection = (liste.data?.items ?? []).filter((row) => selectedIds.includes(row.id));
   const actions: ActionsCompte = {
     onEdit: (user) => {
@@ -134,8 +150,12 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     onDelete: (user) => {
       setDeleting([user]);
     },
+    onUsurper: (user) => {
+      usurpation.mutate(user);
+    },
     togglePending: toggleActive.isPending,
     removePending: remove.isPending,
+    usurperPending: usurpation.isPending,
   };
 
   return (

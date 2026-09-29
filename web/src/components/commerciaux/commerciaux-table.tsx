@@ -2,6 +2,7 @@
 
 import {
   KeyRoundIcon,
+  LogInIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PowerIcon,
@@ -36,8 +37,10 @@ export interface ActionsCompte {
   onResetPassword: (user: UserRow) => void;
   onToggleActive: (user: UserRow) => void;
   onDelete: (user: UserRow) => void;
+  onUsurper: (user: UserRow) => void;
   togglePending: boolean;
   removePending: boolean;
+  usurperPending: boolean;
 }
 
 export function CommerciauxTable({
@@ -213,6 +216,13 @@ function MenuCompte({
         <DropdownMenuItem onClick={() => actions.onResetPassword(user)}>
           <KeyRoundIcon aria-hidden="true" />
           Réinitialiser le mot de passe
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isSelf || !user.isActive || actions.usurperPending}
+          onClick={() => actions.onUsurper(user)}
+        >
+          <LogInIcon aria-hidden="true" />
+          Se connecter en tant que
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

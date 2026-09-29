@@ -1,13 +1,13 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, UserIcon } from 'lucide-react';
+import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, UndoIcon, UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { meQueryOptions } from '@/api/auth';
+import { finirUsurpation, meQueryOptions } from '@/api/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,20 @@ import type { SessionUser } from '@/lib/types';
 export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<'logout' | null>(null);
+  const [pending, setPending] = useState<'logout' | 'retour' | null>(null);
+
+  async function revenir(): Promise<void> {
+    setPending('retour');
+    try {
+      const admin = await finirUsurpation();
+      queryClient.clear();
+      queryClient.setQueryData(meQueryOptions.queryKey, admin);
+      router.replace('/admin/commerciaux');
+    } catch {
+      toast.error('Retour à votre compte impossible. Déconnectez-vous puis reconnectez-vous.');
+      setPending(null);
+    }
+  }
 
   async function signOut(): Promise<void> {
     setPending('logout');
@@ -64,6 +77,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
           {user.fullName}
         </span>
         {user.workspace === 'public' ? null : <Badge variant="warning">{user.workspace}</Badge>}
+        {user.usurpePar === null ? null : <Badge variant="warning">Usurpation</Badge>}
         <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-60">
@@ -84,6 +98,18 @@ export function UserMenu({ user }: { user: SessionUser }) {
           Mot de passe
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        {user.usurpePar === null ? null : (
+          <DropdownMenuItem
+            disabled={pending !== null}
+            closeOnClick={false}
+            onClick={() => {
+              void revenir();
+            }}
+          >
+            <UndoIcon aria-hidden="true" />
+            Revenir à mon compte
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           variant="destructive"
           disabled={pending !== null}
