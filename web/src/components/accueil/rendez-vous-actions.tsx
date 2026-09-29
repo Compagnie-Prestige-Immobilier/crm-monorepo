@@ -14,26 +14,17 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { ReporterRendezVous } from '@/components/accueil/reporter-rendez-vous';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { suivreRendezVous } from '@/lib/data/prospects';
 import { CLE_RENDEZ_VOUS, type RendezVousObtenu } from '@/lib/data/rendez-vous';
-import { dakarLocalToIso } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
 type Geste = 'CONFIRME' | 'ANNULE' | 'HONORE' | 'NON_HONORE' | 'REPORTE';
@@ -59,65 +50,13 @@ const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
 function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[] } {
   if (fiche.etape === 'A_CONFIRMER')
     return { visibles: ['CONFIRME'], menu: ['REPORTER', 'ANNULER'] };
+  if (fiche.etape === 'EN_RETARD' && fiche.confirmation === '') {
+    return { visibles: ['CONFIRME', 'HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
+  }
   if (fiche.etape === 'CONFIRMES' || fiche.etape === 'EN_RETARD') {
     return { visibles: ['HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
   }
   return { visibles: [], menu: [] };
-}
-
-function Reporter({
-  fiche,
-  pending,
-  onReporter,
-  onClose,
-}: {
-  fiche: RendezVousObtenu;
-  pending: boolean;
-  onReporter: (iso: string) => void;
-  onClose: () => void;
-}) {
-  const [local, setLocal] = useState('');
-  const iso = dakarLocalToIso(local);
-  return (
-    <Dialog
-      open
-      onOpenChange={(ouvert) => {
-        if (!ouvert) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            Reporter le rendez-vous de {fiche.prenom} {fiche.nom}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-2">
-          <Label htmlFor="rendez-vous-nouvelle-date">Nouvelle date (heure de Dakar)</Label>
-          <Input
-            id="rendez-vous-nouvelle-date"
-            type="datetime-local"
-            value={local}
-            onChange={(event) => {
-              setLocal(event.target.value);
-            }}
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Fermer
-          </Button>
-          <Button
-            disabled={iso === null || pending}
-            onClick={() => {
-              if (iso !== null) onReporter(iso);
-            }}
-          >
-            Reporter
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function Suites({
@@ -166,6 +105,36 @@ function Suites({
   );
 }
 
+function BoutonGeste({
+  bouton,
+  nom,
+  bulle,
+  pending,
+  onClick,
+}: {
+  bouton: Bouton;
+  nom: string;
+  bulle: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  const { label, Icon } = BOUTONS[bouton];
+  const principal = bouton === 'CONFIRME' || bouton === 'HONORE';
+  return (
+    <Button
+      size={bulle ? 'default' : 'sm'}
+      variant={principal ? 'default' : 'outline'}
+      disabled={pending}
+      aria-label={`${label} : ${nom}`}
+      onClick={onClick}
+      className={bulle ? 'h-11 justify-start gap-2 text-[0.9375rem]' : 'gap-1.5'}
+    >
+      <Icon className="size-4" aria-hidden="true" />
+      {label}
+    </Button>
+  );
+}
+
 export function ActionsRendezVous({
   fiche,
   peutNoter,
@@ -173,14 +142,16 @@ export function ActionsRendezVous({
   onCloser,
   onEnregistrerVisite,
   onFait,
+  bulle = false,
 }: {
   fiche: RendezVousObtenu;
   peutNoter: boolean;
   peutCloser: boolean;
   onCloser: (fiche: RendezVousObtenu) => void;
   onEnregistrerVisite: ((fiche: RendezVousObtenu) => void) | null;
-  /** L'agenda ferme sa fiche une fois le geste enregistré. */
+  /** L'agenda ferme sa bulle une fois le geste enregistré. */
   onFait?: () => void;
+  bulle?: boolean;
 }) {
   const client = useQueryClient();
   const [dialogue, setDialogue] = useState<'reporter' | 'annuler' | null>(null);
@@ -204,30 +175,26 @@ export function ActionsRendezVous({
     else if (bouton === 'ANNULER') setDialogue('annuler');
     else noter.mutate({ issue: bouton });
   };
-  const { visibles, menu } = peutNoter ? gestesDe(fiche) : { visibles: [], menu: [] };
+  const gestes = peutNoter ? gestesDe(fiche) : { visibles: [], menu: [] };
+  // En bulle, tout est à portée de clic ; en ligne, le secondaire passe dans « … ».
+  const visibles = bulle ? [...gestes.visibles, ...gestes.menu] : gestes.visibles;
+  const menu = bulle ? [] : gestes.menu;
   const nom = `${fiche.prenom} ${fiche.nom}`;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {visibles.map((bouton) => {
-        const { label, Icon } = BOUTONS[bouton];
-        return (
-          <Button
-            key={bouton}
-            size="sm"
-            variant={bouton === 'NON_HONORE' ? 'outline' : 'default'}
-            disabled={noter.isPending}
-            aria-label={`${label} : ${nom}`}
-            onClick={() => {
-              cliquer(bouton);
-            }}
-            className="gap-1.5"
-          >
-            <Icon className="size-3.5" aria-hidden="true" />
-            {label}
-          </Button>
-        );
-      })}
+    <div className={bulle ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'}>
+      {visibles.map((bouton) => (
+        <BoutonGeste
+          key={bouton}
+          bouton={bouton}
+          nom={nom}
+          bulle={bulle}
+          pending={noter.isPending}
+          onClick={() => {
+            cliquer(bouton);
+          }}
+        />
+      ))}
       <Suites
         fiche={fiche}
         peutCloser={peutCloser}
@@ -260,7 +227,7 @@ export function ActionsRendezVous({
         </DropdownMenu>
       )}
       {dialogue === 'reporter' ? (
-        <Reporter
+        <ReporterRendezVous
           fiche={fiche}
           pending={noter.isPending}
           onReporter={(reporteAt) => {

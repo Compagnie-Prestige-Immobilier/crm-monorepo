@@ -191,7 +191,7 @@ test.describe('closing par le chargé de clientèle', () => {
     await closing.getByRole('button', { name: 'Suivant' }).click();
     await closing.getByRole('button', { name: 'Suivant' }).click();
     await closing.getByRole('combobox', { name: 'Prochaine action' }).click();
-    await page.getByRole('option', { name: 'Signature du contrat' }).click();
+    await page.getByRole('option', { name: 'Signature / encaissement acompte' }).click();
     await closing.getByRole('button', { name: 'Enregistrer et fermer' }).click();
     await expect(closing).toHaveCount(0);
     await expect(ligne).toHaveCount(0);

@@ -22,14 +22,14 @@ import { suivreRendezVous } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { peut, type ProspectRow } from '@/lib/types';
+import { etatRendezVousFiche, peut, type ProspectRow } from '@/lib/types';
 
 type Issue = NonNullable<ProspectRow['rendezVousIssue']> | 'REPORTE';
 type Suite = NonNullable<ProspectRow['suiteRencontre']>;
 
 export const ISSUES: Record<Issue, string> = {
-  HONORE: 'Honoré',
-  NON_HONORE: 'Non honoré',
+  HONORE: 'Présent',
+  NON_HONORE: 'Absent',
   REPORTE: 'Reporté',
 };
 
@@ -41,15 +41,17 @@ export const SUITES: Record<Suite, string> = {
 
 /** Le résultat noté, lisible par tous ceux qui voient la fiche. */
 export function SuiviRendezVousBadges({ prospect }: { prospect: ProspectRow }) {
-  if (prospect.rendezVousIssue === null) {
-    if (prospect.rendezVousReporteAt === null) return null;
-    return (
-      <Badge variant="outline">RV reporté au {formatDateTime(prospect.rendezVousReporteAt)}</Badge>
-    );
-  }
+  if (prospect.phase2Status !== 'APPOINTMENT' && prospect.rendezVousIssue === null) return null;
+  const report =
+    prospect.rendezVousReporteAt === null
+      ? ''
+      : ` · reporté au ${formatDateTime(prospect.rendezVousReporteAt)}`;
   return (
     <>
-      <Badge variant="outline">RV {ISSUES[prospect.rendezVousIssue].toLowerCase()}</Badge>
+      <Badge variant="outline">
+        RV {etatRendezVousFiche(prospect).toLowerCase()}
+        {report}
+      </Badge>
       {prospect.suiteRencontre === null ? null : (
         <Badge variant="outline">{SUITES[prospect.suiteRencontre]}</Badge>
       )}

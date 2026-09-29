@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ChoixOuAutre } from '@/components/accueil/choix-ou-autre';
+import { ETAPES, type Question } from '@/components/accueil/closing-questions';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,75 +22,17 @@ import {
 } from '@/lib/data/rendez-vous';
 import { toastApiError } from '@/lib/mutation-feedback';
 
-const OUI_NON: readonly string[] = ['Oui', 'Non'];
-
-type Champ = keyof Closing;
-type Question = { champ: Champ; label: string; choix?: readonly string[] | 'sites'; long?: true };
-
-/** Trois écrans courts : le chargé de clientèle enregistre dès qu'il a ce qu'il sait. */
-const ETAPES: readonly { titre: string; questions: readonly Question[] }[] = [
-  {
-    titre: 'Lot',
-    questions: [
-      { champ: 'localite', label: 'Localité du lot', choix: 'sites' },
-      {
-        champ: 'superficie',
-        label: 'Superficie du lot',
-        choix: ['300 m²', '200 m²', '225 m²', '150 m²'],
-      },
-      {
-        champ: 'natureJuridique',
-        label: 'Nature juridique',
-        choix: ['Titre foncier', 'Bail', 'Notification de bail et délibération'],
-      },
-      {
-        champ: 'etatSite',
-        label: 'État du site',
-        choix: ['Viabilisé complet', 'Viabilisé partiel', 'Loti'],
-      },
-      {
-        champ: 'position',
-        label: 'Position',
-        choix: ['Bordure route', 'Deuxième position', 'Angle', 'Double façade', 'Pas angle'],
-      },
-    ],
-  },
-  {
-    titre: 'Acquéreur',
-    questions: [
-      { champ: 'auNomDe', label: 'Au nom de qui sera le bien ?', choix: ['Le prospect'] },
-      { champ: 'pieceIdentiteVerifiee', label: 'Pièce d’identité vérifiée', choix: OUI_NON },
-      { champ: 'paiementAcompte', label: 'Paiement de l’acompte', choix: OUI_NON },
-      { champ: 'origineFondsJustifiee', label: 'Origine des fonds justifiée', choix: OUI_NON },
-    ],
-  },
-  {
-    titre: 'Suivi',
-    questions: [
-      { champ: 'freinPrincipal', label: 'Frein principal', choix: ['Prix', 'Financement'] },
-      { champ: 'autresPromoteurs', label: 'A consulté d’autres promoteurs ?', choix: OUI_NON },
-      { champ: 'parrain', label: 'Parrain ou apporteur' },
-      { champ: 'chargeDeClientele', label: 'Chargé de clientèle en charge' },
-      {
-        champ: 'prochaineAction',
-        label: 'Prochaine action',
-        choix: ['Signature du contrat', 'Rappel'],
-      },
-      { champ: 'dateRelance', label: 'Date de relance' },
-      { champ: 'compteRendu', label: 'Compte-rendu de l’échange', long: true },
-    ],
-  },
-];
-
 function Saisie({
   question,
   value,
   sites,
+  autre,
   onChange,
 }: {
   question: Question;
   value: string;
   sites: string[];
+  autre: boolean;
   onChange: (value: string) => void;
 }) {
   const id = `closing-${question.champ}`;
@@ -99,7 +42,7 @@ function Saisie({
       <ChoixOuAutre
         label={question.label}
         options={options}
-        autre={options !== OUI_NON}
+        autre={autre}
         value={value}
         onChange={onChange}
       />
@@ -190,6 +133,7 @@ function Formulaire({
             question={question}
             value={closing[question.champ]}
             sites={sites}
+            autre={etape === 0}
             onChange={(valeur) => {
               setClosing((avant) => ({ ...avant, [question.champ]: valeur }));
             }}

@@ -90,11 +90,13 @@ SELECT * FROM "rendez_vous_closings" WHERE "prospectId" = @prospect_id;
 INSERT INTO "rendez_vous_closings" AS c (
   "prospectId", "localite", "superficie", "natureJuridique", "etatSite", "position", "auNomDe",
   "pieceIdentiteVerifiee", "paiementAcompte", "origineFondsJustifiee", "freinPrincipal", "autresPromoteurs",
-  "parrain", "chargeDeClientele", "prochaineAction", "dateRelance", "compteRendu", "auteurId"
+  "parrain", "chargeDeClientele", "prochaineAction", "dateRelance", "compteRendu", "auteurId",
+  "titulaires", "personnePolitiquementExposee"
 ) VALUES (
   @prospect_id, @localite, @superficie, @nature_juridique, @etat_site, @position, @au_nom_de,
   @piece_identite_verifiee, @paiement_acompte, @origine_fonds_justifiee, @frein_principal, @autres_promoteurs,
-  @parrain, @charge_de_clientele, @prochaine_action, @date_relance, @compte_rendu, @auteur_id
+  @parrain, @charge_de_clientele, @prochaine_action, @date_relance, @compte_rendu, @auteur_id,
+  @titulaires, @personne_politiquement_exposee
 )
 ON CONFLICT ("prospectId") DO UPDATE SET
   "localite" = EXCLUDED."localite", "superficie" = EXCLUDED."superficie",
@@ -105,5 +107,7 @@ ON CONFLICT ("prospectId") DO UPDATE SET
   "autresPromoteurs" = EXCLUDED."autresPromoteurs", "parrain" = EXCLUDED."parrain",
   "chargeDeClientele" = EXCLUDED."chargeDeClientele", "prochaineAction" = EXCLUDED."prochaineAction",
   "dateRelance" = EXCLUDED."dateRelance", "compteRendu" = EXCLUDED."compteRendu",
+  "titulaires" = EXCLUDED."titulaires",
+  "personnePolitiquementExposee" = EXCLUDED."personnePolitiquementExposee",
   "auteurId" = EXCLUDED."auteurId", "updatedAt" = CURRENT_TIMESTAMP
 RETURNING *;

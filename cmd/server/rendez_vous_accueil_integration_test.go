@@ -346,6 +346,7 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	vides := []string{
 		"natureJuridique", "etatSite", "position", "auNomDe", "pieceIdentiteVerifiee", "paiementAcompte",
 		"origineFondsJustifiee", "freinPrincipal", "autresPromoteurs", "parrain", "chargeDeClientele", "compteRendu",
+		"titulaires", "personnePolitiquementExposee",
 	}
 	for _, champ := range vides {
 		corps[champ] = ""

@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { getApiClient } from '@/lib/api/browser';
 import { formatDateTime, formatNumber } from '@/lib/format';
-import type { ProspectRow } from '@/lib/types';
+import { etatRendezVousFiche, type ProspectRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type RendezVous = components['schemas']['RendezVousObtenu'];
@@ -43,16 +43,19 @@ const joursEntre = (de: number, a: number): number =>
 
 function repere(quand: Date, now: number, prospect: ProspectRow) {
   const heure = quand.toISOString().slice(11, 16);
-  if (prospect.rendezVousIssue === 'HONORE') return { ton: TON.honore, texte: 'Venu' };
-  if (prospect.rendezVousIssue === 'NON_HONORE') return { ton: TON.manque, texte: 'Pas venu' };
+  const etat = etatRendezVousFiche(prospect);
+  if (prospect.rendezVousIssue === 'HONORE') return { ton: TON.honore, texte: etat };
+  if (prospect.rendezVousIssue === 'NON_HONORE' || prospect.rendezVousConfirmation === 'ANNULE') {
+    return { ton: TON.manque, texte: etat };
+  }
   const ecart = joursEntre(now, quand.getTime());
   if (ecart < 0) {
     const passe = ecart === -1 ? 'Hier' : `Il y a ${String(-ecart)} jours`;
-    return { ton: TON.anoter, texte: `${passe} · venue à noter` };
+    return { ton: TON.anoter, texte: `${passe} · présence à noter` };
   }
-  if (ecart === 0) return { ton: TON.proche, texte: `Aujourd’hui à ${heure}` };
-  if (ecart === 1) return { ton: TON.proche, texte: `Demain à ${heure}` };
-  return { ton: TON.avenir, texte: `Dans ${String(ecart)} jours` };
+  if (ecart === 0) return { ton: TON.proche, texte: `Aujourd’hui à ${heure} · ${etat}` };
+  if (ecart === 1) return { ton: TON.proche, texte: `Demain à ${heure} · ${etat}` };
+  return { ton: TON.avenir, texte: `Dans ${String(ecart)} jours · ${etat}` };
 }
 
 const titreDe = (rdv: RendezVous): string =>

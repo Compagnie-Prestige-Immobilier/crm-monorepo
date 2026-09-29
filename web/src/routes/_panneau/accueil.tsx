@@ -11,7 +11,7 @@ export const Route = createFileRoute('/_panneau/accueil')({
 /** Le layout `(panel)/accueil` de la v1. */
 function AccueilLayout() {
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6 md:pr-60">
       <VisitesTabs />
       <Outlet />
     </div>

@@ -407,9 +407,9 @@ type exportLigneProspect struct {
 func exportSuiviRendezVous(issue *string) string {
 	switch exportChaineOuVide(issue) {
 	case "HONORE":
-		return "Honoré"
+		return "Présent"
 	case "NON_HONORE":
-		return "Non honoré"
+		return "Absent"
 	case "REPORTE":
 		return "Reporté"
 	default:

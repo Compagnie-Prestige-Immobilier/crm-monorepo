@@ -231,7 +231,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Affluence et motifs de visite',
-        acces: 'accueil.registre',
+        acces: 'chiffres.disposer',
         hidden: true,
       },
       {

@@ -110,7 +110,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		HomonymeTelephone: l.HomonymeTelephone, HomonymeAppeleAt: prospectISOPtr(l.HomonymeAppeleAt), HomonymeAppelePar: l.HomonymeAppelePar,
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
-		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
+		RendezVousIssue: p.RendezVousIssue, RendezVousConfirmation: p.RendezVousConfirmation, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		// string_agg ne rend rien hors campagne : le vide devient un tiret.
 		Campagne: prospectVide(string(l.CampagneNoms)), RendezVousAt: prospectISOPtr(l.RendezVousAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),

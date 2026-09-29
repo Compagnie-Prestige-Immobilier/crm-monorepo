@@ -140,12 +140,23 @@ export const RENDEZ_VOUS_ISSUES = [
   'SANS',
 ] as const satisfies readonly (RendezVousIssue | 'SANS')[];
 
+// Les mêmes mots sur la fiche, les listes, l'agenda et l'export.
 export const RENDEZ_VOUS_ISSUE_LABELS: Record<RendezVousIssue | 'SANS', string> = {
-  HONORE: 'Honoré',
-  NON_HONORE: 'Non honoré',
+  HONORE: 'Présent',
+  NON_HONORE: 'Absent',
   REPORTE: 'Reporté',
   SANS: 'Sans suivi',
 };
+
+/** Où en est le rendez-vous d'une fiche : présence notée, sinon confirmation, sinon à confirmer. */
+export function etatRendezVousFiche(
+  prospect: Pick<ProspectRow, 'rendezVousIssue' | 'rendezVousConfirmation' | 'rendezVousReporteAt'>,
+): string {
+  if (prospect.rendezVousIssue !== null) return RENDEZ_VOUS_ISSUE_LABELS[prospect.rendezVousIssue];
+  if (prospect.rendezVousConfirmation === 'CONFIRME') return 'Confirmé';
+  if (prospect.rendezVousConfirmation === 'ANNULE') return 'Annulé';
+  return prospect.rendezVousReporteAt === null ? 'À confirmer' : 'Reporté, à confirmer';
+}
 
 export const TYPE_CONTRATS = ['CDI', 'CDD', 'AUTRE'] as const satisfies readonly TypeContrat[];
 
