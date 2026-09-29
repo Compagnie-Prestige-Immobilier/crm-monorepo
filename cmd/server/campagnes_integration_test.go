@@ -732,6 +732,17 @@ func TestAdminChangementDeRoleRetireDesCampagnes(t *testing.T) {
 func TestCampagneClasseurEtProgrammes(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	b.creer()
+	if _, err := b.pool.Exec(b.ctx, `
+		WITH fiche AS (SELECT "representantId" AS id FROM "lot_export_items" WHERE "lotId" = $1 ORDER BY "position" LIMIT 1),
+		statut AS (SELECT "id" FROM "statuts_qualification" WHERE "code" = 'A_RAPPELER'),
+		appel AS (
+			INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","comment","clientCreatedAt")
+			SELECT gen_random_uuid()::text, fiche.id, $2, statut.id, 'Rappeler après la paie', now() FROM fiche, statut)
+		UPDATE "representants" SET "lastCallAt" = now(), "lastCallById" = $2,
+			"statutQualificationId" = (SELECT id FROM statut) WHERE "id" = (SELECT id FROM fiche)`,
+		b.lotID, b.agentA); err != nil {
+		t.Fatal(err)
+	}
 
 	statut, entetes, corps := b.telechargerCampagne("/api/v1/lots-export/" + b.lotID + "/export.xlsx")
 	if statut != http.StatusOK || entetes.Get("Content-Type") != campagnes.LotMimeClasseur {
@@ -751,6 +762,14 @@ func TestCampagneClasseurEtProgrammes(t *testing.T) {
 	}
 	if lignes[1][0] != "Agent Aïda Ndoye" {
 		t.Fatalf("le classeur suit l'ordre du tourniquet : %v", lignes[1])
+	}
+	resultats := map[string]int{}
+	for _, ligne := range lignes[1:] {
+		ligne = append(ligne, make([]string, 14)...)
+		resultats[ligne[9]+" / "+ligne[12]+" / "+ligne[13]]++
+	}
+	if resultats["Non appelé / 0 / "] != 9 || resultats["À rappeler / 1 / Rappeler après la paie"] != 1 {
+		t.Fatalf("le classeur porte le résultat des appels : %v", resultats)
 	}
 }
 

@@ -395,6 +395,27 @@ var lotColonnesProspects = []struct {
 	{exports.ExportEnteteDateSaisie, 20},
 }
 
+var lotColonnesResultat = []struct {
+	entete  string
+	largeur float64
+}{
+	{"Statut de qualification", 30},
+	{"Dernier appel", 20},
+	{"Appelé par", 26},
+	{"Appels", 8},
+	{"Dernier commentaire", 60},
+}
+
+func (s *service) lotCellulesResultat(statut *string, dernierAppel *time.Time, appelePar *string,
+	appels int32, commentaire *string, styleDate int,
+) []any {
+	if dernierAppel == nil {
+		return []any{"Non appelé", "", "", int(appels), lotValeurTexte(commentaire)}
+	}
+	appel := excelize.Cell{StyleID: styleDate, Value: lotHeureMuraleDakar(*dernierAppel, s.Cfg.TimeZone)}
+	return []any{lotValeurTexte(statut), appel, lotValeurTexte(appelePar), int(appels), lotValeurTexte(commentaire)}
+}
+
 // Le classeur du lot : la répartition d'abord, la fiche ensuite. L'ordre est
 // celui du tourniquet, pas celui des positions : chacun imprime son bloc.
 func (s *service) lotEcrireClasseur(ctx context.Context, row *db.LotParIdRow, sortie huma.Context) error {
@@ -474,16 +495,17 @@ func (s *service) lotFeuilleRepresentants(ctx context.Context, id string, rang [
 		return lotOrdreImpression(rang, lignes[i].AssigneeId, lignes[i].Day, lignes[i].Position,
 			lignes[j].AssigneeId, lignes[j].Day, lignes[j].Position)
 	})
-	if err := lotEcrireEntete(flux, lotColonnesRepresentants, styleEntete); err != nil {
+	if err := lotEcrireEntete(flux, slices.Concat(lotColonnesRepresentants, lotColonnesResultat), styleEntete); err != nil {
 		return err
 	}
 	for index := range lignes {
 		ligne := &lignes[index]
-		cellules := []any{
+		cellules := slices.Concat([]any{
 			lotValeurTexte(ligne.AssigneeName), int(ligne.Day), ligne.FullName, ligne.PhoneE164,
 			ligne.Departement, lotValeurTexte(ligne.Ief), ligne.Commercial, lotValeurTexte(ligne.Notes),
 			excelize.Cell{StyleID: styleDate, Value: lotHeureMuraleDakar(ligne.ClientCreatedAt, s.Cfg.TimeZone)},
-		}
+		}, s.lotCellulesResultat(ligne.StatutQualification, ligne.LastCallAt,
+			ligne.AppelePar, ligne.NombreAppels, ligne.DernierCommentaire, styleDate))
 		if err := flux.SetRow("A"+strconv.Itoa(index+2), cellules); err != nil {
 			return err
 		}
@@ -502,17 +524,18 @@ func (s *service) lotFeuilleProspects(ctx context.Context, id string, rang []str
 		return lotOrdreImpression(rang, lignes[i].AssigneeId, lignes[i].Day, lignes[i].Position,
 			lignes[j].AssigneeId, lignes[j].Day, lignes[j].Position)
 	})
-	if err := lotEcrireEntete(flux, lotColonnesProspects, styleEntete); err != nil {
+	if err := lotEcrireEntete(flux, slices.Concat(lotColonnesProspects, lotColonnesResultat), styleEntete); err != nil {
 		return err
 	}
 	for index := range lignes {
 		ligne := &lignes[index]
-		cellules := []any{
-			lotValeurTexte(ligne.AssigneeName), int(ligne.Day), ligne.Nom, ligne.Prenom, ligne.PhoneE164,
+		cellules := slices.Concat([]any{
+			lotValeurTexte(ligne.AssigneeName), int(ligne.Day), ligne.Nom, ligne.Prenom, lotValeurTexte(ligne.PhoneE164),
 			lotValeurTexte(ligne.Banque), lotValeurTexte(ligne.Syndicat), lotValeurTexte(ligne.Representant),
 			lotValeurTexte(ligne.Departement), ligne.Commercial,
 			excelize.Cell{StyleID: styleDate, Value: lotHeureMuraleDakar(ligne.ClientCreatedAt, s.Cfg.TimeZone)},
-		}
+		}, s.lotCellulesResultat(ligne.StatutQualification, ligne.LastCallAt,
+			ligne.AppelePar, ligne.NombreAppels, ligne.DernierCommentaire, styleDate))
 		if err := flux.SetRow("A"+strconv.Itoa(index+2), cellules); err != nil {
 			return err
 		}
