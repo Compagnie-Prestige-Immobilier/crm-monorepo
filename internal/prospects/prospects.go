@@ -221,7 +221,7 @@ type Prospect struct {
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
-	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE"`
+	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
 	Campagne                 *string           `json:"campagne" doc:"Campagnes d'appels qui ont confié la fiche, dernières d'abord."`
