@@ -34,14 +34,12 @@ function TeleconseilProspectsPage() {
     <ProspectsView
       canAdminister={peut(user, 'fiches.ignorer_propriete')}
       canReassign={peut(user, 'prospects.reaffecter_tout')}
-      canExport={canExportProspects(user.role)}
-      readOnly={readsOnly(user.role)}
+      canExport={canExportProspects(user)}
+      readOnly={readsOnly(user)}
       canCreate={peut(user, 'prospects.superviser')}
-      canCreateGrandPublic={['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CHARGE_CLIENTELE'].includes(
-        user.role,
-      )}
-      campaignScoped={user.role === 'COMMERCIAL'}
-      viewerId={['ADMIN', 'DIRECTION'].includes(user.role) ? user.id : undefined}
+      canCreateGrandPublic={peut(user, 'fiches.tenir')}
+      campaignScoped={!peut(user, 'portefeuille.voir_tout')}
+      viewerId={peut(user, 'portefeuille.voir_tout') ? user.id : undefined}
     />
   );
 }

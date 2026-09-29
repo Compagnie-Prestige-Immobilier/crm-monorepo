@@ -25,7 +25,5 @@ function Loading() {
 
 /** La page `(panel)/accueil/tableau-de-bord` de la v1. */
 function TableauDeBordVisitesPage() {
-  const { user } = Route.useRouteContext();
-
-  return <DashboardVisitesView role={user.role} />;
+  return <DashboardVisitesView />;
 }

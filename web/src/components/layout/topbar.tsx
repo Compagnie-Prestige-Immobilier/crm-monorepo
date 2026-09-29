@@ -15,7 +15,6 @@ const DevRoleSwitcher =
 import {
   aPlusieursEspaces,
   coqueOf,
-  hasInbox,
   HUB_PATH,
   inboxPathFor,
   navTitle,
@@ -127,15 +126,12 @@ export function Topbar({ user }: { user: SessionUser }) {
         </div>
       ) : null}
 
-      {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à
-          ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
-          droit sur un refus de permission. */}
       {peut(user, 'support.signaler') ? (
         <div className="hidden md:block">
           <SignalerProbleme ecran={title} plateforme={peut(user, 'support.plateforme')} />
         </div>
       ) : null}
-      {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
+      {peut(user, 'panneau.acceder') ? <NotificationBell href={inboxPathFor(user)} /> : null}
       <ThemeToggle />
       <UserMenu user={user} />
     </header>

@@ -79,6 +79,7 @@ const (
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
+	PermissionFichesVoirSegment           Permission = "fiches.voir_segment"
 	PermissionFichesIgnorerPropriete      Permission = "fiches.ignorer_propriete"
 	PermissionFichesOuvrirAttribuees      Permission = "fiches.ouvrir_attribuees"
 	PermissionFichesConsignerAttribuees   Permission = "fiches.consigner_attribuees"
@@ -105,9 +106,9 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionProspectsSuperviser:      {domaineFiches, "Régler segments et paramètres CHUES, requalifier une fiche", Encadrement},
 	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
 	PermissionProspectsFusionner:       {domaineFiches, "Fusionner des fiches", []Role{Commercial, ChargeClientele, Admin}},
-	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
-	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter vers un autre téléconseiller", []Role{Admin, Superviseur}},
-	PermissionProspectsRevoir:          {domaineFiches, "Revoir une demande", []Role{ChargeClientele, Superviseur, Admin}},
+	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
+	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter vers un autre téléconseiller", Encadrement},
+	PermissionProspectsRevoir:          {domaineFiches, "Revoir une demande", []Role{ChargeClientele, Superviseur, Direction, Admin}},
 	PermissionProspectsConvertir:       {domaineFiches, "Convertir les parcours grand public", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
 	PermissionComptesAdministrer:       {domaineComptes, "Créer, modifier et désactiver les comptes", AdminSeul},
 	PermissionComptesLister:            {domaineComptes, "Lister les comptes", Encadrement},
@@ -122,12 +123,12 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionBanqueDossiers:           {domaineBanque, "Traiter les dossiers Banque & Finance", Banque},
 	PermissionBanqueLire:               {domaineBanque, "Lire les dossiers Banque & Finance", BanqueLecture},
 	PermissionAccueilRegistre:          {domaineAccueil, "Tenir le registre des visites", Registre},
-	PermissionAccueilListes:            {domaineAccueil, "Gérer les listes de visites et les imports", []Role{Admin, Direction}},
-	PermissionCampagnesGerer:           {domaineCampagnes, "Créer et modifier les campagnes", []Role{Admin, Superviseur}},
+	PermissionAccueilListes:            {domaineAccueil, "Gérer les listes de visites et les imports", Encadrement},
+	PermissionCampagnesGerer:           {domaineCampagnes, "Créer et modifier les campagnes", Encadrement},
 	PermissionChiffresDisposer:         {domaineChiffres, "Disposer le tableau de bord", []Role{Admin, Direction, Superviseur, Accueil}},
 	PermissionExportsGlobaux:           {domaineExports, "Exporter les données d'encadrement", Encadrement},
 	PermissionExportsProspects:         {domaineExports, "Exporter les prospects", Parcours},
-	PermissionExportsBanque:            {domaineExports, "Exporter Banque & Finance", []Role{Admin, BanqueFinance, Superviseur}},
+	PermissionExportsBanque:            {domaineExports, "Exporter Banque & Finance", []Role{Admin, BanqueFinance, Superviseur, Direction}},
 	PermissionExportsModeles:           {domaineExports, "Télécharger les modèles d'import", AdminSeul},
 	PermissionFormulairesAdministrer:   {"Formulaires", "Régler les champs de conversion", AdminSeul},
 	PermissionQualificationRappels:     {"Qualification", "Reporter ou annuler ses rappels", []Role{Admin, Commercial, ChargeClientele}},
@@ -135,15 +136,16 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionVentesGerer:              {"Ventes", "Saisir les ventes, déposer le classeur, régler sites et canaux", []Role{Admin, Direction}},
 	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
 	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
-	PermissionRendezVousSuivre:         {domaineRendezVous, "Confirmer, reporter ou annuler un rendez-vous et noter la présence", []Role{Admin, Direction, ChargeClientele, Accueil}},
-	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, ChargeClientele, Accueil}},
-	PermissionRendezVousCloser:         {domaineRendezVous, "Remplir le formulaire de closing après un rendez-vous", []Role{Admin, Direction, ChargeClientele}},
-	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
+	PermissionRendezVousSuivre:         {domaineRendezVous, "Confirmer, reporter ou annuler un rendez-vous et noter la présence", []Role{Admin, Direction, Superviseur, ChargeClientele, Accueil}},
+	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Superviseur, ChargeClientele, Accueil}},
+	PermissionRendezVousCloser:         {domaineRendezVous, "Remplir le formulaire de closing après un rendez-vous", []Role{Admin, Direction, Superviseur, ChargeClientele}},
+	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Superviseur, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", Encadrement},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
+	PermissionFichesVoirSegment:           {domaineFiches, "Voir le segment d'une fiche et son historique", []Role{Admin, Commercial}},
 	PermissionFichesIgnorerPropriete:      {domaineFiches, "Agir sur les rappels et identifiants des autres", AdminSeul},
 	PermissionFichesOuvrirAttribuees:      {domaineFiches, "Ouvrir une fiche attribuée à un autre téléconseiller", Encadrement},
 	PermissionFichesConsignerAttribuees:   {domaineFiches, "Consigner un appel sur une fiche attribuée à un autre téléconseiller", []Role{}},
@@ -152,7 +154,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionFichesParametresReserves:    {domaineFiches, "Régler les liens, l'adresse et les destinataires CHUES", AdminSeul},
 	PermissionDonneesVoirSupprimees:       {"Données", "Voir les données supprimées", AdminSeul},
 	PermissionChiffresVoirMontants:        {domaineChiffres, "Voir les montants", []Role{Admin, Direction}},
-	PermissionVisitesVoirArchivees:        {domaineAccueil, "Voir les visites archivées", []Role{Direction}},
+	PermissionVisitesVoirArchivees:        {domaineAccueil, "Voir les visites archivées", []Role{Direction, Superviseur}},
 	PermissionVisitesDetruire:             {domaineAccueil, "Détruire définitivement une visite archivée", []Role{Direction}},
 	PermissionBanqueVoirTousPortefeuilles: {domaineBanque, "Voir les demandes de tous les portefeuilles", AdminSeul},
 	PermissionCampagnesAttributionsToutes: {domaineCampagnes, "Voir toutes les attributions", []Role{Admin, Superviseur, Direction, BanqueFinance, Accueil}},

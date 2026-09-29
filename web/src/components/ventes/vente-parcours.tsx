@@ -453,6 +453,12 @@ function EcranCourant({
         <Question titre="Qui a suivi la vente ?">
           <div className="grid gap-3 sm:grid-cols-2">
             <ChoixPersonne
+              cle="nomTeleconseiller"
+              label="Nom du téléconseiller"
+              draft={draft}
+              changer={changer}
+            />
+            <ChoixPersonne
               cle="responsableClosing"
               label="Responsable closing"
               draft={draft}
@@ -774,7 +780,7 @@ function ChoixPersonne({
   label,
   draft,
   changer,
-}: EcranProps & { cle: 'responsableClosing'; label: string }) {
+}: EcranProps & { cle: 'nomTeleconseiller' | 'responsableClosing'; label: string }) {
   const teleconseillers = useQuery({
     queryKey: queryKeys.lotsExportTeleconseillers,
     queryFn: () => fetchTeleconseillers(),

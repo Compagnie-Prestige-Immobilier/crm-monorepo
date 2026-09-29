@@ -223,6 +223,19 @@ var routesInterditesEnDemo = map[string]bool{
 	"GET /api/v1/bank-inscriptions/{id}/piece":                     true,
 	"GET /api/v1/bank-inscriptions/{id}/pieces.zip":                true,
 	"POST /api/v1/admin/database-dump":                             true,
+	// Le profil ADMIN de démonstration s'ouvre sans mot de passe : il ne doit ni
+	// créer d'accès durable, ni changer les droits, ni effacer des données.
+	"POST /api/v1/users":                 true,
+	"PATCH /api/v1/users/{id}":           true,
+	"PUT /api/v1/users/{id}/active":      true,
+	"PUT /api/v1/users/{id}/password":    true,
+	"DELETE /api/v1/users/{id}":          true,
+	"POST /api/v1/roles":                 true,
+	"PATCH /api/v1/roles/{id}":           true,
+	"DELETE /api/v1/roles/{id}":          true,
+	"PUT /api/v1/roles/{id}/permissions": true,
+	"POST /api/v1/auth/usurpation":       true,
+	"POST /api/v1/admin/purge":           true,
 }
 
 func refusBaseDemo(w http.ResponseWriter, r *http.Request, motif, base string) bool {

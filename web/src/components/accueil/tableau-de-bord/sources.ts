@@ -2,7 +2,6 @@ import type { components } from '@crm/api-client';
 
 import { MOIS_LABELS } from '@/lib/data/visites-stats';
 import type { NamedCount } from '@/lib/types';
-import type { Role } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
@@ -425,8 +424,8 @@ const SOURCES_REGISTRE_ACCUEIL: readonly VisiteSource[] = [
   'avec-telephone',
 ];
 
-export function catalogueVisitesDe(role: Role): Readonly<Record<string, SourceDefinition>> {
-  if (role !== 'ACCUEIL') return SOURCES;
+export function catalogueVisitesDe(complet: boolean): Readonly<Record<string, SourceDefinition>> {
+  if (complet) return SOURCES;
   return Object.fromEntries(SOURCES_REGISTRE_ACCUEIL.map((source) => [source, SOURCES[source]]));
 }
 

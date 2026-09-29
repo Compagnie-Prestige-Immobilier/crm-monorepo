@@ -34,7 +34,7 @@ function TeleconseilRepresentantPage() {
       representantId={id}
       author={{ id: user.id, fullName: user.fullName }}
       canAdminister={peut(user, 'comptes.administrer')}
-      readOnly={readsOnly(user.role)}
+      readOnly={readsOnly(user)}
     />
   );
 }

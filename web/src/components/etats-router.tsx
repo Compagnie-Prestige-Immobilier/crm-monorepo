@@ -15,7 +15,7 @@ export function EcranErreur({ error, reset }: { error: unknown; reset: () => voi
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  if (error instanceof RefusPermission) return <PermissionDenied role={error.role} />;
+  if (error instanceof RefusPermission) return <PermissionDenied user={error.user} />;
 
   // `reset` seul rejoue la route sur le cache en échec : la requête doit repartir.
   const reessayer = (): void => {

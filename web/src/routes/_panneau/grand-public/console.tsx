@@ -31,11 +31,6 @@ function GrandPublicConsolePage() {
   const canCreateProspect = peut(user, 'prospects.superviser');
 
   return (
-    <ConsoleView
-      projet="GRAND_PUBLIC"
-      viewerId={user.id}
-      role={user.role}
-      canCreateProspect={canCreateProspect}
-    />
+    <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />
   );
 }

@@ -935,6 +935,7 @@ type seedFixtureUser struct {
 }
 
 var seedFixtureUsers = []seedFixtureUser{
+	{"fixture.admin@cpi.sn", "fixture.admin", "Admin Fixture", db.RoleADMIN},
 	{"fixture.awa@cpi.sn", "fixture.awa", "Awa Fixture", db.RoleCOMMERCIAL},
 	{"fixture.fatou@cpi.sn", "fixture.fatou", "Fatou Fixture", db.RoleCOMMERCIAL},
 	{"fixture.banque@cpi.sn", "fixture.banque", "Moussa Fixture", db.RoleBANQUEFINANCE},

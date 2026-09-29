@@ -149,6 +149,7 @@ const BARRES = [
       'Tableau de bord',
       'Campagnes d’appels',
       'Intéressés, hésitants et RDV',
+      'Banque & Finance',
       'Fiche représentant',
       'Fiche prospect',
       'Rappels promis',

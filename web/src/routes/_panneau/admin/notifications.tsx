@@ -1,16 +1,13 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { hasInbox, INBOX_PATH } from '@/components/layout/nav-items';
+import { INBOX_PATH } from '@/components/layout/nav-items';
 import { NotificationsView } from '@/components/notifications/notifications-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/admin/notifications')({
   beforeLoad: ({ context }) => {
-    if (context.user.role !== 'ADMIN' && hasInbox(context.user.role)) {
-      throw redirect({ href: INBOX_PATH });
-    }
-    guardPermission('notifications.administrer')({ context });
+    if (!peut(context.user, 'notifications.administrer')) throw redirect({ href: INBOX_PATH });
   },
   component: NotificationsPage,
   pendingComponent: Loading,

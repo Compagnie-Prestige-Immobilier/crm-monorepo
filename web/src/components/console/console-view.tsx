@@ -77,7 +77,6 @@ import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   type ProspectRow,
-  type Role,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -181,15 +180,12 @@ export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[
 export function ConsoleView({
   projet = null,
   viewerId,
-  role,
   origineFiltrable = false,
   canCreateProspect = false,
 }: {
   projet?: Projet | null;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
   viewerId?: string | undefined;
-  /** L'historique de la fiche cache ce que ce rôle n'a pas le droit de lire. */
-  role?: Role | undefined;
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
   origineFiltrable?: boolean | undefined;
   canCreateProspect?: boolean | undefined;
@@ -284,7 +280,7 @@ export function ConsoleView({
         prospect={ouverte.prospect}
         ouverture={ouverte.ouverture}
         projet={ouverte.prospect.projet}
-        role={role}
+        avecHistorique
         canCreateProspect={canCreateProspect}
         onAbandon={() => {
           revenir();
@@ -768,7 +764,7 @@ interface ConsignationProps {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
-  role?: Role | undefined;
+  avecHistorique?: boolean;
   canCreateProspect: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string, detailStatut?: string) => void;
@@ -782,7 +778,7 @@ export function Consignation(props: ConsignationProps) {
   return <FicheConvertie {...props} />;
 }
 
-function FicheConvertie({ prospect, projet, role, onAbandon }: ConsignationProps) {
+function FicheConvertie({ prospect, projet, avecHistorique, onAbandon }: ConsignationProps) {
   useShortcuts({
     Escape: onAbandon,
     c: () => {
@@ -804,7 +800,7 @@ function FicheConvertie({ prospect, projet, role, onAbandon }: ConsignationProps
         Fiche {prospect.statut === 'VENDU' ? 'vendue' : 'convertie'} : l’appel ne se consigne plus.
       </p>
       <PiedPas suite={null} premier disabled={false} onRetour={onAbandon} onSuite={() => {}} />
-      {role === undefined ? null : <HistoriqueFiche prospect={prospect} role={role} />}
+      {avecHistorique === true ? <HistoriqueFiche prospect={prospect} /> : null}
     </div>
   );
 }
@@ -818,7 +814,7 @@ function ConsignationPasAPas({
   prospect,
   ouverture,
   projet,
-  role,
+  avecHistorique,
   canCreateProspect,
   onAbandon,
   onEnregistre,
@@ -1185,7 +1181,7 @@ function ConsignationPasAPas({
       </section>
       {garde.dialogue}
 
-      {role === undefined ? null : <HistoriqueFiche prospect={prospect} role={role} />}
+      {avecHistorique === true ? <HistoriqueFiche prospect={prospect} /> : null}
 
       <details
         className="pointer-coarse:hidden"

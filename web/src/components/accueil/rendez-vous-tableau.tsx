@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,14 @@ const quandDe = (fiche: RendezVousObtenu): string =>
 
 const lieuDe = (fiche: RendezVousObtenu): string =>
   fiche.site === '' ? fiche.type : `${fiche.type} · ${fiche.site}`;
+
+function NomProspect({ fiche }: { fiche: RendezVousObtenu }) {
+  return (
+    <Link href={`/teleconseil/prospects/${fiche.id}`} className="font-[600] hover:underline">
+      {fiche.prenom} {fiche.nom}
+    </Link>
+  );
+}
 
 function Telephone({ fiche }: { fiche: RendezVousObtenu }) {
   if (fiche.phoneE164 === null) return null;
@@ -119,8 +128,8 @@ export function Groupes({
                       <TableCell className="whitespace-nowrap tabular-nums">
                         {quandDe(fiche)}
                       </TableCell>
-                      <TableCell className="font-[600]">
-                        {fiche.prenom} {fiche.nom}
+                      <TableCell>
+                        <NomProspect fiche={fiche} />
                       </TableCell>
                       <TableCell>
                         <Telephone fiche={fiche} />
@@ -155,9 +164,7 @@ export function Groupes({
                     className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-[600]">
-                        {fiche.prenom} {fiche.nom}
-                      </p>
+                      <NomProspect fiche={fiche} />
                       <Badge variant={etat.ton}>{etat.texte}</Badge>
                     </div>
                     <p className="text-[0.8125rem] text-muted-foreground">

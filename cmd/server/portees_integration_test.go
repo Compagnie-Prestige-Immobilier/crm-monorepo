@@ -215,7 +215,7 @@ func TestPorteeReferentielsParListe(t *testing.T) {
 		{"COMMERCIAL", http.MethodGet, "/api/v1/referentiels/bank-rejection-reasons", http.StatusForbidden},
 		{"BANQUE_FINANCE", http.MethodGet, "/api/v1/referentiels/bank-rejection-reasons", http.StatusOK},
 		{"ACCUEIL", http.MethodGet, "/api/v1/referentiels/visite-objets", http.StatusOK},
-		{"SUPERVISEUR", http.MethodPost, "/api/v1/referentiels/visite-objets", http.StatusForbidden},
+		{"COMMERCIAL", http.MethodPost, "/api/v1/referentiels/visite-objets", http.StatusForbidden},
 		{"SUPERVISEUR", http.MethodPost, "/api/v1/referentiels/regions", http.StatusNotFound},
 	}
 	for _, c := range cas {

@@ -9,7 +9,7 @@ import { peut } from '@/lib/types';
 export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
   beforeLoad: ({ context }: Contexte) => {
     if (!peut(context.user, 'rendez_vous.voir')) {
-      throw new RefusPermission(context.user.role);
+      throw new RefusPermission(context.user);
     }
   },
   component: RendezVousPage,

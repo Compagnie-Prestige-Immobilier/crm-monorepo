@@ -557,7 +557,7 @@ func TestAssistantSuggestionsEtEpingles(t *testing.T) {
 		t.Fatalf("huit questions types pour la direction, %d reçues", n)
 	}
 	for _, s := range lireSuggestions(superviseur) {
-		if outil := texteDe(objetDe(s)["outil"]); outil == "ventes" || outil == "visites" || outil == "rendez_vous" {
+		if outil := texteDe(objetDe(s)["outil"]); outil == "ventes" {
 			t.Fatalf("question type hors du rôle de la supervision : %v", s)
 		}
 	}
