@@ -489,6 +489,34 @@ func TestSupervisionActiviteDeLaFenetre(t *testing.T) {
 	analyticsNul(b, "sans appel le taux est nul, jamais 0", totaux["reachRate"])
 }
 
+// Un rendez-vous se pose en appel : seule la fiche dont le dernier appel de
+// la fenêtre porte une date compte, chez qui l'a posée.
+func TestSupervisionActiviteRendezVous(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	analyticsViderCache()
+	t.Cleanup(analyticsViderCache)
+	jeu := analyticsSemer(b)
+	joint := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	autre := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsAppel(b, joint, "REACHED")
+	analyticsAppel(b, autre, "UNREACHABLE")
+	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","method","rendezVousAt","clientCreatedAt")
+		SELECT $1,$2,$3,"id",'RDV_CPI',$4::timestamp,$4::timestamp FROM "call_outcome_reasons" WHERE "code" = 'DEMANDE_INFORMATION'`,
+		uuid.NewString(), joint, b.userID, "2026-03-15T11:00:00Z")
+	analyticsViderCache()
+
+	fenetre := "?commercialId=" + b.userID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre, nil, false)
+	b.attend(statut, http.StatusOK, "activité", body)
+	totaux := analyticsObjet(b, "totaux", body["totals"])
+	analyticsEgal(b, "rendez-vous posés", totaux["rendezVous"], 1)
+	analyticsEgal(b, "taux posés sur fiches jointes", totaux["rendezVousRate"], 100)
+
+	ligne := analyticsObjet(b, "ligne", analyticsListe(b, "une ligne par agent et par jour", body["items"], 1)[0])
+	analyticsEgal(b, "rendez-vous de la ligne", ligne["rendezVous"], 1)
+	analyticsEgal(b, "taux de la ligne", ligne["rendezVousRate"], 100)
+}
+
 func TestSupervisionCampagnesEtStock(t *testing.T) {
 	b := analyticsConnexion(t, "SUPERVISEUR")
 	jeu := analyticsSemer(b)

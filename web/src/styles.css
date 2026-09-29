@@ -1109,25 +1109,42 @@ html.dark:has([data-coque='chues']) {
 }
 
 .agenda-rendez-vous .rbc-time-view {
+  overflow: hidden;
   border-radius: 0.5rem;
   background: var(--card);
 }
 
+/* Un rendez-vous a toujours une heure : la ligne « toute la journée » ne servirait à rien. */
+.agenda-rendez-vous .rbc-allday-cell {
+  display: none;
+}
+
+.agenda-rendez-vous .rbc-header {
+  padding: 0.5rem 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.agenda-rendez-vous .rbc-timeslot-group {
+  min-height: 3.5rem;
+}
+
+.agenda-rendez-vous .rbc-day-slot .rbc-time-slot {
+  border-top-style: dashed;
+}
+
+.agenda-rendez-vous .rbc-label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
 .agenda-rendez-vous .rbc-today {
-  background: var(--muted);
+  background: color-mix(in oklab, var(--primary) 5%, transparent);
 }
 
-.agenda-rendez-vous .rbc-toolbar button {
-  color: var(--foreground);
-  border-color: var(--border);
-  min-height: 2.25rem;
-}
-
-.agenda-rendez-vous .rbc-toolbar button.rbc-active,
-.agenda-rendez-vous .rbc-toolbar button:hover {
+.agenda-rendez-vous .rbc-current-time-indicator {
   background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: none;
 }
 
 .agenda-rendez-vous .rbc-event,
@@ -1135,7 +1152,7 @@ html.dark:has([data-coque='chues']) {
   border: 0;
   border-left: 3px solid currentColor;
   border-radius: 0.375rem;
-  font-weight: 600;
+  padding: 0.25rem 0.375rem;
 }
 
 .agenda-rendez-vous .rbc-event .rbc-event-label {

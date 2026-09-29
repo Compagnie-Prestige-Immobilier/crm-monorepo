@@ -24,7 +24,7 @@ const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   // Les mêmes mots que sur les champs repliés : la pastille est ce qu'on lit
   // quand le panneau est fermé, elle ne peut pas nommer autrement.
   segment: 'Groupe (syndicat × banque)',
-  phase2Status: 'Résultat de l’appel',
+  phase2Status: 'Statut de qualification',
   enrollmentMethod: 'Comment il a adhéré',
   enrollmentCapturedById: 'Adhésion obtenue par',
   revue: 'Revue de la demande',
