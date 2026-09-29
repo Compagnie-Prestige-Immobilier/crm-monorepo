@@ -250,7 +250,7 @@ test.describe('rendez-vous site pris en console', () => {
     ).json()) as { creneaux: { quand: string; restantes: number | null }[] };
     [complet = '', libre = ''] = creneaux.filter((c) => c.restantes === 2).map((c) => c.quand);
     expect(libre, 'deux heures libres demain').not.toBe('');
-    for (const rang of [1, 2, 3]) {
+    for (const rang of [1, 2, 3, 4]) {
       const id = await creerProspect(api, {
         nom: `${nom} ${String(rang)}`,
         prenom: 'Awa',
@@ -258,7 +258,7 @@ test.describe('rendez-vous site pris en console', () => {
         projet: 'GRAND_PUBLIC',
       });
       prospects.push(id);
-      if (rang === 3) continue;
+      if (rang >= 3) continue;
       const appel = await api.post('/api/v1/phase2/call-attempts', {
         data: {
           id: randomUUID(),
@@ -298,6 +298,9 @@ test.describe('rendez-vous site pris en console', () => {
       .getByRole('button', { name: /Rendez-vous/u })
       .click();
     await page.getByRole('button', { name: /RV site/u }).click();
+    await expect(
+      page.getByLabel('Commentaire sur le point de rencontre, facultatif'),
+    ).toBeVisible();
 
     if (demain.slice(0, 7) !== new Date().toISOString().slice(0, 7)) {
       await page.getByRole('button', { name: 'Mois suivant' }).click();
@@ -315,6 +318,42 @@ test.describe('rendez-vous site pris en console', () => {
     await expect(creneauLibre).toBeEnabled();
     await creneauLibre.click();
     await expect(creneauLibre).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('un RV externe se prend à une date saisie, avec son type', async ({ page }) => {
+    await page.goto('/teleconseil/console');
+    await page.getByLabel('Quel prospect avez-vous appelé ?').fill(`${nom} 4`);
+    await page.getByRole('button', { name: new RegExp(`${nom} 4`, 'u') }).click();
+    await page
+      .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
+      .getByRole('button', { name: /Oui, elle a répondu/u })
+      .click();
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page
+      .getByRole('group', { name: 'Qu’a dit la personne ?' })
+      .getByRole('button', { name: /Rendez-vous/u })
+      .click();
+    await page.getByRole('button', { name: /RV externe/u }).click();
+
+    await expect(page.getByRole('button', { name: /Demain 9 h/u })).toHaveCount(0);
+    await page.getByLabel('Autre échéance').fill(`${demain}T10:00`);
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await expect(page.getByText('Choisissez le type avant la date.')).toBeVisible();
+    await page.getByLabel('Type de rendez-vous externe').selectOption('Autres');
+    await page.getByLabel('Autre type').fill('Mairie de Pikine');
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page.getByRole('button', { name: /^Enregistrer l’appel/u }).click();
+
+    await expect
+      .poll(async () => {
+        const [appel] = await lire<{ type: string; precision: string }>(
+          `SELECT "rvExterneType" AS type, "rvExternePrecision" AS precision
+           FROM "call_attempts" WHERE "prospectId" = $1`,
+          [prospects[3]],
+        );
+        return appel === undefined ? '' : `${appel.type} ${appel.precision}`;
+      })
+      .toBe('AUTRE Mairie de Pikine');
   });
 });
 

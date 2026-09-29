@@ -141,6 +141,35 @@ func TestRendezVousSiteSurCreneauOuvert(t *testing.T) {
 	}
 }
 
+// Un RV externe dit son type, précisé quand c'est « Autres », et la liste des rendez-vous l'affiche.
+func TestRendezVousExterneAvecSonType(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := rvSiteFiche(b)
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	rv := func(champs map[string]any) (int, map[string]any) {
+		champs["callbackAt"] = quand
+		if champs["reasonCode"] == nil {
+			champs["reasonCode"] = "RV_EXTERNE"
+		}
+		return qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, champs))
+	}
+	statut, body := rv(map[string]any{})
+	b.attend(statut, http.StatusBadRequest, "RV externe sans type", body)
+	statut, body = rv(map[string]any{"rvExterneType": "AUTRE", "rvExternePrecision": "  "})
+	b.attend(statut, http.StatusBadRequest, "« Autres » sans précision", body)
+	statut, body = rv(map[string]any{"reasonCode": "RV_CPI", "rvExterneType": "PERSONNE"})
+	b.attend(statut, http.StatusBadRequest, "type externe hors RV externe", body)
+	statut, body = rv(map[string]any{"rvExterneType": "AUTRE", "rvExternePrecision": " Mairie de Pikine "})
+	b.attend(statut, http.StatusOK, "RV externe « Autres » précisé", body)
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/rendez-vous", nil)
+	b.attend(statut, http.StatusOK, "rendez-vous de la fiche", body)
+	rdv, _ := body["rendezVous"].(map[string]any)
+	if rdv["typeCode"] != "RV_EXTERNE" || rdv["type"] != "RV externe · Autres : Mairie de Pikine" {
+		t.Fatalf("rendez-vous externe relu : %v", rdv)
+	}
+}
+
 // Le dimanche de 7 h à 8 h, une visite par heure ; les réglages d'avant reviennent à la fin du test.
 func rvSiteUneVisiteLeDimanche(t *testing.T) (site, point string) {
 	t.Helper()

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
 import { CalendrierRvSite } from '@/components/console/calendrier-rv-site';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getApiClient } from '@/lib/api/browser';
 import type { CallbackSlot } from '@/lib/data/console';
@@ -13,6 +14,7 @@ import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const CODE_RV_SITE = 'RV_SITE';
+const CODE_RV_EXTERNE = 'RV_EXTERNE';
 const CODES_RENDEZ_VOUS = new Set([
   'RENDEZ_VOUS',
   'RV_CPI',
@@ -22,13 +24,33 @@ const CODES_RENDEZ_VOUS = new Set([
 ]);
 const CLASSE_SELECT = 'h-11 rounded-md border border-input bg-background px-3 text-[0.875rem]';
 
+type TypeRvExterne = NonNullable<
+  components['schemas']['QualificationCallAttemptBody']['rvExterneType']
+>;
+
+const TYPES_RV_EXTERNE: readonly { id: TypeRvExterne; libelle: string }[] = [
+  { id: 'PERSONNE', libelle: 'Personne' },
+  { id: 'COOPERATIVE', libelle: 'Coopérative' },
+  { id: 'ENTREPRISE', libelle: 'Entreprise' },
+  { id: 'VISITE_BIEN', libelle: 'Visite bien' },
+  { id: 'AUTRE', libelle: 'Autres' },
+];
+
 interface RvSiteSaisie {
   siteId: string;
   pointRencontreId: string;
   pointRencontreCommentaire: string;
+  rvExterneType: TypeRvExterne | '';
+  rvExternePrecision: string;
 }
 
-const VIDE: RvSiteSaisie = { siteId: '', pointRencontreId: '', pointRencontreCommentaire: '' };
+const VIDE: RvSiteSaisie = {
+  siteId: '',
+  pointRencontreId: '',
+  pointRencontreCommentaire: '',
+  rvExterneType: '',
+  rvExternePrecision: '',
+};
 
 type Choix = components['schemas']['QualificationRvSiteOutputBody'];
 
@@ -44,6 +66,19 @@ function corpsRvSite(saisie: RvSiteSaisie) {
     ...(commentaire === '' ? {} : { pointRencontreCommentaire: commentaire }),
   };
 }
+
+function corpsRvExterne(saisie: RvSiteSaisie) {
+  if (saisie.rvExterneType === '') return {};
+  if (saisie.rvExterneType !== 'AUTRE') return { rvExterneType: saisie.rvExterneType };
+  return {
+    rvExterneType: saisie.rvExterneType,
+    rvExternePrecision: saisie.rvExternePrecision.trim(),
+  };
+}
+
+const rvExterneComplet = (saisie: RvSiteSaisie): boolean =>
+  saisie.rvExterneType !== '' &&
+  (saisie.rvExterneType !== 'AUTRE' || saisie.rvExternePrecision.trim() !== '');
 
 function ChampRvSite({
   id,
@@ -132,16 +167,80 @@ function ChampsRvSite({
           onChange({ pointRencontreId });
         }}
       />
+      <div className="grid gap-1.5 sm:col-span-2">
+        <Label htmlFor="rv-site-point-commentaire">
+          Commentaire sur le point de rencontre, facultatif
+        </Label>
+        <Input
+          id="rv-site-point-commentaire"
+          maxLength={500}
+          value={saisie.pointRencontreCommentaire}
+          onChange={(event) => {
+            onChange({ pointRencontreCommentaire: event.target.value });
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ChampsRvExterne({
+  saisie,
+  verifie,
+  onChange,
+}: {
+  saisie: RvSiteSaisie;
+  verifie: boolean;
+  onChange: (patch: Partial<RvSiteSaisie>) => void;
+}) {
+  const precisionManque = verifie && saisie.rvExternePrecision.trim() === '';
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <ChampRvSite
+        id="rv-externe-type"
+        libelle="Type de rendez-vous externe"
+        erreur={verifie && saisie.rvExterneType === '' ? 'Choisissez le type avant la date.' : null}
+        valeur={saisie.rvExterneType}
+        vide="Choisir un type"
+        options={TYPES_RV_EXTERNE}
+        onChange={(valeur) => {
+          onChange({
+            rvExterneType: TYPES_RV_EXTERNE.find((type) => type.id === valeur)?.id ?? '',
+          });
+        }}
+      />
+      {saisie.rvExterneType === 'AUTRE' ? (
+        <div className="grid gap-1.5">
+          <Label htmlFor="rv-externe-precision">Autre type (obligatoire)</Label>
+          <Input
+            id="rv-externe-precision"
+            required
+            maxLength={200}
+            aria-invalid={precisionManque}
+            aria-describedby={precisionManque ? 'rv-externe-precision-erreur' : undefined}
+            value={saisie.rvExternePrecision}
+            onChange={(event) => {
+              onChange({ rvExternePrecision: event.target.value });
+            }}
+          />
+          {precisionManque ? (
+            <p id="rv-externe-precision-erreur" className="text-[0.8125rem] text-destructive">
+              Précisez le type avant la date.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Ce qu'un RV site ajoute à l'appel : ses créneaux à la place des créneaux de
- * rappel, le site visité et le point de rencontre, exigés avant la date.
+ * Ce qu'un rendez-vous ajoute à l'appel, exigé avant la date : pour un RV site,
+ * ses créneaux, le site visité et le point de rencontre ; pour un RV externe, son type.
  */
 export function useRvSite(code: string | undefined) {
   const estRvSite = code === CODE_RV_SITE;
+  const estRvExterne = code === CODE_RV_EXTERNE;
   const [saisie, setSaisie] = useState<RvSiteSaisie>(VIDE);
   const [verifie, setVerifie] = useState(false);
   const choix = useQuery({
@@ -175,25 +274,27 @@ export function useRvSite(code: string | undefined) {
   /** Vrai quand rien ne manque ; sinon l'erreur s'affiche sous le champ vide. */
   const verifier = (): boolean => {
     setVerifie(true);
+    if (estRvExterne) return rvExterneComplet(saisie);
     return !estRvSite || (saisie.siteId !== '' && saisie.pointRencontreId !== '');
   };
 
-  return {
-    filtrer,
-    calendrier,
-    verifier,
-    champs: estRvSite ? (
-      <ChampsRvSite
-        choix={choix.data}
-        saisie={saisie}
-        verifie={verifie}
-        onChange={(patch) => {
-          setSaisie((avant) => ({ ...avant, ...patch }));
-        }}
-      />
-    ) : null,
-    corps: estRvSite ? corpsRvSite(saisie) : undefined,
+  const onChange = (patch: Partial<RvSiteSaisie>): void => {
+    setSaisie((avant) => ({ ...avant, ...patch }));
   };
+  let champs: ReactNode = null;
+  let corps: ReturnType<typeof corpsRvSite> | ReturnType<typeof corpsRvExterne> | undefined;
+  if (estRvSite) {
+    champs = (
+      <ChampsRvSite choix={choix.data} saisie={saisie} verifie={verifie} onChange={onChange} />
+    );
+    corps = corpsRvSite(saisie);
+  }
+  if (estRvExterne) {
+    champs = <ChampsRvExterne saisie={saisie} verifie={verifie} onChange={onChange} />;
+    corps = corpsRvExterne(saisie);
+  }
+
+  return { filtrer, calendrier, verifier, champs, corps };
 }
 
 export type RvSiteConsole = ReturnType<typeof useRvSite>;

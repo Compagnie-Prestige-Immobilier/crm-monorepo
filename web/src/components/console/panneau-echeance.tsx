@@ -12,6 +12,7 @@ export function PanneauEcheance({
   choisi,
   surDossier,
   titre,
+  champs = null,
   contenu = null,
   disabled,
   inputRef,
@@ -26,6 +27,8 @@ export function PanneauEcheance({
   choisi?: string | null;
   surDossier: boolean;
   titre?: string;
+  /** Ce que le rendez-vous exige avant sa date. */
+  champs?: React.ReactNode;
   /** Remplace créneaux et saisie libre : le calendrier d'un RV site. */
   contenu?: React.ReactNode;
   disabled: boolean;
@@ -44,6 +47,7 @@ export function PanneauEcheance({
           Vous retrouverez le dossier déjà rempli au prochain appel.
         </p>
       ) : null}
+      {champs}
       {contenu}
       <div className={cn('flex flex-wrap gap-2', contenu !== null && 'hidden')}>
         {slots.map((slot) => (
