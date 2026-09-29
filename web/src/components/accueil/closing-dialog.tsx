@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ChoixOuAutre } from '@/components/accueil/choix-ou-autre';
-import { ETAPES, type Question } from '@/components/accueil/closing-questions';
+import { etapesDe, type Question } from '@/components/accueil/closing-questions';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,29 +22,90 @@ import {
 } from '@/lib/data/rendez-vous';
 import { toastApiError } from '@/lib/mutation-feedback';
 
-type Listes = { sites: string[]; chargesDeClientele: string[] };
+type Listes = { sites: string[]; chargesDeClientele: string[]; pointsRencontre: string[] };
+
+function Cases({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  value: readonly string[];
+  onChange: (value: string[]) => void;
+}) {
+  const coches = value.filter((choix) => options.includes(choix));
+  const precision = value.find((choix) => !options.includes(choix)) ?? '';
+  const [autre, setAutre] = useState(precision !== '');
+  return (
+    <fieldset className="grid gap-2 sm:col-span-2">
+      <legend className="mb-1.5 text-[0.9375rem] font-[600]">{label}</legend>
+      <div className="flex flex-wrap gap-x-5 gap-y-1">
+        {[...options, 'Autre, à préciser'].map((option) => {
+          const estAutre = !options.includes(option);
+          return (
+            <label key={option} className="flex min-h-9 items-center gap-2 text-[0.875rem]">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--primary)]"
+                checked={estAutre ? autre : coches.includes(option)}
+                onChange={(event) => {
+                  const coche = event.target.checked;
+                  if (estAutre) {
+                    setAutre(coche);
+                    if (!coche) onChange(coches);
+                  } else {
+                    const suite = coche ? [...coches, option] : coches.filter((c) => c !== option);
+                    onChange(precision === '' ? suite : [...suite, precision]);
+                  }
+                }}
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
+      {autre ? (
+        <Input
+          className="h-9"
+          aria-label={`${label}, précision`}
+          value={precision}
+          maxLength={120}
+          onChange={(event) => {
+            const texte = event.target.value;
+            onChange(texte === '' ? coches : [...coches, texte]);
+          }}
+        />
+      ) : null}
+    </fieldset>
+  );
+}
 
 function Saisie({
   question,
   value,
   listes,
-  autre,
   onChange,
 }: {
   question: Question;
-  value: string;
+  value: string | string[];
   listes: Listes;
-  autre: boolean;
-  onChange: (value: string) => void;
+  onChange: (value: string | string[]) => void;
 }) {
   const id = `closing-${question.champ}`;
-  if (question.choix !== undefined) {
-    const options = typeof question.choix === 'string' ? listes[question.choix] : question.choix;
+  const options = typeof question.choix === 'string' ? listes[question.choix] : question.choix;
+  if (Array.isArray(value)) {
+    return (
+      <Cases label={question.label} options={options ?? []} value={value} onChange={onChange} />
+    );
+  }
+  if (options !== undefined) {
     return (
       <ChoixOuAutre
         label={question.label}
         options={options}
-        autre={autre}
+        autre={question.autre === true}
         value={value}
         onChange={onChange}
       />
@@ -68,7 +129,7 @@ function Saisie({
         <Input
           id={id}
           className="h-9"
-          type={question.champ === 'dateRelance' ? 'date' : 'text'}
+          type={question.type ?? 'text'}
           maxLength={120}
           value={value}
           onChange={(event) => {
@@ -78,6 +139,18 @@ function Saisie({
       )}
     </div>
   );
+}
+
+/** Un RV site reprend ce que la console a noté ; le closing le confirme ou le corrige. */
+function avecLaVisite(closing: Closing, rendezVous: RendezVousObtenu): Closing {
+  if (rendezVous.typeCode !== 'RV_SITE') return closing;
+  return {
+    ...closing,
+    dateVisite: closing.dateVisite || (rendezVous.quand ?? '').slice(0, 10),
+    heureVisite: closing.heureVisite || (rendezVous.quand ?? '').slice(11, 16),
+    pointRencontre: closing.pointRencontre || rendezVous.pointRencontre,
+    siteInteresse: closing.siteInteresse || rendezVous.site,
+  };
 }
 
 function Formulaire({
@@ -90,8 +163,9 @@ function Formulaire({
   onClose: () => void;
 }) {
   const client = useQueryClient();
-  const [closing, setClosing] = useState(lu.closing);
+  const [closing, setClosing] = useState(() => avecLaVisite(lu.closing, rendezVous));
   const [etape, setEtape] = useState(0);
+  const etapes = etapesDe(rendezVous.typeCode);
   const enregistrer = useMutation({
     mutationFn: () => enregistrerClosing(rendezVous.id, closing),
     onSuccess: () => {
@@ -101,8 +175,8 @@ function Formulaire({
     },
     onError: (error) => toastApiError(error, 'Le closing n’a pas été enregistré.'),
   });
-  const courante = ETAPES[etape] ?? ETAPES[0];
-  const derniere = etape === ETAPES.length - 1;
+  const courante = etapes[etape] ?? etapes[0];
+  const derniere = etape === etapes.length - 1;
 
   return (
     <form
@@ -113,7 +187,7 @@ function Formulaire({
       }}
     >
       <ol className="flex gap-1" aria-label="Étapes du closing">
-        {ETAPES.map((item, rang) => (
+        {etapes.map((item, rang) => (
           <li key={item.titre} className="flex-1">
             <button
               type="button"
@@ -129,18 +203,19 @@ function Formulaire({
         ))}
       </ol>
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-        {courante?.questions.map((question) => (
-          <Saisie
-            key={question.champ}
-            question={question}
-            value={closing[question.champ]}
-            listes={lu}
-            autre={etape === 0}
-            onChange={(valeur) => {
-              setClosing((avant) => ({ ...avant, [question.champ]: valeur }));
-            }}
-          />
-        ))}
+        {courante?.questions
+          .filter((question) => question.si?.(closing) ?? true)
+          .map((question) => (
+            <Saisie
+              key={question.champ}
+              question={question}
+              value={closing[question.champ]}
+              listes={lu}
+              onChange={(valeur) => {
+                setClosing((avant) => ({ ...avant, [question.champ]: valeur }));
+              }}
+            />
+          ))}
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
         <Button

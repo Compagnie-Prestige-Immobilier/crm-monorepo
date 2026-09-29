@@ -74,6 +74,7 @@ const LIBELLES: Record<string, string> = {
   issue: 'Rendez-vous',
   suiteRencontre: 'Suite après rencontre',
   reporteAt: 'Reporté au',
+  commentaire: 'Commentaire',
 };
 
 const PROJETS: Record<string, string> = { CHUES: 'CHUES', GRAND_PUBLIC: 'Grand Public' };
