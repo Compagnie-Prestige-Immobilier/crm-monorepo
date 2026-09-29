@@ -30,6 +30,7 @@ import {
   fetchVentesConfiguration,
   formatFcfa,
   lotsRestants,
+  mandataireDe,
   stockEpuise,
   type SiteVente,
   type Vente,
@@ -80,8 +81,17 @@ type ChampTexte =
   | 'adresseProfessionnelle'
   | 'representant'
   | 'nomTeleconseiller'
-  | 'responsableClosing';
-type Champ = { cle: ChampTexte; label: string; type?: 'email' | 'date'; placeholder?: string };
+  | 'responsableClosing'
+  | 'mandataireNom'
+  | 'mandatairePrenom'
+  | 'mandataireTelephone'
+  | 'mandataireCni';
+type Champ = {
+  cle: ChampTexte;
+  label: string;
+  type?: 'email' | 'date' | 'tel';
+  placeholder?: string;
+};
 
 const CHAMPS_IDENTITE: readonly Champ[] = [
   { cle: 'email', label: 'E-mail', type: 'email' },
@@ -91,6 +101,23 @@ const CHAMPS_IDENTITE: readonly Champ[] = [
   { cle: 'demeurantA', label: 'Demeurant à' },
   { cle: 'profession', label: 'Profession' },
   { cle: 'adresseProfessionnelle', label: 'Adresse professionnelle' },
+];
+
+const CHAMPS_MANDATAIRE: readonly Champ[] = [
+  { cle: 'mandataireNom', label: 'Nom du représentant' },
+  { cle: 'mandatairePrenom', label: 'Prénom du représentant' },
+  { cle: 'mandataireTelephone', label: 'Numéro du représentant', type: 'tel' },
+  { cle: 'mandataireCni', label: 'CNI du représentant' },
+];
+const SANS_MANDATAIRE: Patch = {
+  mandataireNom: '',
+  mandatairePrenom: '',
+  mandataireTelephone: '',
+  mandataireCni: '',
+};
+const OUI_NON: readonly [boolean, string][] = [
+  [true, 'Oui'],
+  [false, 'Non'],
 ];
 
 const CHAMPS_SUIVI: readonly Champ[] = [{ cle: 'representant', label: 'Ambassadeur' }];
@@ -173,6 +200,10 @@ function brouillonDe(vente: Vente | null): Draft {
     representant: vente.representant,
     nomTeleconseiller: vente.nomTeleconseiller,
     responsableClosing: vente.responsableClosing,
+    mandataireNom: vente.mandataireNom,
+    mandatairePrenom: vente.mandatairePrenom,
+    mandataireTelephone: vente.mandataireTelephone,
+    mandataireCni: vente.mandataireCni,
   };
 }
 
@@ -443,11 +474,7 @@ function EcranCourant({
     case 'nom':
       return <EcranNom draft={draft} changer={changer} />;
     case 'identite':
-      return (
-        <Question titre="Qui est le client ?">
-          <Champs champs={CHAMPS_IDENTITE} draft={draft} changer={changer} />
-        </Question>
-      );
+      return <EcranIdentite draft={draft} changer={changer} />;
     case 'suivi':
       return (
         <Question titre="Qui a suivi la vente ?">
@@ -773,6 +800,27 @@ function Champs({ champs, draft, changer }: EcranProps & { champs: readonly Cham
   );
 }
 
+function EcranIdentite({ draft, changer }: EcranProps) {
+  const [represente, setRepresente] = useState(() =>
+    CHAMPS_MANDATAIRE.some((champ) => (draft[champ.cle] ?? '') !== ''),
+  );
+  return (
+    <Question titre="Qui est le client ?">
+      <Champs champs={CHAMPS_IDENTITE} draft={draft} changer={changer} />
+      <Choix
+        label="Représentant"
+        options={OUI_NON}
+        valeur={represente}
+        onChoisir={(oui) => {
+          setRepresente(oui);
+          if (!oui) changer(SANS_MANDATAIRE);
+        }}
+      />
+      {represente ? <Champs champs={CHAMPS_MANDATAIRE} draft={draft} changer={changer} /> : null}
+    </Question>
+  );
+}
+
 const AUCUN = 'aucun';
 
 function ChoixPersonne({
@@ -912,7 +960,7 @@ function prochaineDate(jour: number): string {
   return `${date.getFullYear()}-${deux(date.getMonth() + 1)}-${deux(date.getDate())}`;
 }
 
-function Choix<T extends number>({
+function Choix<T extends number | boolean>({
   label,
   options,
   valeur,
@@ -924,12 +972,12 @@ function Choix<T extends number>({
   onChoisir: (valeur: T) => void;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div role="group" aria-label={label} className="flex flex-col gap-1.5">
       <span className="text-[1rem] font-[600]">{label}</span>
       <div className="flex flex-wrap gap-2">
         {options.map(([option, libelle]) => (
           <Button
-            key={option}
+            key={String(option)}
             type="button"
             variant={option === valeur ? 'default' : 'outline'}
             aria-pressed={option === valeur}
@@ -1112,6 +1160,7 @@ function EcranRecap({ draft, changer, estNouvelle }: EcranProps & { estNouvelle:
     ['Reste à payer', formatFcfa(prixTotal - draft.acompte)],
     ['Statut', soldee ? 'Soldée' : 'À solder'],
     ['Pièce', pieceDe(draft)],
+    ['Représentant', mandataireDe(draft)],
     ['Suivi', joindre([draft.representant, draft.nomTeleconseiller, draft.responsableClosing])],
   ].filter((ligne): ligne is [string, string] => ligne[1] !== '');
   return (
