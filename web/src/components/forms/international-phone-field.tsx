@@ -8,10 +8,15 @@ import {
   parsePhoneNumberFromString,
   type CountryCode,
 } from 'libphonenumber-js/min';
+import { CheckIcon } from 'lucide-react';
+import { useState } from 'react';
 
 import { Field } from '@/components/forms/field';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Pays } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 export interface CallingCountry {
   code: string;
@@ -111,29 +116,45 @@ export function InternationalPhoneField({
   onCallingCodeChange: (value: string) => void;
 }) {
   const liste = countries === undefined || countries.length === 0 ? COUNTRIES : countries;
-  // Un indicatif venu du pays de résidence peut ne pas figurer dans la liste
-  // courte : sans cette entrée, le `select` retomberait silencieusement sur +221.
-  const connu = liste.some((country) => country.code === callingCode);
-
+  const [open, setOpen] = useState(false);
+  const selected = liste.find((country) => country.code === callingCode);
   return (
     <Field label={label} required={required} error={error} description={description}>
       {(props) => (
         <div className="flex gap-2">
-          <select
-            aria-label={countryLabel}
-            value={callingCode}
-            className="h-11 rounded-md border border-input bg-background px-3 text-[0.875rem]"
-            onChange={(event) => {
-              onCallingCodeChange(event.target.value);
-            }}
-          >
-            {connu ? null : <option value={callingCode}>+{callingCode}</option>}
-            {liste.map((country) => (
-              <option key={country.code} value={country.code}>
-                {country.label}
-              </option>
-            ))}
-          </select>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger
+              aria-label={countryLabel}
+              aria-expanded={open}
+              className="h-11 shrink-0 rounded-md border border-input bg-background px-3 text-[0.875rem]"
+            >
+              {selected?.label ?? `+${callingCode}`}⌄
+            </PopoverTrigger>
+            <PopoverContent className="w-64 overflow-hidden p-0">
+              <Command>
+                <CommandInput placeholder="Chercher un pays ou un indicatif…" />
+                <CommandEmpty>Aucun pays trouvé.</CommandEmpty>
+                <CommandList>
+                  {liste.map((country) => (
+                    <CommandItem
+                      key={country.code}
+                      value={`${country.label} ${country.code}`}
+                      onSelect={() => {
+                        onCallingCodeChange(country.code);
+                        setOpen(false);
+                      }}
+                    >
+                      <CheckIcon
+                        aria-hidden="true"
+                        className={cn('size-4', country.code === callingCode ? 'opacity-100' : 'opacity-0')}
+                      />
+                      {country.label}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <Input
             {...props}
             value={value}
@@ -143,9 +164,18 @@ export function InternationalPhoneField({
             placeholder={placeholder}
             onChange={(event) => {
               const saisie = event.target.value;
+              const international = saisie.trim().replace(/^00/u, '+');
+              const parsed = international.startsWith('+')
+                ? parsePhoneNumberFromString(international)
+                : undefined;
+              if (parsed !== undefined) onCallingCodeChange(parsed.countryCallingCode);
               // Le masque ne s'applique qu'à la frappe : reformater une suppression
               // remettrait le séparateur que le retour arrière vient d'enlever.
-              onChange(saisie.length > value.length ? masquer(saisie, callingCode) : saisie);
+              onChange(
+                saisie.length > value.length
+                  ? masquer(saisie, parsed?.countryCallingCode ?? callingCode)
+                  : saisie,
+              );
             }}
           />
         </div>

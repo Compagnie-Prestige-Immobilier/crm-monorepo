@@ -465,6 +465,16 @@ func TestUsurpation(t *testing.T) {
 	b.attend(statut, http.StatusForbidden, "usurpation de soi", body)
 	adminExec(b, `UPDATE "users" SET "lastLoginAt" = NULL WHERE "id" = $1`, cibleID)
 
+	horsPanneauID, _ := adminCompte(b, "COMMERCIAL")
+	role := "HORS_PANNEAU_" + strings.ToUpper(uuid.NewString()[:8])
+	adminExec(b, `INSERT INTO "roles" ("id","libelle","roleDeBase") VALUES ($1,$1,'COMMERCIAL')`, role)
+	adminExec(b, `UPDATE "users" SET "roleId" = $1 WHERE "id" = $2`, role, horsPanneauID)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "roles" WHERE "id" = $1`, role) })
+	statut, body = usurper(b, horsPanneauID)
+	b.attend(statut, http.StatusForbidden, "usurpation d'un compte sans accès au panneau", body)
+	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
+	b.attend(statut, http.StatusOK, "l'administrateur reste connecté après un refus", body)
+
 	statut, body = usurper(b, cibleID)
 	b.attend(statut, http.StatusOK, "usurpation", body)
 	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)

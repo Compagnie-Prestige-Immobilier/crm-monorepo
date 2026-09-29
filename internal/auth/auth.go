@@ -182,12 +182,12 @@ func (s *service) usurper(ctx context.Context, in *UsurpationInput) (*SessionOut
 	if !cible.IsActive {
 		return nil, socle.Problem(http.StatusConflict, "ACCOUNT_DISABLED", "Ce compte est désactivé.")
 	}
-	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton(ctx))); err != nil {
-		return nil, err
-	}
 	u := db.UserForLoginRow(cible)
 	out, err := s.ouvrirSession(ctx, in.UserAgent, &u, &admin.ID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton(ctx))); err != nil {
 		return nil, err
 	}
 	slog.Info("usurpation", "adminId", admin.ID, "userId", cible.ID, "username", cible.Username)
