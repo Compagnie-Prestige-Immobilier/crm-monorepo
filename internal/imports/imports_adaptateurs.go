@@ -971,8 +971,8 @@ func identiteGrandPublicImport(cellules map[string]string, numero int, etat *eta
 	return nom, prenom, telephone, nil
 }
 
-// Seul le pays refuse la ligne : l'employeur retombe en texte libre, ce que la
-// fiche prévoit déjà.
+// L'employeur et le pays inconnus ne refusent pas la ligne : le classeur du
+// marketing écrit souvent une ville à la place du pays, et le lead serait perdu.
 func completerSituationGrandPublicImport(ligne *ligneGrandPublicImport, cellules map[string]string, numero int, etat *etatGrandPublicImport) *erreurLigneImport {
 	brutEmployeur := cellules[enteteGrandPublicImport(9)]
 	if identifiant, connu := etat.employeurs[cleImport(brutEmployeur)]; connu && brutEmployeur != "" {
@@ -1005,12 +1005,15 @@ func completerSituationGrandPublicImport(ligne *ligneGrandPublicImport, cellules
 		ligne.modeEpargne = pointeurImport(db.ModeEpargne(valeur))
 	}
 	brutPays := cellules[enteteGrandPublicImport(14)]
-	paysID, refus := referentielFacultatifImport(brutPays, etat.pays, cleImport, numero, enteteGrandPublicImport(14),
+	ville := couperImport(cellules[enteteGrandPublicImport(15)], 120)
+	paysID, inconnu := referentielFacultatifImport(brutPays, etat.pays, cleImport, numero, enteteGrandPublicImport(14),
 		"PROSPECT_GP_IMPORT_PAYS_INCONNU", "Pays de résidence inconnu", etat.paysLabels)
-	if refus != nil {
-		refus.Message = fmt.Sprintf("Pays de résidence inconnu : « %s ». Nom en français ou code ISO. Valeurs admises : %s, ou cellule vide.",
-			brutPays, valeursAdmisesImport(etat.paysLabels))
-		return refus
+	if inconnu != nil {
+		inconnu.Message = fmt.Sprintf("Pays de résidence inconnu : « %s ». La fiche entre sans pays ; la valeur passe en ville si la ville est vide.", brutPays)
+		ligne.avertissements = append(ligne.avertissements, *inconnu)
+		if ville == nil {
+			ville = couperImport(brutPays, 120)
+		}
 	}
 	whatsapp, refus := telephoneFacultatifImport(cellules[enteteGrandPublicImport(16)], etat.region, numero, enteteGrandPublicImport(16),
 		"PROSPECT_GP_IMPORT_WHATSAPP_ILLISIBLE", "Numéro WhatsApp inexploitable : « %s ». Écrivez-le avec son indicatif s’il est étranger.")
@@ -1024,7 +1027,7 @@ func completerSituationGrandPublicImport(ligne *ligneGrandPublicImport, cellules
 	}
 	ligne.lieuActivite = couperImport(cellules[enteteGrandPublicImport(12)], 160)
 	ligne.paysID = paysID
-	ligne.villeResidence = couperImport(cellules[enteteGrandPublicImport(15)], 120)
+	ligne.villeResidence = ville
 	ligne.whatsapp = whatsapp
 	ligne.relaisNom = couperImport(cellules[enteteGrandPublicImport(17)], 160)
 	ligne.relaisTel = relais
