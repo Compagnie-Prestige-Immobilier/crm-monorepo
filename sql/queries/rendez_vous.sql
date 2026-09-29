@@ -114,6 +114,6 @@ RETURNING *;
 
 -- name: ChargesDeClientele :many
 SELECT "fullName" FROM "users"
-WHERE "role" = 'CHARGE_CLIENTELE' AND "isActive" AND "deletedAt" IS NULL
+WHERE "role" <> 'ADMIN' AND "isActive" AND "deletedAt" IS NULL
 ORDER BY "fullName"
 LIMIT 200;
