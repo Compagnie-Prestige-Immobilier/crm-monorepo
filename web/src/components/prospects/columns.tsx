@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { DateRendezVous } from '@/components/prospects/date-rendez-vous';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { SUITES } from '@/components/prospects/suivi-rendez-vous';
@@ -215,18 +216,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       id: 'dateRendezVous',
       accessorKey: 'dateRendezVous',
       header: 'Date de rendez-vous',
-      cell: ({ row }) =>
-        row.original.dateRendezVous === null ? (
-          <Empty />
-        ) : (
-          <time
-            dateTime={row.original.dateRendezVous}
-            className="whitespace-nowrap tabular-nums"
-            title={formatDateTime(row.original.dateRendezVous)}
-          >
-            {formatDateTime(row.original.dateRendezVous)}
-          </time>
-        ),
+      cell: ({ row }) => <DateRendezVous at={row.original.dateRendezVous} vide={<Empty />} />,
     },
     {
       id: 'type',

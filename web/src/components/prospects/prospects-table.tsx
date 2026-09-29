@@ -1,13 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type ColumnDef,
-  type Row,
-} from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable, type Row } from '@tanstack/react-table';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -165,8 +159,8 @@ function optionReferentiel(
 }
 
 /**
- * « Téléconseiller » n'y figure pas : la colonne montre le titulaire de la
- * fiche, quand `commercialId` porte sur qui l'a saisie.
+ * « Téléconseiller » et `commercialId` lisent tous deux `createdById`, le
+ * titulaire de la fiche : une réaffectation le réécrit.
  */
 const CRITERES_COLONNES: readonly CritereColonne[] = [
   {
@@ -276,6 +270,13 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
     placeholder: 'Tous les suivis',
     options: () => SUIVI_OPTIONS,
   },
+  {
+    colonne: 'ownedByCommercialName',
+    cle: 'commercialId',
+    label: 'Téléconseiller',
+    placeholder: 'Tous les téléconseillers',
+    options: (reference) => reference?.utilisateurs ?? [],
+  },
 ];
 
 function filtresDesColonnes(
@@ -285,17 +286,23 @@ function filtresDesColonnes(
   motifs: readonly MotifAppel[],
   sources: CritereSources,
 ): Partial<Record<string, FiltreColonne>> {
+  // Sans option ni valeur, l'en-tête n'ouvrirait qu'une liste vide : c'est le
+  // cas du filtre « Téléconseiller » pour un compte qui ne liste pas les comptes.
+  const lire = (critere: CritereColonne): string | null =>
+    critere.lire === undefined
+      ? ((filters[critere.cle] as string | null) ?? null)
+      : critere.lire(filters);
+  const utiles = CRITERES_COLONNES.filter(
+    (critere) => critere.options(reference, motifs, sources).length > 0 || lire(critere) !== null,
+  );
   return Object.fromEntries(
-    CRITERES_COLONNES.map((critere) => [
+    utiles.map((critere) => [
       critere.colonne,
       {
         label: critere.label,
         placeholder: critere.placeholder,
         options: critere.options(reference, motifs, sources),
-        value:
-          critere.lire === undefined
-            ? ((filters[critere.cle] as string | null) ?? null)
-            : critere.lire(filters),
+        value: lire(critere),
         onChange: (value: string | null) => {
           if (critere.ecrire !== undefined) {
             setFilters(critere.ecrire(value));
@@ -306,25 +313,6 @@ function filtresDesColonnes(
       },
     ]),
   );
-}
-
-// « Suivi » lit plusieurs champs : il reste affiché même sans issue de rendez-vous.
-const TOUJOURS_AFFICHEES = new Set(['nom', 'suivi']);
-
-/** Une colonne vide sur toute la page n'apporte rien : elle se masque. */
-function colonnesVides(
-  columns: readonly ColumnDef<ProspectRow>[],
-  items: readonly ProspectRow[],
-): Record<string, boolean> {
-  const masquees: Record<string, boolean> = {};
-  if (items.length === 0) return masquees;
-  for (const colonne of columns) {
-    if (colonne.id === undefined || TOUJOURS_AFFICHEES.has(colonne.id)) continue;
-    if (!('accessorKey' in colonne)) continue;
-    const cle = colonne.accessorKey as keyof ProspectRow;
-    if (items.every((item) => item[cle] === null || item[cle] === '')) masquees[colonne.id] = false;
-  }
-  return masquees;
 }
 
 function tableSourceData(data: Paginated<ProspectRow> | undefined): {
@@ -515,7 +503,6 @@ export function ProspectsTable({
     pageCount: source.pageCount,
     state: {
       sorting: [{ id: filters.sortBy, desc: filters.sortDir === 'desc' }],
-      columnVisibility: colonnesVides(columns, source.items),
     },
   });
 

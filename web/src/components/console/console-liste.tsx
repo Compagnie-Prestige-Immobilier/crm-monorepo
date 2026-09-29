@@ -3,6 +3,7 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import Link from 'next/link';
 
+import { DateRendezVous } from '@/components/prospects/date-rendez-vous';
 import { Pages } from '@/components/console/rep-annuaire';
 import {
   FilterableTableHead,
@@ -176,6 +177,7 @@ function TableauAnnuaire({
           <TableHead>Numéro</TableHead>
           <FilterableTableHead label="Statut / Qualification" filtre={filtreStatut} />
           <TableHead>Dernier appel</TableHead>
+          <TableHead>Date de rendez-vous</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -204,6 +206,9 @@ function TableauAnnuaire({
             </TableCell>
             <TableCell className="whitespace-nowrap text-muted-foreground">
               {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              <DateRendezVous at={row.dateRendezVous} vide="—" />
             </TableCell>
           </TableRow>
         ))}
