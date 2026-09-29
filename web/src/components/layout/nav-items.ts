@@ -40,7 +40,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { type Permission, peut, type Role, type SessionUser } from '@/lib/types';
+import { type Permission, peut, type SessionUser } from '@/lib/types';
 
 /** Écran de choix, seul atterrissage après connexion. */
 export const HUB_PATH = '/espaces';
@@ -54,41 +54,21 @@ export const HUB_PATH = '/espaces';
  */
 export const INBOX_PATH = '/notifications';
 
-/**
- * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le panneau
- * web est le seul client depuis l'abandon de l'application mobile : tous les
- * rôles qui reçoivent des notifications côté serveur les lisent ici.
- */
-export const INBOX_ROLES: readonly Role[] = [
-  'ADMIN',
-  'DIRECTION',
-  'SUPERVISEUR',
-  'BANQUE_FINANCE',
-  'ACCUEIL',
-  'COMMERCIAL',
-  'CHARGE_CLIENTELE',
-];
-
-export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
-
-/** L'ADMIN lit la sienne dans le composeur, qui porte le même onglet. */
-export const inboxPathFor = (role: Role): string =>
-  role === 'ADMIN' ? '/admin/notifications?onglet=reception' : INBOX_PATH;
+/** Qui envoie les notifications lit la sienne dans le composeur, qui porte le même onglet. */
+export const inboxPathFor = (visiteur: Visiteur): string =>
+  peut(visiteur, 'notifications.administrer')
+    ? '/admin/notifications?onglet=reception'
+    : INBOX_PATH;
 
 export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
 
-/**
- * La permission que garde la route ; une liste de rôles là où aucune
- * permission n'a exactement le même ensemble, et le rôle de base décide.
- */
-type Acces = Permission | readonly Role[] | ((visiteur: Visiteur) => boolean);
+/** La permission que garde la route. */
+type Acces = Permission | ((visiteur: Visiteur) => boolean);
 
 export type Visiteur = Pick<SessionUser, 'role' | 'permissions'>;
 
-const ouvert = (visiteur: Visiteur, acces: Acces): boolean => {
-  if (typeof acces === 'function') return acces(visiteur);
-  return typeof acces === 'string' ? peut(visiteur, acces) : acces.includes(visiteur.role);
-};
+const ouvert = (visiteur: Visiteur, acces: Acces): boolean =>
+  typeof acces === 'function' ? acces(visiteur) : peut(visiteur, acces);
 
 export interface CoqueEntry {
   id: Coque;
@@ -169,20 +149,8 @@ export interface NavSection {
   items: readonly NavItem[];
 }
 
-/**
- * Les rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils lisent les
- * mêmes intitulés dans le même ordre : une seule suite d'entrées les sert tous,
- * et on n'explique qu'un seul parcours au téléphone.
- */
-const TERRAIN: readonly Role[] = [
-  'ADMIN',
-  'COMMERCIAL',
-  'CHARGE_CLIENTELE',
-  'SUPERVISEUR',
-  'DIRECTION',
-];
-/** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
-const ENCADREMENT: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
+const TERRAIN: Permission = 'fiches.tenir';
+const ENCADREMENT: Permission = 'analytics.superviser';
 
 /**
  * Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la
@@ -275,7 +243,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de pilotage',
         icon: GaugeIcon,
         description: 'Ventes, encaissements, objectifs, Banque & Finance et risques',
-        acces: ['DIRECTION'],
+        acces: 'chiffres.voir_montants',
       },
       {
         href: '/teleconseil/tableau-de-bord',
@@ -303,14 +271,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Ventes',
         icon: TrendingUpIcon,
         description: 'Tableau des ventes',
-        acces: ['DIRECTION'],
+        acces: 'ventes.lire',
       },
       {
         href: '/finance',
         label: 'Banque & Finance',
         icon: LandmarkIcon,
         description: 'Vue d’ensemble des dossiers',
-        acces: ['DIRECTION'],
+        acces: 'banque.lire',
       },
       {
         href: '/teleconseil/pole-deploiement',
@@ -341,7 +309,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        acces: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        acces: (visiteur) => peut(visiteur, TERRAIN) && !peut(visiteur, ENCADREMENT),
       },
       {
         href: '/teleconseil',
@@ -738,24 +706,21 @@ export function coqueHomePath(visiteur: Visiteur, coque: Coque): string {
   return first?.href ?? HUB_PATH;
 }
 
-/** Écran d'atterrissage après connexion, selon le rôle. */
-export function homePathForRole(role: Role): string {
-  switch (role) {
-    case 'ACCUEIL':
-      return '/accueil';
-    case 'COMMERCIAL':
-    case 'CHARGE_CLIENTELE':
-      return '/teleconseil';
-    case 'DIRECTION':
-    case 'SUPERVISEUR':
-      return '/teleconseil/tableau-de-bord';
-    case 'ADMIN':
-      return '/admin/pilotage';
-    case 'BANQUE_FINANCE':
-      return '/finance';
-    default:
-      return '/connexion';
-  }
+const ATTERRISSAGES: readonly { href: string; acces: Acces }[] = [
+  {
+    href: '/admin/pilotage',
+    acces: (v) => peut(v, 'comptes.administrer') && peut(v, 'chiffres.voir_montants'),
+  },
+  { href: '/teleconseil/tableau-de-bord', acces: 'analytics.superviser' },
+  { href: '/teleconseil', acces: 'fiches.tenir' },
+  { href: '/accueil', acces: 'accueil.registre' },
+  { href: '/finance', acces: 'banque.lire' },
+];
+
+/** Écran d'atterrissage après connexion : le premier que ses permissions ouvrent. */
+export function homePath(visiteur: Visiteur | null | undefined): string {
+  if (visiteur === null || visiteur === undefined) return '/connexion';
+  return ATTERRISSAGES.find((cible) => ouvert(visiteur, cible.acces))?.href ?? HUB_PATH;
 }
 
 /**

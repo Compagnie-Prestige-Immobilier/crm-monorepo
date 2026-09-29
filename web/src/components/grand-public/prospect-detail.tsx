@@ -59,7 +59,6 @@ import {
   type ProspectStatut,
   type Offer,
   type PaymentMode,
-  type Role,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -360,12 +359,10 @@ export function GrandPublicProspectDetail({
   prospect: initialProspect,
   offers: offersProp,
   canEdit: canEditProp,
-  role,
 }: {
   prospect: ProspectRow;
   offers?: Offer[];
   canEdit?: boolean;
-  role: Role;
 }) {
   const offers = offersProp ?? [];
   const canEdit = Boolean(canEditProp);
@@ -495,7 +492,7 @@ export function GrandPublicProspectDetail({
       <CarteRendezVous prospect={prospect} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <HistoireDeLaFiche prospect={prospect} role={role} />
+        <HistoireDeLaFiche prospect={prospect} />
 
         <div className="@container flex min-w-0 flex-col gap-6">
           <Card>

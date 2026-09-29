@@ -42,7 +42,7 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { queryKeys } from '@/lib/query-keys';
-import { peut, type Role } from '@/lib/types';
+import { peut } from '@/lib/types';
 
 function exportCsv(stats: VisiteStats, plage: { du: string; au: string }): void {
   const bloc = (
@@ -182,13 +182,13 @@ function BoutonReinitialiser({
   );
 }
 
-export function DashboardVisitesView({ role }: { role: Role }) {
+export function DashboardVisitesView() {
   const { filters, setFilters } = useUrlFilters(dashboardFiltersAdapter);
   const plage = plageDeFiltres(filters);
   const tropLarge = plageTropLarge(plage);
   const comparaisonPlage = plageComparaison(plage, filters.comparaison);
-  const catalogue = catalogueVisitesDe(role);
   const { data: user } = useQuery(meQueryOptions);
+  const catalogue = catalogueVisitesDe(peut(user, 'accueil.listes'));
   const peutDisposer = peut(user, 'chiffres.disposer');
 
   const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });

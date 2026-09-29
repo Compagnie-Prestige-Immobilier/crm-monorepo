@@ -31,8 +31,8 @@ func TestSuiviRendezVousParLaDirection(t *testing.T) {
 
 	chemin := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
 	honore := map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD"}
-	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, honore)
-	superviseur.attend(statut, http.StatusForbidden, "le superviseur observe", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, chemin, honore)
+	b.attend(statut, http.StatusForbidden, "le téléconseiller ne note pas la présence", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "REPORTE"})
 	direction.attend(statut, http.StatusBadRequest, "report sans date", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "NON_HONORE", "suiteRencontre": "CHAUD"})

@@ -1,13 +1,13 @@
-import { type Permission, peut, type Role, type SessionUser } from '@/lib/types';
+import { type Permission, peut, type SessionUser } from '@/lib/types';
 
-/** Refus de rôle : la coque le rend en `PermissionDenied`, sans quitter l'écran. */
+/** Refus de permission : la coque le rend en `PermissionDenied`, sans quitter l'écran. */
 export class RefusPermission extends Error {
-  readonly role: Role;
+  readonly user: SessionUser;
 
-  constructor(role: Role) {
+  constructor(user: SessionUser) {
     super('Accès refusé');
     this.name = 'RefusPermission';
-    this.role = role;
+    this.user = user;
   }
 }
 
@@ -17,6 +17,6 @@ export interface Contexte {
 
 export function guardPermission(permission: Permission) {
   return ({ context }: Contexte): void => {
-    if (!peut(context.user, permission)) throw new RefusPermission(context.user.role);
+    if (!peut(context.user, permission)) throw new RefusPermission(context.user);
   };
 }

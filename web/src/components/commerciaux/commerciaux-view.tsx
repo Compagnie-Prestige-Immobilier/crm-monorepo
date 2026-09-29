@@ -22,7 +22,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { deleteUser, fetchUsers, setUserActive } from '@/lib/data/users';
 import { formatNumber } from '@/lib/format';
-import { homePathForRole } from '@/lib/nav';
+import { homePath } from '@/lib/nav';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { UserRow } from '@/lib/types';
@@ -129,7 +129,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     onSuccess: (compte) => {
       queryClient.clear();
       queryClient.setQueryData(meQueryOptions.queryKey, compte);
-      router.replace(homePathForRole(compte.role));
+      router.replace(homePath(compte));
     },
     onError: (error) => {
       toastApiError(error, 'Connexion à ce compte impossible. Réessayez.');

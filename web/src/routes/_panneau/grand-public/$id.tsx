@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchProspect } from '@/lib/data/prospects';
 import { fetchOffers } from '@/lib/data/reference';
 import { guardPermission } from '@/lib/guard';
-import type { Offer, ProspectRow } from '@/lib/types';
+import { peut, type Offer, type ProspectRow } from '@/lib/types';
 
 type Chargement =
   { statut: 'ok'; prospect: ProspectRow; offers: Offer[] } | { statut: 'panne'; error: unknown };
@@ -57,8 +57,7 @@ function GrandPublicProspectPage() {
     <GrandPublicProspectDetail
       prospect={chargement.prospect}
       offers={chargement.offers}
-      canEdit={user.role === 'ADMIN' || user.role === 'COMMERCIAL' || user.role === 'SUPERVISEUR'}
-      role={user.role}
+      canEdit={peut(user, 'fiches.tenir')}
     />
   );
 }

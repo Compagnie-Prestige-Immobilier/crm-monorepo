@@ -34,7 +34,7 @@ function BanqueGrandPublicPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <OngletsPilotage coque="grand-public" role={user.role} />
+      <OngletsPilotage user={user} />
       <BankDashboardView projet="GRAND_PUBLIC" />
     </div>
   );

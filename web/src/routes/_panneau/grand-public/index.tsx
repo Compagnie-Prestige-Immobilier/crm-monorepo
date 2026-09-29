@@ -6,7 +6,7 @@ import {
 } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
-import { canExportProspects } from '@/lib/types';
+import { canExportProspects, peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/')({
   beforeLoad: guardPermission('prospects.lire'),
@@ -31,14 +31,13 @@ function Loading() {
 function GrandPublicPage() {
   const { user } = Route.useRouteContext();
 
-  // Le superviseur travaille les fiches Grand Public ; seule la DIRECTION y lit.
   return (
     <GrandPublicProspectsView
       viewerId={user.id}
-      canCreate={['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CHARGE_CLIENTELE'].includes(user.role)}
-      canExport={canExportProspects(user.role)}
-      campaignScoped={user.role === 'COMMERCIAL'}
-      canFilterOrigine={user.role === 'COMMERCIAL' || user.role === 'CHARGE_CLIENTELE'}
+      canCreate={peut(user, 'fiches.tenir')}
+      canExport={canExportProspects(user)}
+      campaignScoped={!peut(user, 'portefeuille.voir_tout')}
+      canFilterOrigine={!peut(user, 'portefeuille.voir_tout')}
     />
   );
 }

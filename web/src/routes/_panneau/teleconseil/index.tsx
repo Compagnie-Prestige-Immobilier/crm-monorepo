@@ -8,9 +8,11 @@ import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/')({
   beforeLoad: ({ context }) => {
-    if (context.user.role === 'BANQUE_FINANCE') throw redirect({ href: '/finance' });
+    if (!peut(context.user, 'fiches.tenir') && peut(context.user, 'banque.lire')) {
+      throw redirect({ href: '/finance' });
+    }
     guardPermission('fiches.tenir')({ context });
-    if (['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(context.user.role)) {
+    if (peut(context.user, 'analytics.superviser')) {
       throw redirect({ href: '/teleconseil/tableau-de-bord' });
     }
   },

@@ -9,7 +9,7 @@ import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form
 
 import { meQueryOptions } from '@/api/auth';
 import { resetSessionExpiryGuard } from '@/lib/api/session-expiry';
-import { homePathForRole } from '@/components/layout/nav-items';
+import { homePath } from '@/components/layout/nav-items';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,17 +24,14 @@ import { loginSchema, type LoginInput } from '@/lib/schemas';
 import { ROLE_LABELS, type Role, type SessionUser } from '@/lib/types';
 import { apiErrorMessage } from '@/lib/utils';
 
-function roleOf(payload: unknown): Role {
-  if (typeof payload !== 'object' || payload === null || !('user' in payload)) return 'ADMIN';
-  const { user } = payload as { user?: unknown };
-  if (typeof user !== 'object' || user === null || !('role' in user)) return 'ADMIN';
-  const { role } = user as { role?: unknown };
-  return typeof role === 'string' && role in ROLE_LABELS ? (role as Role) : 'ADMIN';
+function compteDe(payload: unknown): SessionUser | null {
+  return ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null;
 }
 
 const COOKIE_BASE = 'cpi_base';
 const BASE_PUBLIQUE = 'public';
 const DEMO_ROLES = [
+  'ADMIN',
   'SUPERVISEUR',
   'COMMERCIAL',
   'BANQUE_FINANCE',
@@ -211,18 +208,15 @@ export function LoginForm({ next }: { next?: string | null }) {
         return;
       }
 
-      const payload: unknown = await response.json().catch(() => null);
+      const compte = compteDe(await response.json().catch(() => null));
       queryClient.clear();
-      queryClient.setQueryData(
-        meQueryOptions.queryKey,
-        ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
-      );
+      queryClient.setQueryData(meQueryOptions.queryKey, compte);
       // Une route du serveur (connexion à GLPI) ne se sert pas par le routeur du panneau.
       if (next?.startsWith('/api/') === true) {
         window.location.replace(next);
         return;
       }
-      router.replace(next != null && next !== '' ? next : homePathForRole(roleOf(payload)));
+      router.replace(next != null && next !== '' ? next : homePath(compte));
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');
     }
@@ -246,13 +240,10 @@ export function LoginForm({ next }: { next?: string | null }) {
         return;
       }
 
-      const payload: unknown = await response.json().catch(() => null);
+      const compte = compteDe(await response.json().catch(() => null));
       queryClient.clear();
-      queryClient.setQueryData(
-        meQueryOptions.queryKey,
-        ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
-      );
-      router.replace(next != null && next !== '' ? next : homePathForRole(demoRole));
+      queryClient.setQueryData(meQueryOptions.queryKey, compte);
+      router.replace(next != null && next !== '' ? next : homePath(compte));
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');
     } finally {

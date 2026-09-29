@@ -18,23 +18,24 @@ const (
 
 var entetesRendezVous = []string{
 	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Étape", "Pris le", "Pris par",
-	"Site", "Point de rencontre", "Précision du point",
+	"Site", "Point de rencontre", "Précision du point", "À recontacter : ce qu'a dit la personne", "Recontacter le",
 }
 
 // Le comptoir emporte ce qu'il voit : les mêmes lignes, les mêmes filtres.
 type ExportRendezVousInput struct {
 	Type   string `query:"type" maxLength:"40"`
 	Search string `query:"search" maxLength:"120"`
-	Etape  string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
+	Etape  string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,A_RECONTACTER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
 	Du     string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
 	Au     string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 }
 
 var etapesRendezVous = map[string]string{
-	"A_CONFIRMER": "À confirmer",
-	"CONFIRMES":   "Confirmé",
-	"A_CLOSER":    "Présent, à closer",
-	"EN_RETARD":   "En retard",
+	"A_CONFIRMER":   "À confirmer",
+	"A_RECONTACTER": "À recontacter",
+	"CONFIRMES":     "Confirmé",
+	"A_CLOSER":      "Présent, à closer",
+	"EN_RETARD":     "En retard",
 }
 
 func etapeLisible(l *db.RendezVousObtenusRow) string {
@@ -73,7 +74,7 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille("Rendez-vous", entetesRendezVous,
-		[]float64{20, 30, 18, 16, 14, 20, 26, 20, 26, 30}, map[int]int{3: c.texte})
+		[]float64{20, 30, 18, 16, 14, 20, 26, 20, 26, 30, 40, 14}, map[int]int{3: c.texte})
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 		if err := f.ecrire(quandLisible(ligne.Quand, s.Cfg.TimeZone), ligne.Prenom+" "+ligne.Nom,
 			exportCelluleTexte(ligne.PhoneE164), ligne.Type, etapeLisible(ligne),
 			c.horodate(ligne.LastCallAt), ligne.PrisPar, ligne.Site, ligne.PointRencontre,
-			ligne.PointRencontreCommentaire); err != nil {
+			ligne.PointRencontreCommentaire, ligne.RecontacterNote, ligne.RecontacterLe); err != nil {
 			return nil, err
 		}
 	}

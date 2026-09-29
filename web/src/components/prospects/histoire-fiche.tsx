@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { meQueryOptions } from '@/api/auth';
 import {
   CarteHistoire,
   Champ,
@@ -20,7 +21,7 @@ import {
   type SegmentChangeRow,
 } from '@/lib/data/prospects';
 import { formatDateTime, formatDetectedCall, formatDeviceCall, formatNumber } from '@/lib/format';
-import { SEGMENT_LABELS, enrollmentMethodLabel, type ProspectRow, type Role } from '@/lib/types';
+import { SEGMENT_LABELS, enrollmentMethodLabel, peut, type ProspectRow } from '@/lib/types';
 
 export const NO_VALUE = '–';
 
@@ -35,8 +36,9 @@ export function ouVide(value: string | null, repli: string = NO_VALUE): string {
   return value === null || value === '' ? repli : value;
 }
 
-export function voitLeSegment(role: Role): boolean {
-  return role === 'ADMIN' || role === 'COMMERCIAL';
+export function useVoitLeSegment(): boolean {
+  const { data: user } = useQuery(meQueryOptions);
+  return peut(user, 'fiches.voir_segment');
 }
 
 function evenementCreation(prospect: ProspectRow): EvenementHistorique {
@@ -217,7 +219,8 @@ function evenementsDeLaFiche(prospect: ProspectRow): EvenementHistorique[] {
  * Tout ce qui est arrivé à une fiche, CHUES ou Grand Public : ses appels, ses
  * bascules et chaque changement noté au journal, du plus récent au plus ancien.
  */
-export function HistoireDeLaFiche({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+export function HistoireDeLaFiche({ prospect }: { prospect: ProspectRow }) {
+  const voitLeSegment = useVoitLeSegment();
   const appels = useQuery({
     queryKey: ['prospects', 'call-attempts', prospect.id],
     queryFn: () => fetchProspectCallAttempts(prospect.id),
@@ -229,7 +232,7 @@ export function HistoireDeLaFiche({ prospect, role }: { prospect: ProspectRow; r
   const segments = useQuery({
     queryKey: ['prospects', 'segment-history', prospect.id],
     queryFn: () => fetchProspectSegmentHistory(prospect.id),
-    enabled: voitLeSegment(role),
+    enabled: voitLeSegment,
   });
   const journal = useQuery({
     queryKey: ['prospects', 'journal', prospect.id],
@@ -245,9 +248,7 @@ export function HistoireDeLaFiche({ prospect, role }: { prospect: ProspectRow; r
   const plafondsAtteints = [appels.data, segments.data, journal.data].flatMap((liste) =>
     liste?.tronque === true ? [liste.items.length] : [],
   );
-  const sources = voitLeSegment(role)
-    ? [appels, releves, segments, journal]
-    : [appels, releves, journal];
+  const sources = voitLeSegment ? [appels, releves, segments, journal] : [appels, releves, journal];
 
   return (
     <CarteHistoire

@@ -29,7 +29,7 @@ export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
   beforeLoad: (contexte: Contexte & { location: { searchStr: string } }) => {
     const { user } = contexte.context;
     if (!peut(user, 'prospects.superviser') && !peut(user, 'rendez_vous.suivre')) {
-      throw new RefusPermission(user.role);
+      throw new RefusPermission(user);
     }
     const params = new URLSearchParams(contexte.location.searchStr);
     const statut = params.get('phase2Status');
@@ -75,8 +75,8 @@ function TeleconseilInteressesPage() {
         canAdminister={peut(user, 'fiches.ignorer_propriete')}
         canReassign={peut(user, 'prospects.reaffecter_tout')}
         canExport={peut(user, 'exports.prospects')}
-        readOnly={readsOnly(user.role)}
-        viewerId={['ADMIN', 'DIRECTION'].includes(user.role) ? user.id : undefined}
+        readOnly={readsOnly(user)}
+        viewerId={peut(user, 'portefeuille.voir_tout') ? user.id : undefined}
       />
     </div>
   );

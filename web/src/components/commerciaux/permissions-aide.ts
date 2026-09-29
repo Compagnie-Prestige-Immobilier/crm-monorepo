@@ -44,6 +44,7 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'fiches.tenir': 'Lire et modifier les fiches de son propre portefeuille.',
   'fiches.voir_converties':
     'Voir aussi les fiches déjà converties dans les listes et à l’ouverture.',
+  'fiches.voir_segment': 'Voir le segment d’une fiche et l’historique de ses changements.',
   'formulaires.administrer': 'Régler les champs du formulaire de conversion.',
   'imports.administrer': 'Importer des fichiers de prospects ou de représentants.',
   'notifications.administrer': 'Envoyer des notifications et régler leur envoi.',

@@ -13,7 +13,7 @@ const DevRoleButtons =
     : null;
 import { Facade } from '@/components/auth/facade';
 import { LoginForm } from '@/components/auth/login-form';
-import { homePathForRole } from '@/components/layout/nav-items';
+import { homePath } from '@/components/layout/nav-items';
 import { SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE } from '@/lib/api/session-expiry';
 import { cheminInterne } from '@/lib/nav';
 
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/connexion')({
   },
   beforeLoad: async ({ context }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions);
-    if (user !== null) throw redirect({ href: homePathForRole(user.role) });
+    if (user !== null) throw redirect({ href: homePath(user) });
   },
   component: ConnexionPage,
 });

@@ -155,6 +155,7 @@ export function etatRendezVousFiche(
   if (prospect.rendezVousIssue !== null) return RENDEZ_VOUS_ISSUE_LABELS[prospect.rendezVousIssue];
   if (prospect.rendezVousConfirmation === 'CONFIRME') return 'Confirmé';
   if (prospect.rendezVousConfirmation === 'ANNULE') return 'Annulé';
+  if (prospect.rendezVousConfirmation === 'A_RECONTACTER') return 'À recontacter';
   return prospect.rendezVousReporteAt === null ? 'À confirmer' : 'Reporté, à confirmer';
 }
 
@@ -218,6 +219,7 @@ export const PERMISSIONS = [
   'fiches.parametres_reserves',
   'fiches.tenir',
   'fiches.voir_converties',
+  'fiches.voir_segment',
   'formulaires.administrer',
   'imports.administrer',
   'notifications.administrer',
@@ -263,24 +265,12 @@ export const ROLE_LABELS: Record<Role, string> = {
   CHARGE_CLIENTELE: 'Chargé de clientèle',
 };
 
-/**
- * Les rôles qui LISENT le travail des autres sans jamais y écrire. Les écrans
- * partagés s'en servent pour retirer les gestes, l'API refusant de toute façon.
- */
-export const readsOnly = (role: Role | undefined): boolean =>
-  role === 'SUPERVISEUR' || role === 'DIRECTION';
+export const readsOnly = (user: Pick<SessionUser, 'permissions'> | null | undefined): boolean =>
+  !peut(user, 'fiches.tenir');
 
-/**
- * L'export des prospects n'est pas un geste d'écriture : côté API la permission
- * `exports.prospects` couvre le groupe Parcours (Admin, Commercial, Chargé de
- * clientèle, Superviseur, Direction), l'écran le leur laisse.
- */
-export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' ||
-  role === 'COMMERCIAL' ||
-  role === 'CHARGE_CLIENTELE' ||
-  role === 'SUPERVISEUR' ||
-  role === 'DIRECTION';
+export const canExportProspects = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+): boolean => peut(user, 'exports.prospects');
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
@@ -290,13 +280,8 @@ export const peutTenirUneFiche = (
   user: Pick<SessionUser, 'permissions'> | null | undefined,
 ): boolean => peut(user, 'fiches.tenir');
 
-/** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
-export const canExportRepresentants = (role: Role | undefined): boolean =>
-  role === 'ADMIN' ||
-  role === 'COMMERCIAL' ||
-  role === 'CHARGE_CLIENTELE' ||
-  role === 'SUPERVISEUR' ||
-  role === 'DIRECTION';
+/** Miroir de la garde de `GET /export/representants.xlsx`. */
+export const canExportRepresentants = peutTenirUneFiche;
 
 /** Qui marque une demande convertie « revue ». Miroir de `POST /prospects/{id}/revue`. */
 export const peutRevoirUneDemande = (

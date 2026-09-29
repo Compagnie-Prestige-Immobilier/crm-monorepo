@@ -2,7 +2,7 @@ export {
   coqueHomePath,
   coqueOf,
   coquesForRole,
-  homePathForRole,
+  homePath,
   HUB_PATH,
   navTitle,
 } from '@/components/layout/nav-items';

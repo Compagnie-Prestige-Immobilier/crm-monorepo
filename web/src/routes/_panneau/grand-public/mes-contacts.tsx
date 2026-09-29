@@ -4,6 +4,7 @@ import { MesContactsView } from '@/components/contacts/mes-contacts-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/mes-contacts')({
   beforeLoad: guardPermission('fiches.tenir'),
@@ -32,7 +33,7 @@ function MesContactsGrandPublicPage() {
     <MesContactsView
       projet="GRAND_PUBLIC"
       userId={user.id}
-      canFilter={user.role !== 'COMMERCIAL'}
+      canFilter={peut(user, 'comptes.lister')}
     />
   );
 }

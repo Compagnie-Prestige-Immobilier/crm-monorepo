@@ -311,8 +311,8 @@ func TestBaseDemoNAtteintAucunServiceExterne(t *testing.T) {
 	}
 }
 
-// Les bases de démonstration existantes gardent `admin@cpi.sn` : le profil ne doit plus l'ouvrir.
-func TestBaseDemoRefuseLeProfilAdmin(t *testing.T) {
+// Des bases de démonstration gardent `admin@cpi.sn` : le profil ouvre le compte de démonstration, jamais celui-là.
+func TestBaseDemoProfilAdminSansEscalade(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
 	d := creerBaseDemo(b, "profil-admin")
@@ -327,11 +327,24 @@ func TestBaseDemoRefuseLeProfilAdmin(t *testing.T) {
 	basculer(b, d.nom)
 
 	statut, body := appelJSON(b, http.MethodPost, "/api/v1/auth/demo-login", map[string]any{"role": "ADMIN"}, nil)
-	if statut != http.StatusBadRequest {
-		t.Fatalf("demo-login ADMIN : 400 attendu, %d reçu %v", statut, body)
+	b.attend(statut, http.StatusOK, "profil ADMIN de démonstration", body)
+	if compte, _ := body["user"].(map[string]any); compte["email"] != "fixture.admin@cpi.sn" {
+		t.Fatalf("le profil ADMIN doit ouvrir le compte de démonstration, reçu %v", compte)
 	}
-	statut, body = appelJSON(b, http.MethodPost, "/api/v1/auth/demo-login", map[string]any{"role": "SUPERVISEUR"}, nil)
-	b.attend(statut, http.StatusOK, "profil de démonstration existant", body)
+
+	for _, appel := range []struct{ methode, chemin string }{
+		{http.MethodPost, "/api/v1/users"},
+		{http.MethodPut, "/api/v1/users/" + uuid.NewString() + "/password"},
+		{http.MethodPost, "/api/v1/roles"},
+		{http.MethodPut, "/api/v1/roles/ADMIN/permissions"},
+		{http.MethodPost, "/api/v1/auth/usurpation"},
+		{http.MethodPost, "/api/v1/admin/purge"},
+	} {
+		statut, body = appelJSON(b, appel.methode, appel.chemin, map[string]any{}, nil)
+		if code, _ := body["code"].(string); statut != http.StatusForbidden || code != "BASE_DEMO" {
+			t.Fatalf("%s %s en démonstration : 403 BASE_DEMO attendu, %d reçu %v", appel.methode, appel.chemin, statut, body)
+		}
+	}
 }
 
 func TestBaseDemoSansMotDePasseDesFixtures(t *testing.T) {

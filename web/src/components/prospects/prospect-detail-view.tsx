@@ -21,7 +21,7 @@ import {
   HistoireDeLaFiche,
   NO_VALUE,
   ouVide,
-  voitLeSegment,
+  useVoitLeSegment,
 } from '@/components/prospects/histoire-fiche';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +40,6 @@ import {
   peutRevoirUneDemande,
   peutTenirUneFiche,
   type ProspectRow,
-  type Role,
   type SessionUser,
 } from '@/lib/types';
 
@@ -70,7 +69,8 @@ export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
 }
 
 /** La liste des prospects est réservée à l'encadrement ; le téléconseiller retrouve ses fiches dans Mes contacts. */
-function RetourFiche({ user }: { user: SessionUser | null | undefined }) {
+function RetourFiche({ user, masque }: { user: SessionUser | null | undefined; masque: boolean }) {
+  if (masque) return null;
   if (peut(user, 'prospects.superviser')) {
     return <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>;
   }
@@ -78,8 +78,15 @@ function RetourFiche({ user }: { user: SessionUser | null | undefined }) {
 }
 
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
-export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
+export function ProspectDetailView({
+  prospectId,
+  enPopup = false,
+}: {
+  prospectId: string;
+  enPopup?: boolean;
+}) {
   const { data: user } = useQuery(meQueryOptions);
+  const retour = <RetourFiche user={user} masque={enPopup} />;
   const fiche = useQuery({
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
@@ -89,7 +96,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <RetourFiche user={user} />
+        {retour}
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -99,7 +106,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <RetourFiche user={user} />
+        {retour}
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -115,7 +122,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
 
   return (
     <div className="flex flex-col gap-6">
-      <RetourFiche user={user} />
+      {retour}
 
       <FicheEnTete
         nom={`${prospect.prenom} ${prospect.nom}`}
@@ -167,10 +174,10 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
       <CarteRendezVous prospect={prospect} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <HistoireDeLaFiche prospect={prospect} role={role} />
+        <HistoireDeLaFiche prospect={prospect} />
 
         <div className="flex min-w-0 flex-col gap-6">
-          <FicheProspect prospect={prospect} role={role} />
+          <FicheProspect prospect={prospect} />
           <ChampsAjoutes prospect={prospect} />
         </div>
       </div>
@@ -178,7 +185,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   );
 }
 
-function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+function FicheProspect({ prospect }: { prospect: ProspectRow }) {
+  const voitLeSegment = useVoitLeSegment();
   return (
     <Card>
       <CardHeader>
@@ -201,7 +209,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
           <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Banque">{ouVide(prospect.banqueName)}</Champ>
             <Champ label="Syndicat">{ouVide(prospect.syndicatSigle)}</Champ>
-            {voitLeSegment(role) ? (
+            {voitLeSegment ? (
               <Champ label="Segment">
                 {prospect.segment === null ? NO_VALUE : SEGMENT_LABELS[prospect.segment]}
               </Champ>

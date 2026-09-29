@@ -3,15 +3,15 @@ import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { homePathForRole } from '@/components/layout/nav-items';
-import { ROLE_LABELS, type Role } from '@/lib/types';
+import { homePath } from '@/components/layout/nav-items';
+import type { SessionUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export function PermissionDenied({
-  role,
+  user,
   what = 'Cet écran',
 }: {
-  role: Role;
+  user: SessionUser;
   what?: string | undefined;
 }) {
   return (
@@ -27,15 +27,13 @@ export function PermissionDenied({
       </span>
       <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">Accès refusé</h2>
       <p className="max-w-md text-[0.9375rem] text-muted-foreground">
-        {what} est réservé à un autre rôle. Rôle en cours :{' '}
-        <strong className="font-[600] text-foreground">{ROLE_LABELS[role]}</strong>.
+        {what} demande une permission que le rôle{' '}
+        <strong className="font-[600] text-foreground">{user.roleLibelle}</strong> n’a pas. Un
+        administrateur peut la lui donner dans Utilisateurs et rôles.
       </p>
       {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
           `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
-      <Link
-        href={homePathForRole(role)}
-        className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
-      >
+      <Link href={homePath(user)} className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}>
         Retour à l’accueil
       </Link>
     </Card>

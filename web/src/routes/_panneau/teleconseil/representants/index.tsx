@@ -31,9 +31,9 @@ function TeleconseilRepresentantsPage() {
   return (
     <RepresentantsView
       canAdminister={peut(user, 'imports.administrer')}
-      readOnly={readsOnly(user.role)}
-      canExport={canExportRepresentants(user.role)}
-      campaignScoped={user.role === 'COMMERCIAL'}
+      readOnly={readsOnly(user)}
+      canExport={canExportRepresentants(user)}
+      campaignScoped={!peut(user, 'portefeuille.voir_tout')}
     />
   );
 }

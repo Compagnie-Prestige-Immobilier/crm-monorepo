@@ -307,9 +307,9 @@ const FERMES: readonly { role: RoleCompte; libelle: string; ecrans: readonly Ecr
     libelle: 'Téléconseiller',
     ecrans: [DOSSIERS, CLASSEUR, TABLEAU, DEMANDES],
   },
-  // L'export suit la permission `exports.banque` de l'API, ouverte à la supervision.
+  // L'export suit la permission `exports.banque` de l'API, ouverte à l'encadrement.
   { role: 'SUPERVISEUR', libelle: 'Supervision', ecrans: [ETAPES] },
-  { role: 'DIRECTION', libelle: 'Direction', ecrans: [CLASSEUR, ETAPES] },
+  { role: 'DIRECTION', libelle: 'Direction', ecrans: [ETAPES] },
   { role: 'BANQUE_FINANCE', libelle: 'Banque & Finance', ecrans: [ETAPES, ETAPE1] },
 ];
 
@@ -326,7 +326,7 @@ async function attendreRefus(page: Page, ecran: Ecran, libelle: string): Promise
   const refus = page.getByRole('alert').filter({ hasText: 'Accès refusé' });
   await expect(refus.getByRole('heading', { name: 'Accès refusé', level: 2 })).toBeVisible();
   await expect(refus).toContainText(
-    `Cet écran est réservé à un autre rôle. Rôle en cours : ${libelle}.`,
+    `Cet écran demande une permission que le rôle ${libelle} n’a pas.`,
   );
   const retour = refus.getByRole('link', { name: 'Retour à l’accueil' });
   await expect(retour).toHaveAttribute('href', /^\/(teleconseil|finance|accueil)/);

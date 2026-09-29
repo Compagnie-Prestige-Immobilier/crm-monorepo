@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
-import { homePathForRole } from '@/components/layout/nav-items';
+import { homePath } from '@/components/layout/nav-items';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -79,7 +79,7 @@ function useDevLogin(next: string | null | undefined) {
         const payload = (await response.json()) as { user: SessionUser };
         queryClient.clear();
         queryClient.setQueryData(meQueryOptions.queryKey, payload.user);
-        router.replace(next != null && next !== '' ? next : homePathForRole(payload.user.role));
+        router.replace(next != null && next !== '' ? next : homePath(payload.user));
       } catch {
         setError('Le compte dev est indisponible. Lancez `make db` puis réessayez.');
         setPending(null);

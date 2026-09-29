@@ -241,15 +241,15 @@ func TestReferentielsVisiteSystemeNonDesactivable(t *testing.T) {
 	b.attend(statut, http.StatusOK, "renommage d'une entrée système", body)
 }
 
-func TestReferentielsVisiteFermeeAuSuperviseur(t *testing.T) {
+func TestReferentielsVisiteOuverteAuSuperviseur(t *testing.T) {
 	b := nouveauBanc(t, "SUPERVISEUR")
 	b.referentielsConnexion("SUPERVISEUR")
 
 	b.referentielsLecture("/api/v1/referentiels/visite-objets")
 
 	statut, body := b.referentielsEnvoi(http.MethodPost, "/api/v1/referentiels/visite-objets",
-		map[string]any{"code": "OBJ_" + b.referentielsJeton(), "label": "Objet interdit"})
-	b.attend(statut, http.StatusForbidden, "les listes de visite restent à ADMIN et DIRECTION", body)
+		map[string]any{"code": "OBJ_" + b.referentielsJeton(), "label": "Objet de la supervision"})
+	b.attend(statut, http.StatusCreated, "la supervision tient les listes de visite", body)
 }
 
 func TestReferentielsStatutCodeDeduitDuLibelle(t *testing.T) {
