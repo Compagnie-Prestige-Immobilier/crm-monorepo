@@ -20,8 +20,6 @@ interface Onglet {
 const ONGLETS: Record<Coque, readonly Onglet[]> = {
   chues: [
     { label: 'Tableau de bord', chemin: 'statistiques' },
-    { label: 'Activité', chemin: 'supervision' },
-    { label: 'Présence', chemin: 'supervision', volet: 'comptes' },
     { label: 'Campagnes', chemin: 'campagnes' },
     // La vue bancaire est le tableau de bord de l'agent bancaire ; l'ADMIN la
     // lit ici plutôt que dans une entrée de barre de plus.
@@ -32,7 +30,6 @@ const ONGLETS: Record<Coque, readonly Onglet[]> = {
   ],
   'grand-public': [
     { label: 'Tableau de bord', chemin: 'statistiques' },
-    { label: 'Activité', chemin: 'supervision' },
     { label: 'Campagnes', chemin: 'campagnes' },
     { label: 'Banque', chemin: 'banque', roles: ['ADMIN'] },
   ],

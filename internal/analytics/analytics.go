@@ -828,7 +828,6 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/supervision/campagnes":             socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/supervision/activite":              socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/supervision/creneaux":              socle.PermissionAnalyticsSuperviser,
-	"PUT /api/v1/supervision/creneaux":              socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/supervision/objectifs":             socle.PermissionAnalyticsSuperviser,
 }
 

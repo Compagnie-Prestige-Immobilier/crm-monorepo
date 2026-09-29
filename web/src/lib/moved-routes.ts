@@ -17,7 +17,6 @@ const MOVED_ROUTES: Readonly<Record<string, string>> = {
   banque: '/finance',
   dossiers: '/finance/dossiers',
   'demandes-clients': '/finance/demandes-clients',
-  supervision: '/teleconseil/supervision',
   commerciaux: '/admin/commerciaux',
   referentiels: '/admin/referentiels',
   imports: '/admin/imports',
