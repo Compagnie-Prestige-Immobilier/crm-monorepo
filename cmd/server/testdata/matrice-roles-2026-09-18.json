@@ -547,6 +547,16 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
+  "POST /api/v1/auth/usurpation": ["ADMIN"],
+  "DELETE /api/v1/auth/usurpation": [
+    "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "POST /api/v1/bank-case-stages": ["ADMIN"],
   "POST /api/v1/bank-case-stages/reorder": ["ADMIN"],
   "POST /api/v1/bank-case-stages/{id}/active": ["ADMIN"],
