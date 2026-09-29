@@ -1,7 +1,10 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { Fragment } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -14,6 +17,21 @@ import {
 import { type RendezVousObtenu } from '@/lib/data/rendez-vous';
 import { dakarNow } from '@/lib/data/visites';
 import { formatDateTime, formatPhone } from '@/lib/format';
+import { peut } from '@/lib/types';
+
+function NomFiche({ fiche }: { fiche: RendezVousObtenu }) {
+  const { data: user } = useQuery(meQueryOptions);
+  const nom = `${fiche.prenom} ${fiche.nom}`;
+  if (!peut(user, 'prospects.lire')) return nom;
+  return (
+    <Link
+      href={`/teleconseil/prospects/${fiche.id}`}
+      className="underline-offset-4 hover:underline"
+    >
+      {nom}
+    </Link>
+  );
+}
 
 type Ton = 'warning' | 'success' | 'destructive' | 'outline' | 'info';
 
@@ -120,7 +138,7 @@ export function Groupes({
                         {quandDe(fiche)}
                       </TableCell>
                       <TableCell className="font-[600]">
-                        {fiche.prenom} {fiche.nom}
+                        <NomFiche fiche={fiche} />
                       </TableCell>
                       <TableCell>
                         <Telephone fiche={fiche} />
@@ -156,7 +174,7 @@ export function Groupes({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-[600]">
-                        {fiche.prenom} {fiche.nom}
+                        <NomFiche fiche={fiche} />
                       </p>
                       <Badge variant={etat.ton}>{etat.texte}</Badge>
                     </div>

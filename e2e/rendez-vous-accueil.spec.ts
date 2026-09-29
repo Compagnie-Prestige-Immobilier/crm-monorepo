@@ -84,6 +84,7 @@ test.describe('rendez-vous au comptoir', () => {
     await expect(ligne).toHaveCount(1);
     await expect(ligne.getByText('À confirmer', { exact: true })).toBeVisible();
     await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
+    await expect(ligne.getByRole('link', { name: `Awa ${nom}` })).toHaveCount(0);
 
     // Le type filtre la file : un RV CPI ne s'affiche pas sous RV site.
     await page.getByRole('combobox', { name: 'Type de rendez-vous' }).click();
@@ -172,6 +173,10 @@ test.describe('closing par le chargé de clientèle', () => {
 
     await page.getByRole('link', { name: 'Rendez-vous', exact: true }).first().click();
     const ligne = page.getByRole('row').filter({ hasText: nom });
+    await expect(ligne.getByRole('link', { name: `Awa ${nom}` })).toHaveAttribute(
+      'href',
+      /^\/teleconseil\/prospects\//u,
+    );
 
     await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
     await page.getByRole('menuitem', { name: 'Reporter' }).click();
