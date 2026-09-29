@@ -108,6 +108,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RevueAt: prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName, RemarqueImport: p.RemarqueImport,
 		LastCallAt: prospectISOPtr(p.LastCallAt), LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
+		HomonymeTelephone: l.HomonymeTelephone, HomonymeAppeleAt: prospectISOPtr(l.HomonymeAppeleAt), HomonymeAppelePar: l.HomonymeAppelePar,
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		// string_agg ne rend rien hors campagne : le vide devient un tiret.
@@ -132,6 +133,7 @@ type prospectPortee struct {
 	tout       bool
 	converti   bool
 	rendezVous bool
+	suivi      bool
 	userID     string
 }
 
@@ -142,7 +144,9 @@ func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout),
 		converti:   u.Peut(socle.PermissionFichesVoirConverties),
 		rendezVous: u.Peut(socle.PermissionRendezVousSuivre),
-		userID:     u.ID,
+		// Qui tient les rendez-vous suit aussi les intéressés et hésitants de tous les téléconseillers.
+		suivi:  u.Peut(socle.PermissionRendezVousCloser),
+		userID: u.ID,
 	}
 }
 
@@ -189,7 +193,7 @@ func (s *service) prospectCharger(ctx context.Context, arg *db.ListProspectsPara
 func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id string) (*Prospect, error) {
 	p := prospectPorteeDe(u)
 	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
-		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
+		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous, ScopeSuivi: p.suivi,
 		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
 	})
 	if err != nil {

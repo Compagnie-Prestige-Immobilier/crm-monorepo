@@ -29,7 +29,16 @@ SELECT
   ru."fullName" AS representant_appele_par,
   ha."phoneE164" AS homonyme_telephone,
   ha."lastCallAt" AS homonyme_appele_at,
-  hu."fullName" AS homonyme_appele_par
+  hu."fullName" AS homonyme_appele_par,
+  -- Les campagnes d'appels qui ont confié la fiche, dernières d'abord.
+  (SELECT string_agg(l."name", ' · ' ORDER BY l."createdAt" DESC, l."id" DESC)
+   FROM "lot_export_items" li JOIN "lots_export" l ON l."id" = li."lotId"
+   WHERE li."prospectId" = p."id") AS campagne_noms,
+  -- Le dernier rendez-vous posé en appel, tous motifs : c'est la date que
+  -- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
+  (SELECT a."rendezVousAt" FROM "call_attempts" a
+   WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
+   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
