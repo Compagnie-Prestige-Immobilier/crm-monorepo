@@ -48,7 +48,7 @@ const TABS: readonly {
     href: '/accueil/tableau-de-bord',
     label: 'Tableau de bord',
     icon: ChartNoAxesCombinedIcon,
-    permission: null,
+    permission: 'chiffres.disposer',
   },
   {
     // Gestion des quatre listes qui alimentent la saisie : réservée à qui les

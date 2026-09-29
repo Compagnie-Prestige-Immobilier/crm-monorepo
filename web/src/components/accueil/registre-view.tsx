@@ -541,10 +541,10 @@ export function RegistreView() {
 
       <section
         aria-label="Actions et filtres du registre"
-        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 shadow-elev-sm print:hidden"
+        className="flex flex-col gap-3 print:hidden"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-2">
             <Button
               type="button"
               onClick={() => {
@@ -610,7 +610,7 @@ export function RegistreView() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <SearchField
               value={searchDraft}
               onChange={setSearchDraft}
