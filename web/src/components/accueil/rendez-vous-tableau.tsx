@@ -113,7 +113,8 @@ function Recontact({ fiche }: { fiche: RendezVousObtenu }) {
   const note = fiche.recontacterAt === '' ? '' : `, le ${formatDateTime(fiche.recontacterAt)}`;
   return (
     <p className="mt-1 max-w-md text-[0.8125rem] font-normal whitespace-pre-line text-muted-foreground">
-      « {fiche.recontacterNote} » · {fiche.recontacterPar}
+      {fiche.recontacterNote === '' ? 'Reporté' : `« ${fiche.recontacterNote} »`} ·{' '}
+      {fiche.recontacterPar}
       {note}
     </p>
   );

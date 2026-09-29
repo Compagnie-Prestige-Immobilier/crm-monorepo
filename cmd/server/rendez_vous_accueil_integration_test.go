@@ -328,8 +328,6 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 		t.Fatal("un rendez-vous tout juste pris doit être à confirmer")
 	}
 
-	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE"})
-	cc.attend(statut, http.StatusBadRequest, "report sans date", body)
 	nouvelle := quandRV.AddDate(0, 0, 3)
 	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE", "reporteAt": nouvelle.Format(time.RFC3339)})
 	cc.attend(statut, http.StatusOK, "report daté", body)
@@ -346,12 +344,16 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	vides := []string{
 		"natureJuridique", "etatSite", "position", "auNomDe", "pieceIdentiteVerifiee", "paiementAcompte",
 		"origineFondsJustifiee", "freinPrincipal", "autresPromoteurs", "parrain", "chargeDeClientele", "compteRendu",
-		"titulaires", "personnePolitiquementExposee",
+		"titulaires", "personnePolitiquementExposee", "pointRencontre", "siteInteresse", "moyensUtilises",
+		"accompagnement", "agent", "chauffeur",
 	}
 	for _, champ := range vides {
 		corps[champ] = ""
 	}
 	corps["localite"], corps["superficie"], corps["prochaineAction"], corps["dateRelance"] = "Site test", "300 m²", "Signature du contrat", "2026-10-15"
+	corps["qualification"], corps["qualificationCommentaire"] = "Partenariat", "Coopérative d'enseignants"
+	corps["qualificationExterne"] = []string{"Négociation", "Visite du notaire"}
+	corps["dateVisite"], corps["heureVisite"] = "2026-10-02", "09:30"
 	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
 	cc.attend(statut, http.StatusUnprocessableEntity, "closing avant la venue", body)
 
@@ -375,14 +377,65 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	cc.attend(statut, http.StatusOK, "closing enregistré", body)
 	statut, body = qualificationEnvoi(cc, http.MethodGet, closing, nil)
 	cc.attend(statut, http.StatusOK, "closing relu", body)
-	if relu, _ := body["closing"].(map[string]any); relu["superficie"] != "300 m²" || relu["dateRelance"] != "2026-10-15" {
-		t.Fatalf("closing relu : %v", body)
+	relu, _ := body["closing"].(map[string]any)
+	for champ, attendu := range map[string]string{
+		"superficie": "300 m²", "dateRelance": "2026-10-15", "qualification": "Partenariat",
+		"qualificationCommentaire": "Coopérative d'enseignants", "qualificationExterne": "[Négociation Visite du notaire]",
+		"dateVisite": "2026-10-02", "heureVisite": "09:30",
+	} {
+		if fmt.Sprint(relu[champ]) != attendu {
+			t.Fatalf("closing relu, %s : %v", champ, relu[champ])
+		}
 	}
+	if points, _ := body["pointsRencontre"].([]any); len(points) == 0 {
+		t.Fatalf("le closing propose les points de rencontre d'un RV site : %v", body)
+	}
+	incoherent := maps.Clone(corps)
+	incoherent["heureVisite"] = "9h30"
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, incoherent)
+	cc.attend(statut, http.StatusUnprocessableEntity, "heure de visite illisible", body)
 	attendreEtape(cc, fiche, "HISTORIQUE")
 	statut, body = qualificationEnvoi(cc, http.MethodGet, listeRendezVous+"&etape=A_TRAITER", nil)
 	cc.attend(statut, http.StatusOK, "rendez-vous à traiter après closing", body)
 	if contientFiche(body, fiche) {
 		t.Fatal("un rendez-vous closé quitte « À traiter »")
+	}
+}
+
+// Date et heure d'un report sont facultatives : sans heure, il attend dans
+// « À recontacter » ; le commentaire d'un report daté reste au journal.
+func TestRendezVousReportSansDate(t *testing.T) {
+	_, fiches, quandRV := rendezVousPoses(t)
+	fiche := fiches["RV_CPI"]
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	suivi := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
+
+	statut, body := qualificationEnvoi(cc, http.MethodPost, suivi,
+		map[string]any{"issue": "REPORTE", "commentaire": "Rappellera après la Tabaski", "recontacterLe": "2026-10-20"})
+	cc.attend(statut, http.StatusOK, "report sans heure", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_RECONTACTER" ||
+		rdv["recontacterNote"] != "Rappellera après la Tabaski" || rdv["recontacterLe"] != "2026-10-20" {
+		t.Fatalf("un report sans heure attend à recontacter, avec son commentaire : %v", rdv)
+	}
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE"})
+	cc.attend(statut, http.StatusOK, "report sans date ni commentaire", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_RECONTACTER" || rdv["recontacterLe"] != "" {
+		t.Fatalf("un report sans date attend à recontacter : %v", rdv)
+	}
+
+	nouvelle := quandRV.AddDate(0, 0, 3).Format(time.RFC3339)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi,
+		map[string]any{"issue": "REPORTE", "reporteAt": nouvelle, "recontacterLe": "2026-10-20"})
+	cc.attend(statut, http.StatusBadRequest, "date de recontact sur un report daté", body)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi,
+		map[string]any{"issue": "REPORTE", "reporteAt": nouvelle, "commentaire": "Préfère le matin"})
+	cc.attend(statut, http.StatusOK, "report daté avec commentaire", body)
+	attendreEtape(cc, fiche, "A_CONFIRMER")
+	var commentaire string
+	if err := cc.pool.QueryRow(cc.ctx, `SELECT "after"->>'commentaire' FROM "audit_logs"
+		WHERE "entityId" = $1 AND "action" = 'prospect.suivi_rendez_vous' ORDER BY "id" DESC LIMIT 1`, fiche).Scan(&commentaire); err != nil ||
+		commentaire != "Préfère le matin" {
+		t.Fatalf("le commentaire d'un report daté reste au journal : %q, %v", commentaire, err)
 	}
 }
 
