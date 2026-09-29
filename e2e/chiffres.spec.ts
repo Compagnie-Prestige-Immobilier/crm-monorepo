@@ -1,15 +1,7 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { avecBase, compteDe } from './comptes';
-import {
-  apiDe,
-  creerCompte,
-  ligne,
-  purger,
-  sessionApi,
-  suffixe,
-  type CompteCree,
-} from './donnees-listes';
+import { apiDe, creerCompte, ligne, purger, suffixe, type CompteCree } from './donnees-listes';
 
 const cle = suffixe();
 const SUPERVISEUR = compteDe('SUPERVISEUR');
@@ -47,15 +39,6 @@ async function widgetsDe(userId: string): Promise<string[]> {
 }
 
 const blocsDe = (page: Page) => page.getByRole('button', { name: /^À propos de / });
-
-// Un jeu de comptes par fichier de parcours : les téléconseillers débordent la page de 25.
-async function toutesLesLignesTeleconseillers(page: Page): Promise<void> {
-  const legende = page.getByRole('table', { name: /^Téléconseillers/ }).locator('caption');
-  const nombre = Number((await legende.textContent())?.replace(/\D/g, ''));
-  if (nombre <= 25) return;
-  await page.getByRole('combobox', { name: 'Lignes' }).first().click();
-  await page.getByRole('option', { name: '100', exact: true }).click();
-}
 
 async function reporterRappelIntrusif(page: Page): Promise<void> {
   const reporter = page.getByRole('button', { name: 'Plus tard' });
@@ -217,56 +200,5 @@ test.describe('parcours 9, le tableau de pilotage', () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'À propos de Ventes du mois' })).toBeVisible();
     await expect(retirer).toHaveCount(0);
-  });
-});
-
-test.describe('parcours 9, la supervision', () => {
-  test.use({ storageState: SUPERVISEUR.etat });
-
-  test('un battement fait passer un compte de « Inactif » à « Connecté »', async ({
-    page,
-    browser,
-  }) => {
-    expect(veilleur, 'le compte de veille n’a pas été créé').not.toBeNull();
-    const compte = veilleur as CompteCree;
-
-    await page.goto('/teleconseil/supervision?volet=comptes');
-    await reporterRappelIntrusif(page);
-    await toutesLesLignesTeleconseillers(page);
-    const rangee = page.getByRole('row').filter({ hasText: compte.identifiant });
-    await expect(rangee).toContainText('Inactif');
-
-    const battant: APIRequestContext = await sessionApi(
-      compte.identifiant,
-      compte.motDePasse,
-      '198.51.100.75',
-    );
-    const poste = await browser.newContext({ storageState: await battant.storageState() });
-    await battant.dispose();
-    await (await poste.newPage()).goto('/teleconseil/console');
-
-    await expect
-      .poll(
-        async () =>
-          (
-            await ligne<{ userId: string }>(
-              'SELECT "userId" FROM agent_heartbeats WHERE "userId" = $1',
-              [compte.id],
-            )
-          )?.userId,
-        { message: 'le battement n’est pas écrit en base' },
-      )
-      .toBe(compte.id);
-    await poste.close();
-
-    await page.reload();
-    await toutesLesLignesTeleconseillers(page);
-    await expect(rangee).toContainText('Connecté');
-  });
-
-  test('le volet Activité compte les appels et les saisies', async ({ page }) => {
-    await page.goto('/teleconseil/supervision');
-    await reporterRappelIntrusif(page);
-    await expect(page.getByRole('table').first()).toContainText('Téléconseiller');
   });
 });

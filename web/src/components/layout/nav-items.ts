@@ -391,14 +391,6 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/teleconseil/supervision',
-        label: 'Superviser l’équipe',
-        icon: ActivityIcon,
-        description: 'Activité et présence des téléconseillers',
-        acces: 'analytics.superviser',
-        secondary: true,
-      },
-      {
         href: '/teleconseil/leads-importes',
         label: 'Leads importés',
         icon: UploadIcon,

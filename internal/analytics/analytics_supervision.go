@@ -2,13 +2,10 @@ package analytics
 
 import (
 	"context"
-	"cpi-go/db"
-	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -202,15 +199,6 @@ type CreneauxDeTravail struct {
 
 type CreneauxOutput struct{ Body CreneauxDeTravail }
 
-type MajCreneauxInput struct {
-	Body struct {
-		MorningStart   string `json:"morningStart" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$" example:"09:00"`
-		MorningEnd     string `json:"morningEnd" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$" example:"14:00"`
-		AfternoonStart string `json:"afternoonStart" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$" example:"15:00"`
-		AfternoonEnd   string `json:"afternoonEnd" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$" example:"18:00"`
-	}
-}
-
 func secondesDepuisMinuit(heure string) int {
 	heures, minutes := 0, 0
 	parties := strings.SplitN(heure, ":", 2)
@@ -275,41 +263,6 @@ func (s *service) creneauxDeTravail(ctx context.Context, _ *struct{}) (*Creneaux
 		return nil, err
 	}
 	return &CreneauxOutput{Body: corps}, nil
-}
-
-func (s *service) enregistrerCreneauxDeTravail(ctx context.Context, in *MajCreneauxInput) (*CreneauxOutput, error) {
-	shifts := []CreneauDeTravail{
-		{Key: cleMatin, Label: "Matin", Start: in.Body.MorningStart, End: in.Body.MorningEnd},
-		{Key: cleApresMidi, Label: "Après-midi", Start: in.Body.AfternoonStart, End: in.Body.AfternoonEnd},
-	}
-	if !creneauxOrdonnes(shifts) {
-		return nil, socle.Problem(http.StatusBadRequest, "INVALID_WORK_SHIFTS",
-			"Les créneaux doivent être ordonnés, sans chevauchement.")
-	}
-	valeur, err := json.Marshal(map[string][]CreneauDeTravail{"shifts": shifts})
-	if err != nil {
-		return nil, err
-	}
-	auteur := socle.UtilisateurCourant(ctx).ID
-	// Les créneaux servent de dénominateur aux notes de rendement : les
-	// déplacer change tous les taux affichés, d'où la trace.
-	avant := s.creneauxOuValeursParDefaut(ctx)
-	var quand time.Time
-	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		q := s.Q.WithTx(tx)
-		ecrit, err := q.EnregistrerCreneauxTravail(ctx, db.EnregistrerCreneauxTravailParams{
-			Value: string(valeur), UpdatedById: &auteur,
-		})
-		if err != nil {
-			return err
-		}
-		quand = ecrit
-		return database.Auditer(ctx, q, auteur, "supervision.creneaux", "supervision", "creneaux", avant, shifts)
-	}); err != nil {
-		return nil, err
-	}
-	iso := quand.UTC().Format(time.RFC3339Nano)
-	return &CreneauxOutput{Body: CreneauxDeTravail{Shifts: shifts, UpdatedAt: &iso}}, nil
 }
 
 type StockParZone struct {
@@ -546,9 +499,4 @@ func monterSupervision(api huma.API, s *service) {
 	routeDeLecture(api, "getSupervisionCampagnes", "/api/v1/supervision/campagnes", s.rendementDesCampagnes)
 	routeDeLecture(api, "getSupervisionActivite", "/api/v1/supervision/activite", s.activiteDesTeleconseillers)
 	routeDeLecture(api, "getSupervisionCreneaux", "/api/v1/supervision/creneaux", s.creneauxDeTravail)
-	huma.Register(api, huma.Operation{
-		OperationID: "updateSupervisionCreneaux",
-		Method:      http.MethodPut,
-		Path:        "/api/v1/supervision/creneaux",
-	}, s.enregistrerCreneauxDeTravail)
 }

@@ -82,7 +82,6 @@
   "GET /api/v1/admin/journal": ["ADMIN"],
   "GET /api/v1/admin/kairo": ["ADMIN"],
   "GET /api/v1/admin/purge": ["ADMIN"],
-  "GET /api/v1/admin/supervision": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/analytics/by-banque": [
     "ADMIN",
     "CHARGE_CLIENTELE",
@@ -722,7 +721,6 @@
     "SUPERVISEUR"
   ],
   "PUT /api/v1/roles/{id}/permissions": ["ADMIN"],
-  "PUT /api/v1/supervision/creneaux": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition": [
     "ACCUEIL",
     "ADMIN",

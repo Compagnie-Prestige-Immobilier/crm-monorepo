@@ -85,13 +85,6 @@ SELECT pg_advisory_xact_lock($1);
 -- name: CreneauxTravail :one
 SELECT value, "updatedAt" FROM "app_settings" WHERE key = 'supervision.creneaux';
 
--- name: EnregistrerCreneauxTravail :one
-INSERT INTO "app_settings" (key, value, "updatedById", "updatedAt")
-VALUES ('supervision.creneaux', $1, $2, now())
-ON CONFLICT (key) DO UPDATE
-  SET value = EXCLUDED.value, "updatedById" = EXCLUDED."updatedById", "updatedAt" = now()
-RETURNING "updatedAt";
-
 -- name: QualiteBaseRepresentants :one
 -- Éprouvée dès le premier appel. « Joint » se lit sur l'effet du statut, « productif »
 -- sur les prospects que le représentant a réellement apportés.
