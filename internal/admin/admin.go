@@ -1005,7 +1005,7 @@ func supprimerTablePurge(ctx context.Context, tx pgx.Tx, etape etapePurge, acteu
 var (
 	sourcesVisites       = strings.Split("total-visites,moyenne-journaliere,jour-le-plus-charge,par-entreprise,par-objet,par-direction,par-destinataire,par-jour,par-mois,par-heure,par-jour-semaine,par-heure-jour-semaine,par-agent,par-entreprise-objet,par-destinataire-direction,par-objet-mois,visiteurs-recurrents,avec-telephone,qualite-de-saisie", ",")
 	sourcesQualification = strings.Split("taux-de-contact,taux-de-joignabilite-representants,taux-d-acceptation,taux-de-rappel,repartition-statuts-qualification,joints-non-joints,statuts-par-famille,joignabilite-par-creneau,taux-d-exploitation,representants-par-departement,representants-par-ief,representants-jamais-appeles,representants-injoignables", ",")
-	sourcesProspects     = strings.Split("taux-de-joignabilite,prospects-notes,adhesions,reste-a-appeler,fiches-ouvertes,taux-de-qualification,taux-de-reiteration,duree-moyenne-sur-la-fiche,duree-moyenne-de-communication,appels-par-jour,par-teleconseiller,rendez-vous-par-teleconseiller,couverture-derniere-campagne,hors-attribution-derniere-campagne,encaisse,de-l-appel-a-l-encaissement,methodes-d-adhesion,par-banque,delais-medians,rendement-par-departement", ",")
+	sourcesProspects     = strings.Split("taux-de-joignabilite,taux-de-rendez-vous,prospects-notes,adhesions,reste-a-appeler,fiches-ouvertes,taux-de-qualification,taux-de-reiteration,duree-moyenne-sur-la-fiche,duree-moyenne-de-communication,appels-par-jour,par-teleconseiller,rendez-vous-par-teleconseiller,couverture-derniere-campagne,hors-attribution-derniere-campagne,encaisse,de-l-appel-a-l-encaissement,methodes-d-adhesion,par-banque,delais-medians,rendement-par-departement", ",")
 	sourcesEnrolement    = strings.Split("enrolement-inscriptions,enrolement-taux-rapprochement,enrolement-taux-conversion,enrolement-par-jour,enrolement-par-etape,enrolement-par-teleconseiller", ",")
 
 	sourcesParEcran = map[string][]string{
@@ -1074,7 +1074,7 @@ var reglesParSource = map[string]regleMarque{
 	sourceTauxExploitation:              regleCamembert,
 	"representants-par-departement":     regleClassement, "representants-par-ief": regleClassement,
 	"representants-jamais-appeles": regleChiffre, "representants-injoignables": regleChiffre,
-	"taux-de-joignabilite": regleChiffre, "prospects-notes": regleChiffre,
+	"taux-de-joignabilite": regleChiffre, "taux-de-rendez-vous": regleChiffre, "prospects-notes": regleChiffre,
 	"adhesions": regleChiffre, "reste-a-appeler": regleChiffre,
 	sourceFichesOuvertes: regleMatrice, "taux-de-qualification": regleChiffre,
 	"taux-de-reiteration":        regleChiffre,
@@ -1124,7 +1124,7 @@ var dispositionsUsine = map[string][]DispositionWidget{
 	// viennent après, sinon l'écran ouvre sur des zéros les semaines sans campagne
 	// de représentants.
 	ecranChues: slices.Concat(
-		widgetsDe("taux-de-joignabilite", "adhesions", "taux-de-contact", "taux-de-qualification", "taux-de-reiteration"),
+		widgetsDe("taux-de-joignabilite", "taux-de-rendez-vous", "adhesions", "taux-de-contact", "taux-de-qualification", "taux-de-reiteration"),
 		[]DispositionWidget{
 			{Source: "appels-par-jour", Taille: taillePleine},
 			{Source: sourceTauxExploitation, Marque: marqueCamembert, Taille: taillePleine},

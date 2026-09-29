@@ -278,36 +278,59 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
 });
 
 /** Nombre de rendez-vous posés et taux (posés ÷ fiches jointes), par téléconseiller. Le pied reprend `totals`, calculé par le serveur. */
-function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
-  const poses = new Map<string, number>();
-  const joints = new Map<string, number>();
-  for (const ligne of activite.items) {
-    poses.set(ligne.teleconseillerId, (poses.get(ligne.teleconseillerId) ?? 0) + ligne.rendezVous);
-    joints.set(
-      ligne.teleconseillerId,
-      (joints.get(ligne.teleconseillerId) ?? 0) + ligne.fichesJointes,
-    );
-  }
-  const cellules = (rdv: number, fichesJointes: number): EquipeLigne['cellules'] => [
-    { cle: 'Rendez-vous', texte: formatNumber(rdv) },
-    { cle: 'Taux', texte: taux(part(rdv, fichesJointes)) },
+interface CompteRendezVous {
+  rendezVous: number;
+  rendezVousTelephoniques: number;
+  fichesJointes: number;
+}
+
+function cellulesRendezVous(compte: CompteRendezVous): EquipeLigne['cellules'] {
+  return [
+    { cle: 'RV téléphoniques', texte: formatNumber(compte.rendezVousTelephoniques) },
+    {
+      cle: 'Autres RV',
+      texte: formatNumber(compte.rendezVous - compte.rendezVousTelephoniques),
+    },
+    { cle: 'Total', texte: formatNumber(compte.rendezVous) },
+    { cle: 'Taux', texte: taux(part(compte.rendezVous, compte.fichesJointes)) },
   ];
+}
+
+function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
+  const parPersonne = new Map<string, CompteRendezVous>();
+  for (const ligne of activite.items) {
+    const compte = parPersonne.get(ligne.teleconseillerId) ?? {
+      rendezVous: 0,
+      rendezVousTelephoniques: 0,
+      fichesJointes: 0,
+    };
+    compte.rendezVous += ligne.rendezVous;
+    compte.rendezVousTelephoniques += ligne.rendezVousTelephoniques;
+    compte.fichesJointes += ligne.fichesJointes;
+    parPersonne.set(ligne.teleconseillerId, compte);
+  }
+  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousTelephoniques: 0, fichesJointes: 0 };
   return {
     forme: 'equipe',
     donnee: {
-      colonnes: ['Rendez-vous', 'Taux'],
+      colonnes: ['RV téléphoniques', 'Autres RV', 'Total', 'Taux'],
       lignes: activite.teleconseillers.map((personne) => ({
         id: personne.id,
         nom: personne.fullName,
-        cellules: cellules(poses.get(personne.id) ?? 0, joints.get(personne.id) ?? 0),
+        cellules: cellulesRendezVous(parPersonne.get(personne.id) ?? aucun),
       })),
-      pied: {
-        id: 'equipe',
-        nom: 'Équipe',
-        cellules: cellules(activite.totals.rendezVous, activite.totals.fichesJointes),
-      },
+      pied: { id: 'equipe', nom: 'Équipe', cellules: cellulesRendezVous(activite.totals) },
     },
   };
+}
+
+/** Le détail d'une tuile de rendez-vous : combien, sur combien de joints, dont combien par téléphone. */
+function detailRendezVous(totaux: ChiffresActivite['totals']): string {
+  const autres = totaux.rendezVous - totaux.rendezVousTelephoniques;
+  return (
+    `${formatNumber(totaux.rendezVous)} sur ${formatNumber(totaux.fichesJointes)} prospects joints · ` +
+    `${formatNumber(totaux.rendezVousTelephoniques)} téléphoniques, ${formatNumber(autres)} autres`
+  );
 }
 
 /** La même phrase que le détail d'une campagne : appelées sur confiées, appels consignés. */
@@ -657,6 +680,22 @@ const SOURCES_CHIFFRES = {
             'Aucun appel à un prospect sur la période',
           ),
   },
+  'taux-de-rendez-vous': {
+    label: 'Taux de rendez-vous',
+    forme: 'scalaire',
+    jeu: 'activite',
+    description:
+      'Prospects avec un rendez-vous posé (téléphonique, CPI, site, externe) ÷ prospects joints, sur la période.',
+    groupe: 'Appels aux prospects',
+    extraire: ({ activite }) =>
+      activite === undefined
+        ? null
+        : scalaireTaux(
+            activite.totals.rendezVousRate,
+            detailRendezVous(activite.totals),
+            'Aucun prospect joint sur la période',
+          ),
+  },
   'prospects-notes': {
     label: 'Prospects saisis',
     forme: 'scalaire',
@@ -688,7 +727,7 @@ const SOURCES_CHIFFRES = {
     forme: 'equipe',
     jeu: 'activite',
     description:
-      'Rendez-vous posés et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
+      'Rendez-vous posés, téléphoniques et autres (CPI, site, externe), et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
     groupe: 'Équipe',
     extraire: ({ activite }) => (activite === undefined ? null : tableauRendezVous(activite)),
   },
