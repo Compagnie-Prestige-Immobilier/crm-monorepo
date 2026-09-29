@@ -180,6 +180,47 @@ export function FiltersBar({
               setFilters({ revue: value === null ? null : value === 'oui' });
             }}
           />
+          <DatePicker
+            id="prospects-rdv-from"
+            label="RDV posé à partir du"
+            value={filters.rdvFrom}
+            max={filters.rdvTo}
+            onChange={(rdvFrom) => {
+              setFilters({ rdvFrom });
+            }}
+          />
+          <DatePicker
+            id="prospects-rdv-to"
+            label="RDV posé jusqu’au"
+            value={filters.rdvTo}
+            min={filters.rdvFrom}
+            onChange={(rdvTo) => {
+              setFilters({ rdvTo });
+            }}
+          />
+          {/* Comme « Ajoutée par » : qui a appelé, pas qui détient la fiche. */}
+          {reference.utilisateurs.length === 0 ? null : (
+            <FilterCombobox
+              label="Appelée par"
+              placeholder="Tous les utilisateurs"
+              options={reference.utilisateurs}
+              value={filters.appelePar}
+              onChange={(value) => {
+                setFilters({ appelePar: value });
+              }}
+            />
+          )}
+          {reference.utilisateurs.length === 0 ? null : (
+            <FilterCombobox
+              label="Dernier appel par"
+              placeholder="Tous les utilisateurs"
+              options={reference.utilisateurs}
+              value={filters.lastCallById}
+              onChange={(value) => {
+                setFilters({ lastCallById: value });
+              }}
+            />
+          )}
         </>
       </AdvancedPanel>
     </section>

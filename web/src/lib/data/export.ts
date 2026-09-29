@@ -28,8 +28,10 @@ export function buildExportUrl(
 
   // L'ecran ecrit « oui » et « non » dans son URL ; la route d'export attend le
   // booleen que porte le contrat.
-  const revue = params.get('revue');
-  if (revue !== null) params.set('revue', String(revue === 'oui'));
+  for (const cle of ['revue', 'avecRdv', 'avecCommentaire'] as const) {
+    const valeur = params.get(cle);
+    if (valeur !== null) params.set(cle, String(valeur === 'oui'));
+  }
 
   const query = params.toString();
   return query === '' ? CHEMIN_PROSPECTS : `${CHEMIN_PROSPECTS}?${query}`;

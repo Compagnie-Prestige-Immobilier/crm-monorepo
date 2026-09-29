@@ -9,16 +9,30 @@ import {
 import {
   BDD_SEGMENTS,
   ENROLLMENT_METHODS,
+  MODE_EPARGNES,
+  PAYMENT_MODES,
   PHASE2_STATUSES,
+  PROSPECT_ORIGINS,
   PROSPECT_SORT_FIELDS,
   PROSPECT_STATUTS,
+  PROSPECT_TYPES,
+  RENDEZ_VOUS_ISSUES,
+  TYPE_CONTRATS,
+  TYPES_BIEN,
   type BddSegment,
   type EnrollmentMethod,
+  type ModeEpargne,
+  type PaymentMode,
   type Phase2Status,
   type ProspectFilters,
+  type ProspectOrigin,
   type ProspectSortField,
   type ProspectStatut,
+  type ProspectType,
+  type RendezVousIssue,
   type SortDirection,
+  type TypeBien,
+  type TypeContrat,
 } from '@/lib/types';
 
 const PROJETS = ['CHUES', 'GRAND_PUBLIC'] as const;
@@ -42,8 +56,27 @@ export const EMPTY_FILTERS: ProspectFilters = {
   revue: null,
   sansMotif: null,
   motif: null,
+  campagneId: null,
+  type: null,
+  canalProvenanceId: null,
+  origin: null,
+  professionId: null,
+  incomeBandId: null,
+  employeurId: null,
+  paysResidenceId: null,
+  paymentMode: null,
+  typeBien: null,
+  typeContrat: null,
+  modeEpargne: null,
+  rendezVousIssue: null,
+  avecRdv: null,
+  avecCommentaire: null,
+  appelePar: null,
+  lastCallById: null,
   dateFrom: null,
   dateTo: null,
+  rdvFrom: null,
+  rdvTo: null,
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
   sortBy: 'clientCreatedAt',
@@ -100,8 +133,31 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     revue: readFrenchBoolean(params, 'revue'),
     sansMotif: readString(params, 'sansMotif'),
     motif: readString(params, 'motif'),
+    campagneId: readString(params, 'campagneId'),
+    type: readEnum<ProspectType>(params, 'type', PROSPECT_TYPES),
+    canalProvenanceId: readString(params, 'canalProvenanceId'),
+    origin: readEnum<ProspectOrigin>(params, 'origin', PROSPECT_ORIGINS),
+    professionId: readString(params, 'professionId'),
+    incomeBandId: readString(params, 'incomeBandId'),
+    employeurId: readString(params, 'employeurId'),
+    paysResidenceId: readString(params, 'paysResidenceId'),
+    paymentMode: readEnum<PaymentMode>(params, 'paymentMode', PAYMENT_MODES),
+    typeBien: readEnum<TypeBien>(params, 'typeBien', TYPES_BIEN),
+    typeContrat: readEnum<TypeContrat>(params, 'typeContrat', TYPE_CONTRATS),
+    modeEpargne: readEnum<ModeEpargne>(params, 'modeEpargne', MODE_EPARGNES),
+    rendezVousIssue: readEnum<RendezVousIssue | 'SANS'>(
+      params,
+      'rendezVousIssue',
+      RENDEZ_VOUS_ISSUES,
+    ),
+    avecRdv: readFrenchBoolean(params, 'avecRdv'),
+    avecCommentaire: readFrenchBoolean(params, 'avecCommentaire'),
+    appelePar: readString(params, 'appelePar'),
+    lastCallById: readString(params, 'lastCallById'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
+    rdvFrom: readIsoDate(params, 'rdvFrom'),
+    rdvTo: readIsoDate(params, 'rdvTo'),
     page: readPositiveInt(params, 'page', 1),
     pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)
       ? pageSize
@@ -109,6 +165,11 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     sortBy: readSortBy(params),
     sortDir: readSortDir(params),
   };
+}
+
+function ouiNon(value: boolean | null): string | null {
+  if (value === null) return null;
+  return value ? 'oui' : 'non';
 }
 
 export function serializeProspectFilters(filters: ProspectFilters): URLSearchParams {
@@ -129,11 +190,30 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('phase2Status', filters.phase2Status);
   put('enrollmentMethod', filters.enrollmentMethod);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
-  if (filters.revue !== null) put('revue', filters.revue ? 'oui' : 'non');
+  put('revue', ouiNon(filters.revue));
   put('sansMotif', filters.sansMotif);
   put('motif', filters.motif);
+  put('campagneId', filters.campagneId);
+  put('type', filters.type);
+  put('canalProvenanceId', filters.canalProvenanceId);
+  put('origin', filters.origin);
+  put('professionId', filters.professionId);
+  put('incomeBandId', filters.incomeBandId);
+  put('employeurId', filters.employeurId);
+  put('paysResidenceId', filters.paysResidenceId);
+  put('paymentMode', filters.paymentMode);
+  put('typeBien', filters.typeBien);
+  put('typeContrat', filters.typeContrat);
+  put('modeEpargne', filters.modeEpargne);
+  put('rendezVousIssue', filters.rendezVousIssue);
+  put('avecRdv', ouiNon(filters.avecRdv));
+  put('avecCommentaire', ouiNon(filters.avecCommentaire));
+  put('appelePar', filters.appelePar);
+  put('lastCallById', filters.lastCallById);
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
+  put('rdvFrom', filters.rdvFrom);
+  put('rdvTo', filters.rdvTo);
   if (filters.page !== 1) put('page', String(filters.page));
   if (filters.pageSize !== DEFAULT_PAGE_SIZE) put('pageSize', String(filters.pageSize));
   if (filters.sortBy !== EMPTY_FILTERS.sortBy) put('sortBy', filters.sortBy);
@@ -196,7 +276,25 @@ export function countActiveFilters(filters: ProspectFilters): number {
     filters.enrollmentMethod !== null,
     filters.enrollmentCapturedById !== null,
     filters.revue !== null,
+    filters.campagneId !== null,
+    filters.type !== null,
+    filters.canalProvenanceId !== null,
+    filters.origin !== null,
+    filters.professionId !== null,
+    filters.incomeBandId !== null,
+    filters.employeurId !== null,
+    filters.paysResidenceId !== null,
+    filters.paymentMode !== null,
+    filters.typeBien !== null,
+    filters.typeContrat !== null,
+    filters.modeEpargne !== null,
+    filters.rendezVousIssue !== null,
+    filters.avecRdv !== null,
+    filters.avecCommentaire !== null,
+    filters.appelePar !== null,
+    filters.lastCallById !== null,
     filters.dateFrom !== null || filters.dateTo !== null,
+    filters.rdvFrom !== null || filters.rdvTo !== null,
   ];
   return filtresActifs.filter(Boolean).length;
 }

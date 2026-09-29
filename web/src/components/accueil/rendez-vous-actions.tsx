@@ -172,12 +172,15 @@ export function ActionsRendezVous({
   peutCloser,
   onCloser,
   onEnregistrerVisite,
+  onFait,
 }: {
   fiche: RendezVousObtenu;
   peutNoter: boolean;
   peutCloser: boolean;
   onCloser: (fiche: RendezVousObtenu) => void;
   onEnregistrerVisite: ((fiche: RendezVousObtenu) => void) | null;
+  /** L'agenda ferme sa fiche une fois le geste enregistré. */
+  onFait?: () => void;
 }) {
   const client = useQueryClient();
   const [dialogue, setDialogue] = useState<'reporter' | 'annuler' | null>(null);
@@ -187,6 +190,7 @@ export function ActionsRendezVous({
     onSuccess: (_, { issue }) => {
       void client.invalidateQueries({ queryKey: CLE_RENDEZ_VOUS });
       setDialogue(null);
+      onFait?.();
       // Présent, le closing s'ouvre aussitôt : pas d'aller-retour dans la liste.
       if (issue === 'HONORE' && peutCloser) {
         toast.dismiss();

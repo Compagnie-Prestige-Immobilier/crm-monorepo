@@ -45,7 +45,7 @@ export function ChoixOuAutre({
           onChange(choix === AUTRE || choix === null ? '' : choix);
         }}
       >
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger id={id} size="sm" className="w-full">
           <SelectValue placeholder="Sélectionner" />
         </SelectTrigger>
         <SelectContent>
@@ -58,6 +58,7 @@ export function ChoixOuAutre({
       </Select>
       {autre ? (
         <Input
+          className="h-9"
           aria-label={`${label}, précision`}
           value={value}
           maxLength={120}

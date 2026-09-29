@@ -12,15 +12,16 @@ export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
       throw new RefusPermission(context.user.role);
     }
   },
-  component: RendezVousAccueilPage,
+  component: RendezVousPage,
 });
 
-/** Le comptoir voit arriver les rendez-vous et note qui vient ; le closing se tient dans l'espace Rendez-vous. */
-function RendezVousAccueilPage() {
+/** Même liste pour tous : le chargé de clientèle y remplit le closing, le comptoir y enregistre la visite. */
+function RendezVousPage() {
   const { user } = Route.useRouteContext();
   const [historique, setHistorique] = useState(false);
+  const closing = peut(user, 'rendez_vous.closer');
   return (
-    <div className="flex flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <Tabs
         value={historique ? 'historique' : 'a-traiter'}
         onValueChange={(valeur) => {
@@ -36,9 +37,9 @@ function RendezVousAccueilPage() {
         key={String(historique)}
         historique={historique}
         peutNoter={peut(user, 'rendez_vous.suivre')}
-        peutCloser={false}
+        peutCloser={closing}
         peutExporter={peut(user, 'rendez_vous.exporter')}
-        peutEnregistrerVisite={peut(user, 'accueil.registre')}
+        peutEnregistrerVisite={!closing && peut(user, 'accueil.registre')}
       />
     </div>
   );

@@ -54,12 +54,51 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   return query;
 }
 
+type SansNull<T> = { [K in keyof T]?: Exclude<T[K], null> };
+
+/** Retire les clés à `null` : le serveur lit une clé absente comme « pas de filtre ». */
+function sansNulls<T extends object>(champs: T): SansNull<T> {
+  return Object.fromEntries(
+    Object.entries(champs).filter(([, valeur]) => valeur !== null),
+  ) as SansNull<T>;
+}
+
+function vraiFaux(value: boolean | null): 'true' | 'false' | null {
+  if (value === null) return null;
+  return value ? 'true' : 'false';
+}
+
+function siDefini<T, R>(value: T | null, map: (value: T) => R): R | null {
+  return value === null ? null : map(value);
+}
+
 export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   return {
     ...toFilterQuery(filters),
-    ...(filters.phase2Status === 'TOUT' ? { phase2Status: 'TOUT' as const } : {}),
-    ...(filters.sansMotif === null ? {} : { sansMotif: filters.sansMotif }),
-    ...(filters.motif === null ? {} : { motif: filters.motif }),
+    ...sansNulls({
+      phase2Status: filters.phase2Status === 'TOUT' ? ('TOUT' as const) : null,
+      sansMotif: filters.sansMotif,
+      motif: filters.motif,
+      campagneId: filters.campagneId,
+      type: filters.type,
+      canalProvenanceId: filters.canalProvenanceId,
+      origin: filters.origin,
+      professionId: filters.professionId,
+      incomeBandId: filters.incomeBandId,
+      employeurId: filters.employeurId,
+      paysResidenceId: filters.paysResidenceId,
+      paymentMode: filters.paymentMode,
+      typeBien: filters.typeBien,
+      typeContrat: filters.typeContrat,
+      modeEpargne: filters.modeEpargne,
+      rendezVousIssue: filters.rendezVousIssue,
+      avecRdv: vraiFaux(filters.avecRdv),
+      avecCommentaire: vraiFaux(filters.avecCommentaire),
+      appelePar: filters.appelePar,
+      lastCallById: filters.lastCallById,
+      rdvFrom: siDefini(filters.rdvFrom, startOfDay),
+      rdvTo: siDefini(filters.rdvTo, endOfDay),
+    }),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: filters.sortBy,

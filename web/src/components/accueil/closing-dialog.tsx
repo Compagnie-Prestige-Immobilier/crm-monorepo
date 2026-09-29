@@ -9,7 +9,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -106,12 +106,12 @@ function Saisie({
     );
   }
   return (
-    <div className="grid gap-1.5">
+    <div className={question.long === true ? 'grid gap-1.5 sm:col-span-2' : 'grid gap-1.5'}>
       <Label htmlFor={id}>{question.label}</Label>
       {question.long === true ? (
         <Textarea
           id={id}
-          rows={4}
+          rows={3}
           maxLength={4000}
           placeholder="Ce qui s’est dit, ce qui a été promis."
           value={value}
@@ -122,6 +122,7 @@ function Saisie({
       ) : (
         <Input
           id={id}
+          className="h-9"
           type={question.champ === 'dateRelance' ? 'date' : 'text'}
           maxLength={120}
           value={value}
@@ -160,13 +161,13 @@ function Formulaire({
 
   return (
     <form
-      className="flex min-h-0 flex-1 flex-col"
+      className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         enregistrer.mutate();
       }}
     >
-      <ol className="flex gap-1 px-4" aria-label="Étapes du closing">
+      <ol className="flex gap-1" aria-label="Étapes du closing">
         {ETAPES.map((item, rang) => (
           <li key={item.titre} className="flex-1">
             <button
@@ -182,7 +183,7 @@ function Formulaire({
           </li>
         ))}
       </ol>
-      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4">
+      <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         {courante?.questions.map((question) => (
           <Saisie
             key={question.champ}
@@ -195,7 +196,7 @@ function Formulaire({
           />
         ))}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-border p-4">
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
         <Button
           type="submit"
           variant={derniere ? 'default' : 'outline'}
@@ -218,7 +219,7 @@ function Formulaire({
   );
 }
 
-export function ClosingSheet({
+export function ClosingDialog({
   rendezVous,
   onClose,
 }: {
@@ -232,26 +233,26 @@ export function ClosingSheet({
   });
   if (rendezVous === null) return null;
   return (
-    <Sheet
+    <Dialog
       open
       onOpenChange={(ouvert) => {
         if (!ouvert) onClose();
       }}
     >
-      <SheetContent className="w-full sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>
+      <DialogContent className="max-h-[90dvh] gap-3 overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
             Closing de {rendezVous.prenom} {rendezVous.nom}
-          </SheetTitle>
-        </SheetHeader>
+          </DialogTitle>
+        </DialogHeader>
         {lecture.isError ? (
           <QueryErrorState error={lecture.error} onRetry={() => void lecture.refetch()} />
         ) : null}
-        {lecture.isPending ? <Skeleton className="mx-4 h-96 rounded-lg" /> : null}
+        {lecture.isPending ? <Skeleton className="h-64 rounded-lg" /> : null}
         {lecture.data === undefined ? null : (
           <Formulaire rendezVous={rendezVous} lu={lecture.data} onClose={onClose} />
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

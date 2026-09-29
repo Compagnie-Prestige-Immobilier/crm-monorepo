@@ -15,6 +15,7 @@ import {
 } from '@/lib/search-params';
 import {
   PROSPECT_STATUTS,
+  PROSPECT_TYPES,
   type Paginated,
   type Projet,
   type ProspectRow,
@@ -22,24 +23,11 @@ import {
   type ProspectType,
 } from '@/lib/types';
 
-export type { ProspectType };
+export { PROSPECT_TYPES, PROSPECT_TYPE_LABELS } from '@/lib/types';
+export type { ProspectType } from '@/lib/types';
 export type CanalProvenance = components['schemas']['ReferentielsItem'];
 
 const GRAND_PUBLIC: Projet = 'GRAND_PUBLIC';
-
-export const PROSPECT_TYPES = [
-  'FONCTIONNAIRE',
-  'SECTEUR_PRIVE',
-  'INFORMEL',
-  'DIASPORA',
-] as const satisfies readonly ProspectType[];
-
-export const PROSPECT_TYPE_LABELS: Record<ProspectType, string> = {
-  FONCTIONNAIRE: 'Fonctionnaire',
-  SECTEUR_PRIVE: 'Secteur privé',
-  INFORMEL: 'Informel',
-  DIASPORA: 'Diaspora',
-};
 
 /** Les durées que le métier pratique. Un choix fermé plutôt qu'une frappe libre. */
 export const DUREES_MOIS = [

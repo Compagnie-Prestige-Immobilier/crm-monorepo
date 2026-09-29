@@ -46,6 +46,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchMotifsAppel, motifsRacine, type MotifAppel } from '@/lib/data/call-outcome-reasons';
+import { fetchCanauxProvenance, grandPublicKeys } from '@/lib/data/grand-public';
+import { fetchLotsExport } from '@/lib/data/lots-export';
 import { deleteProspect, fetchProspects } from '@/lib/data/prospects';
 import { fetchReferenceData } from '@/lib/data/reference';
 import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
@@ -56,10 +58,22 @@ import {
   BDD_SEGMENTS,
   ENROLLMENT_METHOD_LABELS,
   ENROLLMENT_METHOD_ORDER,
+  MODE_EPARGNE_LABELS,
+  MODE_EPARGNES,
+  PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
+  PROSPECT_ORIGIN_LABELS,
+  PROSPECT_ORIGINS,
   PROSPECT_SORT_FIELDS,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  RENDEZ_VOUS_ISSUE_LABELS,
+  RENDEZ_VOUS_ISSUES,
   statutForProjet,
+  TYPE_BIEN_LABELS,
+  TYPE_CONTRAT_LABELS,
+  TYPE_CONTRATS,
+  TYPES_BIEN,
   type FilterOption,
   type Paginated,
   type ProspectFilters,
@@ -68,6 +82,7 @@ import {
   type ReferenceData,
   type SortDirection,
 } from '@/lib/types';
+import { PROSPECT_TYPE_LABELS, PROSPECT_TYPES } from '@/lib/data/grand-public';
 import { cn } from '@/lib/utils';
 
 function isSortField(id: string): id is ProspectSortField {
@@ -94,17 +109,101 @@ const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => (
   label: ENROLLMENT_METHOD_LABELS[method],
 }));
 
+const COMMENTAIRE_OPTIONS: FilterOption[] = [
+  { value: 'oui', label: 'Avec commentaire' },
+  { value: 'non', label: 'Sans commentaire' },
+];
+
+const RDV_OPTIONS: FilterOption[] = [
+  { value: 'oui', label: 'Avec RDV' },
+  { value: 'non', label: 'Sans RDV' },
+];
+
+const TYPE_OPTIONS: FilterOption[] = PROSPECT_TYPES.map((type) => ({
+  value: type,
+  label: PROSPECT_TYPE_LABELS[type],
+}));
+
+const ORIGINE_OPTIONS: FilterOption[] = PROSPECT_ORIGINS.map((origin) => ({
+  value: origin,
+  label: PROSPECT_ORIGIN_LABELS[origin],
+}));
+
+const PAIEMENT_OPTIONS: FilterOption[] = PAYMENT_MODES.map((mode) => ({
+  value: mode,
+  label: PAYMENT_MODE_LABELS[mode],
+}));
+
+const BIEN_OPTIONS: FilterOption[] = TYPES_BIEN.map((bien) => ({
+  value: bien,
+  label: TYPE_BIEN_LABELS[bien],
+}));
+
+const CONTRAT_OPTIONS: FilterOption[] = TYPE_CONTRATS.map((contrat) => ({
+  value: contrat,
+  label: TYPE_CONTRAT_LABELS[contrat],
+}));
+
+const EPARGNE_OPTIONS: FilterOption[] = MODE_EPARGNES.map((epargne) => ({
+  value: epargne,
+  label: MODE_EPARGNE_LABELS[epargne],
+}));
+
+const SUIVI_OPTIONS: FilterOption[] = RENDEZ_VOUS_ISSUES.map((issue) => ({
+  value: issue,
+  label: RENDEZ_VOUS_ISSUE_LABELS[issue],
+}));
+
+/** Les campagnes proposées en filtre : les 100 dernières, borne explicite. */
+const CAMPAGNES_PAR_PAGE = 100;
+
 /** Critères de liste portés par une colonne, dans l'ordre du tableau. */
 type CritereColonne = {
   colonne: string;
   cle: keyof ProspectFilters;
   label: string;
   placeholder: string;
+  lire?: ((filters: ProspectFilters) => string | null) | undefined;
+  ecrire?: ((value: string | null) => Partial<ProspectFilters>) | undefined;
   options: (
     reference: ReferenceData | undefined,
     motifs: readonly MotifAppel[],
+    sources: CritereSources,
   ) => readonly FilterOption[];
 };
+
+interface CritereSources {
+  campagnes: FilterOption[];
+  canaux: FilterOption[];
+}
+
+function lireOuiNon(
+  lire: (filters: ProspectFilters) => boolean | null,
+): (filters: ProspectFilters) => string | null {
+  return (filters) => {
+    const valeur = lire(filters);
+    if (valeur === null) return null;
+    return valeur ? 'oui' : 'non';
+  };
+}
+
+function ecrireOuiNon(
+  ecrire: (valeur: boolean | null) => Partial<ProspectFilters>,
+): (value: string | null) => Partial<ProspectFilters> {
+  return (value) => {
+    if (value === null) return ecrire(null);
+    return ecrire(value === 'oui');
+  };
+}
+
+function optionReferentiel(
+  items: readonly { id: string; label: string | null; isActive: boolean | null }[] | undefined,
+): FilterOption[] {
+  return (items ?? []).map((item) => ({
+    value: item.id,
+    label: withRetired(item.label ?? '', item.isActive ?? false),
+  }));
+}
 
 /**
  * « Téléconseiller » n'y figure pas : la colonne montre le titulaire de la
@@ -200,6 +299,115 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
         hint: syndicat.secteur ?? undefined,
       })),
   },
+  {
+    colonne: 'campagne',
+    cle: 'campagneId',
+    label: 'Campagne',
+    placeholder: 'Toutes les campagnes',
+    options: (_reference, _motifs, sources) => sources.campagnes,
+  },
+  {
+    colonne: 'commentaire',
+    cle: 'avecCommentaire',
+    label: 'Commentaire',
+    placeholder: 'Tous les commentaires',
+    lire: lireOuiNon((filters) => filters.avecCommentaire),
+    ecrire: ecrireOuiNon((valeur) => ({ avecCommentaire: valeur })),
+    options: () => COMMENTAIRE_OPTIONS,
+  },
+  {
+    colonne: 'rendezVousAt',
+    cle: 'avecRdv',
+    label: 'RDV posé',
+    placeholder: 'Tous les RDV',
+    lire: lireOuiNon((filters) => filters.avecRdv),
+    ecrire: ecrireOuiNon((valeur) => ({ avecRdv: valeur })),
+    options: () => RDV_OPTIONS,
+  },
+  {
+    colonne: 'type',
+    cle: 'type',
+    label: 'Secteur',
+    placeholder: 'Tous les secteurs',
+    options: () => TYPE_OPTIONS,
+  },
+  {
+    colonne: 'profession',
+    cle: 'professionId',
+    label: 'Profession',
+    placeholder: 'Toutes les professions',
+    options: (reference) => optionReferentiel(reference?.professions),
+  },
+  {
+    colonne: 'canal',
+    cle: 'canalProvenanceId',
+    label: 'Canal',
+    placeholder: 'Tous les canaux',
+    options: (_reference, _motifs, sources) => sources.canaux,
+  },
+  {
+    colonne: 'employeur',
+    cle: 'employeurId',
+    label: 'Employeur',
+    placeholder: 'Tous les employeurs',
+    options: (reference) => optionReferentiel(reference?.employeurs),
+  },
+  {
+    colonne: 'typeContrat',
+    cle: 'typeContrat',
+    label: 'Contrat',
+    placeholder: 'Tous les contrats',
+    options: () => CONTRAT_OPTIONS,
+  },
+  {
+    colonne: 'paiement',
+    cle: 'paymentMode',
+    label: 'Paiement',
+    placeholder: 'Tous les paiements',
+    options: () => PAIEMENT_OPTIONS,
+  },
+  {
+    colonne: 'typeBien',
+    cle: 'typeBien',
+    label: 'Bien',
+    placeholder: 'Tous les biens',
+    options: () => BIEN_OPTIONS,
+  },
+  {
+    colonne: 'revenu',
+    cle: 'incomeBandId',
+    label: 'Revenu',
+    placeholder: 'Tous les revenus',
+    options: (reference) => optionReferentiel(reference?.incomeBands),
+  },
+  {
+    colonne: 'epargne',
+    cle: 'modeEpargne',
+    label: 'Épargne',
+    placeholder: 'Toutes les épargnes',
+    options: () => EPARGNE_OPTIONS,
+  },
+  {
+    colonne: 'pays',
+    cle: 'paysResidenceId',
+    label: 'Résidence',
+    placeholder: 'Tous les pays',
+    options: (reference) => optionReferentiel(reference?.pays),
+  },
+  {
+    colonne: 'origine',
+    cle: 'origin',
+    label: 'Origine',
+    placeholder: 'Toutes les origines',
+    options: () => ORIGINE_OPTIONS,
+  },
+  {
+    colonne: 'suivi',
+    cle: 'rendezVousIssue',
+    label: 'Suivi du RDV',
+    placeholder: 'Tous les suivis',
+    options: () => SUIVI_OPTIONS,
+  },
 ];
 
 function filtresDesColonnes(
@@ -207,6 +415,7 @@ function filtresDesColonnes(
   setFilters: (patch: Partial<ProspectFilters>) => void,
   reference: ReferenceData | undefined,
   motifs: readonly MotifAppel[],
+  sources: CritereSources,
 ): Partial<Record<string, FiltreColonne>> {
   return Object.fromEntries(
     CRITERES_COLONNES.map((critere) => [
@@ -214,10 +423,17 @@ function filtresDesColonnes(
       {
         label: critere.label,
         placeholder: critere.placeholder,
-        options: critere.options(reference, motifs),
-        value: filters[critere.cle] as string | null,
+        options: critere.options(reference, motifs, sources),
+        value:
+          critere.lire === undefined
+            ? ((filters[critere.cle] as string | null) ?? null)
+            : critere.lire(filters),
         onChange: (value: string | null) => {
-          setFilters({ [critere.cle]: value } as Partial<ProspectFilters>);
+          if (critere.ecrire !== undefined) {
+            setFilters(critere.ecrire(value));
+          } else {
+            setFilters({ [critere.cle]: value } as Partial<ProspectFilters>);
+          }
         },
       },
     ]),
@@ -230,6 +446,22 @@ function tableSourceData(data: Paginated<ProspectRow> | undefined): {
 } {
   if (data === undefined) return { items: [], pageCount: 0 };
   return { items: data.items, pageCount: data.pageCount };
+}
+
+/** Les campagnes d'appels proposées en filtre, dernières d'abord. */
+async function campagnesOptions(): Promise<FilterOption[]> {
+  const page = await fetchLotsExport({ page: 1, pageSize: CAMPAGNES_PAR_PAGE });
+  if (page.total > page.items.length) {
+    toast.warning(
+      `Seules les ${formatNumber(page.items.length)} dernières campagnes sont proposées dans les filtres. Signalez-le à l’administrateur.`,
+      { id: 'plafond-campagnes' },
+    );
+  }
+  return page.items.map((campagne) => ({
+    value: campagne.id,
+    label: campagne.name,
+    hint: `${formatNumber(campagne.itemCount)} fiches`,
+  }));
 }
 
 function rangeLabel(first: number, last: number, total: number): string {
@@ -333,6 +565,29 @@ export function ProspectsTable({
     staleTime: 300_000,
   });
 
+  const campagnes = useQuery({
+    queryKey: queryKeys.lotsExport({ page: 1, pageSize: CAMPAGNES_PAR_PAGE }),
+    queryFn: () => campagnesOptions(),
+    staleTime: 5 * 60_000,
+  });
+
+  const canaux = useQuery({
+    queryKey: grandPublicKeys.canaux,
+    queryFn: () => fetchCanauxProvenance(),
+    staleTime: 5 * 60_000,
+  });
+
+  const sources = useMemo<CritereSources>(
+    () => ({
+      campagnes: campagnes.data ?? [],
+      canaux: (canaux.data ?? []).map((canal) => ({
+        value: canal.id,
+        label: canal.label ?? '',
+      })),
+    }),
+    [campagnes.data, canaux.data],
+  );
+
   const remove = useMutation({
     mutationFn: (target: ProspectRow) => deleteProspect(target.id),
     onSuccess: (_result, target) => {
@@ -406,7 +661,13 @@ export function ProspectsTable({
   const last = Math.min(page * filters.pageSize, total);
   const lignes = table.getRowModel().rows;
   const groupes = regrouperProspects(lignes, regroupement, filters.projet);
-  const filtres = filtresDesColonnes(filters, setFilters, reference, motifs.data ?? MOTIFS_SYSTEME);
+  const filtres = filtresDesColonnes(
+    filters,
+    setFilters,
+    reference,
+    motifs.data ?? MOTIFS_SYSTEME,
+    sources,
+  );
 
   const basculerGroupe = (cle: string): void => {
     setGroupesFermes((courants) => {

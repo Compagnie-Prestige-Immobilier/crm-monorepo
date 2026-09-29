@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   ArchiveIcon,
+  CalendarCheckIcon,
+  CalendarDaysIcon,
   ChartNoAxesCombinedIcon,
   HeartHandshakeIcon,
   ListChecksIcon,
@@ -22,19 +24,31 @@ const TABS: readonly {
   icon: typeof ListIcon;
   permission: Permission | null;
 }[] = [
-  { href: '/accueil', label: 'Liste', icon: ListIcon, permission: null },
+  // Les rendez-vous d'abord : c'est le métier du chargé de clientèle, le comptoir ne voit que le sien.
+  {
+    href: '/accueil/agenda',
+    label: 'Agenda',
+    icon: CalendarDaysIcon,
+    permission: 'rendez_vous.closer',
+  },
+  {
+    href: '/accueil/rendez-vous',
+    label: 'Rendez-vous',
+    icon: CalendarCheckIcon,
+    permission: 'rendez_vous.voir',
+  },
+  {
+    href: '/accueil/interesses',
+    label: 'Intéressés et hésitants',
+    icon: HeartHandshakeIcon,
+    permission: 'rendez_vous.closer',
+  },
+  { href: '/accueil', label: 'Registre', icon: ListIcon, permission: null },
   {
     href: '/accueil/tableau-de-bord',
     label: 'Tableau de bord',
     icon: ChartNoAxesCombinedIcon,
     permission: null,
-  },
-  {
-    // Les rendez-vous obtenus au téléphone : le comptoir constate qui vient.
-    href: '/accueil/rendez-vous',
-    label: 'Rendez-vous',
-    icon: HeartHandshakeIcon,
-    permission: 'rendez_vous.voir',
   },
   {
     // Gestion des quatre listes qui alimentent la saisie : réservée à qui les
@@ -62,7 +76,6 @@ export function VisitesTabs() {
   const pathname = usePathname();
   const { data: user } = useQuery(meQueryOptions);
   const tabs = TABS.filter((tab) => tab.permission === null || peut(user, tab.permission));
-
   return (
     <nav aria-label="Visites" className="print:hidden">
       <ul className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">

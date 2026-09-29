@@ -308,3 +308,17 @@ func TestRendezVousSitePlacesRestantesParCreneau(t *testing.T) {
 	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/rv-site/creneaux?du=2026-01-01&au=2026-02-02", nil)
 	b.attend(statut, http.StatusBadRequest, "plus de 31 jours", body)
 }
+
+// Le chargé de clientèle amène au rendez-vous les intéressés et hésitants de tous les téléconseillers.
+func TestChargeDeClienteleVoitTousLesInteresses(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	for _, statut := range []string{"INTERESTED", "HESITANT"} {
+		fiche := qualificationProspect(b)
+		if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "phase2Status" = $2::"Phase2Status" WHERE "id" = $1`, fiche, statut); err != nil {
+			t.Fatal(err)
+		}
+		code, body := qualificationEnvoi(cc, http.MethodGet, "/api/v1/prospects/"+fiche, nil)
+		cc.attend(code, http.StatusOK, "fiche "+statut+" d'un autre téléconseiller", body)
+	}
+}

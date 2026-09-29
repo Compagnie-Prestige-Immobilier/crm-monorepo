@@ -29,7 +29,16 @@ SELECT
   ru."fullName" AS representant_appele_par,
   ha."phoneE164" AS homonyme_telephone,
   ha."lastCallAt" AS homonyme_appele_at,
-  hu."fullName" AS homonyme_appele_par
+  hu."fullName" AS homonyme_appele_par,
+  -- Les campagnes d'appels qui ont confié la fiche, dernières d'abord.
+  (SELECT string_agg(l."name", ' · ' ORDER BY l."createdAt" DESC, l."id" DESC)
+   FROM "lot_export_items" li JOIN "lots_export" l ON l."id" = li."lotId"
+   WHERE li."prospectId" = p."id") AS campagne_noms,
+  -- Le dernier rendez-vous posé en appel, tous motifs : c'est la date que
+  -- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
+  (SELECT a."rendezVousAt" FROM "call_attempts" a
+   WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
+   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
@@ -76,6 +85,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -189,6 +199,40 @@ WHERE p."deletedAt" IS NULL
       WHERE ca."prospectId" = p."id" AND ca."performedById" = sqlc.narg('appele_par')::text
     )
   )
+  AND (sqlc.narg('campagne_id')::text IS NULL
+       OR EXISTS (SELECT 1 FROM "lot_export_items" li
+                  WHERE li."prospectId" = p."id" AND li."lotId" = sqlc.narg('campagne_id')::text))
+  AND (sqlc.narg('profession_id')::text IS NULL OR p."professionId" = sqlc.narg('profession_id')::text)
+  AND (sqlc.narg('income_band_id')::text IS NULL OR p."incomeBandId" = sqlc.narg('income_band_id')::text)
+  AND (sqlc.narg('employeur_id')::text IS NULL OR p."employeurId" = sqlc.narg('employeur_id')::text)
+  AND (sqlc.narg('pays_residence_id')::text IS NULL OR p."paysResidenceId" = sqlc.narg('pays_residence_id')::text)
+  AND (sqlc.narg('payment_mode')::"PaymentMode" IS NULL OR p."paymentMode" = sqlc.narg('payment_mode')::"PaymentMode")
+  AND (sqlc.narg('type_bien')::"TypeBien" IS NULL OR p."typeBien" = sqlc.narg('type_bien')::"TypeBien")
+  AND (sqlc.narg('type_contrat')::"TypeContrat" IS NULL OR p."typeContrat" = sqlc.narg('type_contrat')::"TypeContrat")
+  AND (sqlc.narg('mode_epargne')::"ModeEpargne" IS NULL OR p."modeEpargne" = sqlc.narg('mode_epargne')::"ModeEpargne")
+  AND (sqlc.narg('rendez_vous_issue')::text IS NULL
+       OR (sqlc.narg('rendez_vous_issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)
+       OR p."rendezVousIssue" = sqlc.narg('rendez_vous_issue')::text)
+  AND (sqlc.narg('avec_rdv')::boolean IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" ar
+                  WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)
+          = sqlc.narg('avec_rdv')::boolean)
+  -- « Avec commentaire » lit le DERNIER appel, comme la colonne : un ancien
+  -- commentaire écrasé par un appel muet ne compte plus.
+  AND (sqlc.narg('avec_commentaire')::boolean IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" ac
+                  WHERE ac."prospectId" = p."id"
+                    AND ac."id" = (SELECT ac2."id" FROM "call_attempts" ac2
+                                   WHERE ac2."prospectId" = p."id"
+                                   ORDER BY ac2."clientCreatedAt" DESC, ac2."id" DESC LIMIT 1)
+                    AND NULLIF(btrim(ac."comment"), '') IS NOT NULL)
+          = sqlc.narg('avec_commentaire')::boolean)
+  AND (sqlc.narg('rdv_from')::timestamp IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" rf
+                  WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= sqlc.narg('rdv_from')::timestamp))
+  AND (sqlc.narg('rdv_to')::timestamp IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" rt
+                  WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= sqlc.narg('rdv_to')::timestamp))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR p."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR p."clientCreatedAt" <= sqlc.narg('date_to')::timestamp)
   AND (
@@ -231,6 +275,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -344,6 +389,40 @@ WHERE p."deletedAt" IS NULL
       WHERE ca."prospectId" = p."id" AND ca."performedById" = sqlc.narg('appele_par')::text
     )
   )
+  AND (sqlc.narg('campagne_id')::text IS NULL
+       OR EXISTS (SELECT 1 FROM "lot_export_items" li
+                  WHERE li."prospectId" = p."id" AND li."lotId" = sqlc.narg('campagne_id')::text))
+  AND (sqlc.narg('profession_id')::text IS NULL OR p."professionId" = sqlc.narg('profession_id')::text)
+  AND (sqlc.narg('income_band_id')::text IS NULL OR p."incomeBandId" = sqlc.narg('income_band_id')::text)
+  AND (sqlc.narg('employeur_id')::text IS NULL OR p."employeurId" = sqlc.narg('employeur_id')::text)
+  AND (sqlc.narg('pays_residence_id')::text IS NULL OR p."paysResidenceId" = sqlc.narg('pays_residence_id')::text)
+  AND (sqlc.narg('payment_mode')::"PaymentMode" IS NULL OR p."paymentMode" = sqlc.narg('payment_mode')::"PaymentMode")
+  AND (sqlc.narg('type_bien')::"TypeBien" IS NULL OR p."typeBien" = sqlc.narg('type_bien')::"TypeBien")
+  AND (sqlc.narg('type_contrat')::"TypeContrat" IS NULL OR p."typeContrat" = sqlc.narg('type_contrat')::"TypeContrat")
+  AND (sqlc.narg('mode_epargne')::"ModeEpargne" IS NULL OR p."modeEpargne" = sqlc.narg('mode_epargne')::"ModeEpargne")
+  AND (sqlc.narg('rendez_vous_issue')::text IS NULL
+       OR (sqlc.narg('rendez_vous_issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)
+       OR p."rendezVousIssue" = sqlc.narg('rendez_vous_issue')::text)
+  AND (sqlc.narg('avec_rdv')::boolean IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" ar
+                  WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)
+          = sqlc.narg('avec_rdv')::boolean)
+  -- « Avec commentaire » lit le DERNIER appel, comme la colonne : un ancien
+  -- commentaire écrasé par un appel muet ne compte plus.
+  AND (sqlc.narg('avec_commentaire')::boolean IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" ac
+                  WHERE ac."prospectId" = p."id"
+                    AND ac."id" = (SELECT ac2."id" FROM "call_attempts" ac2
+                                   WHERE ac2."prospectId" = p."id"
+                                   ORDER BY ac2."clientCreatedAt" DESC, ac2."id" DESC LIMIT 1)
+                    AND NULLIF(btrim(ac."comment"), '') IS NOT NULL)
+          = sqlc.narg('avec_commentaire')::boolean)
+  AND (sqlc.narg('rdv_from')::timestamp IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" rf
+                  WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= sqlc.narg('rdv_from')::timestamp))
+  AND (sqlc.narg('rdv_to')::timestamp IS NULL
+       OR EXISTS (SELECT 1 FROM "call_attempts" rt
+                  WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= sqlc.narg('rdv_to')::timestamp))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR p."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR p."clientCreatedAt" <= sqlc.narg('date_to')::timestamp)
   AND (

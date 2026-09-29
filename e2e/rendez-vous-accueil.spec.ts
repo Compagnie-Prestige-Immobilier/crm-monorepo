@@ -156,15 +156,21 @@ test.describe('closing par le chargé de clientèle', () => {
     await purger({ prospects: [convoque] });
   });
 
-  test('son espace : un report revient à confirmer, la venue ouvre le closing', async ({
+  test('dans l’Accueil, il arrive sur l’agenda ; un report revient à confirmer, la venue ouvre le closing', async ({
     page,
   }) => {
     await page.goto('/espaces');
     await page
-      .getByRole('link', { name: /Rendez-vous/u })
+      .getByRole('link', { name: /Accueil/u })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/rendez-vous$/u);
+    await expect(page).toHaveURL(/\/accueil\/agenda$/u);
+    await expect(page.getByRole('button', { name: 'Semaine' })).toBeVisible();
+    const onglets = page.getByRole('navigation', { name: 'Visites' }).getByRole('link');
+    await expect(onglets.first()).toHaveText('Agenda');
+    await expect(page.getByRole('link', { name: 'Intéressés et hésitants' })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Rendez-vous', exact: true }).first().click();
     const ligne = page.getByRole('listitem').filter({ hasText: nom });
 
     await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
@@ -190,7 +196,7 @@ test.describe('closing par le chargé de clientèle', () => {
     await expect(closing).toHaveCount(0);
     await expect(ligne).toHaveCount(0);
 
-    await page.getByRole('link', { name: 'Historique' }).click();
+    await page.getByRole('tab', { name: 'Historique' }).click();
     await expect(ligne.getByText('Closing enregistré')).toBeVisible();
     const [enregistre = { superficie: '' }] = await lire<{ superficie: string }>(
       'SELECT "superficie" FROM "rendez_vous_closings" WHERE "prospectId" = $1',
