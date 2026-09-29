@@ -189,7 +189,7 @@ type outilDecrit struct {
 func outilsPermis(u *socle.Utilisateur) map[string]outilDecrit {
 	permis := map[string]outilDecrit{}
 	for nom, o := range outils {
-		if u.Peut(o.permission) {
+		if u.Peut(o.permission) || u.Peut(socle.PermissionAssistantToutLire) {
 			permis[nom] = outilDecrit{Description: o.description, Axes: o.axes}
 		}
 	}

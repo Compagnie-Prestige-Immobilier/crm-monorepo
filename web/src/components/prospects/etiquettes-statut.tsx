@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import {
+  etatRendezVousFiche,
   PHASE2_STATUS_LABELS,
   type BadgeVariant,
   type Phase2Status,
@@ -18,16 +19,26 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
   WRONG_NUMBER: 'warning',
 };
 
-/** Le statut de qualification de la fiche. */
+/** Le statut de qualification de la fiche ; un rendez-vous dit aussi où il en est. */
 export function EtiquettesStatut({
   prospect,
 }: {
-  prospect: Pick<ProspectRow, 'phase2Status' | 'statutQualification'>;
+  prospect: Pick<
+    ProspectRow,
+    | 'phase2Status'
+    | 'statutQualification'
+    | 'rendezVousIssue'
+    | 'rendezVousConfirmation'
+    | 'rendezVousReporteAt'
+  >;
 }) {
   const statut = prospect.statutQualification ?? PHASE2_STATUS_LABELS[prospect.phase2Status];
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge variant={PHASE2_VARIANT[prospect.phase2Status]}>{statut}</Badge>
+      {prospect.phase2Status === 'APPOINTMENT' ? (
+        <Badge variant="outline">{etatRendezVousFiche(prospect)}</Badge>
+      ) : null}
     </span>
   );
 }

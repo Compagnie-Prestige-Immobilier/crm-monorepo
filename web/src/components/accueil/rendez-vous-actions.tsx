@@ -51,7 +51,7 @@ function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[]
   if (fiche.etape === 'A_CONFIRMER')
     return { visibles: ['CONFIRME'], menu: ['REPORTER', 'ANNULER'] };
   if (fiche.etape === 'EN_RETARD' && fiche.confirmation === '') {
-    return { visibles: ['CONFIRME', 'HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
+    return { visibles: ['CONFIRME'], menu: ['HONORE', 'NON_HONORE', 'REPORTER', 'ANNULER'] };
   }
   if (fiche.etape === 'CONFIRMES' || fiche.etape === 'EN_RETARD') {
     return { visibles: ['HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
