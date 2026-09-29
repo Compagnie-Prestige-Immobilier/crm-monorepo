@@ -28,8 +28,19 @@ db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sèm
 gen: ## sqlc, document OpenAPI, types et routes du panneau
 	tools/dev/gen.sh
 
-dev: db ## base créée et semée si besoin, .env chargé, API sur :4000 et Vite sur :5173
+dev: gen ## code régénéré, base semée, .env chargé, API et Vite sur les premiers ports libres
+	$(MAKE) db
 	@set -a; [ -f .env ] && . ./.env; set +a; \
+	  command -v lsof >/dev/null || { echo "lsof est requis pour choisir le port API" >&2; exit 1; }; \
+	  export PORT=$${PORT:-4000}; \
+	  case "$$PORT" in *[!0-9]*|'') echo "PORT doit être un entier" >&2; exit 1 ;; esac; \
+	  [ "$$PORT" -ge 1 ] && [ "$$PORT" -le 65515 ] || { echo "PORT doit être compris entre 1 et 65515" >&2; exit 1; }; \
+	  limite=$$((PORT + 20)); \
+	  while lsof -nP -iTCP:$$PORT -sTCP:LISTEN -t >/dev/null; do \
+	    PORT=$$((PORT + 1)); \
+	    [ "$$PORT" -lt "$$limite" ] || { echo "Aucun port API libre après 20 essais" >&2; exit 1; }; \
+	  done; \
+	  echo "API : http://localhost:$$PORT"; \
 	  trap 'kill 0' INT TERM; \
 	  pnpm --dir web dev & \
 	  go run ./cmd/server ; wait

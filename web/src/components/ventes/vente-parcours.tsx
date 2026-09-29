@@ -5,6 +5,7 @@ import { CheckIcon, LoaderIcon, MinusIcon, PlusIcon, UserCheckIcon, XIcon } from
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import {
   callingCountriesFrom,
   fromE164,
@@ -46,7 +47,13 @@ import { cn } from '@/lib/utils';
 
 type Draft = VenteInput;
 type Patch = Partial<Draft>;
-type Fiche = { id: string; nom: string; prenom: string; phoneE164: string | null };
+type Fiche = {
+  id: string;
+  nom: string;
+  prenom: string;
+  phoneE164: string | null;
+  representantName: string | null;
+};
 
 const ECRANS = [
   'telephone',
@@ -86,7 +93,7 @@ const CHAMPS_IDENTITE: readonly Champ[] = [
   { cle: 'adresseProfessionnelle', label: 'Adresse professionnelle' },
 ];
 
-const CHAMPS_SUIVI: readonly Champ[] = [{ cle: 'representant', label: 'Représentant' }];
+const CHAMPS_SUIVI: readonly Champ[] = [{ cle: 'representant', label: 'Ambassadeur' }];
 
 const EMAIL_VALIDE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -272,10 +279,16 @@ export function VenteParcours({
 
 function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | null }) {
   const queryClient = useQueryClient();
+  const { data: utilisateur } = useQuery(meQueryOptions);
   const [pas, setPas] = useState(vente === null ? 0 : RECAP);
   const [erreur, setErreur] = useState<string | null>(null);
   const [erreurLots, setErreurLots] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => brouillonDe(vente));
+  const [draft, setDraft] = useState<Draft>(() => ({
+    ...brouillonDe(vente),
+    ...(vente === null && utilisateur !== null && utilisateur !== undefined
+      ? { nomTeleconseiller: utilisateur.fullName }
+      : {}),
+  }));
   const [callingCode, setCallingCode] = useState(
     () => fromE164(vente?.telephone ?? '').callingCode,
   );
@@ -366,6 +379,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
           changer({
             client: `${fiche.prenom} ${fiche.nom}`.trim(),
             telephone: telephone.phone,
+            representant: fiche.representantName ?? '',
           });
           aller(rang('identite'));
         }}
@@ -438,12 +452,6 @@ function EcranCourant({
       return (
         <Question titre="Qui a suivi la vente ?">
           <div className="grid gap-3 sm:grid-cols-2">
-            <ChoixPersonne
-              cle="nomTeleconseiller"
-              label="Nom du téléconseiller"
-              draft={draft}
-              changer={changer}
-            />
             <ChoixPersonne
               cle="responsableClosing"
               label="Responsable closing"
@@ -766,7 +774,7 @@ function ChoixPersonne({
   label,
   draft,
   changer,
-}: EcranProps & { cle: 'nomTeleconseiller' | 'responsableClosing'; label: string }) {
+}: EcranProps & { cle: 'responsableClosing'; label: string }) {
   const teleconseillers = useQuery({
     queryKey: queryKeys.lotsExportTeleconseillers,
     queryFn: () => fetchTeleconseillers(),

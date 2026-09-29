@@ -731,9 +731,10 @@ function navItems(visiteur: Visiteur, coque: Coque): NavItem[] {
   return navSections(visiteur, coque).flatMap((section) => section.items);
 }
 
-/** Premier écran d'une coque pour ce rôle : le premier de la barre, replis exclus. */
+/** Premier écran d'une coque pour ce rôle : le premier de la barre qui vit dans la coque, replis exclus. */
 export function coqueHomePath(visiteur: Visiteur, coque: Coque): string {
-  const first = navItems(visiteur, coque).find((item) => item.secondary !== true);
+  const principaux = navItems(visiteur, coque).filter((item) => item.secondary !== true);
+  const first = principaux.find((item) => coqueOf(item.href) === coque) ?? principaux[0];
   return first?.href ?? HUB_PATH;
 }
 
