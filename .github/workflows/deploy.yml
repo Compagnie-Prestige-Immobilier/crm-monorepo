@@ -1,15 +1,11 @@
 name: deploy
 
-# Déploie la production via Dokploy dès qu'une PR est fusionnée dans `prod`.
-# Les contrôles de `ci` ont déjà tourné sur la PR avant la fusion.
 on:
-  pull_request:
+  push:
     branches: [prod]
-    types: [closed]
 
 permissions: {}
 
-# Deux fusions rapprochées : on les déploie l'une après l'autre, sans annuler.
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
@@ -17,7 +13,7 @@ concurrency:
 jobs:
   dokploy:
     name: déclencher Dokploy
-    if: github.event.pull_request.merged == true
+    if: github.event.deleted == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: production
@@ -28,5 +24,9 @@ jobs:
           DOKPLOY_DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
         run: |
           test -n "$DOKPLOY_DEPLOY_URL" || { echo "::error::secret DOKPLOY_DEPLOY_URL absent"; exit 1; }
-          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors \
-            -X POST "$DOKPLOY_DEPLOY_URL"
+          status=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \
+            --output "$RUNNER_TEMP/dokploy-response.json" --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' -H 'X-GitHub-Event: push' \
+            --data-binary "@$GITHUB_EVENT_PATH" "$DOKPLOY_DEPLOY_URL")
+          cat "$RUNNER_TEMP/dokploy-response.json"
+          [[ "$status" == 2?? ]] || { echo "::error::Dokploy HTTP $status"; exit 1; }
