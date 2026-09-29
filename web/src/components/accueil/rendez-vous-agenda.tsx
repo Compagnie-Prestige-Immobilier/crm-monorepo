@@ -25,6 +25,7 @@ import {
   type View,
 } from 'react-big-calendar';
 
+import { meQueryOptions } from '@/api/auth';
 import { ClosingDialog } from '@/components/accueil/closing-dialog';
 import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
@@ -39,6 +40,7 @@ import {
   type RendezVousObtenu,
 } from '@/lib/data/rendez-vous';
 import { formatDateTime, formatPhone } from '@/lib/format';
+import { peut } from '@/lib/types';
 
 const localisateur = dateFnsLocalizer({
   format,
@@ -136,6 +138,7 @@ function Barre({ label, onNavigate, view, onView }: ToolbarProps<Evenement>) {
 
 function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void }) {
   const ouvrirClosing = useContext(OuvrirClosing);
+  const { data: user } = useQuery(meQueryOptions);
   const etat = etatDe(fiche);
   return (
     <div className="flex flex-col gap-3">
@@ -164,13 +167,15 @@ function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void 
         onFait={onFait}
       />
       <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
-        <Link
-          href={`/teleconseil/prospects/${fiche.id}`}
-          className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
-        >
-          <FileTextIcon className="size-4" aria-hidden="true" />
-          Ouvrir la fiche
-        </Link>
+        {peut(user, 'prospects.lire') ? (
+          <Link
+            href={`/teleconseil/prospects/${fiche.id}`}
+            className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
+          >
+            <FileTextIcon className="size-4" aria-hidden="true" />
+            Ouvrir la fiche
+          </Link>
+        ) : null}
         {fiche.phoneE164 === null ? null : (
           <a
             href={`tel:${fiche.phoneE164}`}

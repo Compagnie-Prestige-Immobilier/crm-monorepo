@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 
+import { DateRendezVous } from '@/components/prospects/date-rendez-vous';
 import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { useFileDownload } from '@/components/exports/download-button';
@@ -533,7 +534,7 @@ function ProspectsTable({
               <TableHead>Profession</TableHead>
               <FilterableTableHead label="Canal" filtre={filtresColonnes.canal} />
               <FilterableTableHead label="Banque" filtre={filtresColonnes.banque} />
-              <TableHead>Segment</TableHead>
+              <TableHead>Date de rendez-vous</TableHead>
               <TableHead>Téléconseiller</TableHead>
               <TableHead>Saisi le</TableHead>
             </TableRow>
@@ -731,14 +732,8 @@ function Row({ prospect }: { prospect: ProspectRow }) {
           <span className="truncate">{prospect.banqueName}</span>
         )}
       </TableCell>
-      {/* Sans banque NI syndicat, la fiche n'entre dans aucun BDD1-4. On l'écrit :
-          la ranger dans BDD4 serait une réponse là où il n'y a qu'une absence. */}
       <TableCell>
-        {prospect.segment === null ? (
-          <Absent>Aucun</Absent>
-        ) : (
-          <Badge variant="outline">{prospect.segment}</Badge>
-        )}
+        <DateRendezVous at={prospect.dateRendezVous} vide={<Absent />} />
       </TableCell>
       <TableCell>
         <span className="truncate">{prospect.ownedByCommercialName}</span>
