@@ -144,7 +144,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
     {
       id: 'phase2Status',
       accessorKey: 'phase2Status',
-      header: 'Résultat de l’appel',
+      header: 'Statut de qualification',
       cell: ({ row }) => <EtiquettesStatut prospect={row.original} />,
     },
     {
