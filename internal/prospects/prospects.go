@@ -7,7 +7,6 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
-	"maps"
 	"net/http"
 	"reflect"
 	"slices"
@@ -146,15 +145,6 @@ func prospectTronquer(texte string, maximum int) string {
 	return string([]rune(texte)[:maximum])
 }
 
-type ProspectJourney struct {
-	ID          string  `json:"id"`
-	Projet      string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-	Statut      string  `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
-	Consent     string  `json:"consent" enum:"NON_DEMANDE,INTERESSE,REFUSE"`
-	ConsentAt   *string `json:"consentAt"`
-	ConvertedAt *string `json:"convertedAt"`
-}
-
 type Prospect struct {
 	ID                       string            `json:"id"`
 	Nom                      string            `json:"nom"`
@@ -192,6 +182,7 @@ type Prospect struct {
 	PaysResidenceLabel       *string           `json:"paysResidenceLabel"`
 	VilleResidence           *string           `json:"villeResidence"`
 	Etablissement            *string           `json:"etablissement"`
+	Email                    *string           `json:"email"`
 	WhatsappStatus           string            `json:"whatsappStatus" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
 	WhatsappE164             *string           `json:"whatsappE164"`
 	WhatsappNumber           *string           `json:"whatsappNumber"`
@@ -224,6 +215,7 @@ type Prospect struct {
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
 	RepresentantAppelePar    *string           `json:"representantAppelePar" doc:"Auteur de ce dernier appel au représentant."`
+	Origin                   *string           `json:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
 	HomonymeTelephone        *string           `json:"homonymeTelephone" doc:"Numéro d'une autre fiche au même nom, déjà appelée."`
 	HomonymeAppeleAt         *string           `json:"homonymeAppeleAt" doc:"Dernier appel de cette fiche homonyme."`
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
@@ -233,6 +225,8 @@ type Prospect struct {
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
+	Campagne                 *string           `json:"campagne" doc:"Campagnes d'appels qui ont confié la fiche, dernières d'abord."`
+	RendezVousAt             *string           `json:"rendezVousAt" doc:"Dernier rendez-vous posé en appel, tous motifs."`
 	ClientCreatedAt          string            `json:"clientCreatedAt"`
 	CreatedAt                string            `json:"createdAt"`
 	UpdatedAt                string            `json:"updatedAt"`
@@ -472,6 +466,20 @@ type ProspectListInput struct {
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById" format:"uuid"`
 	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	CampagneID             string `query:"campagneId" format:"uuid" doc:"Campagne d'appels qui a confié la fiche."`
+	ProfessionID           string `query:"professionId" format:"uuid"`
+	IncomeBandID           string `query:"incomeBandId" format:"uuid"`
+	EmployeurID            string `query:"employeurId" format:"uuid"`
+	PaysResidenceID        string `query:"paysResidenceId" format:"uuid"`
+	PaymentMode            string `query:"paymentMode" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
+	TypeBien               string `query:"typeBien" enum:"TERRAIN,VILLA"`
+	TypeContrat            string `query:"typeContrat" enum:"CDI,CDD,AUTRE"`
+	ModeEpargne            string `query:"modeEpargne" enum:"TONTINE,MOBILE_MONEY,BANQUE,AUCUN"`
+	RendezVousIssue        string `query:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE,SANS" doc:"SANS isole les rendez-vous sans suivi."`
+	AvecRdv                string `query:"avecRdv" enum:"true,false" doc:"Un rendez-vous a été posé en appel."`
+	AvecCommentaire        string `query:"avecCommentaire" enum:"true,false" doc:"Le dernier appel porte un commentaire."`
+	RdvFrom                string `query:"rdvFrom" doc:"Rendez-vous posé à partir de ce jour de Dakar."`
+	RdvTo                  string `query:"rdvTo" doc:"Rendez-vous posé jusqu'à ce jour de Dakar."`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
 	Revue                  string `query:"revue" enum:"true,false"`
@@ -558,17 +566,33 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		SansMotif:        prospectVide(in.SansMotif), Motif: prospectVide(in.Motif),
 		EnrollmentMethod:       prospectTypeEnum[db.EnrollmentMethod](in.EnrollmentMethod),
 		EnrollmentCapturedByID: prospectVide(in.EnrollmentCapturedByID), LastCallByID: prospectVide(in.LastCallByID),
-		DepartementID: prospectVide(in.DepartementID),
-		Projet:        prospectTypeEnum[db.Projet](in.Projet),
-		Statut:        prospectTypeEnum[db.ProspectStatut](in.Statut),
-		Segment:       prospectVide(in.Segment),
-		AppelePar:     prospectVide(in.AppelePar),
-		Search:        prospectVide(strings.TrimSpace(in.Search)),
-		Attribue:      in.Attribue,
-		ResteAAppeler: in.ResteAAppeler,
+		DepartementID:   prospectVide(in.DepartementID),
+		Projet:          prospectTypeEnum[db.Projet](in.Projet),
+		Statut:          prospectTypeEnum[db.ProspectStatut](in.Statut),
+		Segment:         prospectVide(in.Segment),
+		AppelePar:       prospectVide(in.AppelePar),
+		CampagneID:      prospectVide(in.CampagneID),
+		ProfessionID:    prospectVide(in.ProfessionID),
+		IncomeBandID:    prospectVide(in.IncomeBandID),
+		EmployeurID:     prospectVide(in.EmployeurID),
+		PaysResidenceID: prospectVide(in.PaysResidenceID),
+		PaymentMode:     prospectTypeEnum[db.PaymentMode](in.PaymentMode),
+		TypeBien:        prospectTypeEnum[db.TypeBien](in.TypeBien),
+		TypeContrat:     prospectTypeEnum[db.TypeContrat](in.TypeContrat),
+		ModeEpargne:     prospectTypeEnum[db.ModeEpargne](in.ModeEpargne),
+		RendezVousIssue: prospectVide(in.RendezVousIssue),
+		Search:          prospectVide(strings.TrimSpace(in.Search)),
+		Attribue:        in.Attribue,
+		ResteAAppeler:   in.ResteAAppeler,
 	}
 	if in.Revue != "" {
 		arg.Revue = prospectPtr(in.Revue == prospectVrai)
+	}
+	if in.AvecRdv != "" {
+		arg.AvecRdv = prospectPtr(in.AvecRdv == prospectVrai)
+	}
+	if in.AvecCommentaire != "" {
+		arg.AvecCommentaire = prospectPtr(in.AvecCommentaire == prospectVrai)
 	}
 	if arg.Search != nil {
 		arg.PhoneSearch = prospectRechercheTelephone(*arg.Search, s.Cfg.PhoneRegion)
@@ -577,7 +601,13 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	if arg.DateFrom, err = prospectBorneDate(in.DateFrom, s.Cfg.TimeZone, false); err != nil {
 		return arg, err
 	}
-	arg.DateTo, err = prospectBorneDate(in.DateTo, s.Cfg.TimeZone, true)
+	if arg.DateTo, err = prospectBorneDate(in.DateTo, s.Cfg.TimeZone, true); err != nil {
+		return arg, err
+	}
+	if arg.RdvFrom, err = prospectBorneDate(in.RdvFrom, s.Cfg.TimeZone, false); err != nil {
+		return arg, err
+	}
+	arg.RdvTo, err = prospectBorneDate(in.RdvTo, s.Cfg.TimeZone, true)
 	return arg, err
 }
 
@@ -592,6 +622,11 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		EnrollmentCapturedByID: arg.EnrollmentCapturedByID, LastCallByID: arg.LastCallByID,
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
+		CampagneID: arg.CampagneID, ProfessionID: arg.ProfessionID, IncomeBandID: arg.IncomeBandID,
+		EmployeurID: arg.EmployeurID, PaysResidenceID: arg.PaysResidenceID, PaymentMode: arg.PaymentMode,
+		TypeBien: arg.TypeBien, TypeContrat: arg.TypeContrat, ModeEpargne: arg.ModeEpargne,
+		RendezVousIssue: arg.RendezVousIssue, AvecRdv: arg.AvecRdv, AvecCommentaire: arg.AvecCommentaire,
+		RdvFrom: arg.RdvFrom, RdvTo: arg.RdvTo,
 		Search: arg.Search, PhoneSearch: arg.PhoneSearch, Attribue: arg.Attribue,
 		ResteAAppeler: arg.ResteAAppeler,
 	}
