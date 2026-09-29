@@ -158,16 +158,19 @@ export async function fetchClientsContacts(
   ).items;
 }
 
-/** Le parcours d'un téléconseiller sur ses contacts, de l'appel à la vente. */
+/** Le parcours d'un téléconseiller sur ses contacts, de l'appel à la vente ; sans lui, celui de l'équipe. */
 export async function fetchPipelineContacts(
-  appelePar: string,
+  appelePar: string | null,
   projet: Projet | null | undefined,
   client: ApiClient = getApiClient(),
 ): Promise<PipelineContacts> {
   return unwrap(
     await client.GET('/api/v1/prospects/pipeline', {
       params: {
-        query: { appelePar, ...(projet === null || projet === undefined ? {} : { projet }) },
+        query: {
+          ...(appelePar === null ? {} : { appelePar }),
+          ...(projet === null || projet === undefined ? {} : { projet }),
+        },
       },
     }),
   );

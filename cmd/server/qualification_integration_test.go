@@ -1427,6 +1427,17 @@ func TestPipelineDesContactsJusquALaVente(t *testing.T) {
 	if body["appelees"] != float64(0) {
 		t.Fatalf("les fiches d'un collègue ne comptent pas : %v", body)
 	}
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	statut, body = qualificationEnvoi(superviseur, http.MethodGet, "/api/v1/prospects/pipeline?appelePar="+b.userID, nil)
+	superviseur.attend(statut, http.StatusOK, "pipeline d'un téléconseiller choisi", body)
+	if body["appelees"] != float64(2) {
+		t.Fatalf("l'encadrement lit le parcours du téléconseiller choisi : %v", body)
+	}
+	statut, body = qualificationEnvoi(superviseur, http.MethodGet, "/api/v1/prospects/pipeline", nil)
+	superviseur.attend(statut, http.StatusOK, "pipeline de l'équipe", body)
+	if appelees, _ := body["appelees"].(float64); appelees < 2 {
+		t.Fatalf("sans téléconseiller choisi, l'encadrement lit toute l'équipe, pas ses seuls appels : %v", body)
+	}
 	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/clients", nil)
 	b.attend(statut, http.StatusOK, "clients", body)
 	items, _ := body["items"].([]any)
