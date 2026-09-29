@@ -6,6 +6,7 @@ import (
 	"cpi-go/internal/analytics"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -530,6 +531,27 @@ func TestSupervisionActiviteRendezVous(t *testing.T) {
 	analyticsEgal(b, "rendez-vous de la ligne", ligne["rendezVous"], 3)
 	analyticsEgal(b, "téléphoniques de la ligne", ligne["rendezVousTelephoniques"], 1)
 	analyticsEgal(b, "taux de la ligne", ligne["rendezVousRate"], 100)
+
+	parType := analyticsObjet(b, "rendez-vous par type de la ligne", ligne["rendezVousParType"])
+	analyticsEgal(b, "RV téléphonique", parType["RDV_TELEPHONIQUE"], 1)
+	analyticsEgal(b, "RV site", parType["RV_SITE"], 1)
+	analyticsEgal(b, "méthode datée sans statut de rendez-vous", parType["METHODE_RENDEZ_VOUS"], 1)
+	analyticsEgal(b, "RV téléphonique de l'équipe",
+		analyticsObjet(b, "par type de l'équipe", totaux["rendezVousParType"])["RDV_TELEPHONIQUE"], 1)
+
+	types, _ := body["typesRendezVous"].([]any)
+	codes := make([]string, 0, len(types))
+	for _, t := range types {
+		codes = append(codes, analyticsObjet(b, "type", t)["code"].(string))
+	}
+	for _, attendu := range []string{"RV_CPI", "RV_SITE", "RV_EXTERNE", "RDV_TELEPHONIQUE", "METHODE_RENDEZ_VOUS"} {
+		if !slices.Contains(codes, attendu) {
+			t.Fatalf("colonne %s absente de %v", attendu, codes)
+		}
+	}
+	if slices.Contains(codes, "RENDEZ_VOUS") {
+		t.Fatalf("le parent RENDEZ_VOUS ne doit pas avoir de colonne : %v", codes)
+	}
 }
 
 func TestSupervisionCampagnesEtStock(t *testing.T) {

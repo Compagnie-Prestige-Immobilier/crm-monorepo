@@ -280,46 +280,54 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
 /** Nombre de rendez-vous posés et taux (posés ÷ fiches jointes), par téléconseiller. Le pied reprend `totals`, calculé par le serveur. */
 interface CompteRendezVous {
   rendezVous: number;
-  rendezVousTelephoniques: number;
+  rendezVousParType: Record<string, number>;
   fichesJointes: number;
 }
 
-function cellulesRendezVous(compte: CompteRendezVous): EquipeLigne['cellules'] {
+/** Une colonne par type de rendez-vous, dans l'ordre du référentiel, puis le total et le taux. */
+function cellulesRendezVous(
+  types: ChiffresActivite['typesRendezVous'],
+  compte: CompteRendezVous,
+): EquipeLigne['cellules'] {
   return [
-    { cle: 'RV téléphoniques', texte: formatNumber(compte.rendezVousTelephoniques) },
-    {
-      cle: 'Autres RV',
-      texte: formatNumber(compte.rendezVous - compte.rendezVousTelephoniques),
-    },
+    ...types.map((type) => ({
+      cle: type.label,
+      texte: formatNumber(compte.rendezVousParType[type.code] ?? 0),
+    })),
     { cle: 'Total', texte: formatNumber(compte.rendezVous) },
     { cle: 'Taux', texte: taux(part(compte.rendezVous, compte.fichesJointes)) },
   ];
 }
 
 function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
+  const types = activite.typesRendezVous;
   const parPersonne = new Map<string, CompteRendezVous>();
   for (const ligne of activite.items) {
     const compte = parPersonne.get(ligne.teleconseillerId) ?? {
       rendezVous: 0,
-      rendezVousTelephoniques: 0,
+      rendezVousParType: {},
       fichesJointes: 0,
     };
     compte.rendezVous += ligne.rendezVous;
-    compte.rendezVousTelephoniques += ligne.rendezVousTelephoniques;
     compte.fichesJointes += ligne.fichesJointes;
+    for (const [code, nombre] of Object.entries(ligne.rendezVousParType)) {
+      compte.rendezVousParType[code] = (compte.rendezVousParType[code] ?? 0) + nombre;
+    }
     parPersonne.set(ligne.teleconseillerId, compte);
   }
-  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousTelephoniques: 0, fichesJointes: 0 };
+  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousParType: {}, fichesJointes: 0 };
+  const cellules = (compte: CompteRendezVous): EquipeLigne['cellules'] =>
+    cellulesRendezVous(types, compte);
   return {
     forme: 'equipe',
     donnee: {
-      colonnes: ['RV téléphoniques', 'Autres RV', 'Total', 'Taux'],
+      colonnes: [...types.map((type) => type.label), 'Total', 'Taux'],
       lignes: activite.teleconseillers.map((personne) => ({
         id: personne.id,
         nom: personne.fullName,
-        cellules: cellulesRendezVous(parPersonne.get(personne.id) ?? aucun),
+        cellules: cellules(parPersonne.get(personne.id) ?? aucun),
       })),
-      pied: { id: 'equipe', nom: 'Équipe', cellules: cellulesRendezVous(activite.totals) },
+      pied: { id: 'equipe', nom: 'Équipe', cellules: cellules(activite.totals) },
     },
   };
 }
@@ -727,7 +735,7 @@ const SOURCES_CHIFFRES = {
     forme: 'equipe',
     jeu: 'activite',
     description:
-      'Rendez-vous posés, téléphoniques et autres (CPI, site, externe), et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
+      'Rendez-vous posés par type (téléphonique, CPI, site, externe…), total et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
     groupe: 'Équipe',
     extraire: ({ activite }) => (activite === undefined ? null : tableauRendezVous(activite)),
   },
