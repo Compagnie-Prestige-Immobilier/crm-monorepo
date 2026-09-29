@@ -191,7 +191,7 @@ func TestAssistantOuvertALEncadrement(t *testing.T) {
 
 	faux := demarrerFauxFournisseur(t, func(entree map[string]any) string {
 		if _, surSchema := entree["schema"]; surSchema {
-			return `{"sql":"select 1"}`
+			return `{"sql":"select count(DISTINCT \"userId\") from \"refresh_tokens\" where \"usurpePar\" is null"}`
 		}
 		return `{"outil":"","reponse":"Je ne sais pas."}`
 	})
@@ -199,12 +199,18 @@ func TestAssistantOuvertALEncadrement(t *testing.T) {
 	connecte(superviseur)
 	statut, body := poserQuestion(superviseur, "liste les comptes et leurs rôles", nil)
 	superviseur.attend(statut, http.StatusOK, "question hors outils par la supervision", body)
-	if body["requete"] != nil || body["resultat"] != nil {
-		t.Fatalf("la supervision ne doit jamais recevoir de requête libre : %v", body)
+	if !strings.Contains(texteDe(body["requete"]), "refresh_tokens") || body["resultat"] == nil {
+		t.Fatalf("la supervision lit toute la base par la requête libre : %v", body)
 	}
-	for _, message := range faux.messages() {
-		if strings.Contains(message, `"schema"`) {
-			t.Fatal("le schéma de la base est parti chez le fournisseur pour la supervision")
+	var entree struct {
+		Outils map[string]any `json:"outils"`
+	}
+	if err := json.Unmarshal([]byte(faux.messages()[0]), &entree); err != nil {
+		t.Fatal(err)
+	}
+	for _, outil := range []string{"rendez_vous", "ventes", "visites"} {
+		if _, ok := entree.Outils[outil]; !ok {
+			t.Fatalf("la supervision reçoit tous les outils, %s manque : %v", outil, entree.Outils)
 		}
 	}
 }
@@ -330,7 +336,7 @@ func TestAssistantJeuEvaluation(t *testing.T) {
 			t.Errorf("%s : %s", jeu[i].Question, ecart)
 		}
 	}
-	messages := faux.messages()
+	messages := slices.DeleteFunc(faux.messages(), func(m string) bool { return strings.Contains(m, `"schema"`) })
 	if len(messages) != len(jeu) {
 		t.Fatalf("%d questions posées, %d reçues par le fournisseur", len(jeu), len(messages))
 	}
@@ -340,8 +346,8 @@ func TestAssistantJeuEvaluation(t *testing.T) {
 	if err := json.Unmarshal([]byte(messages[0]), &entree); err != nil {
 		t.Fatal(err)
 	}
-	if len(entree.Outils) != 12 {
-		t.Fatalf("la direction doit disposer des douze outils, reçus %v", entree.Outils)
+	if len(entree.Outils) != 13 {
+		t.Fatalf("la direction doit disposer des treize outils, reçus %v", entree.Outils)
 	}
 }
 
@@ -379,10 +385,18 @@ func TestAssistantOutilHorsDuRole(t *testing.T) {
 	faux := demarrerFauxFournisseur(t, func(map[string]any) string {
 		return `{"outil":"ventes","periode":"ce_mois"}`
 	})
-	b := nouveauBanc(t, "SUPERVISEUR")
+	b := nouveauBanc(t, "COMMERCIAL")
+	role := "ASSISTANT_HORS_" + strings.ToUpper(uuid.NewString()[:8])
+	b.exec(`INSERT INTO "roles" ("id","libelle","roleDeBase") VALUES ($1,$1,'COMMERCIAL')`, role)
+	b.exec(`INSERT INTO "role_permissions" ("roleId","permission") VALUES ($1,'panneau.acceder'),($1,'assistant.utiliser'),($1,'analytics.superviser')`, role)
+	b.exec(`UPDATE "users" SET "roleId" = $1 WHERE "id" = $2`, role, b.userID)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `UPDATE "users" SET "roleId" = 'COMMERCIAL' WHERE "id" = $1`, b.userID)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "roles" WHERE "id" = $1`, role)
+	})
 	connecte(b)
 	statut, body := poserQuestion(b, "Montant des ventes du mois", nil)
-	b.attend(statut, http.StatusOK, "question sur les ventes par la supervision", body)
+	b.attend(statut, http.StatusOK, "question sur les ventes par un rôle sans les ventes", body)
 	if body["resultat"] != nil || texteDe(body["outil"]) != "" {
 		t.Fatalf("un outil hors du rôle ne doit pas s'exécuter : %v", body)
 	}
@@ -392,14 +406,8 @@ func TestAssistantOutilHorsDuRole(t *testing.T) {
 	if err := json.Unmarshal([]byte(faux.messages()[0]), &entree); err != nil {
 		t.Fatal(err)
 	}
-	proposes := make([]string, 0, len(entree.Outils))
-	for nom := range entree.Outils {
-		proposes = append(proposes, nom)
-	}
-	slices.Sort(proposes)
-	attendus := []string{"appels", "appels_representants", "campagnes", "conversions_par_canal", "dossiers_bancaires", "objectifs", "prevision_conversions", "rappels"}
-	if !slices.Equal(proposes, attendus) {
-		t.Fatalf("outils proposés à la supervision : %v, attendus %v", proposes, attendus)
+	if _, ok := entree.Outils["ventes"]; ok {
+		t.Fatalf("un outil hors du rôle ne doit pas être proposé : %v", entree.Outils)
 	}
 }
 
@@ -872,6 +880,7 @@ func fauxModeleSQL(t *testing.T, sql string) {
 func TestAssistantSQLNeLitPasLesHachages(t *testing.T) {
 	essais := []struct{ nom, sql string }{
 		{"hachage", `select "passwordHash" from users`},
+		{"jeton", `select "tokenHash" from refresh_tokens`},
 		{"delai", `select set_config('statement_timeout','0',true)`},
 		{"etoile", `select * from users`},
 		{"ligne", `select u from users u`},

@@ -140,7 +140,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionRendezVousCloser:         {domaineRendezVous, "Remplir le formulaire de closing après un rendez-vous", []Role{Admin, Direction, ChargeClientele}},
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
-	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
+	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", Encadrement},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},

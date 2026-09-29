@@ -54,7 +54,8 @@ Choisis l'outil qui répond à la question et réponds uniquement par un objet J
 - reponse : si outil vaut "", une phrase en français qui dit ce que l'assistant sait chiffrer ; sinon "".
 Ne calcule jamais les dates d'une période nommée : le serveur les calcule à partir de periode.
 Quand precedent est fourni et que la question le prolonge (« et le mois dernier ? », « et pour le Grand Public ? », « par site »), reprends son outil et ses paramètres et ne change que ce que la question change.
-Un outil ne se choisit que s'il répond vraiment. Une conversion de fiche n'est pas une vente.`
+Un outil ne se choisit que s'il répond vraiment. Une conversion de fiche n'est pas une vente, un rappel n'est pas un rendez-vous.
+Si la question demande une mesure, un détail ou une répartition (par agent, par personne...) que l'outil n'offre pas dans sa description ou ses axes, outil vaut "".`
 )
 
 var permission = socle.PermissionAssistantUtiliser
@@ -218,8 +219,8 @@ func (s *service) repondreA(ctx context.Context, question string, precedent *Par
 	if err != nil {
 		return nil, err
 	}
-	o, ok := outils[c.Outil]
-	if !ok || !u.Peut(o.permission) {
+	_, ok := permis[c.Outil]
+	if !ok {
 		if u.Peut(socle.PermissionAssistantToutLire) {
 			return s.requeteLibre(ctx, question, maintenant.In(s.Cfg.TimeZone))
 		}
