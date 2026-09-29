@@ -6,9 +6,12 @@ import (
 	"cpi-go/internal/shared/socle"
 	"log/slog"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func moyenneEnSecondes(total, nombre int32) *float64 {
@@ -130,56 +133,57 @@ type ligneDeStatutRepresentant struct {
 }
 
 type CompteursDActivite struct {
-	Calls                   int      `json:"calls"`
-	ConfirmedCalls          int      `json:"confirmedCalls"`
-	DetectedCalls           int      `json:"detectedCalls"`
-	UnloggedCalls           int      `json:"unloggedCalls"`
-	AvgCallSeconds          *float64 `json:"avgCallSeconds"`
-	Unreachable             int      `json:"unreachable"`
-	WrongNumber             int      `json:"wrongNumber"`
-	MethodObtained          int      `json:"methodObtained"`
-	Callback                int      `json:"callback"`
-	ReachRate               *float64 `json:"reachRate"`
-	Fiches                  int      `json:"fiches"`
-	FichesJointes           int      `json:"fichesJointes"`
-	FicheReachRate          *float64 `json:"ficheReachRate"`
-	RendezVous              int      `json:"rendezVous"`
-	RendezVousRate          *float64 `json:"rendezVousRate"`
-	RendezVousTelephoniques int      `json:"rendezVousTelephoniques" doc:"Rendez-vous téléphoniques, déjà comptés dans rendezVous."`
-	ProspectsCreated        int      `json:"prospectsCreated"`
-	RepresentantsContacted  int      `json:"representantsContacted"`
-	RepCalls                int      `json:"repCalls"`
-	RepConfirmedCalls       int      `json:"repConfirmedCalls"`
-	RepDetectedCalls        int      `json:"repDetectedCalls"`
-	RepUnloggedCalls        int      `json:"repUnloggedCalls"`
-	RepAvgCallSeconds       *float64 `json:"repAvgCallSeconds"`
-	RepWrongNumber          int      `json:"repWrongNumber"`
-	RepReached              int      `json:"repReached"`
-	RepCallback             int      `json:"repCallback"`
-	RepUnreachable          int      `json:"repUnreachable"`
-	RepContactRate          *float64 `json:"repContactRate"`
-	RepCallbackRate         *float64 `json:"repCallbackRate"`
-	RepQuestioned           int      `json:"repQuestioned"`
-	RepQualified            int      `json:"repQualified"`
-	RepQualificationRate    *float64 `json:"repQualificationRate"`
-	RepFiches               int      `json:"repFiches"`
-	RepFichesJointes        int      `json:"repFichesJointes"`
-	RepFichesNonJointes     int      `json:"repFichesNonJointes"`
-	RepFichesAcceptees      int      `json:"repFichesAcceptees"`
-	RepFichesRefusees       int      `json:"repFichesRefusees"`
-	RepFichesARappeler      int      `json:"repFichesARappeler"`
-	RepFichesEligibles      int      `json:"repFichesEligibles"`
-	RepReachabilityRate     *float64 `json:"repReachabilityRate"`
-	RepAcceptanceRate       *float64 `json:"repAcceptanceRate"`
-	RepCallbackFicheRate    *float64 `json:"repCallbackFicheRate"`
-	InboundCalls            int      `json:"inboundCalls"`
-	MissedCalls             int      `json:"missedCalls"`
-	CallbacksHonored        int      `json:"callbacksHonored"`
-	CallbacksLate           int      `json:"callbacksLate"`
-	CallbacksUpcoming       int      `json:"callbacksUpcoming"`
-	RepCallbacksHonored     int      `json:"repCallbacksHonored"`
-	RepCallbacksLate        int      `json:"repCallbacksLate"`
-	RepCallbacksUpcoming    int      `json:"repCallbacksUpcoming"`
+	Calls                   int            `json:"calls"`
+	ConfirmedCalls          int            `json:"confirmedCalls"`
+	DetectedCalls           int            `json:"detectedCalls"`
+	UnloggedCalls           int            `json:"unloggedCalls"`
+	AvgCallSeconds          *float64       `json:"avgCallSeconds"`
+	Unreachable             int            `json:"unreachable"`
+	WrongNumber             int            `json:"wrongNumber"`
+	MethodObtained          int            `json:"methodObtained"`
+	Callback                int            `json:"callback"`
+	ReachRate               *float64       `json:"reachRate"`
+	Fiches                  int            `json:"fiches"`
+	FichesJointes           int            `json:"fichesJointes"`
+	FicheReachRate          *float64       `json:"ficheReachRate"`
+	RendezVous              int            `json:"rendezVous"`
+	RendezVousRate          *float64       `json:"rendezVousRate"`
+	RendezVousTelephoniques int            `json:"rendezVousTelephoniques" doc:"Rendez-vous téléphoniques, déjà comptés dans rendezVous."`
+	RendezVousParType       map[string]int `json:"rendezVousParType" doc:"Rendez-vous par code de type (voir typesRendezVous) ; un type absent vaut 0."`
+	ProspectsCreated        int            `json:"prospectsCreated"`
+	RepresentantsContacted  int            `json:"representantsContacted"`
+	RepCalls                int            `json:"repCalls"`
+	RepConfirmedCalls       int            `json:"repConfirmedCalls"`
+	RepDetectedCalls        int            `json:"repDetectedCalls"`
+	RepUnloggedCalls        int            `json:"repUnloggedCalls"`
+	RepAvgCallSeconds       *float64       `json:"repAvgCallSeconds"`
+	RepWrongNumber          int            `json:"repWrongNumber"`
+	RepReached              int            `json:"repReached"`
+	RepCallback             int            `json:"repCallback"`
+	RepUnreachable          int            `json:"repUnreachable"`
+	RepContactRate          *float64       `json:"repContactRate"`
+	RepCallbackRate         *float64       `json:"repCallbackRate"`
+	RepQuestioned           int            `json:"repQuestioned"`
+	RepQualified            int            `json:"repQualified"`
+	RepQualificationRate    *float64       `json:"repQualificationRate"`
+	RepFiches               int            `json:"repFiches"`
+	RepFichesJointes        int            `json:"repFichesJointes"`
+	RepFichesNonJointes     int            `json:"repFichesNonJointes"`
+	RepFichesAcceptees      int            `json:"repFichesAcceptees"`
+	RepFichesRefusees       int            `json:"repFichesRefusees"`
+	RepFichesARappeler      int            `json:"repFichesARappeler"`
+	RepFichesEligibles      int            `json:"repFichesEligibles"`
+	RepReachabilityRate     *float64       `json:"repReachabilityRate"`
+	RepAcceptanceRate       *float64       `json:"repAcceptanceRate"`
+	RepCallbackFicheRate    *float64       `json:"repCallbackFicheRate"`
+	InboundCalls            int            `json:"inboundCalls"`
+	MissedCalls             int            `json:"missedCalls"`
+	CallbacksHonored        int            `json:"callbacksHonored"`
+	CallbacksLate           int            `json:"callbacksLate"`
+	CallbacksUpcoming       int            `json:"callbacksUpcoming"`
+	RepCallbacksHonored     int            `json:"repCallbacksHonored"`
+	RepCallbacksLate        int            `json:"repCallbacksLate"`
+	RepCallbacksUpcoming    int            `json:"repCallbacksUpcoming"`
 }
 
 type LigneDActivite struct {
@@ -252,6 +256,7 @@ type ActiviteDesTeleconseillers struct {
 	ProspectsByTeleconseiller []BarreDHistogramme          `json:"prospectsByTeleconseiller"`
 	ProspectsByRepresentant   []BarreDHistogramme          `json:"prospectsByRepresentant"`
 	RepQualificationStatuses  *RepartitionParStatut        `json:"repQualificationStatuses"`
+	TypesRendezVous           []TypeDeRendezVous           `json:"typesRendezVous" doc:"Les colonnes de rendezVousParType, dans l'ordre du référentiel."`
 }
 
 type ActiviteOutput struct{ Body ActiviteDesTeleconseillers }
@@ -414,7 +419,10 @@ func (perimetre perimetreSupervision) rendezVousProspects(p *parametresSQL) stri
 	SELECT DISTINCT ON (ca."prospectId")
 	  ca."performedById"                                AS "userId",
 	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
-	  (cr."code" IS NOT DISTINCT FROM 'RDV_TELEPHONIQUE')::int AS telephonique
+	  (cr."code" IS NOT DISTINCT FROM 'RDV_TELEPHONIQUE')::int AS telephonique,
+	  COALESCE(CASE WHEN cr."effect" = 'CLOSE_APPOINTMENT' THEN cr."code" END, '` + typeRendezVousMethode + `') AS code,
+	  COALESCE(CASE WHEN cr."effect" = 'CLOSE_APPOINTMENT' THEN cr."label" END, '` + libelleRendezVousMethode + `') AS libelle,
+	  COALESCE(CASE WHEN cr."effect" = 'CLOSE_APPOINTMENT' THEN cr."sortOrder" END, 1000)::int AS ordre
 	FROM "call_attempts" ca
 	LEFT JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
 	WHERE (cr."effect" = 'CLOSE_APPOINTMENT' OR ca."rendezVousAt" IS NOT NULL)
@@ -495,6 +503,82 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	  FROM "rep_call_attempts" rca
 	  WHERE rca."callbackAt" IS NOT NULL AND ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."callbackAt"`) + `
 	) h`
+}
+
+// Le rendez-vous posé par la seule méthode d'adhésion datée, sans statut de la
+// famille « Rendez-vous » : il garde sa colonne plutôt que de se perdre.
+const (
+	typeRendezVousMethode    = "METHODE_RENDEZ_VOUS"
+	libelleRendezVousMethode = "Méthode rendez-vous"
+)
+
+type ligneRendezVousParType struct {
+	Jour    string
+	ID      string
+	Code    string
+	Libelle string
+	Ordre   int32
+	Nombre  int32
+}
+
+func (s *service) rendezVousParType(ctx context.Context, perimetre perimetreSupervision) ([]ligneRendezVousParType, error) {
+	p := &parametresSQL{}
+	sql := `SELECT to_char(r.bucket, '` + formatJourISO + `') AS jour, r."userId" AS id,
+	  r.code, r.libelle, r.ordre, COUNT(*)::int AS nombre
+	FROM (` + perimetre.rendezVousProspects(p) + `) r
+	WHERE ` + perimetre.membreDeLEquipe(p, `r."userId"`) + `
+	GROUP BY 1, 2, 3, 4, 5`
+	return lignesAgregat[ligneRendezVousParType](ctx, s, sql, p.args)
+}
+
+type TypeDeRendezVous struct {
+	Code  string `json:"code"`
+	Label string `json:"label"`
+}
+
+// Une colonne par statut actif de la famille « Rendez-vous » (le parent qui
+// porte des enfants n'en a pas), plus tout type compté sur la fenêtre, éteint
+// ou non : un rendez-vous posé ne disparaît pas du tableau.
+func (s *service) typesDeRendezVous(ctx context.Context, comptes []ligneRendezVousParType) ([]TypeDeRendezVous, error) {
+	type typeOrdonne struct {
+		TypeDeRendezVous
+		ordre int32
+	}
+	lignes, err := s.Pool.Query(ctx, `SELECT cr."code", cr."label", cr."sortOrder"
+	FROM "call_outcome_reasons" cr
+	WHERE cr."effect" = 'CLOSE_APPOINTMENT' AND cr."isActive"
+	  AND NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" e WHERE e."parentId" = cr."id" AND e."isActive")`)
+	if err != nil {
+		return nil, err
+	}
+	actifs, err := pgx.CollectRows(lignes, func(ligne pgx.CollectableRow) (typeOrdonne, error) {
+		var t typeOrdonne
+		return t, ligne.Scan(&t.Code, &t.Label, &t.ordre)
+	})
+	if err != nil {
+		return nil, err
+	}
+	vus := make(map[string]bool, len(actifs))
+	for _, t := range actifs {
+		vus[t.Code] = true
+	}
+	for _, c := range comptes {
+		if !vus[c.Code] {
+			vus[c.Code] = true
+			actifs = append(actifs, typeOrdonne{TypeDeRendezVous{Code: c.Code, Label: c.Libelle}, c.Ordre})
+		}
+	}
+	slices.SortStableFunc(actifs, func(a, b typeOrdonne) int {
+		if a.ordre != b.ordre {
+			return int(a.ordre - b.ordre)
+		}
+		return strings.Compare(a.Label, b.Label)
+	})
+	types := make([]TypeDeRendezVous, 0, len(actifs))
+	for _, t := range actifs {
+		types = append(types, t.TypeDeRendezVous)
+	}
+	return types, nil
 }
 
 func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimetreSupervision) ([]ligneParTeleconseiller, error) {
@@ -1119,6 +1203,9 @@ func (s *service) calculerLActivite(ctx context.Context, f *FiltreDeSupervision)
 	activite.ProspectsByTeleconseiller = barresDHistogramme(parAgent)
 	activite.ProspectsByRepresentant = barresDHistogramme(parRepresentant)
 	activite.RepQualificationStatuses = statuts
+	if activite.TypesRendezVous, err = s.typesDeRendezVous(ctx, faits.rendezVousParType); err != nil {
+		return ActiviteDesTeleconseillers{}, err
+	}
 	return activite, nil
 }
 
@@ -1128,6 +1215,7 @@ type faitsDeLaFenetre struct {
 	journal             []ligneJournalParTeleconseiller
 	totauxProspects     CompteursProspects
 	totauxRepresentants CompteursRepresentants
+	rendezVousParType   []ligneRendezVousParType
 }
 
 func (s *service) faitsDeLaFenetre(ctx context.Context, perimetre perimetreSupervision) (faitsDeLaFenetre, error) {
@@ -1143,6 +1231,9 @@ func (s *service) faitsDeLaFenetre(ctx context.Context, perimetre perimetreSuper
 		return faits, err
 	}
 	if faits.totauxProspects, err = s.totauxDesProspects(ctx, perimetre); err != nil {
+		return faits, err
+	}
+	if faits.rendezVousParType, err = s.rendezVousParType(ctx, perimetre); err != nil {
 		return faits, err
 	}
 	faits.totauxRepresentants, err = s.totauxDesRepresentants(ctx, perimetre)
@@ -1170,22 +1261,39 @@ func assemblerLActivite(perimetre perimetreSupervision, faits *faitsDeLaFenetre)
 		journalDe[ligne.Jour+"|"+ligne.ID] = ligne.CompteursJournalEtRappels
 		totalJournal = cumulerLeJournal(totalJournal, ligne.CompteursJournalEtRappels)
 	}
+	rendezVousDe := map[string]map[string]int{}
+	totalRendezVous := map[string]int{}
+	for _, ligne := range faits.rendezVousParType {
+		cle := ligne.Jour + "|" + ligne.ID
+		if rendezVousDe[cle] == nil {
+			rendezVousDe[cle] = map[string]int{}
+		}
+		rendezVousDe[cle][ligne.Code] += int(ligne.Nombre)
+		totalRendezVous[ligne.Code] += int(ligne.Nombre)
+	}
 	items := make([]LigneDActivite, 0, len(faits.parTeleconseiller))
 	for _, ligne := range faits.parTeleconseiller {
 		cle := ligne.Jour + "|" + ligne.ID
+		compteurs := compteursDActivite(ligne.CompteursProspects, representantsDe[cle], journalDe[cle])
+		compteurs.RendezVousParType = rendezVousDe[cle]
+		if compteurs.RendezVousParType == nil {
+			compteurs.RendezVousParType = map[string]int{}
+		}
 		items = append(items, LigneDActivite{
-			CompteursDActivite: compteursDActivite(ligne.CompteursProspects, representantsDe[cle], journalDe[cle]),
+			CompteursDActivite: compteurs,
 			Bucket:             ligne.Jour,
 			TeleconseillerID:   ligne.ID,
 			TeleconseillerName: ligne.Nom,
 		})
 	}
+	totaux := compteursDActivite(faits.totauxProspects, faits.totauxRepresentants, totalJournal)
+	totaux.RendezVousParType = totalRendezVous
 	return ActiviteDesTeleconseillers{
 		From:        instantISOouNul(perimetre.depuis),
 		To:          instantISOouNul(perimetre.jusqua),
 		Granularity: perimetre.unite,
 		Items:       items,
-		Totals:      compteursDActivite(faits.totauxProspects, faits.totauxRepresentants, totalJournal),
+		Totals:      totaux,
 	}
 }
 

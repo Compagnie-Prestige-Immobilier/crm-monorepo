@@ -48,7 +48,9 @@ export function lienExportRendezVous(filtres: FiltresRendezVous): string {
   return `/api/v1/export/rendez-vous.xlsx?${new URLSearchParams(query(filtres)).toString()}`;
 }
 
-export async function lireClosing(id: string): Promise<{ closing: Closing; sites: string[] }> {
+export async function lireClosing(
+  id: string,
+): Promise<{ closing: Closing; sites: string[]; chargesDeClientele: string[] }> {
   return unwrap(
     await getApiClient().GET('/api/v1/prospects/{id}/closing', { params: { path: { id } } }),
   );

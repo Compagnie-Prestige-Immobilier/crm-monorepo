@@ -29,7 +29,7 @@ export function ChoixOuAutre({
   onChange: (value: string) => void;
 }) {
   const id = useId();
-  const [autre, setAutre] = useState(value !== '' && !options.includes(value));
+  const [autre, setAutre] = useState(autreOuvert && value !== '' && !options.includes(value));
   const items = (autreOuvert ? [...options, AUTRE] : options).map((option) => ({
     value: option,
     label: option,

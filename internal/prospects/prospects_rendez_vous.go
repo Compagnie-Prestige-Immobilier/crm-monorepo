@@ -99,6 +99,7 @@ type ClosingOutput struct {
 	Body struct {
 		Closing Closing  `json:"closing" doc:"Vide, au nom de qui l'ouvre, tant que le formulaire n'a jamais été enregistré."`
 		Sites   []string `json:"sites" doc:"Les sites de vente actifs, pour la localité du lot."`
+		Charges []string `json:"chargesDeClientele" doc:"Les chargés de clientèle actifs, pour « Chargé de clientèle en charge »."`
 	}
 }
 
@@ -129,6 +130,9 @@ func (s *service) closingLire(ctx context.Context, in *ClosingInput) (*ClosingOu
 	out.Body.Sites = make([]string, 0, len(sites))
 	for _, site := range sites {
 		out.Body.Sites = append(out.Body.Sites, site.Nom)
+	}
+	if out.Body.Charges, err = s.Q.ChargesDeClientele(ctx); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
