@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -261,8 +262,13 @@ func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.Use
 
 func stringPtr(value string) *string { return &value }
 
+// Kairos refuse les bases de démonstration : sans la permission, le panneau n'affiche ni bulle ni page d'assistant.
 func (s *service) compte(u *socle.Utilisateur) CompteConnecte {
-	return CompteConnecte{Utilisateur: *u, Permissions: u.Permissions(), IsActive: true, Workspace: s.Cfg.Base}
+	permissions := u.Permissions()
+	if s.Cfg.Base != socle.BasePublique {
+		permissions = slices.DeleteFunc(permissions, func(p string) bool { return p == string(socle.PermissionAssistantUtiliser) })
+	}
+	return CompteConnecte{Utilisateur: *u, Permissions: permissions, IsActive: true, Workspace: s.Cfg.Base}
 }
 
 type MeOutput struct{ Body CompteConnecte }

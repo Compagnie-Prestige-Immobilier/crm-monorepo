@@ -196,6 +196,8 @@ func TestAssistantOuvertALEncadrement(t *testing.T) {
 		return `{"outil":"","reponse":"Je ne sais pas."}`
 	})
 	superviseur := nouveauBanc(t, "SUPERVISEUR")
+	superviseur.exec(`REVOKE USAGE ON SCHEMA public FROM PUBLIC`)
+	t.Cleanup(func() { _, _ = superviseur.pool.Exec(superviseur.ctx, `GRANT USAGE ON SCHEMA public TO PUBLIC`) })
 	connecte(superviseur)
 	statut, body := poserQuestion(superviseur, "liste les comptes et leurs rôles", nil)
 	superviseur.attend(statut, http.StatusOK, "question hors outils par la supervision", body)
