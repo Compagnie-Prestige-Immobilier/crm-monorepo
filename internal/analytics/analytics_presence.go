@@ -31,6 +31,9 @@ type CompteursProspects struct {
 	Representants int32
 	Fiches        int32
 	FichesJointes int32
+	Rdv           int32
+	// Rdv les compte déjà : le reste est « autres rendez-vous ».
+	RdvTelephoniques int32
 }
 
 type ligneParTeleconseiller struct {
@@ -127,53 +130,56 @@ type ligneDeStatutRepresentant struct {
 }
 
 type CompteursDActivite struct {
-	Calls                  int      `json:"calls"`
-	ConfirmedCalls         int      `json:"confirmedCalls"`
-	DetectedCalls          int      `json:"detectedCalls"`
-	UnloggedCalls          int      `json:"unloggedCalls"`
-	AvgCallSeconds         *float64 `json:"avgCallSeconds"`
-	Unreachable            int      `json:"unreachable"`
-	WrongNumber            int      `json:"wrongNumber"`
-	MethodObtained         int      `json:"methodObtained"`
-	Callback               int      `json:"callback"`
-	ReachRate              *float64 `json:"reachRate"`
-	Fiches                 int      `json:"fiches"`
-	FichesJointes          int      `json:"fichesJointes"`
-	FicheReachRate         *float64 `json:"ficheReachRate"`
-	ProspectsCreated       int      `json:"prospectsCreated"`
-	RepresentantsContacted int      `json:"representantsContacted"`
-	RepCalls               int      `json:"repCalls"`
-	RepConfirmedCalls      int      `json:"repConfirmedCalls"`
-	RepDetectedCalls       int      `json:"repDetectedCalls"`
-	RepUnloggedCalls       int      `json:"repUnloggedCalls"`
-	RepAvgCallSeconds      *float64 `json:"repAvgCallSeconds"`
-	RepWrongNumber         int      `json:"repWrongNumber"`
-	RepReached             int      `json:"repReached"`
-	RepCallback            int      `json:"repCallback"`
-	RepUnreachable         int      `json:"repUnreachable"`
-	RepContactRate         *float64 `json:"repContactRate"`
-	RepCallbackRate        *float64 `json:"repCallbackRate"`
-	RepQuestioned          int      `json:"repQuestioned"`
-	RepQualified           int      `json:"repQualified"`
-	RepQualificationRate   *float64 `json:"repQualificationRate"`
-	RepFiches              int      `json:"repFiches"`
-	RepFichesJointes       int      `json:"repFichesJointes"`
-	RepFichesNonJointes    int      `json:"repFichesNonJointes"`
-	RepFichesAcceptees     int      `json:"repFichesAcceptees"`
-	RepFichesRefusees      int      `json:"repFichesRefusees"`
-	RepFichesARappeler     int      `json:"repFichesARappeler"`
-	RepFichesEligibles     int      `json:"repFichesEligibles"`
-	RepReachabilityRate    *float64 `json:"repReachabilityRate"`
-	RepAcceptanceRate      *float64 `json:"repAcceptanceRate"`
-	RepCallbackFicheRate   *float64 `json:"repCallbackFicheRate"`
-	InboundCalls           int      `json:"inboundCalls"`
-	MissedCalls            int      `json:"missedCalls"`
-	CallbacksHonored       int      `json:"callbacksHonored"`
-	CallbacksLate          int      `json:"callbacksLate"`
-	CallbacksUpcoming      int      `json:"callbacksUpcoming"`
-	RepCallbacksHonored    int      `json:"repCallbacksHonored"`
-	RepCallbacksLate       int      `json:"repCallbacksLate"`
-	RepCallbacksUpcoming   int      `json:"repCallbacksUpcoming"`
+	Calls                   int      `json:"calls"`
+	ConfirmedCalls          int      `json:"confirmedCalls"`
+	DetectedCalls           int      `json:"detectedCalls"`
+	UnloggedCalls           int      `json:"unloggedCalls"`
+	AvgCallSeconds          *float64 `json:"avgCallSeconds"`
+	Unreachable             int      `json:"unreachable"`
+	WrongNumber             int      `json:"wrongNumber"`
+	MethodObtained          int      `json:"methodObtained"`
+	Callback                int      `json:"callback"`
+	ReachRate               *float64 `json:"reachRate"`
+	Fiches                  int      `json:"fiches"`
+	FichesJointes           int      `json:"fichesJointes"`
+	FicheReachRate          *float64 `json:"ficheReachRate"`
+	RendezVous              int      `json:"rendezVous"`
+	RendezVousRate          *float64 `json:"rendezVousRate"`
+	RendezVousTelephoniques int      `json:"rendezVousTelephoniques" doc:"Rendez-vous téléphoniques, déjà comptés dans rendezVous."`
+	ProspectsCreated        int      `json:"prospectsCreated"`
+	RepresentantsContacted  int      `json:"representantsContacted"`
+	RepCalls                int      `json:"repCalls"`
+	RepConfirmedCalls       int      `json:"repConfirmedCalls"`
+	RepDetectedCalls        int      `json:"repDetectedCalls"`
+	RepUnloggedCalls        int      `json:"repUnloggedCalls"`
+	RepAvgCallSeconds       *float64 `json:"repAvgCallSeconds"`
+	RepWrongNumber          int      `json:"repWrongNumber"`
+	RepReached              int      `json:"repReached"`
+	RepCallback             int      `json:"repCallback"`
+	RepUnreachable          int      `json:"repUnreachable"`
+	RepContactRate          *float64 `json:"repContactRate"`
+	RepCallbackRate         *float64 `json:"repCallbackRate"`
+	RepQuestioned           int      `json:"repQuestioned"`
+	RepQualified            int      `json:"repQualified"`
+	RepQualificationRate    *float64 `json:"repQualificationRate"`
+	RepFiches               int      `json:"repFiches"`
+	RepFichesJointes        int      `json:"repFichesJointes"`
+	RepFichesNonJointes     int      `json:"repFichesNonJointes"`
+	RepFichesAcceptees      int      `json:"repFichesAcceptees"`
+	RepFichesRefusees       int      `json:"repFichesRefusees"`
+	RepFichesARappeler      int      `json:"repFichesARappeler"`
+	RepFichesEligibles      int      `json:"repFichesEligibles"`
+	RepReachabilityRate     *float64 `json:"repReachabilityRate"`
+	RepAcceptanceRate       *float64 `json:"repAcceptanceRate"`
+	RepCallbackFicheRate    *float64 `json:"repCallbackFicheRate"`
+	InboundCalls            int      `json:"inboundCalls"`
+	MissedCalls             int      `json:"missedCalls"`
+	CallbacksHonored        int      `json:"callbacksHonored"`
+	CallbacksLate           int      `json:"callbacksLate"`
+	CallbacksUpcoming       int      `json:"callbacksUpcoming"`
+	RepCallbacksHonored     int      `json:"repCallbacksHonored"`
+	RepCallbacksLate        int      `json:"repCallbacksLate"`
+	RepCallbacksUpcoming    int      `json:"repCallbacksUpcoming"`
 }
 
 type LigneDActivite struct {
@@ -399,6 +405,23 @@ func (perimetre perimetreSupervision) fichesProspects(p *parametresSQL) string {
 	ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
 }
 
+// Un rendez-vous se pose par un statut de la famille « Rendez-vous » (RV CPI,
+// site, externe, téléphonique), ou par la méthode d'adhésion qui porte une
+// date. Un appel suivant ne l'efface pas : la fiche compte une fois, chez qui
+// a posé son dernier rendez-vous de la fenêtre.
+func (perimetre perimetreSupervision) rendezVousProspects(p *parametresSQL) string {
+	return `
+	SELECT DISTINCT ON (ca."prospectId")
+	  ca."performedById"                                AS "userId",
+	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
+	  (cr."code" IS NOT DISTINCT FROM 'RDV_TELEPHONIQUE')::int AS telephonique
+	FROM "call_attempts" ca
+	LEFT JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
+	WHERE (cr."effect" = 'CLOSE_APPOINTMENT' OR ca."rendezVousAt" IS NOT NULL)
+	  AND ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
+}
+
 func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string {
 	return `
 	SELECT
@@ -480,6 +503,10 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	fiches AS (
 	  SELECT "userId", bucket, COUNT(*)::int AS fiches, SUM(joint)::int AS "fichesJointes"
 	  FROM (` + perimetre.fichesProspects(p) + `) f GROUP BY 1, 2
+	),
+	rendez_vous AS (
+	  SELECT "userId", bucket, COUNT(*)::int AS rdv, SUM(telephonique)::int AS "rdvTelephoniques"
+	  FROM (` + perimetre.rendezVousProspects(p) + `) r GROUP BY 1, 2
 	)
 	SELECT
 	  to_char(a.bucket, '` + formatJourISO + `') AS jour,
@@ -495,10 +522,13 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	  SUM(a.prospect)::int                AS prospects,
 	  COUNT(DISTINCT a.representant)::int AS representants,
 	  COALESCE(MAX(f.fiches), 0)::int          AS fiches,
-	  COALESCE(MAX(f."fichesJointes"), 0)::int AS "fichesJointes"
+	  COALESCE(MAX(f."fichesJointes"), 0)::int AS "fichesJointes",
+	  COALESCE(MAX(r.rdv), 0)::int             AS rdv,
+	  COALESCE(MAX(r."rdvTelephoniques"), 0)::int AS "rdvTelephoniques"
 	FROM actes a
 	INNER JOIN "users" u ON u."id" = a."userId"
 	LEFT JOIN fiches f ON f."userId" = a."userId" AND f.bucket = a.bucket
+	LEFT JOIN rendez_vous r ON r."userId" = a."userId" AND r.bucket = a.bucket
 	WHERE ` + perimetre.teleconseiller(p) + `
 	GROUP BY 1, 2, 3
 	ORDER BY 1 ASC, 3 ASC`
@@ -586,6 +616,11 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  SELECT COUNT(*)::int AS fiches, COALESCE(SUM(f.joint), 0)::int AS "fichesJointes"
 	  FROM (` + perimetre.fichesProspects(p) + `) f
 	  WHERE ` + perimetre.membreDeLEquipe(p, `f."userId"`) + `
+	),
+	rendez_vous AS (
+	  SELECT COUNT(*)::int AS rdv, COALESCE(SUM(r.telephonique), 0)::int AS "rdvTelephoniques"
+	  FROM (` + perimetre.rendezVousProspects(p) + `) r
+	  WHERE ` + perimetre.membreDeLEquipe(p, `r."userId"`) + `
 	)
 	SELECT
 	  COALESCE(SUM(a.appel), 0)::int       AS appels,
@@ -598,8 +633,11 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  COALESCE(SUM(a.prospect), 0)::int    AS prospects,
 	  COUNT(DISTINCT a.representant)::int  AS representants,
 	  MAX(f.fiches)::int                   AS fiches,
-	  MAX(f."fichesJointes")::int          AS "fichesJointes"
+	  MAX(f."fichesJointes")::int          AS "fichesJointes",
+	  MAX(r.rdv)::int                      AS rdv,
+	  MAX(r."rdvTelephoniques")::int       AS "rdvTelephoniques"
 	FROM fiches f
+	CROSS JOIN rendez_vous r
 	LEFT JOIN actes a ON ` + perimetre.membreDeLEquipe(p, `a."userId"`)
 	return ligneAgregat[CompteursProspects](ctx, s, sql, p.args)
 }
@@ -970,53 +1008,56 @@ func NoterRendement(rendement *RendementDunTeleconseiller) NoteDeRendement {
 
 func compteursDActivite(prospects CompteursProspects, representants CompteursRepresentants, journal CompteursJournalEtRappels) CompteursDActivite {
 	return CompteursDActivite{
-		Calls:                  int(prospects.Appels),
-		ConfirmedCalls:         int(prospects.Confirmes),
-		DetectedCalls:          int(journal.Detectes),
-		UnloggedCalls:          int(journal.NonConsignes),
-		AvgCallSeconds:         moyenneEnSecondes(journal.Duree, journal.Durees),
-		Unreachable:            int(prospects.Injoignables),
-		WrongNumber:            int(prospects.Faux),
-		MethodObtained:         int(prospects.Methodes),
-		Callback:               int(prospects.Rappels),
-		ReachRate:              tauxOuNul(int(prospects.Joignables), int(prospects.Appels)),
-		Fiches:                 int(prospects.Fiches),
-		FichesJointes:          int(prospects.FichesJointes),
-		FicheReachRate:         tauxOuNul(int(prospects.FichesJointes), int(prospects.Fiches)),
-		ProspectsCreated:       int(prospects.Prospects),
-		RepresentantsContacted: int(prospects.Representants),
-		RepCalls:               int(representants.Appels),
-		RepConfirmedCalls:      int(representants.Confirmes),
-		RepDetectedCalls:       int(journal.RepDetectes),
-		RepUnloggedCalls:       int(journal.RepNonConsignes),
-		RepAvgCallSeconds:      moyenneEnSecondes(journal.RepDuree, journal.RepDurees),
-		RepWrongNumber:         int(representants.Faux),
-		RepReached:             int(representants.Joints),
-		RepCallback:            int(representants.Rappels),
-		RepUnreachable:         int(representants.Injoignables),
-		RepContactRate:         tauxOuNul(int(representants.Joints), int(representants.Appels)),
-		RepCallbackRate:        tauxOuNul(int(representants.Rappels), int(representants.Appels)),
-		RepQuestioned:          int(representants.Interroges),
-		RepQualified:           int(representants.Qualifies),
-		RepQualificationRate:   tauxOuNul(int(representants.Qualifies), int(representants.Interroges)),
-		RepFiches:              int(representants.Fiches),
-		RepFichesJointes:       int(representants.FichesJointes),
-		RepFichesNonJointes:    int(representants.Fiches - representants.FichesJointes),
-		RepFichesAcceptees:     int(representants.FichesAcceptees),
-		RepFichesRefusees:      int(representants.FichesRefusees),
-		RepFichesARappeler:     int(representants.FichesARappeler),
-		RepFichesEligibles:     int(representants.FichesEligibles),
-		RepReachabilityRate:    tauxOuNul(int(representants.FichesJointes), int(representants.Fiches)),
-		RepAcceptanceRate:      tauxOuNul(int(representants.FichesAcceptees), int(representants.FichesEligibles)),
-		RepCallbackFicheRate:   tauxOuNul(int(representants.FichesARappeler), int(representants.Fiches)),
-		InboundCalls:           int(journal.Entrants),
-		MissedCalls:            int(journal.Manques),
-		CallbacksHonored:       int(journal.RappelsHonores),
-		CallbacksLate:          int(journal.RappelsRetard),
-		CallbacksUpcoming:      int(journal.RappelsAVenir),
-		RepCallbacksHonored:    int(journal.RepRappelsHonores),
-		RepCallbacksLate:       int(journal.RepRappelsRetard),
-		RepCallbacksUpcoming:   int(journal.RepRappelsAVenir),
+		Calls:                   int(prospects.Appels),
+		ConfirmedCalls:          int(prospects.Confirmes),
+		DetectedCalls:           int(journal.Detectes),
+		UnloggedCalls:           int(journal.NonConsignes),
+		AvgCallSeconds:          moyenneEnSecondes(journal.Duree, journal.Durees),
+		Unreachable:             int(prospects.Injoignables),
+		WrongNumber:             int(prospects.Faux),
+		MethodObtained:          int(prospects.Methodes),
+		Callback:                int(prospects.Rappels),
+		ReachRate:               tauxOuNul(int(prospects.Joignables), int(prospects.Appels)),
+		Fiches:                  int(prospects.Fiches),
+		FichesJointes:           int(prospects.FichesJointes),
+		FicheReachRate:          tauxOuNul(int(prospects.FichesJointes), int(prospects.Fiches)),
+		RendezVous:              int(prospects.Rdv),
+		RendezVousRate:          tauxOuNul(int(prospects.Rdv), int(prospects.FichesJointes)),
+		RendezVousTelephoniques: int(prospects.RdvTelephoniques),
+		ProspectsCreated:        int(prospects.Prospects),
+		RepresentantsContacted:  int(prospects.Representants),
+		RepCalls:                int(representants.Appels),
+		RepConfirmedCalls:       int(representants.Confirmes),
+		RepDetectedCalls:        int(journal.RepDetectes),
+		RepUnloggedCalls:        int(journal.RepNonConsignes),
+		RepAvgCallSeconds:       moyenneEnSecondes(journal.RepDuree, journal.RepDurees),
+		RepWrongNumber:          int(representants.Faux),
+		RepReached:              int(representants.Joints),
+		RepCallback:             int(representants.Rappels),
+		RepUnreachable:          int(representants.Injoignables),
+		RepContactRate:          tauxOuNul(int(representants.Joints), int(representants.Appels)),
+		RepCallbackRate:         tauxOuNul(int(representants.Rappels), int(representants.Appels)),
+		RepQuestioned:           int(representants.Interroges),
+		RepQualified:            int(representants.Qualifies),
+		RepQualificationRate:    tauxOuNul(int(representants.Qualifies), int(representants.Interroges)),
+		RepFiches:               int(representants.Fiches),
+		RepFichesJointes:        int(representants.FichesJointes),
+		RepFichesNonJointes:     int(representants.Fiches - representants.FichesJointes),
+		RepFichesAcceptees:      int(representants.FichesAcceptees),
+		RepFichesRefusees:       int(representants.FichesRefusees),
+		RepFichesARappeler:      int(representants.FichesARappeler),
+		RepFichesEligibles:      int(representants.FichesEligibles),
+		RepReachabilityRate:     tauxOuNul(int(representants.FichesJointes), int(representants.Fiches)),
+		RepAcceptanceRate:       tauxOuNul(int(representants.FichesAcceptees), int(representants.FichesEligibles)),
+		RepCallbackFicheRate:    tauxOuNul(int(representants.FichesARappeler), int(representants.Fiches)),
+		InboundCalls:            int(journal.Entrants),
+		MissedCalls:             int(journal.Manques),
+		CallbacksHonored:        int(journal.RappelsHonores),
+		CallbacksLate:           int(journal.RappelsRetard),
+		CallbacksUpcoming:       int(journal.RappelsAVenir),
+		RepCallbacksHonored:     int(journal.RepRappelsHonores),
+		RepCallbacksLate:        int(journal.RepRappelsRetard),
+		RepCallbacksUpcoming:    int(journal.RepRappelsAVenir),
 	}
 }
 

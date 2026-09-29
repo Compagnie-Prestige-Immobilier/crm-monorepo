@@ -234,7 +234,7 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
   {
     colonne: 'phase2Status',
     cle: 'motif',
-    label: 'Résultat de l’appel',
+    label: 'Statut de qualification',
     placeholder: 'Tous les résultats',
     options: (_reference, motifs) =>
       [

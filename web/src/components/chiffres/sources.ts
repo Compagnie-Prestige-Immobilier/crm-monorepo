@@ -277,6 +277,62 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
 });
 
+/** Nombre de rendez-vous posés et taux (posés ÷ fiches jointes), par téléconseiller. Le pied reprend `totals`, calculé par le serveur. */
+interface CompteRendezVous {
+  rendezVous: number;
+  rendezVousTelephoniques: number;
+  fichesJointes: number;
+}
+
+function cellulesRendezVous(compte: CompteRendezVous): EquipeLigne['cellules'] {
+  return [
+    { cle: 'RV téléphoniques', texte: formatNumber(compte.rendezVousTelephoniques) },
+    {
+      cle: 'Autres RV',
+      texte: formatNumber(compte.rendezVous - compte.rendezVousTelephoniques),
+    },
+    { cle: 'Total', texte: formatNumber(compte.rendezVous) },
+    { cle: 'Taux', texte: taux(part(compte.rendezVous, compte.fichesJointes)) },
+  ];
+}
+
+function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
+  const parPersonne = new Map<string, CompteRendezVous>();
+  for (const ligne of activite.items) {
+    const compte = parPersonne.get(ligne.teleconseillerId) ?? {
+      rendezVous: 0,
+      rendezVousTelephoniques: 0,
+      fichesJointes: 0,
+    };
+    compte.rendezVous += ligne.rendezVous;
+    compte.rendezVousTelephoniques += ligne.rendezVousTelephoniques;
+    compte.fichesJointes += ligne.fichesJointes;
+    parPersonne.set(ligne.teleconseillerId, compte);
+  }
+  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousTelephoniques: 0, fichesJointes: 0 };
+  return {
+    forme: 'equipe',
+    donnee: {
+      colonnes: ['RV téléphoniques', 'Autres RV', 'Total', 'Taux'],
+      lignes: activite.teleconseillers.map((personne) => ({
+        id: personne.id,
+        nom: personne.fullName,
+        cellules: cellulesRendezVous(parPersonne.get(personne.id) ?? aucun),
+      })),
+      pied: { id: 'equipe', nom: 'Équipe', cellules: cellulesRendezVous(activite.totals) },
+    },
+  };
+}
+
+/** Le détail d'une tuile de rendez-vous : combien, sur combien de joints, dont combien par téléphone. */
+function detailRendezVous(totaux: ChiffresActivite['totals']): string {
+  const autres = totaux.rendezVous - totaux.rendezVousTelephoniques;
+  return (
+    `${formatNumber(totaux.rendezVous)} sur ${formatNumber(totaux.fichesJointes)} prospects joints · ` +
+    `${formatNumber(totaux.rendezVousTelephoniques)} téléphoniques, ${formatNumber(autres)} autres`
+  );
+}
+
 /** La même phrase que le détail d'une campagne : appelées sur confiées, appels consignés. */
 function couvertureDeLaCampagne(campagne: CouvertureCampagne): string {
   const pluriel = (nombre: number): string => (nombre > 1 ? 's' : '');
@@ -624,6 +680,22 @@ const SOURCES_CHIFFRES = {
             'Aucun appel à un prospect sur la période',
           ),
   },
+  'taux-de-rendez-vous': {
+    label: 'Taux de rendez-vous',
+    forme: 'scalaire',
+    jeu: 'activite',
+    description:
+      'Prospects avec un rendez-vous posé (téléphonique, CPI, site, externe) ÷ prospects joints, sur la période.',
+    groupe: 'Appels aux prospects',
+    extraire: ({ activite }) =>
+      activite === undefined
+        ? null
+        : scalaireTaux(
+            activite.totals.rendezVousRate,
+            detailRendezVous(activite.totals),
+            'Aucun prospect joint sur la période',
+          ),
+  },
   'prospects-notes': {
     label: 'Prospects saisis',
     forme: 'scalaire',
@@ -650,6 +722,15 @@ const SOURCES_CHIFFRES = {
           ),
   },
   'par-teleconseiller': parTeleconseiller(false),
+  'rendez-vous-par-teleconseiller': {
+    label: 'Rendez-vous par téléconseiller',
+    forme: 'equipe',
+    jeu: 'activite',
+    description:
+      'Rendez-vous posés, téléphoniques et autres (CPI, site, externe), et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
+    groupe: 'Équipe',
+    extraire: ({ activite }) => (activite === undefined ? null : tableauRendezVous(activite)),
+  },
   'fiches-ouvertes': {
     label: 'Fiches ouvertes',
     forme: 'matrice',
