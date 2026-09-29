@@ -111,3 +111,9 @@ ON CONFLICT ("prospectId") DO UPDATE SET
   "personnePolitiquementExposee" = EXCLUDED."personnePolitiquementExposee",
   "auteurId" = EXCLUDED."auteurId", "updatedAt" = CURRENT_TIMESTAMP
 RETURNING *;
+
+-- name: ChargesDeClientele :many
+SELECT "fullName" FROM "users"
+WHERE "role" <> 'ADMIN' AND "isActive" AND "deletedAt" IS NULL
+ORDER BY "fullName"
+LIMIT 200;

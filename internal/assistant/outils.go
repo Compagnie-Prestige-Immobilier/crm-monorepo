@@ -85,9 +85,11 @@ var (
 	mesuresRisques             = []string{"Nombre"}
 )
 
+const cheminTableauDeBord = "/teleconseil/tableau-de-bord"
+
 var (
-	ecranChiffres            = ecranOutil{"/teleconseil/tableau-de-bord", socle.PermissionAnalyticsSuperviser, filtresChiffres}
-	ecranAppelsRepresentants = ecranOutil{"/teleconseil/supervision", socle.PermissionAnalyticsSuperviser, ""}
+	ecranChiffres            = ecranOutil{cheminTableauDeBord, socle.PermissionAnalyticsSuperviser, filtresChiffres}
+	ecranAppelsRepresentants = ecranOutil{cheminTableauDeBord, socle.PermissionAnalyticsSuperviser, ""}
 )
 
 var outils = map[string]*outil{
@@ -157,7 +159,7 @@ var outils = map[string]*outil{
 		libelle: "Objectifs de la campagne 2026", description: "Objectifs de la campagne 2026 contre le réalisé : CHUES, Grand Public et leads marketing, avec l'avancement et les cadences quotidiennes requise et réelle. Sans période : la campagne court du 10/09 au 23/12/2026.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les objectifs de la supervision, réalisé compté depuis le début de la campagne",
 		groupe: "objectif", mesures: mesuresObjectifs, periode: periodeParDefaut, sansPeriode: true,
-		ecran: ecranOutil{"/teleconseil/supervision", socle.PermissionAnalyticsSuperviser, ""}, executer: objectifs,
+		ecran: ecranOutil{cheminTableauDeBord, socle.PermissionAnalyticsSuperviser, ""}, executer: objectifs,
 	},
 	"echeances_en_retard": {
 		libelle: "Échéances en retard", description: "Ventes à crédit dont une échéance passée n'est pas couverte, et montant dû, par site, au jour d'aujourd'hui. Sans période.",
@@ -187,7 +189,7 @@ type outilDecrit struct {
 func outilsPermis(u *socle.Utilisateur) map[string]outilDecrit {
 	permis := map[string]outilDecrit{}
 	for nom, o := range outils {
-		if u.Peut(o.permission) {
+		if u.Peut(o.permission) || u.Peut(socle.PermissionAssistantToutLire) {
 			permis[nom] = outilDecrit{Description: o.description, Axes: o.axes}
 		}
 	}

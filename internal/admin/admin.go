@@ -66,7 +66,6 @@ var Garde = map[string]socle.Permission{
 	"PUT /api/v1/users/{id}/active":                               socle.PermissionComptesAdministrer,
 	"PUT /api/v1/users/{id}/password":                             socle.PermissionComptesAdministrer,
 	"DELETE /api/v1/users/{id}":                                   socle.PermissionComptesAdministrer,
-	"GET /api/v1/admin/supervision":                               socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/admin/exploitation":                              socle.PermissionExploitationAdministrer,
 	"GET /api/v1/admin/journal":                                   socle.PermissionExploitationAdministrer,
 	"GET /api/v1/admin/exploitation/routes":                       socle.PermissionExploitationAdministrer,
@@ -100,7 +99,6 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "resetUserPassword", Method: http.MethodPut, Path: cheminCompte + "/password"}, s.reinitialiserMotDePasse)
 	huma.Register(api, huma.Operation{OperationID: "deleteUser", Method: http.MethodDelete, Path: cheminCompte}, s.supprimerCompte)
 
-	huma.Register(api, huma.Operation{OperationID: "getSupervision", Method: http.MethodGet, Path: CheminSupervision}, s.supervisionDesComptes)
 	huma.Register(api, huma.Operation{OperationID: "getPurgeCatalog", Method: http.MethodGet, Path: "/api/v1/admin/purge"}, s.cataloguePurge)
 	huma.Register(api, huma.Operation{OperationID: "purgeDatabase", Method: http.MethodPost, Path: "/api/v1/admin/purge"}, s.purgerBase)
 

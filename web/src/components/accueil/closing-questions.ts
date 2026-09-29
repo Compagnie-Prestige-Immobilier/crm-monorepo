@@ -4,7 +4,7 @@ type Champ = keyof Closing;
 export type Question = {
   champ: Champ;
   label: string;
-  choix?: readonly string[] | 'sites';
+  choix?: readonly string[] | 'sites' | 'chargesDeClientele';
   long?: true;
 };
 
@@ -109,7 +109,11 @@ export const ETAPES: readonly { titre: string; questions: readonly Question[] }[
         choix: ['Non, CPI uniquement', 'Oui, un autre', 'Oui, il compare plusieurs offres'],
       },
       { champ: 'parrain', label: 'Parrain ou apporteur' },
-      { champ: 'chargeDeClientele', label: 'Chargé de clientèle en charge' },
+      {
+        champ: 'chargeDeClientele',
+        label: 'Chargé de clientèle en charge',
+        choix: 'chargesDeClientele',
+      },
       {
         champ: 'prochaineAction',
         label: 'Prochaine action',

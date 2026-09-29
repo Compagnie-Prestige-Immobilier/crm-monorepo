@@ -100,11 +100,6 @@ WHERE "role" = 'ADMIN' AND "isActive" AND "deletedAt" IS NULL
 ORDER BY "createdAt" ASC, "id" ASC
 LIMIT 1;
 
--- name: TranchesDActivite :many
-SELECT "userId", "slot", "firstSeenAt", "lastSeenAt", "activeSeconds"
-FROM "agent_activity_slots"
-WHERE "slot" >= sqlc.arg('debut')::timestamp AND "slot" < sqlc.arg('fin')::timestamp;
-
 -- name: GetSetting :one
 SELECT "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -154,6 +155,9 @@ func TestBaseDemoSessionNeVautRienSurLaBasePublique(t *testing.T) {
 
 	statut, body := appelJSON(b, http.MethodGet, "/api/v1/auth/me", nil, nil)
 	b.attend(statut, http.StatusOK, "session valide dans sa base", body)
+	if permissions, _ := body["permissions"].([]any); slices.Contains(permissions, any("assistant.utiliser")) {
+		t.Fatalf("Kairos refuse les bases de démonstration : le panneau ne doit pas proposer l'assistant : %v", permissions)
+	}
 
 	basculer(b, socle.BasePublique)
 	statut, body = appelJSON(b, http.MethodGet, "/api/v1/auth/me", nil, nil)

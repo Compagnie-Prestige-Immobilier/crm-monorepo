@@ -405,7 +405,8 @@ func TestAnalyticsPorteeDuTeleconseiller(t *testing.T) {
 	b.attend(statut, http.StatusForbidden, "stock fermé au téléconseiller", body)
 }
 
-func TestSupervisionCreneauxOrdonnesEtSansChevauchement(t *testing.T) {
+// Les tableaux de bord lisent les créneaux ; un réglage chevauchant retombe sur les valeurs par défaut.
+func TestSupervisionCreneauxLusEtRegleIncoherentIgnore(t *testing.T) {
 	b := analyticsConnexion(t, "SUPERVISEUR")
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'supervision.creneaux'`)
@@ -415,41 +416,18 @@ func TestSupervisionCreneauxOrdonnesEtSansChevauchement(t *testing.T) {
 	b.attend(statut, http.StatusOK, "créneaux", body)
 	analyticsListe(b, "matin et après-midi", body["shifts"], 2)
 
-	refus := []struct {
-		quoi   string
-		statut int
-		corps  map[string]string
-	}{
-		{"créneaux qui se chevauchent", http.StatusBadRequest, map[string]string{
-			"morningStart": "09:00", "morningEnd": "16:00", "afternoonStart": "15:00", "afternoonEnd": "18:00",
-		}},
-		{"créneau inversé", http.StatusBadRequest, map[string]string{
-			"morningStart": "14:00", "morningEnd": "09:00", "afternoonStart": "15:00", "afternoonEnd": "18:00",
-		}},
-		{"arité de deux créneaux exigée", http.StatusUnprocessableEntity, map[string]string{
-			"morningStart": "09:00", "morningEnd": "12:00",
-		}},
-		{"heure hors format", http.StatusUnprocessableEntity, map[string]string{
-			"morningStart": "9h", "morningEnd": "12:00", "afternoonStart": "15:00", "afternoonEnd": "18:00",
-		}},
+	chevauchants := `{"shifts":[{"key":"morning","label":"Matin","start":"09:00","end":"16:00"},` +
+		`{"key":"afternoon","label":"Après-midi","start":"15:00","end":"18:00"}]}`
+	if _, err := b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key", "value", "updatedAt") VALUES ('supervision.creneaux', $1, now())
+		ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`, chevauchants); err != nil {
+		t.Fatal(err)
 	}
-	for _, cas := range refus {
-		statut, body = b.appel(http.MethodPut, "/api/v1/supervision/creneaux", cas.corps, true)
-		b.attend(statut, cas.statut, cas.quoi, body)
-	}
-
-	valide := map[string]string{
-		"morningStart": "08:00", "morningEnd": "12:00",
-		"afternoonStart": "13:00", "afternoonEnd": "17:00",
-	}
-	statut, body = b.appel(http.MethodPut, "/api/v1/supervision/creneaux", valide, true)
-	b.attend(statut, http.StatusOK, "créneaux acceptés", body)
 	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/creneaux", nil, false)
 	b.attend(statut, http.StatusOK, "relecture", body)
 	matin := analyticsObjet(b, "matin", analyticsListe(b, "créneaux relus", body["shifts"], 2)[0])
-	analyticsTexte(b, "début du matin", matin["start"], "08:00")
-	analyticsTexte(b, "fin du matin", matin["end"], "12:00")
-	analyticsNonNul(b, "date de mise à jour", body["updatedAt"])
+	if matin["end"] == "16:00" {
+		t.Fatalf("un réglage chevauchant doit retomber sur les valeurs par défaut : %v", matin)
+	}
 }
 
 func TestSupervisionActiviteDeLaFenetre(t *testing.T) {

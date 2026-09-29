@@ -45,6 +45,15 @@ terrain ou d'une villa.
   `statuts_qualification` et non un motif d'appel.
 - `scheduled_callbacks` : les rappels promis, `scheduledAt` pour l'échéance,
   `status` pour l'état.
+- Un rendez-vous est une fiche `prospects` en `phase2Status` = 'APPOINTMENT',
+  datée par le `scheduledAt` de son dernier rappel non SUPERSEDED (PENDING
+  d'abord) ; `rendezVousIssue` vaut HONORE ou NON_HONORE, `rendezVousReporteAt`
+  marque un report, `lastCallById` est le téléconseiller qui l'a obtenu.
+- `refresh_tokens` : une ligne par connexion d'un compte (`userId`),
+  `createdAt` pour l'heure de connexion, `revokedAt` pour la déconnexion ;
+  `usurpePar` non nul est une session ouverte par un administrateur, à exclure
+  des connexions d'un agent. `users."lastLoginAt"` garde la dernière connexion.
+  Un « agent » est un téléconseiller.
 - `lots_export` et `lot_export_items` : **une campagne d'appels est un lot**,
   ses fiches en sont les items, `assigneeId` est le téléconseiller attributaire.
 - `representants` : les relais syndicaux qui amènent les fiches CHUES, qualifiés

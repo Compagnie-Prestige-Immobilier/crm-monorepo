@@ -37,8 +37,8 @@ var (
 	debutAutorise = regexp.MustCompile(`(?is)^\s*(select|with)\b`)
 	// `\b` s'arrête à un mot Postgres cité entre guillemets aussi bien qu'à
 	// une colonne nue : la liste couvre les deux écritures d'une même table.
-	tablesInterdites   = regexp.MustCompile(`(?i)"?(refresh_tokens|support_signalement_images)"?`)
-	colonnesInterdites = regexp.MustCompile(`(?i)"?passwordHash"?|"?formulaireJeton"?`)
+	tablesInterdites   = regexp.MustCompile(`(?i)"?(support_signalement_images)"?`)
+	colonnesInterdites = regexp.MustCompile(`(?i)"?passwordHash"?|"?formulaireJeton"?|"?tokenHash"?`)
 )
 
 type requeteLibre struct {
