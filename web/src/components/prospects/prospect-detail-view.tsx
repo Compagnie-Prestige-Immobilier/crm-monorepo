@@ -70,7 +70,8 @@ export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
 }
 
 /** La liste des prospects est réservée à l'encadrement ; le téléconseiller retrouve ses fiches dans Mes contacts. */
-function RetourFiche({ user }: { user: SessionUser | null | undefined }) {
+function RetourFiche({ user, masque }: { user: SessionUser | null | undefined; masque: boolean }) {
+  if (masque) return null;
   if (peut(user, 'prospects.superviser')) {
     return <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>;
   }
@@ -78,8 +79,17 @@ function RetourFiche({ user }: { user: SessionUser | null | undefined }) {
 }
 
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
-export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
+export function ProspectDetailView({
+  prospectId,
+  role,
+  enPopup = false,
+}: {
+  prospectId: string;
+  role: Role;
+  enPopup?: boolean;
+}) {
   const { data: user } = useQuery(meQueryOptions);
+  const retour = <RetourFiche user={user} masque={enPopup} />;
   const fiche = useQuery({
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
@@ -89,7 +99,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <RetourFiche user={user} />
+        {retour}
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -99,7 +109,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <RetourFiche user={user} />
+        {retour}
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -115,7 +125,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
 
   return (
     <div className="flex flex-col gap-6">
-      <RetourFiche user={user} />
+      {retour}
 
       <FicheEnTete
         nom={`${prospect.prenom} ${prospect.nom}`}

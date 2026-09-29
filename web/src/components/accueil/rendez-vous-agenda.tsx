@@ -15,7 +15,6 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronLeftIcon, ChevronRightIcon, FileTextIcon, PhoneIcon } from 'lucide-react';
-import Link from 'next/link';
 import { createContext, useContext, useState } from 'react';
 import {
   Calendar,
@@ -27,6 +26,7 @@ import {
 
 import { meQueryOptions } from '@/api/auth';
 import { ClosingDialog } from '@/components/accueil/closing-dialog';
+import { FichePopup } from '@/components/accueil/fiche-popup';
 import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -76,8 +76,11 @@ interface Evenement {
   fiche: RendezVousObtenu;
 }
 
-// Le closing s'ouvre hors de la bulle : la bulle se referme dès que « Présent » est noté.
-const OuvrirClosing = createContext<(fiche: RendezVousObtenu) => void>(() => undefined);
+// Closing et fiche s'ouvrent hors de la bulle : elle se referme avant eux.
+const Ouvrir = createContext<{
+  closing: (fiche: RendezVousObtenu) => void;
+  fiche: (id: string) => void;
+}>({ closing: () => undefined, fiche: () => undefined });
 
 const jour = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -137,7 +140,7 @@ function Barre({ label, onNavigate, view, onView }: ToolbarProps<Evenement>) {
 }
 
 function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void }) {
-  const ouvrirClosing = useContext(OuvrirClosing);
+  const ouvrir = useContext(Ouvrir);
   const { data: user } = useQuery(meQueryOptions);
   const etat = etatDe(fiche);
   return (
@@ -161,20 +164,25 @@ function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void 
         bulle
         onCloser={(choisie) => {
           onFait();
-          ouvrirClosing(choisie);
+          ouvrir.closing(choisie);
         }}
         onEnregistrerVisite={null}
         onFait={onFait}
       />
       <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
         {peut(user, 'prospects.lire') ? (
-          <Link
-            href={`/teleconseil/prospects/${fiche.id}`}
-            className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 gap-2"
+            onClick={() => {
+              onFait();
+              ouvrir.fiche(fiche.id);
+            }}
           >
             <FileTextIcon className="size-4" aria-hidden="true" />
             Ouvrir la fiche
-          </Link>
+          </Button>
         ) : null}
         {fiche.phoneE164 === null ? null : (
           <a
@@ -227,6 +235,7 @@ export function RendezVousAgenda() {
   const [date, setDate] = useState(() => new Date());
   const [vue, setVue] = useState<View>(() => (window.innerWidth < 640 ? 'day' : 'week'));
   const [closingDe, setClosingDe] = useState<RendezVousObtenu | null>(null);
+  const [ficheDe, setFicheDe] = useState<string | null>(null);
   const du = jour(startOfWeek(date, { weekStartsOn: 1 }));
   const au = jour(endOfWeek(date, { weekStartsOn: 1 }));
   const semaine = useQuery({
@@ -242,7 +251,7 @@ export function RendezVousAgenda() {
   const { min, max } = heures(evenements);
 
   return (
-    <OuvrirClosing.Provider value={setClosingDe}>
+    <Ouvrir.Provider value={{ closing: setClosingDe, fiche: setFicheDe }}>
       <div className="agenda-rendez-vous flex flex-col gap-3">
         {semaine.isError ? (
           <QueryErrorState error={semaine.error} onRetry={() => void semaine.refetch()} />
@@ -286,7 +295,13 @@ export function RendezVousAgenda() {
             setClosingDe(null);
           }}
         />
+        <FichePopup
+          prospectId={ficheDe}
+          onClose={() => {
+            setFicheDe(null);
+          }}
+        />
       </div>
-    </OuvrirClosing.Provider>
+    </Ouvrir.Provider>
   );
 }

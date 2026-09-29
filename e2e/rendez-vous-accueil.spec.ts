@@ -84,7 +84,7 @@ test.describe('rendez-vous au comptoir', () => {
     await expect(ligne).toHaveCount(1);
     await expect(ligne.getByText('À confirmer', { exact: true })).toBeVisible();
     await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
-    await expect(ligne.getByRole('link', { name: `Awa ${nom}` })).toHaveCount(0);
+    await expect(ligne.getByRole('button', { name: `Awa ${nom}`, exact: true })).toHaveCount(0);
 
     // Le type filtre la file : un RV CPI ne s'affiche pas sous RV site.
     await page.getByRole('combobox', { name: 'Type de rendez-vous' }).click();
@@ -173,10 +173,12 @@ test.describe('closing par le chargé de clientèle', () => {
 
     await page.getByRole('link', { name: 'Rendez-vous', exact: true }).first().click();
     const ligne = page.getByRole('row').filter({ hasText: nom });
-    await expect(ligne.getByRole('link', { name: `Awa ${nom}` })).toHaveAttribute(
-      'href',
-      /^\/teleconseil\/prospects\//u,
-    );
+    await ligne.getByRole('button', { name: `Awa ${nom}`, exact: true }).click();
+    const fiche = page.getByRole('dialog', { name: 'Fiche du prospect' });
+    await expect(fiche.getByRole('heading', { name: `Awa ${nom}` })).toBeVisible();
+    await expect(page).toHaveURL(/\/accueil\/rendez-vous/u);
+    await page.keyboard.press('Escape');
+    await expect(fiche).toHaveCount(0);
 
     await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
     await page.getByRole('menuitem', { name: 'Reporter' }).click();

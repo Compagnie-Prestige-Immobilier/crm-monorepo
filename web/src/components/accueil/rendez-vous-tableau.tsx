@@ -1,10 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
+import { FichePopup } from '@/components/accueil/fiche-popup';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -21,15 +21,27 @@ import { peut } from '@/lib/types';
 
 function NomFiche({ fiche }: { fiche: RendezVousObtenu }) {
   const { data: user } = useQuery(meQueryOptions);
+  const [ouverte, setOuverte] = useState(false);
   const nom = `${fiche.prenom} ${fiche.nom}`;
   if (!peut(user, 'prospects.lire')) return nom;
   return (
-    <Link
-      href={`/teleconseil/prospects/${fiche.id}`}
-      className="underline-offset-4 hover:underline"
-    >
-      {nom}
-    </Link>
+    <>
+      <button
+        type="button"
+        className="text-left underline-offset-4 hover:underline"
+        onClick={() => {
+          setOuverte(true);
+        }}
+      >
+        {nom}
+      </button>
+      <FichePopup
+        prospectId={ouverte ? fiche.id : null}
+        onClose={() => {
+          setOuverte(false);
+        }}
+      />
+    </>
   );
 }
 
