@@ -385,3 +385,40 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 		t.Fatal("un rendez-vous closé quitte « À traiter »")
 	}
 }
+
+// La veille, la personne ne s'engage pas : le rendez-vous quitte l'agenda et
+// attend avec ce qu'elle a dit, jusqu'à ce qu'on le reporte.
+func TestRendezVousARecontacter(t *testing.T) {
+	_, fiches, quandRV := rendezVousPoses(t)
+	fiche := fiches["RV_CPI"]
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	suivi := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
+	semaine := listeRendezVous + "&du=" + quandRV.Format(time.DateOnly) + "&au=" + quandRV.AddDate(0, 0, 1).Format(time.DateOnly)
+
+	statut, body := qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "A_RECONTACTER", "commentaire": "  "})
+	cc.attend(statut, http.StatusBadRequest, "à recontacter sans ce qu'a dit la personne", body)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi,
+		map[string]any{"issue": "A_RECONTACTER", "commentaire": "Deuil dans la famille, rappellera", "recontacterLe": "2026-10-06"})
+	cc.attend(statut, http.StatusOK, "à recontacter", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_RECONTACTER" || rdv["recontacterNote"] != "Deuil dans la famille, rappellera" ||
+		rdv["recontacterLe"] != "2026-10-06" || rdv["recontacterPar"] == "" {
+		t.Fatalf("le rendez-vous attend avec ce qu'a dit la personne : %v", rdv)
+	}
+	statut, body = qualificationEnvoi(cc, http.MethodGet, semaine, nil)
+	cc.attend(statut, http.StatusOK, "agenda", body)
+	if contientFiche(body, fiche) {
+		t.Fatal("un rendez-vous à recontacter libère son créneau de l'agenda")
+	}
+	statut, body = qualificationEnvoi(cc, http.MethodGet, listeRendezVous+"&etape=A_TRAITER", nil)
+	cc.attend(statut, http.StatusOK, "rendez-vous à traiter", body)
+	if !contientFiche(body, fiche) {
+		t.Fatal("un rendez-vous à recontacter reste à traiter")
+	}
+
+	nouvelle := quandRV.AddDate(0, 0, 7)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "REPORTE", "reporteAt": nouvelle.Format(time.RFC3339)})
+	cc.attend(statut, http.StatusOK, "report une fois la date connue", body)
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CONFIRMER" || rdv["recontacterNote"] != "" {
+		t.Fatalf("le report remet le rendez-vous à confirmer et efface l'attente : %v", rdv)
+	}
+}

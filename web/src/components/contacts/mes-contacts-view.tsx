@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { DateRendezVous } from '@/components/prospects/date-rendez-vous';
 import { MesClients } from '@/components/contacts/mes-clients';
 import { PipelineContactsBande } from '@/components/contacts/pipeline-contacts';
 import { EmptyState } from '@/components/empty-state';
@@ -578,6 +579,7 @@ const COLONNES_PROSPECTS_CONTACTS = {
   appel: (prospect: ProspectRow) => prospect.lastCallAt,
   issue: (prospect: ProspectRow) => prospect.lastReasonLabel,
   statut: (prospect: ProspectRow) => prospect.phase2Status,
+  rdv: (prospect: ProspectRow) => prospect.dateRendezVous,
 };
 
 const ENTETES_PROSPECTS_CONTACTS = [
@@ -587,6 +589,7 @@ const ENTETES_PROSPECTS_CONTACTS = [
   { id: 'appel', label: 'Dernier appel' },
   { id: 'issue', label: 'Issue' },
   { id: 'statut', label: 'Statut' },
+  { id: 'rdv', label: 'Date de rendez-vous' },
 ] as const;
 
 function Quand({ at }: { at: string | null }) {
@@ -697,6 +700,11 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
             <ProjetBadge projet={prospect.projet} />
             <span>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</span>
             <Quand at={prospect.lastCallAt} />
+            {prospect.dateRendezVous === null ? null : (
+              <span>
+                RDV <DateRendezVous at={prospect.dateRendezVous} vide={null} />
+              </span>
+            )}
           </>
         )}
         numero={(prospect) => prospect.phoneE164}
@@ -746,6 +754,9 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
                 )}
               </TableCell>
               <TableCell>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</TableCell>
+              <TableCell>
+                <DateRendezVous at={prospect.dateRendezVous} vide={SANS_VALEUR} />
+              </TableCell>
             </LigneVersFiche>
           ))}
         </TableBody>

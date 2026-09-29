@@ -32,11 +32,16 @@ SELECT
   COALESCE(vs."prixUnitaireDefaut", 0)::bigint AS "sitePrix",
   COALESCE(pr."label", '')::text AS "pointRencontre",
   COALESCE(dernier."pointRencontreCommentaire", '')::text AS "pointRencontreCommentaire",
+  COALESCE(p."rendezVousRecontacterNote", '')::text AS "recontacterNote",
+  COALESCE(to_char(p."rendezVousRecontacterLe", 'YYYY-MM-DD'), '')::text AS "recontacterLe",
+  COALESCE(to_char(p."rendezVousRecontacterAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "recontacterAt",
+  COALESCE(rp."fullName", '')::text AS "recontacterPar",
   count(*) OVER () AS "total"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 JOIN rdv ON rdv."id" = p."id"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
+LEFT JOIN "users" rp ON rp."id" = p."rendezVousRecontacterPar"
 LEFT JOIN LATERAL (
   SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
   WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
@@ -49,7 +54,8 @@ WHERE (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT N
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
   AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text
        OR (sqlc.narg('etape')::text = 'A_TRAITER' AND rdv."etape" <> 'HISTORIQUE'))
-  AND (sqlc.narg('du')::timestamp IS NULL OR rdv."quand" >= sqlc.narg('du')::timestamp)
+  -- L'agenda ne garde pas le créneau d'un rendez-vous à recontacter.
+  AND (sqlc.narg('du')::timestamp IS NULL OR (rdv."quand" >= sqlc.narg('du')::timestamp AND rdv."etape" <> 'A_RECONTACTER'))
   AND (sqlc.narg('au')::timestamp IS NULL OR rdv."quand" < sqlc.narg('au')::timestamp)
   AND (sqlc.narg('recherche')::text IS NULL
        OR public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom"))

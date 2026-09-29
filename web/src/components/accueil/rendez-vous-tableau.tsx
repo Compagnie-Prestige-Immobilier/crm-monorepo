@@ -1,8 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { Fragment } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Fragment, useState } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
+import { FichePopup } from '@/components/accueil/fiche-popup';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -14,7 +16,34 @@ import {
 } from '@/components/ui/table';
 import { type RendezVousObtenu } from '@/lib/data/rendez-vous';
 import { dakarNow } from '@/lib/data/visites';
-import { formatDateTime, formatPhone } from '@/lib/format';
+import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
+import { peut } from '@/lib/types';
+
+function NomFiche({ fiche }: { fiche: RendezVousObtenu }) {
+  const { data: user } = useQuery(meQueryOptions);
+  const [ouverte, setOuverte] = useState(false);
+  const nom = `${fiche.prenom} ${fiche.nom}`;
+  if (!peut(user, 'prospects.lire')) return nom;
+  return (
+    <>
+      <button
+        type="button"
+        className="text-left underline-offset-4 hover:underline"
+        onClick={() => {
+          setOuverte(true);
+        }}
+      >
+        {nom}
+      </button>
+      <FichePopup
+        prospectId={ouverte ? fiche.id : null}
+        onClose={() => {
+          setOuverte(false);
+        }}
+      />
+    </>
+  );
+}
 
 type Ton = 'warning' | 'success' | 'destructive' | 'outline' | 'info';
 
@@ -31,16 +60,37 @@ export function etatDe(fiche: RendezVousObtenu): { texte: string; ton: Ton } {
       };
     case 'A_CLOSER':
       return { texte: 'Présent, closing à compléter', ton: 'success' };
+    case 'A_RECONTACTER':
+      return etatARecontacter(fiche);
     default:
-      if (fiche.confirmation === 'ANNULE') return { texte: 'Annulé', ton: 'destructive' };
-      if (fiche.issue === 'NON_HONORE') return { texte: 'Absent', ton: 'destructive' };
-      return { texte: 'Closing enregistré', ton: 'success' };
+      return etatHistorique(fiche);
   }
 }
 
-const SECTIONS = ['En retard', 'Aujourd’hui', 'Demain', 'Plus tard', 'Sans date'] as const;
+function etatARecontacter(fiche: RendezVousObtenu): { texte: string; ton: Ton } {
+  if (fiche.recontacterLe !== '' && fiche.recontacterLe <= dakarNow().date) {
+    return { texte: 'À recontacter, date arrivée', ton: 'destructive' };
+  }
+  return { texte: 'À recontacter', ton: 'outline' };
+}
+
+function etatHistorique(fiche: RendezVousObtenu): { texte: string; ton: Ton } {
+  if (fiche.confirmation === 'ANNULE') return { texte: 'Annulé', ton: 'destructive' };
+  if (fiche.issue === 'NON_HONORE') return { texte: 'Absent', ton: 'destructive' };
+  return { texte: 'Closing enregistré', ton: 'success' };
+}
+
+const SECTIONS = [
+  'À recontacter',
+  'En retard',
+  'Aujourd’hui',
+  'Demain',
+  'Plus tard',
+  'Sans date',
+] as const;
 
 function sectionDe(fiche: RendezVousObtenu, aujourdhui: string, demain: string): string {
+  if (fiche.etape === 'A_RECONTACTER') return 'À recontacter';
   if (fiche.quand === null) return 'Sans date';
   const jour = fiche.quand.slice(0, 10);
   if (jour < aujourdhui) return 'En retard';
@@ -48,19 +98,29 @@ function sectionDe(fiche: RendezVousObtenu, aujourdhui: string, demain: string):
   return jour === demain ? 'Demain' : 'Plus tard';
 }
 
-const quandDe = (fiche: RendezVousObtenu): string =>
-  fiche.quand === null ? 'Sans date' : formatDateTime(fiche.quand);
+function quandDe(fiche: RendezVousObtenu): string {
+  if (fiche.etape === 'A_RECONTACTER') {
+    return fiche.recontacterLe === ''
+      ? 'Date à fixer'
+      : `Recontacter le ${formatDate(fiche.recontacterLe)}`;
+  }
+  return fiche.quand === null ? 'Sans date' : formatDateTime(fiche.quand);
+}
+
+/** Ce que la personne a dit, et qui l'a noté : l'accueil reprend sans rappeler pour rien. */
+function Recontact({ fiche }: { fiche: RendezVousObtenu }) {
+  if (fiche.etape !== 'A_RECONTACTER') return null;
+  const note = fiche.recontacterAt === '' ? '' : `, le ${formatDateTime(fiche.recontacterAt)}`;
+  return (
+    <p className="mt-1 max-w-md text-[0.8125rem] font-normal whitespace-pre-line text-muted-foreground">
+      « {fiche.recontacterNote} » · {fiche.recontacterPar}
+      {note}
+    </p>
+  );
+}
 
 const lieuDe = (fiche: RendezVousObtenu): string =>
   fiche.site === '' ? fiche.type : `${fiche.type} · ${fiche.site}`;
-
-function NomProspect({ fiche }: { fiche: RendezVousObtenu }) {
-  return (
-    <Link href={`/teleconseil/prospects/${fiche.id}`} className="font-[600] hover:underline">
-      {fiche.prenom} {fiche.nom}
-    </Link>
-  );
-}
 
 function Telephone({ fiche }: { fiche: RendezVousObtenu }) {
   if (fiche.phoneE164 === null) return null;
@@ -78,10 +138,12 @@ function groupes(items: RendezVousObtenu[], historique: boolean) {
   const lendemain = new Date(`${aujourdhui}T12:00:00Z`);
   lendemain.setUTCDate(lendemain.getUTCDate() + 1);
   const { date: demain } = dakarNow(lendemain);
-  return SECTIONS.map((titre) => ({
-    titre,
-    lignes: items.filter((fiche) => sectionDe(fiche, aujourdhui, demain) === titre),
-  })).filter((groupe) => groupe.lignes.length > 0);
+  const parDateDeRecontact = (a: RendezVousObtenu, b: RendezVousObtenu) =>
+    (a.recontacterLe || '9999').localeCompare(b.recontacterLe || '9999');
+  return SECTIONS.map((titre) => {
+    const lignes = items.filter((fiche) => sectionDe(fiche, aujourdhui, demain) === titre);
+    return { titre, lignes: titre === 'À recontacter' ? lignes.sort(parDateDeRecontact) : lignes };
+  }).filter((groupe) => groupe.lignes.length > 0);
 }
 
 export function Groupes({
@@ -128,8 +190,9 @@ export function Groupes({
                       <TableCell className="whitespace-nowrap tabular-nums">
                         {quandDe(fiche)}
                       </TableCell>
-                      <TableCell>
-                        <NomProspect fiche={fiche} />
+                      <TableCell className="font-[600]">
+                        <NomFiche fiche={fiche} />
+                        <Recontact fiche={fiche} />
                       </TableCell>
                       <TableCell>
                         <Telephone fiche={fiche} />
@@ -164,12 +227,15 @@ export function Groupes({
                     className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <NomProspect fiche={fiche} />
+                      <p className="font-[600]">
+                        <NomFiche fiche={fiche} />
+                      </p>
                       <Badge variant={etat.ton}>{etat.texte}</Badge>
                     </div>
                     <p className="text-[0.8125rem] text-muted-foreground">
                       {quandDe(fiche)} · {lieuDe(fiche)}
                     </p>
+                    <Recontact fiche={fiche} />
                     <Telephone fiche={fiche} />
                     {actions(fiche)}
                   </li>

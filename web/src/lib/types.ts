@@ -155,6 +155,7 @@ export function etatRendezVousFiche(
   if (prospect.rendezVousIssue !== null) return RENDEZ_VOUS_ISSUE_LABELS[prospect.rendezVousIssue];
   if (prospect.rendezVousConfirmation === 'CONFIRME') return 'Confirmé';
   if (prospect.rendezVousConfirmation === 'ANNULE') return 'Annulé';
+  if (prospect.rendezVousConfirmation === 'A_RECONTACTER') return 'À recontacter';
   return prospect.rendezVousReporteAt === null ? 'À confirmer' : 'Reporté, à confirmer';
 }
 

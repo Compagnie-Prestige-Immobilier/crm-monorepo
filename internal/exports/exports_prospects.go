@@ -335,7 +335,7 @@ SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
   (SELECT a."rendezVousAt" FROM "call_attempts" a
    WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
    ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1),
-  p."remarqueImport", p."rendezVousIssue", p."rendezVousReporteAt", p."suiteRencontre",
+  p."remarqueImport", COALESCE(p."rendezVousIssue", NULLIF(p."rendezVousConfirmation", 'CONFIRME')), p."rendezVousReporteAt", p."suiteRencontre",
   (SELECT count(*)::int FROM "call_attempts" ca WHERE ca."prospectId" = p."id")`
 
 type exportLigneProspect struct {
@@ -412,6 +412,8 @@ func exportSuiviRendezVous(issue *string) string {
 		return "Absent"
 	case "REPORTE":
 		return "Reporté"
+	case "A_RECONTACTER":
+		return "À recontacter"
 	default:
 		return ""
 	}

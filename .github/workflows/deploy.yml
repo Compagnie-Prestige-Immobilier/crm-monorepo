@@ -19,12 +19,17 @@ jobs:
     environment: production
     steps:
       # L'URL porte le jeton du webhook : elle reste dans un secret, jamais en clair.
+      # Cloudflare oppose un défi aux runners GitHub : l'appel vise l'origine.
       - name: Appeler le webhook Dokploy
         env:
           DOKPLOY_DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+          DOKPLOY_ORIGIN_IP: ${{ vars.DOKPLOY_ORIGIN_IP }}
         run: |
           test -n "$DOKPLOY_DEPLOY_URL" || { echo "::error::secret DOKPLOY_DEPLOY_URL absent"; exit 1; }
+          test -n "$DOKPLOY_ORIGIN_IP" || { echo "::error::variable DOKPLOY_ORIGIN_IP absente"; exit 1; }
+          hote=$(echo "$DOKPLOY_DEPLOY_URL" | cut -d/ -f3)
           status=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \
+            --resolve "$hote:443:$DOKPLOY_ORIGIN_IP" \
             --output "$RUNNER_TEMP/dokploy-response.json" --write-out '%{http_code}' \
             -H 'Content-Type: application/json' -H 'X-GitHub-Event: push' \
             --data-binary "@$GITHUB_EVENT_PATH" "$DOKPLOY_DEPLOY_URL")

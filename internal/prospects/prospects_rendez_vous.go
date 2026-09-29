@@ -16,29 +16,54 @@ import (
 )
 
 const (
-	prospectIssueReporte = "REPORTE"
-	prospectIssueHonore  = "HONORE"
-	cheminClosing        = "/api/v1/prospects/{id}/closing"
+	prospectIssueReporte      = "REPORTE"
+	prospectIssueARecontacter = "A_RECONTACTER"
+	prospectIssueHonore       = "HONORE"
+	cheminClosing             = "/api/v1/prospects/{id}/closing"
 )
 
-// CONFIRME et ANNULE répondent à la confirmation ; HONORE et NON_HONORE à la présence ; REPORTE aux deux.
+// CONFIRME, ANNULE et A_RECONTACTER répondent à la confirmation ; HONORE et NON_HONORE à la présence ; REPORTE aux deux.
 type ProspectSuiviRendezVousInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Issue          string     `json:"issue" enum:"CONFIRME,ANNULE,HONORE,NON_HONORE,REPORTE"`
+		Issue          string     `json:"issue" enum:"CONFIRME,ANNULE,HONORE,NON_HONORE,REPORTE,A_RECONTACTER"`
 		ReporteAt      *time.Time `json:"reporteAt,omitempty" format:"date-time"`
 		SuiteRencontre *string    `json:"suiteRencontre,omitempty" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
+		Commentaire    *string    `json:"commentaire,omitempty" maxLength:"1000" doc:"Ce que la personne a dit ; exigé pour A_RECONTACTER."`
+		RecontacterLe  *string    `json:"recontacterLe,omitempty" format:"date" doc:"Facultatif, seulement pour A_RECONTACTER."`
 	}
+}
+
+func suiviRendezVousRefus(issue string, reporteAt *time.Time, suite, commentaire, recontacterLe *string) error {
+	if (issue == prospectIssueReporte) != (reporteAt != nil) {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_DATE_REPORT", "Un rendez-vous reporté demande sa nouvelle date, et seulement lui.")
+	}
+	if suite != nil && issue != prospectIssueHonore {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_SUITE_SANS_RENCONTRE", "La suite après rencontre se note sur un rendez-vous honoré.")
+	}
+	aRecontacter := issue == prospectIssueARecontacter
+	if aRecontacter != (commentaire != nil && strings.TrimSpace(*commentaire) != "") {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_COMMENTAIRE", "Un rendez-vous à recontacter demande ce que la personne a dit, et seulement lui.")
+	}
+	if recontacterLe != nil && !aRecontacter {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_DATE_RECONTACT", "La date de recontact ne vaut que pour un rendez-vous à recontacter.")
+	}
+	return nil
+}
+
+func dateFacultative(jour *string) pgtype.Date {
+	if jour == nil {
+		return pgtype.Date{}
+	}
+	t, err := time.Parse(time.DateOnly, *jour)
+	return pgtype.Date{Time: t, Valid: err == nil}
 }
 
 func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiviRendezVousInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	b := &in.Body
-	if (b.Issue == prospectIssueReporte) != (b.ReporteAt != nil) {
-		return nil, socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_DATE_REPORT", "Un rendez-vous reporté demande sa nouvelle date, et seulement lui.")
-	}
-	if b.SuiteRencontre != nil && b.Issue != prospectIssueHonore {
-		return nil, socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_SUITE_SANS_RENCONTRE", "La suite après rencontre se note sur un rendez-vous honoré.")
+	if err := suiviRendezVousRefus(b.Issue, b.ReporteAt, b.SuiteRencontre, b.Commentaire, b.RecontacterLe); err != nil {
+		return nil, err
 	}
 	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
 		return nil, err
@@ -49,7 +74,10 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 		reporteAt = &utc
 	}
 	err := s.prospectTx(ctx, func(q *db.Queries) error {
-		avant, err := q.SuivreRendezVous(ctx, db.SuivreRendezVousParams{Issue: b.Issue, ReporteAt: reporteAt, Suite: b.SuiteRencontre, ID: in.ID})
+		avant, err := q.SuivreRendezVous(ctx, db.SuivreRendezVousParams{
+			Issue: b.Issue, ReporteAt: reporteAt, Suite: b.SuiteRencontre, ID: in.ID,
+			Note: b.Commentaire, RecontacterLe: dateFacultative(b.RecontacterLe), Par: &u.ID,
+		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return socle.Problem(http.StatusUnprocessableEntity, "RENDEZ_VOUS_ABSENT", "Cette fiche n'est pas classée en rendez-vous.")
 		}
@@ -58,7 +86,10 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.suivi_rendez_vous", prospectEntite, in.ID,
 			map[string]any{"issue": avant.IssueAvant, "confirmation": avant.ConfirmationAvant, "suiteRencontre": avant.SuiteAvant},
-			map[string]any{"issue": b.Issue, "suiteRencontre": b.SuiteRencontre, "reporteAt": reporteAt})
+			map[string]any{
+				"issue": b.Issue, "suiteRencontre": b.SuiteRencontre, "reporteAt": reporteAt,
+				"commentaire": b.Commentaire, "recontacterLe": b.RecontacterLe,
+			})
 	})
 	if err != nil {
 		return nil, err
