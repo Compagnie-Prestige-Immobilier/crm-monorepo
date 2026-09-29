@@ -539,8 +539,8 @@ func TestSupervisionActiviteRendezVous(t *testing.T) {
 	analyticsEgal(b, "RV téléphonique de l'équipe",
 		analyticsObjet(b, "par type de l'équipe", totaux["rendezVousParType"])["RDV_TELEPHONIQUE"], 1)
 
-	codes := []string{}
 	types, _ := body["typesRendezVous"].([]any)
+	codes := make([]string, 0, len(types))
 	for _, t := range types {
 		codes = append(codes, analyticsObjet(b, "type", t)["code"].(string))
 	}
