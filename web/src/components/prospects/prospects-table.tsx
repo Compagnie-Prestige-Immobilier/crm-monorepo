@@ -18,7 +18,6 @@ import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { ProspectEditDialog } from '@/components/prospects/prospect-edit-dialog';
 import { ProspectMergeDialog } from '@/components/prospects/prospect-merge-dialog';
 import { ProspectReassignDialog } from '@/components/prospects/prospect-reassign-dialog';
-import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -55,25 +54,14 @@ import { formatNumber, formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  BDD_SEGMENTS,
-  ENROLLMENT_METHOD_LABELS,
-  ENROLLMENT_METHOD_ORDER,
-  MODE_EPARGNE_LABELS,
-  MODE_EPARGNES,
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
-  PROSPECT_ORIGIN_LABELS,
-  PROSPECT_ORIGINS,
   PROSPECT_SORT_FIELDS,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   RENDEZ_VOUS_ISSUE_LABELS,
   RENDEZ_VOUS_ISSUES,
   statutForProjet,
-  TYPE_BIEN_LABELS,
-  TYPE_CONTRAT_LABELS,
-  TYPE_CONTRATS,
-  TYPES_BIEN,
   type FilterOption,
   type Paginated,
   type ProspectFilters,
@@ -99,24 +87,9 @@ const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
-const SEGMENT_OPTIONS: FilterOption[] = BDD_SEGMENTS.map((segment) => ({
-  value: segment,
-  label: SEGMENT_LISIBLE[segment],
-}));
-
-const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
-  value: method,
-  label: ENROLLMENT_METHOD_LABELS[method],
-}));
-
 const COMMENTAIRE_OPTIONS: FilterOption[] = [
   { value: 'oui', label: 'Avec commentaire' },
   { value: 'non', label: 'Sans commentaire' },
-];
-
-const RDV_OPTIONS: FilterOption[] = [
-  { value: 'oui', label: 'Avec RDV' },
-  { value: 'non', label: 'Sans RDV' },
 ];
 
 const TYPE_OPTIONS: FilterOption[] = PROSPECT_TYPES.map((type) => ({
@@ -124,29 +97,9 @@ const TYPE_OPTIONS: FilterOption[] = PROSPECT_TYPES.map((type) => ({
   label: PROSPECT_TYPE_LABELS[type],
 }));
 
-const ORIGINE_OPTIONS: FilterOption[] = PROSPECT_ORIGINS.map((origin) => ({
-  value: origin,
-  label: PROSPECT_ORIGIN_LABELS[origin],
-}));
-
 const PAIEMENT_OPTIONS: FilterOption[] = PAYMENT_MODES.map((mode) => ({
   value: mode,
   label: PAYMENT_MODE_LABELS[mode],
-}));
-
-const BIEN_OPTIONS: FilterOption[] = TYPES_BIEN.map((bien) => ({
-  value: bien,
-  label: TYPE_BIEN_LABELS[bien],
-}));
-
-const CONTRAT_OPTIONS: FilterOption[] = TYPE_CONTRATS.map((contrat) => ({
-  value: contrat,
-  label: TYPE_CONTRAT_LABELS[contrat],
-}));
-
-const EPARGNE_OPTIONS: FilterOption[] = MODE_EPARGNES.map((epargne) => ({
-  value: epargne,
-  label: MODE_EPARGNE_LABELS[epargne],
 }));
 
 const SUIVI_OPTIONS: FilterOption[] = RENDEZ_VOUS_ISSUES.map((issue) => ({
@@ -225,13 +178,6 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
     options: () => STATUT_OPTIONS,
   },
   {
-    colonne: 'segment',
-    cle: 'segment',
-    label: 'Segment',
-    placeholder: 'Tous les groupes',
-    options: () => SEGMENT_OPTIONS,
-  },
-  {
     colonne: 'phase2Status',
     cle: 'motif',
     label: 'Statut de qualification',
@@ -241,39 +187,6 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
         ...statutsJoignables(motifs),
         ...motifsRacine(motifs).filter((motif) => !motif.countsAsReached),
       ].map((motif) => ({ value: motif.code, label: motif.label })),
-  },
-  {
-    colonne: 'enrollmentMethod',
-    cle: 'enrollmentMethod',
-    label: 'Méthode',
-    placeholder: 'Toutes les manières',
-    options: () => METHOD_OPTIONS,
-  },
-  {
-    colonne: 'enrollmentCapturedBy',
-    cle: 'enrollmentCapturedById',
-    label: 'Adhésion obtenue par',
-    placeholder: 'Tous les utilisateurs',
-    options: (reference) => reference?.utilisateurs ?? [],
-  },
-  {
-    colonne: 'representantName',
-    cle: 'representantId',
-    label: 'Représentant',
-    placeholder: 'Tous les représentants',
-    options: (reference) => reference?.representants ?? [],
-  },
-  {
-    colonne: 'departementName',
-    cle: 'departementId',
-    label: 'Département',
-    placeholder: 'Tous les départements',
-    options: (reference) =>
-      (reference?.departements ?? []).map((departement) => ({
-        value: departement.id,
-        label: withRetired(departement.name ?? '', departement.isActive ?? false),
-        hint: departement.regionName ?? undefined,
-      })),
   },
   {
     colonne: 'banque',
@@ -316,15 +229,6 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
     options: () => COMMENTAIRE_OPTIONS,
   },
   {
-    colonne: 'rendezVousAt',
-    cle: 'avecRdv',
-    label: 'RDV posé',
-    placeholder: 'Tous les RDV',
-    lire: lireOuiNon((filters) => filters.avecRdv),
-    ecrire: ecrireOuiNon((valeur) => ({ avecRdv: valeur })),
-    options: () => RDV_OPTIONS,
-  },
-  {
     colonne: 'type',
     cle: 'type',
     label: 'Secteur',
@@ -353,53 +257,11 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
     options: (reference) => optionReferentiel(reference?.employeurs),
   },
   {
-    colonne: 'typeContrat',
-    cle: 'typeContrat',
-    label: 'Contrat',
-    placeholder: 'Tous les contrats',
-    options: () => CONTRAT_OPTIONS,
-  },
-  {
     colonne: 'paiement',
     cle: 'paymentMode',
     label: 'Paiement',
     placeholder: 'Tous les paiements',
     options: () => PAIEMENT_OPTIONS,
-  },
-  {
-    colonne: 'typeBien',
-    cle: 'typeBien',
-    label: 'Bien',
-    placeholder: 'Tous les biens',
-    options: () => BIEN_OPTIONS,
-  },
-  {
-    colonne: 'revenu',
-    cle: 'incomeBandId',
-    label: 'Revenu',
-    placeholder: 'Tous les revenus',
-    options: (reference) => optionReferentiel(reference?.incomeBands),
-  },
-  {
-    colonne: 'epargne',
-    cle: 'modeEpargne',
-    label: 'Épargne',
-    placeholder: 'Toutes les épargnes',
-    options: () => EPARGNE_OPTIONS,
-  },
-  {
-    colonne: 'pays',
-    cle: 'paysResidenceId',
-    label: 'Résidence',
-    placeholder: 'Tous les pays',
-    options: (reference) => optionReferentiel(reference?.pays),
-  },
-  {
-    colonne: 'origine',
-    cle: 'origin',
-    label: 'Origine',
-    placeholder: 'Toutes les origines',
-    options: () => ORIGINE_OPTIONS,
   },
   {
     colonne: 'suivi',
