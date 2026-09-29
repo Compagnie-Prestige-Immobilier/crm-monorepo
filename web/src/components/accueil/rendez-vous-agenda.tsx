@@ -196,15 +196,15 @@ function Rendu({ event }: EventProps<Evenement>) {
           <button
             type="button"
             aria-label={`${event.title}, ${etat.texte}`}
-            className="flex h-full w-full flex-col gap-0.5 text-left leading-tight"
+            title={`${format(event.start, 'HH:mm')} · ${event.title} · ${etat.texte}`}
+            className="flex h-full w-full min-w-0 flex-col gap-0.5 overflow-hidden text-left leading-tight"
           />
         }
       >
-        <span className="text-[0.6875rem] tabular-nums opacity-80">
+        <span className="truncate font-[600]">{event.title}</span>
+        <span className="truncate text-[0.6875rem] tabular-nums opacity-80">
           {format(event.start, 'HH:mm')} · {etat.texte}
         </span>
-        <span className="truncate font-[600]">{event.title}</span>
-        <span className="truncate text-[0.6875rem] opacity-80">{event.fiche.type}</span>
       </PopoverTrigger>
       <PopoverContent side="right" className="w-80">
         <Bulle
