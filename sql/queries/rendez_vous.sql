@@ -18,7 +18,13 @@ SELECT
   p."prenom",
   p."nom",
   p."phoneE164",
-  r."label" AS "type",
+  (r."label" || COALESCE(' · ' || CASE dernier."rvExterneType"
+    WHEN 'PERSONNE' THEN 'Personne'
+    WHEN 'COOPERATIVE' THEN 'Coopérative'
+    WHEN 'ENTREPRISE' THEN 'Entreprise'
+    WHEN 'VISITE_BIEN' THEN 'Visite bien'
+    WHEN 'AUTRE' THEN 'Autres : ' || dernier."rvExternePrecision"
+  END, ''))::text AS "type",
   r."code" AS "typeCode",
   -- sqlc tient la colonne d'une jointure externe pour non nulle : un NULL scanné en date échouerait.
   COALESCE(to_char(rdv."quand", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "quand",
@@ -43,7 +49,8 @@ JOIN rdv ON rdv."id" = p."id"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
 LEFT JOIN "users" rp ON rp."id" = p."rendezVousRecontacterPar"
 LEFT JOIN LATERAL (
-  SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
+  SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire", a."rvExterneType", a."rvExternePrecision"
+  FROM "call_attempts" a
   WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
 ) dernier ON true
 LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"

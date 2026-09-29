@@ -348,8 +348,8 @@ export function NouveauProspectConsole({
       maintenant(),
       motif.requiresComment,
     );
-    if (probleme === null) setPas('projet');
-    else toast.error(probleme);
+    if (probleme !== null) toast.error(probleme);
+    else if (rvSite.verifier()) setPas('projet');
   };
 
   const enregistrer = (projet: Projet): void => {

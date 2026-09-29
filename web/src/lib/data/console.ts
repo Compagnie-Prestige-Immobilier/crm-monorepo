@@ -692,9 +692,17 @@ export interface AttemptDraft {
   readonly ouvertureId?: string;
   /** Grand Public seulement : les proches qu'un prospect recommande pendant l'appel. */
   readonly contactsRecommandes?: { nom?: string; phone: string }[];
-  /** RV site seulement : le site visité et le point de rencontre. */
+  /** RV site : le site visité et le point de rencontre ; RV externe : son type. */
   readonly rvSite?:
-    { siteId?: string; pointRencontreId?: string; pointRencontreCommentaire?: string } | undefined;
+    | Pick<
+        SyncEntityData,
+        | 'siteId'
+        | 'pointRencontreId'
+        | 'pointRencontreCommentaire'
+        | 'rvExterneType'
+        | 'rvExternePrecision'
+      >
+    | undefined;
 }
 
 function methodeAttemptErreur(draft: AttemptDraft): string | null {
