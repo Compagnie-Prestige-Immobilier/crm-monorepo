@@ -37,6 +37,8 @@ type CompteursProspects struct {
 	Rdv           int32
 	// Rdv les compte déjà : le reste est « autres rendez-vous ».
 	RdvTelephoniques int32
+	// Fiches jointes par qui a posé le rendez-vous : le dénominateur du taux.
+	RdvBase int32
 }
 
 type ligneParTeleconseiller struct {
@@ -147,7 +149,8 @@ type CompteursDActivite struct {
 	FichesJointes           int            `json:"fichesJointes"`
 	FicheReachRate          *float64       `json:"ficheReachRate"`
 	RendezVous              int            `json:"rendezVous"`
-	RendezVousRate          *float64       `json:"rendezVousRate"`
+	RendezVousRate          *float64       `json:"rendezVousRate" doc:"rendezVous ÷ rendezVousBase."`
+	RendezVousBase          int            `json:"rendezVousBase" doc:"Prospects joints sur la période, une fois par téléconseiller (une fois pour l'équipe) : le dénominateur du taux de rendez-vous."`
 	RendezVousTelephoniques int            `json:"rendezVousTelephoniques" doc:"Rendez-vous téléphoniques, déjà comptés dans rendezVous."`
 	RendezVousParType       map[string]int `json:"rendezVousParType" doc:"Rendez-vous par code de type (voir typesRendezVous) ; un type absent vaut 0."`
 	ProspectsCreated        int            `json:"prospectsCreated"`
@@ -430,6 +433,23 @@ func (perimetre perimetreSupervision) rendezVousProspects(p *parametresSQL) stri
 	ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
 }
 
+// Le dénominateur du taux de rendez-vous : chaque fiche que le téléconseiller a
+// jointe sur la fenêtre, une fois, au jour de son dernier appel joint. L'appel
+// qui pose un rendez-vous en fait partie, donc le taux ne dépasse jamais 100 %,
+// même quand un rappel sans réponse suit le rendez-vous.
+func (perimetre perimetreSupervision) jointsParAppelant(p *parametresSQL) string {
+	return `
+	SELECT DISTINCT ON (ca."performedById", ca."prospectId")
+	  ca."performedById"                                AS "userId",
+	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
+	  ca."prospectId"                                   AS "prospectId"
+	FROM "call_attempts" ca
+	` + JointureMotifIssue + `
+	WHERE (` + ProspectJoint + ` OR cr."effect" = 'CLOSE_APPOINTMENT' OR ca."rendezVousAt" IS NOT NULL)
+	  AND ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	ORDER BY ca."performedById", ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
+}
+
 func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string {
 	return `
 	SELECT
@@ -591,6 +611,10 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	rendez_vous AS (
 	  SELECT "userId", bucket, COUNT(*)::int AS rdv, SUM(telephonique)::int AS "rdvTelephoniques"
 	  FROM (` + perimetre.rendezVousProspects(p) + `) r GROUP BY 1, 2
+	),
+	base_rendez_vous AS (
+	  SELECT "userId", bucket, COUNT(*)::int AS "rdvBase"
+	  FROM (` + perimetre.jointsParAppelant(p) + `) j GROUP BY 1, 2
 	)
 	SELECT
 	  to_char(a.bucket, '` + formatJourISO + `') AS jour,
@@ -608,11 +632,13 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	  COALESCE(MAX(f.fiches), 0)::int          AS fiches,
 	  COALESCE(MAX(f."fichesJointes"), 0)::int AS "fichesJointes",
 	  COALESCE(MAX(r.rdv), 0)::int             AS rdv,
-	  COALESCE(MAX(r."rdvTelephoniques"), 0)::int AS "rdvTelephoniques"
+	  COALESCE(MAX(r."rdvTelephoniques"), 0)::int AS "rdvTelephoniques",
+	  COALESCE(MAX(b."rdvBase"), 0)::int       AS "rdvBase"
 	FROM actes a
 	INNER JOIN "users" u ON u."id" = a."userId"
 	LEFT JOIN fiches f ON f."userId" = a."userId" AND f.bucket = a.bucket
 	LEFT JOIN rendez_vous r ON r."userId" = a."userId" AND r.bucket = a.bucket
+	LEFT JOIN base_rendez_vous b ON b."userId" = a."userId" AND b.bucket = a.bucket
 	WHERE ` + perimetre.teleconseiller(p) + `
 	GROUP BY 1, 2, 3
 	ORDER BY 1 ASC, 3 ASC`
@@ -705,6 +731,12 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  SELECT COUNT(*)::int AS rdv, COALESCE(SUM(r.telephonique), 0)::int AS "rdvTelephoniques"
 	  FROM (` + perimetre.rendezVousProspects(p) + `) r
 	  WHERE ` + perimetre.membreDeLEquipe(p, `r."userId"`) + `
+	),
+	-- Une fiche jointe par deux téléconseillers compte une fois pour l'équipe.
+	base_rendez_vous AS (
+	  SELECT COUNT(DISTINCT j."prospectId")::int AS "rdvBase"
+	  FROM (` + perimetre.jointsParAppelant(p) + `) j
+	  WHERE ` + perimetre.membreDeLEquipe(p, `j."userId"`) + `
 	)
 	SELECT
 	  COALESCE(SUM(a.appel), 0)::int       AS appels,
@@ -719,9 +751,11 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  MAX(f.fiches)::int                   AS fiches,
 	  MAX(f."fichesJointes")::int          AS "fichesJointes",
 	  MAX(r.rdv)::int                      AS rdv,
-	  MAX(r."rdvTelephoniques")::int       AS "rdvTelephoniques"
+	  MAX(r."rdvTelephoniques")::int       AS "rdvTelephoniques",
+	  MAX(b."rdvBase")::int                AS "rdvBase"
 	FROM fiches f
 	CROSS JOIN rendez_vous r
+	CROSS JOIN base_rendez_vous b
 	LEFT JOIN actes a ON ` + perimetre.membreDeLEquipe(p, `a."userId"`)
 	return ligneAgregat[CompteursProspects](ctx, s, sql, p.args)
 }
@@ -1106,7 +1140,8 @@ func compteursDActivite(prospects CompteursProspects, representants CompteursRep
 		FichesJointes:           int(prospects.FichesJointes),
 		FicheReachRate:          tauxOuNul(int(prospects.FichesJointes), int(prospects.Fiches)),
 		RendezVous:              int(prospects.Rdv),
-		RendezVousRate:          tauxOuNul(int(prospects.Rdv), int(prospects.FichesJointes)),
+		RendezVousBase:          int(prospects.RdvBase),
+		RendezVousRate:          tauxOuNul(int(prospects.Rdv), int(prospects.RdvBase)),
 		RendezVousTelephoniques: int(prospects.RdvTelephoniques),
 		ProspectsCreated:        int(prospects.Prospects),
 		RepresentantsContacted:  int(prospects.Representants),

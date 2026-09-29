@@ -277,11 +277,11 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
 });
 
-/** Nombre de rendez-vous posés et taux (posés ÷ fiches jointes), par téléconseiller. Le pied reprend `totals`, calculé par le serveur. */
+/** Nombre de rendez-vous posés et taux (posés ÷ prospects joints par le téléconseiller). Le pied reprend `totals`, calculé par le serveur. */
 interface CompteRendezVous {
   rendezVous: number;
   rendezVousParType: Record<string, number>;
-  fichesJointes: number;
+  rendezVousBase: number;
 }
 
 /** Une colonne par type de rendez-vous, dans l'ordre du référentiel, puis le total et le taux. */
@@ -295,7 +295,7 @@ function cellulesRendezVous(
       texte: formatNumber(compte.rendezVousParType[type.code] ?? 0),
     })),
     { cle: 'Total', texte: formatNumber(compte.rendezVous) },
-    { cle: 'Taux', texte: taux(part(compte.rendezVous, compte.fichesJointes)) },
+    { cle: 'Taux', texte: taux(part(compte.rendezVous, compte.rendezVousBase)) },
   ];
 }
 
@@ -306,16 +306,16 @@ function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
     const compte = parPersonne.get(ligne.teleconseillerId) ?? {
       rendezVous: 0,
       rendezVousParType: {},
-      fichesJointes: 0,
+      rendezVousBase: 0,
     };
     compte.rendezVous += ligne.rendezVous;
-    compte.fichesJointes += ligne.fichesJointes;
+    compte.rendezVousBase += ligne.rendezVousBase;
     for (const [code, nombre] of Object.entries(ligne.rendezVousParType)) {
       compte.rendezVousParType[code] = (compte.rendezVousParType[code] ?? 0) + nombre;
     }
     parPersonne.set(ligne.teleconseillerId, compte);
   }
-  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousParType: {}, fichesJointes: 0 };
+  const aucun: CompteRendezVous = { rendezVous: 0, rendezVousParType: {}, rendezVousBase: 0 };
   const cellules = (compte: CompteRendezVous): EquipeLigne['cellules'] =>
     cellulesRendezVous(types, compte);
   return {
@@ -336,7 +336,7 @@ function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
 function detailRendezVous(totaux: ChiffresActivite['totals']): string {
   const autres = totaux.rendezVous - totaux.rendezVousTelephoniques;
   return (
-    `${formatNumber(totaux.rendezVous)} sur ${formatNumber(totaux.fichesJointes)} prospects joints · ` +
+    `${formatNumber(totaux.rendezVous)} sur ${formatNumber(totaux.rendezVousBase)} prospects joints · ` +
     `${formatNumber(totaux.rendezVousTelephoniques)} téléphoniques, ${formatNumber(autres)} autres`
   );
 }
@@ -735,7 +735,7 @@ const SOURCES_CHIFFRES = {
     forme: 'equipe',
     jeu: 'activite',
     description:
-      'Rendez-vous posés par type (téléphonique, CPI, site, externe…), total et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
+      'Rendez-vous posés par type (téléphonique, CPI, site, externe…), total et taux de rendez-vous (posés ÷ prospects joints par le téléconseiller). Équipe en pied.',
     groupe: 'Équipe',
     extraire: ({ activite }) => (activite === undefined ? null : tableauRendezVous(activite)),
   },

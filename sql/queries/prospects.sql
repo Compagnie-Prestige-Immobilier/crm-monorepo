@@ -38,8 +38,17 @@ SELECT
   -- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
   (SELECT a."rendezVousAt" FROM "call_attempts" a
    WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
-   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at
+   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at,
+  -- sqlc tient la colonne d'une jointure externe pour non nulle : la date passe en texte ISO, vide sans rappel.
+  COALESCE(to_char(rdv."scheduledAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), '')::text AS rendez_vous_rappel
 FROM "prospects" p
+-- Le rappel qui porte la date d'un rendez-vous, comme l'écran Rendez-vous : un
+-- rappel annulé la garde, un rappel supplanté jamais. Le report passe devant.
+LEFT JOIN LATERAL (
+  SELECT s."scheduledAt" FROM "scheduled_callbacks" s
+  WHERE s."prospectId" = p."id" AND s."status" <> 'SUPERSEDED'
+  ORDER BY (s."status" = 'PENDING') DESC, s."createdAt" DESC LIMIT 1
+) rdv ON p."phase2Status" = 'APPOINTMENT'
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "syndicats" sy ON sy."id" = p."syndicatId"

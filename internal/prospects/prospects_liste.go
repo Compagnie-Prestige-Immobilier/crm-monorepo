@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -75,6 +76,18 @@ func prospectReponses(brut []byte) map[string]string {
 	return reponses
 }
 
+// Le report passe devant le rappel ; la requête ne rend le rappel que pour une
+// fiche au statut « rendez-vous ». Sinon reste la date posée avec la méthode.
+func prospectDateRendezVous(p *db.Prospect, rappel string, pose *time.Time) *string {
+	if p.Phase2Status == db.Phase2StatusAPPOINTMENT && p.RendezVousReporteAt != nil {
+		return prospectISOPtr(p.RendezVousReporteAt)
+	}
+	if rappel != "" {
+		return &rappel
+	}
+	return prospectISOPtr(pose)
+}
+
 func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, derniere *db.DernieresTentativesRow) Prospect {
 	p := l.Prospect
 	item := Prospect{
@@ -113,6 +126,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RendezVousIssue: p.RendezVousIssue, RendezVousConfirmation: p.RendezVousConfirmation, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		// string_agg ne rend rien hors campagne : le vide devient un tiret.
 		Campagne: prospectVide(string(l.CampagneNoms)), RendezVousAt: prospectISOPtr(l.RendezVousAt),
+		DateRendezVous:  prospectDateRendezVous(&p, l.RendezVousRappel, l.RendezVousAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
 	}

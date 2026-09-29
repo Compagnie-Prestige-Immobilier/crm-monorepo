@@ -487,14 +487,19 @@ func TestSupervisionActiviteRendezVous(t *testing.T) {
 	telephone := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
 	site := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
 	autre := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	jointSansRdv := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
 	analyticsAppel(b, methode, "REACHED")
 	analyticsAppel(b, autre, "UNREACHABLE")
+	analyticsAppel(b, jointSansRdv, "REACHED")
 	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","method","rendezVousAt","clientCreatedAt")
 		SELECT $1,$2,$3,"id",'RDV_CPI',$4::timestamp,$4::timestamp FROM "call_outcome_reasons" WHERE "code" = 'DEMANDE_INFORMATION'`,
 		uuid.NewString(), methode, b.userID, "2026-03-15T11:00:00Z")
 	analyticsAppelMotif(b, telephone, "RDV_TELEPHONIQUE", instantAnalytics)
 	analyticsAppelMotif(b, telephone, "DEMANDE_INFORMATION", "2026-03-15T12:00:00Z")
 	analyticsAppelMotif(b, site, "RV_SITE", instantAnalytics)
+	// Le rappel de confirmation sonne dans le vide : la fiche n'est plus « jointe »
+	// sur son dernier appel, mais son rendez-vous reste dans le dénominateur.
+	analyticsAppelMotif(b, site, "PAS_DE_REPONSE", "2026-03-15T13:00:00Z")
 	analyticsViderCache()
 
 	fenetre := "?commercialId=" + b.userID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
@@ -503,12 +508,14 @@ func TestSupervisionActiviteRendezVous(t *testing.T) {
 	totaux := analyticsObjet(b, "totaux", body["totals"])
 	analyticsEgal(b, "rendez-vous posés", totaux["rendezVous"], 3)
 	analyticsEgal(b, "dont téléphoniques", totaux["rendezVousTelephoniques"], 1)
-	analyticsEgal(b, "taux posés sur fiches jointes", totaux["rendezVousRate"], 100)
+	analyticsEgal(b, "prospects joints, rendez-vous compris", totaux["rendezVousBase"], 4)
+	analyticsEgal(b, "taux sur les prospects joints, jamais au-delà de 100 %", totaux["rendezVousRate"], 75)
 
 	ligne := analyticsObjet(b, "ligne", analyticsListe(b, "une ligne par agent et par jour", body["items"], 1)[0])
 	analyticsEgal(b, "rendez-vous de la ligne", ligne["rendezVous"], 3)
 	analyticsEgal(b, "téléphoniques de la ligne", ligne["rendezVousTelephoniques"], 1)
-	analyticsEgal(b, "taux de la ligne", ligne["rendezVousRate"], 100)
+	analyticsEgal(b, "base de la ligne", ligne["rendezVousBase"], 4)
+	analyticsEgal(b, "taux de la ligne", ligne["rendezVousRate"], 75)
 
 	parType := analyticsObjet(b, "rendez-vous par type de la ligne", ligne["rendezVousParType"])
 	analyticsEgal(b, "RV téléphonique", parType["RDV_TELEPHONIQUE"], 1)

@@ -13,7 +13,6 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
-import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
 import { SUITES } from '@/components/prospects/suivi-rendez-vous';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,15 +25,10 @@ import {
 import { compte, formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { PROSPECT_TYPE_LABELS } from '@/lib/data/grand-public';
 import {
-  enrollmentMethodLabel,
   etatRendezVousFiche,
-  MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
-  PROSPECT_ORIGIN_LABELS,
   PROSPECT_STATUT_LABELS,
   statutForProjet,
-  TYPE_BIEN_LABELS,
-  TYPE_CONTRAT_LABELS,
   type Projet,
   type ProspectRow,
   type ProspectStatut,
@@ -132,37 +126,10 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       },
     },
     {
-      id: 'segment',
-      accessorKey: 'segment',
-      header: 'Segment',
-      // Une fiche sans banque ni syndicat n'est dans aucun BDD. On l'ecrit,
-      // plutot que de la ranger dans BDD4 qui est une reponse, pas une absence.
-      cell: ({ row }) => {
-        const segment = row.original.segment;
-        return segment === null ? (
-          <span className="text-muted-foreground">Aucun</span>
-        ) : (
-          <Badge variant="outline" title={segment}>
-            {SEGMENT_LISIBLE[segment]}
-          </Badge>
-        );
-      },
-    },
-    {
       id: 'phase2Status',
       accessorKey: 'phase2Status',
       header: 'Statut de qualification',
       cell: ({ row }) => <EtiquettesStatut prospect={row.original} />,
-    },
-    {
-      id: 'enrollmentMethod',
-      accessorKey: 'enrollmentMethod',
-      header: 'Méthode',
-      cell: ({ row }) => {
-        const method = row.original.enrollmentMethod;
-        if (method === null) return <Empty />;
-        return <span className="truncate">{enrollmentMethodLabel(method)}</span>;
-      },
     },
     {
       id: 'lastReasonLabel',
@@ -194,40 +161,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
           </div>
         );
       },
-    },
-    {
-      id: 'enrollmentCapturedBy',
-      accessorKey: 'enrollmentCapturedByName',
-      header: 'Méthode obtenue par',
-      cell: ({ row }) => {
-        const { enrollmentCapturedByName, enrollmentCapturedAt } = row.original;
-        if (enrollmentCapturedByName === null) return <Empty />;
-        return (
-          <div className="min-w-0">
-            <p className="truncate">{enrollmentCapturedByName}</p>
-            {enrollmentCapturedAt !== null ? (
-              <time
-                dateTime={enrollmentCapturedAt}
-                className="block text-[0.75rem] text-muted-foreground tabular-nums"
-              >
-                {formatDate(enrollmentCapturedAt)}
-              </time>
-            ) : null}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'representantName',
-      accessorKey: 'representantName',
-      header: 'Représentant',
-      cell: ({ row }) => <span className="truncate">{row.original.representantName}</span>,
-    },
-    {
-      id: 'departementName',
-      accessorKey: 'departementName',
-      header: 'Département',
-      cell: ({ row }) => <span className="truncate">{row.original.departementName}</span>,
     },
     {
       id: 'banque',
@@ -279,19 +212,19 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       },
     },
     {
-      id: 'rendezVousAt',
-      accessorKey: 'rendezVousAt',
-      header: 'RDV posé',
+      id: 'dateRendezVous',
+      accessorKey: 'dateRendezVous',
+      header: 'Date de rendez-vous',
       cell: ({ row }) =>
-        row.original.rendezVousAt === null ? (
+        row.original.dateRendezVous === null ? (
           <Empty />
         ) : (
           <time
-            dateTime={row.original.rendezVousAt}
+            dateTime={row.original.dateRendezVous}
             className="whitespace-nowrap tabular-nums"
-            title={formatDateTime(row.original.rendezVousAt)}
+            title={formatDateTime(row.original.dateRendezVous)}
           >
-            {formatDateTime(row.original.rendezVousAt)}
+            {formatDateTime(row.original.dateRendezVous)}
           </time>
         ),
     },
@@ -370,17 +303,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       },
     },
     {
-      id: 'typeContrat',
-      accessorKey: 'typeContrat',
-      header: 'Contrat',
-      cell: ({ row }) =>
-        row.original.typeContrat === null ? (
-          <Empty />
-        ) : (
-          <span>{TYPE_CONTRAT_LABELS[row.original.typeContrat]}</span>
-        ),
-    },
-    {
       id: 'paiement',
       accessorKey: 'paymentMode',
       header: 'Paiement',
@@ -393,64 +315,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
             {dureeSystemeMois === null ? null : (
               <p className="text-[0.75rem] text-muted-foreground tabular-nums">
                 {String(dureeSystemeMois)} mois
-              </p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'typeBien',
-      accessorKey: 'typeBien',
-      header: 'Bien',
-      cell: ({ row }) =>
-        row.original.typeBien === null ? (
-          <Empty />
-        ) : (
-          <span>{TYPE_BIEN_LABELS[row.original.typeBien]}</span>
-        ),
-    },
-    {
-      id: 'revenu',
-      accessorKey: 'incomeBandLabel',
-      header: 'Revenu',
-      cell: ({ row }) =>
-        row.original.incomeBandLabel === null ? (
-          <Empty />
-        ) : (
-          <span className="block max-w-40 truncate" title={row.original.incomeBandLabel}>
-            {row.original.incomeBandLabel}
-          </span>
-        ),
-    },
-    {
-      id: 'epargne',
-      accessorKey: 'modeEpargne',
-      header: 'Épargne',
-      cell: ({ row }) =>
-        row.original.modeEpargne === null ? (
-          <Empty />
-        ) : (
-          <span>{MODE_EPARGNE_LABELS[row.original.modeEpargne]}</span>
-        ),
-    },
-    {
-      id: 'pays',
-      accessorKey: 'paysResidenceLabel',
-      header: 'Résidence',
-      cell: ({ row }) => {
-        const { paysResidenceLabel, villeResidence } = row.original;
-        if (paysResidenceLabel === null && villeResidence === null) return <Empty />;
-        return (
-          <div className="min-w-0 max-w-40">
-            {paysResidenceLabel === null ? null : (
-              <p className="truncate" title={paysResidenceLabel}>
-                {paysResidenceLabel}
-              </p>
-            )}
-            {villeResidence === null ? null : (
-              <p className="truncate text-[0.75rem] text-muted-foreground" title={villeResidence}>
-                {villeResidence}
               </p>
             )}
           </div>
@@ -482,25 +346,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
             {email === null ? null : (
               <p className="truncate text-[0.75rem] text-muted-foreground" title={email}>
                 {email}
-              </p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'origine',
-      accessorKey: 'origin',
-      header: 'Origine',
-      cell: ({ row }) => {
-        const { origin, originLabel } = row.original;
-        if (origin === null) return <Empty />;
-        return (
-          <div className="min-w-0 max-w-40">
-            <p className="truncate">{PROSPECT_ORIGIN_LABELS[origin] ?? origin}</p>
-            {originLabel === null || originLabel === '' ? null : (
-              <p className="truncate text-[0.75rem] text-muted-foreground" title={originLabel}>
-                {originLabel}
               </p>
             )}
           </div>

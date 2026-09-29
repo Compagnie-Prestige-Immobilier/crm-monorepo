@@ -164,6 +164,18 @@ const BARRES = [
   },
 ] as const;
 
+test.describe('parcours navigation, la direction ouvre l’espace Commercial', () => {
+  test.use({ storageState: compteDe('DIRECTION').etat });
+
+  test('l’espace Commercial ouvre son tableau de bord, pas le pilotage de l’Admin', async ({
+    page,
+  }) => {
+    await page.goto('/espaces');
+    await page.getByRole('link', { name: /Commercial/u }).click();
+    await expect(page).toHaveURL(/\/teleconseil\/tableau-de-bord$/u);
+  });
+});
+
 for (const barre of BARRES) {
   test.describe(`parcours navigation, la barre de ${barre.role}`, () => {
     test.use({ storageState: compteDe(barre.role).etat });

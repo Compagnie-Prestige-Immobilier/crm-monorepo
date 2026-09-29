@@ -32,4 +32,23 @@ func TestFiltreResultatSuitLeStatutDuFormulaire(t *testing.T) {
 			t.Fatalf("motif %s : %d fiche(s) %v", motif, total, ids)
 		}
 	}
+
+	// La colonne « Date de rendez-vous » lit le rappel qui porte le rendez-vous.
+	dates := map[string]any{}
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects?mesFiches=true&pageSize=100", nil)
+	b.attend(statut, http.StatusOK, "liste des prospects", body)
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		ligne, _ := item.(map[string]any)
+		dates[ligne["id"].(string)] = ligne["dateRendezVous"]
+	}
+	lue, _ := dates[rendezVous].(string)
+	obtenue, err := time.Parse(time.RFC3339, lue)
+	attendue, _ := time.Parse(time.RFC3339, quand)
+	if err != nil || !obtenue.Equal(attendue) {
+		t.Fatalf("date de rendez-vous : %q, attendu %s", lue, quand)
+	}
+	if dates[information] != nil {
+		t.Fatalf("une fiche sans rendez-vous n'a pas de date : %v", dates[information])
+	}
 }
