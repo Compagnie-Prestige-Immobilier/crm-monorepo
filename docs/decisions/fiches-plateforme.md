@@ -37,6 +37,11 @@ l'une des deux plateformes : elles ne sont ni créées ni mises à jour, et le
 rapport du travail les compte sous `PROSPECT_GP_IMPORT_LIGNE_PLATEFORME`. Ces
 personnes n'existent que sur la plateforme.
 
+Depuis le 28 septembre 2026, le même sort vaut pour tout numéro déjà relevé
+dans `inscriptions_plateforme`, quel que soit le Canal. Une fiche rapprochée
+d'une inscription ne se tire plus en campagne et quitte la file « à appeler »
+du téléconseiller. Elle reste consultable, avec ses appels.
+
 Le suivi se lit dans « Plateformes d'enrôlement » (`/admin/enrolement`) :
 inscriptions relevées, étape, dates, filtre « rapproché », entonnoir, et les
 widgets `enrolement-par-jour` et `enrolement-par-etape` du tableau de bord.

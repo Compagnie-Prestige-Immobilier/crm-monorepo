@@ -27,15 +27,9 @@ SELECT
    ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par,
   ra."lastCallAt" AS representant_appele_at,
   ru."fullName" AS representant_appele_par,
-  -- Les campagnes d'appels qui ont confié la fiche, dernières d'abord.
-  (SELECT string_agg(l."name", ' · ' ORDER BY l."createdAt" DESC, l."id" DESC)
-   FROM "lot_export_items" li JOIN "lots_export" l ON l."id" = li."lotId"
-   WHERE li."prospectId" = p."id") AS campagne_noms,
-  -- Le dernier rendez-vous posé en appel, tous motifs : c'est la date que
-  -- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
-  (SELECT a."rendezVousAt" FROM "call_attempts" a
-   WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
-   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at
+  ha."phoneE164" AS homonyme_telephone,
+  ha."lastCallAt" AS homonyme_appele_at,
+  hu."fullName" AS homonyme_appele_par
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
@@ -59,6 +53,17 @@ LEFT JOIN LATERAL (
   ORDER BY r2."lastCallAt" DESC LIMIT 1
 ) ra ON true
 LEFT JOIN "users" ru ON ru."id" = ra."lastCallById"
+-- Une même personne laisse parfois deux numéros : une autre fiche à son nom, déjà appelée, le signale.
+LEFT JOIN LATERAL (
+  SELECT h."phoneE164", h."lastCallAt", h."lastCallById" FROM "prospects" h
+  WHERE h."id" <> p."id" AND h."deletedAt" IS NULL AND h."lastCallAt" IS NOT NULL
+    AND btrim(p."nom") <> '' AND btrim(p."prenom") <> ''
+    AND public.immutable_unaccent(lower(h."nom") || ' ' || lower(h."prenom")) IN (
+      public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom")),
+      public.immutable_unaccent(lower(p."prenom") || ' ' || lower(p."nom")))
+  ORDER BY h."lastCallAt" DESC LIMIT 1
+) ha ON true
+LEFT JOIN "users" hu ON hu."id" = ha."lastCallById"
 WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('id')::text IS NULL OR p."id" = sqlc.narg('id')::text)
   AND (
@@ -71,6 +76,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -92,6 +98,8 @@ WHERE p."deletedAt" IS NULL
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
+        -- Un inscrit d'une plateforme d'enrôlement y est suivi : on ne l'appelle plus d'ici.
+        AND NOT EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
         AND (NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached")
              OR p."remiseATraiterAt" > p."lastCallAt") AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
@@ -258,6 +266,7 @@ WHERE p."deletedAt" IS NULL
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
+    OR (sqlc.arg('scope_suivi')::boolean AND p."phase2Status" IN ('INTERESTED', 'HESITANT'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -279,6 +288,8 @@ WHERE p."deletedAt" IS NULL
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
+        -- Un inscrit d'une plateforme d'enrôlement y est suivi : on ne l'appelle plus d'ici.
+        AND NOT EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
         AND (NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached")
              OR p."remiseATraiterAt" > p."lastCallAt") AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
@@ -861,13 +872,21 @@ WHERE "id" = @prospect_id;
 
 -- name: SuivreRendezVous :one
 UPDATE "prospects" p SET
-  "rendezVousIssue" = sqlc.arg('issue')::text,
-  "rendezVousReporteAt" = sqlc.narg('reporte_at')::timestamp,
-  "suiteRencontre" = sqlc.narg('suite')::text,
+  "rendezVousConfirmation" = CASE sqlc.arg('issue')::text
+    WHEN 'CONFIRME' THEN 'CONFIRME' WHEN 'ANNULE' THEN 'ANNULE' WHEN 'REPORTE' THEN NULL
+    ELSE p."rendezVousConfirmation" END,
+  "rendezVousIssue" = CASE
+    WHEN sqlc.arg('issue')::text IN ('HONORE', 'NON_HONORE') THEN sqlc.arg('issue')::text
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."rendezVousIssue" END,
+  "rendezVousReporteAt" = COALESCE(sqlc.narg('reporte_at')::timestamp, p."rendezVousReporteAt"),
+  "suiteRencontre" = CASE
+    WHEN sqlc.arg('issue')::text = 'HONORE' THEN sqlc.narg('suite')::text
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."suiteRencontre" END,
   "rev" = p."rev" + 1, "updatedAt" = now()
 FROM "prospects" avant
 WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
-RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant;
+RETURNING avant."rendezVousIssue" AS issue_avant, avant."rendezVousConfirmation" AS confirmation_avant,
+  avant."suiteRencontre" AS suite_avant;
 
 -- name: TelephonesDesVentes :many
 SELECT DISTINCT "telephone" FROM "ventes"

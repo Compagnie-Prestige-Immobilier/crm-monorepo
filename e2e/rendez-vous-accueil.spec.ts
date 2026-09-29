@@ -24,8 +24,29 @@ async function poserPermissions(permissions: string[]): Promise<void> {
   await api.dispose();
 }
 
-// Le drapeau `BETA_SUIVI_RENDEZ_VOUS` est posé par le serveur d'essai ; sans lui
-// la permission n'existe pour personne, et l'écran avec elle.
+/** Un téléconseiller pose un RV CPI pour demain, comme dans la console. */
+async function poserRendezVous(nom: string, ip: string): Promise<string> {
+  const api = await apiDe('COMMERCIAL', ip);
+  const id = await creerProspect(api, {
+    nom,
+    prenom: 'Awa',
+    phone: `+22177${String(4_100_000 + Math.floor(Math.random() * 800_000))}`,
+    projet: 'GRAND_PUBLIC',
+  });
+  const appel = await api.post('/api/v1/phase2/call-attempts', {
+    data: {
+      id: randomUUID(),
+      prospectId: id,
+      reasonCode: 'RV_CPI',
+      callbackAt: new Date(Date.now() + 86_400_000).toISOString(),
+      clientCreatedAt: new Date().toISOString(),
+    },
+  });
+  expect(appel.status(), 'rendez-vous consigné').toBe(200);
+  await api.dispose();
+  return id;
+}
+
 test.describe('rendez-vous au comptoir', () => {
   test.use({ storageState: compteDe('ACCUEIL').etat });
 
@@ -35,27 +56,7 @@ test.describe('rendez-vous au comptoir', () => {
 
   test.beforeAll(async () => {
     permissionsAvant = await permissionsDuRoleAccueil();
-
-    // Un téléconseiller pose le rendez-vous, comme dans la console.
-    const api = await apiDe('COMMERCIAL', '198.51.100.92');
-    convoque = await creerProspect(api, {
-      nom,
-      prenom: 'Awa',
-      phone: `+22177${String(4_100_000 + Math.floor(Math.random() * 800_000))}`,
-      projet: 'GRAND_PUBLIC',
-    });
-    const demain = new Date(Date.now() + 86_400_000).toISOString();
-    const appel = await api.post('/api/v1/phase2/call-attempts', {
-      data: {
-        id: randomUUID(),
-        prospectId: convoque,
-        reasonCode: 'RV_CPI',
-        callbackAt: demain,
-        clientCreatedAt: new Date().toISOString(),
-      },
-    });
-    expect(appel.status(), 'rendez-vous consigné').toBe(200);
-    await api.dispose();
+    convoque = await poserRendezVous(nom, '198.51.100.92');
   });
 
   test.afterAll(async () => {
@@ -64,34 +65,40 @@ test.describe('rendez-vous au comptoir', () => {
     await purger({ prospects: [convoque] });
   });
 
-  test('l’onglet trie les rendez-vous par type, et se referme avec la permission', async ({
+  test('le comptoir confirme, note la venue et enregistre la visite, sans closer', async ({
     page,
   }) => {
     await page.goto('/accueil');
-    const onglet = page.getByRole('link', { name: 'Rendez-vous' });
+    const onglet = page.getByRole('link', { name: 'Rendez-vous', exact: true }).first();
     await expect(onglet).toBeVisible();
 
     await onglet.click();
-    // Le comptoir ouvre sur la journée : le rendez-vous de demain n'y est pas.
-    await expect(page.getByRole('button', { name: 'Aujourd’hui' })).toHaveAttribute(
-      'aria-pressed',
+    await expect(page.getByRole('tab', { name: 'À traiter' })).toHaveAttribute(
+      'aria-selected',
       'true',
     );
-    const ligne = page.getByRole('row').filter({ hasText: nom });
-    await expect(ligne).toHaveCount(0);
-    await page.getByRole('button', { name: 'Toutes les dates' }).click();
+    const ligne = page
+      .getByRole('region', { name: 'Demain' })
+      .getByRole('listitem')
+      .filter({ hasText: nom });
     await expect(ligne).toHaveCount(1);
+    await expect(ligne.getByText('À confirmer', { exact: true })).toBeVisible();
     await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
 
-    // Les types trient la file : un RV CPI ne s'affiche pas sous RV site.
-    await page.getByRole('tab', { name: 'RV site', exact: true }).click();
-    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(0);
-    await page.getByRole('tab', { name: 'Tous', exact: true }).click();
+    // Le type filtre la file : un RV CPI ne s'affiche pas sous RV site.
+    await page.getByRole('combobox', { name: 'Type de rendez-vous' }).click();
+    await page.getByRole('option', { name: 'RV site', exact: true }).click();
+    await expect(ligne).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Type de rendez-vous' }).click();
+    await page.getByRole('option', { name: 'Tous les types', exact: true }).click();
     await expect(ligne).toHaveCount(1);
 
-    // La venue se confirme depuis la liste : ouvrir chaque fiche ferait perdre la file.
-    await ligne.getByRole('button', { name: /^Confirmer la venue/ }).click();
-    await expect(ligne.getByText('Venu', { exact: true }).first()).toBeVisible();
+    // Chaque geste reste sur la même ligne : la suivante apparaît sans changer d'écran.
+    await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
+    await expect(ligne.getByText('Confirmé', { exact: true })).toBeVisible();
+    await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
+    await expect(ligne.getByText('Présent, closing à compléter')).toBeVisible();
+    await expect(ligne.getByRole('button', { name: 'Compléter le closing' })).toHaveCount(0);
 
     // Venu, il passe au registre sans ressaisir son nom ni son numéro.
     await ligne.getByRole('button', { name: 'Enregistrer la visite' }).click();
@@ -117,16 +124,6 @@ test.describe('rendez-vous au comptoir', () => {
     );
     expect(visites, 'visite enregistrée au registre').toHaveLength(1);
 
-    // Le filtre des venues sépare ce qui est confirmé de ce qui attend.
-    await page.getByRole('combobox', { name: 'Venue' }).click();
-    await page.getByRole('option', { name: 'Pas venus', exact: true }).click();
-    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(0);
-    await page.getByRole('combobox', { name: 'Venue' }).click();
-    await page.getByRole('option', { name: 'Venus', exact: true }).click();
-    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(1);
-    await page.getByRole('combobox', { name: 'Venue' }).click();
-    await page.getByRole('option', { name: 'Toutes les venues', exact: true }).click();
-
     // Le classeur emporte les filtres posés.
     const lien = page.getByRole('link', { name: 'Exporter' });
     await expect(lien).toHaveAttribute('href', /export\/rendez-vous\.xlsx/u);
@@ -134,15 +131,78 @@ test.describe('rendez-vous au comptoir', () => {
     // La recherche porte sur le nom comme sur le numéro.
     const recherche = page.getByLabel('Rechercher un rendez-vous');
     await recherche.fill(nom);
-    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(1);
+    await expect(ligne).toHaveCount(1);
     await recherche.fill('Personne qui n’existe pas');
-    await expect(page.getByText('Aucun rendez-vous ici', { exact: false })).toBeVisible();
+    await expect(page.getByText('Aucun rendez-vous pour cette recherche')).toBeVisible();
     await recherche.fill('');
 
     await poserPermissions(permissionsAvant.filter((p) => !OUVERTURE.includes(p)));
     await page.reload();
-    await expect(page.getByRole('tab', { name: 'RV CPI', exact: true })).toHaveCount(0);
     await expect(onglet).toHaveCount(0);
+  });
+});
+
+test.describe('closing par le chargé de clientèle', () => {
+  test.use({ storageState: compteDe('CHARGE_CLIENTELE').etat });
+
+  let convoque = '';
+  const nom = `Closing ${suffixe()}`;
+
+  test.beforeAll(async () => {
+    convoque = await poserRendezVous(nom, '198.51.100.93');
+  });
+
+  test.afterAll(async () => {
+    await purger({ prospects: [convoque] });
+  });
+
+  test('dans l’Accueil, il arrive sur l’agenda ; un report revient à confirmer, la venue ouvre le closing', async ({
+    page,
+  }) => {
+    await page.goto('/espaces');
+    await page
+      .getByRole('link', { name: /Accueil/u })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/accueil\/agenda$/u);
+    await expect(page.getByRole('button', { name: 'Semaine' })).toBeVisible();
+    const onglets = page.getByRole('navigation', { name: 'Visites' }).getByRole('link');
+    await expect(onglets.first()).toHaveText('Agenda');
+    await expect(page.getByRole('link', { name: 'Intéressés et hésitants' })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Rendez-vous', exact: true }).first().click();
+    const ligne = page.getByRole('listitem').filter({ hasText: nom });
+
+    await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
+    await page.getByRole('menuitem', { name: 'Reporter' }).click();
+    const report = page.getByRole('dialog', { name: /^Reporter le rendez-vous/u });
+    const apres = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    await report.getByLabel('Nouvelle date (heure de Dakar)').fill(`${apres}T10:00`);
+    await report.getByRole('button', { name: 'Reporter' }).click();
+    await expect(ligne.getByText('Reporté, à confirmer')).toBeVisible();
+
+    // Présent : le closing s'ouvre de lui-même, en trois étapes, rien d'obligatoire.
+    await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
+    await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
+    const closing = page.getByRole('dialog', { name: `Closing de Awa ${nom}` });
+    await closing.getByRole('combobox', { name: 'Superficie du lot' }).click();
+    await page.getByRole('option', { name: 'Autre, à préciser' }).click();
+    await closing.getByLabel('Superficie du lot, précision').fill('400 m²');
+    await closing.getByRole('button', { name: 'Suivant' }).click();
+    await closing.getByRole('button', { name: 'Suivant' }).click();
+    await closing.getByRole('combobox', { name: 'Prochaine action' }).click();
+    await page.getByRole('option', { name: 'Signature du contrat' }).click();
+    await closing.getByRole('button', { name: 'Enregistrer et fermer' }).click();
+    await expect(closing).toHaveCount(0);
+    await expect(ligne).toHaveCount(0);
+
+    await page.getByRole('tab', { name: 'Historique' }).click();
+    await expect(ligne.getByText('Closing enregistré')).toBeVisible();
+    const [enregistre = { superficie: '' }] = await lire<{ superficie: string }>(
+      'SELECT "superficie" FROM "rendez_vous_closings" WHERE "prospectId" = $1',
+      [convoque],
+    );
+    expect(enregistre.superficie).toBe('400 m²');
   });
 });
 

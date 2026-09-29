@@ -580,6 +580,13 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 	b := adminConnecte(t)
 	telephone := adminTelephone()
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
+	rappelPromis(b, prospectID, b.userID)
+	attributaire, _ := adminCompte(b, "COMMERCIAL")
+	lotID := uuid.NewString()
+	adminExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+		VALUES ($1,'Campagne inscrit','PROSPECTS','GRAND_PUBLIC','{}'::jsonb,1,$2)`, lotID, b.userID)
+	adminExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`, lotID, prospectID, attributaire)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = 'GRAND_PUBLIC' AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id")`)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.GRAND_PUBLIC'`)
@@ -598,6 +605,12 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 		t.Fatalf("appel plateforme : jeton %q, limite %q", recu.jeton, recu.limite)
 	}
 	adminInscriptionEcrite(b, prospectID)
+	if n := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, prospectID); n != 0 {
+		t.Fatalf("la plateforme suit l'inscrit : son rappel promis ici est annulé, %d en attente", n)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1 AND "assigneeId" IS NULL`, lotID); n != 1 {
+		t.Fatalf("jamais appelé par son attributaire, l'inscrit sort du dénominateur de la campagne : %d", n)
+	}
 	// Rejeu : la même inscription est mise à jour, jamais redéposée.
 	adminTirage(b, 0, 1)
 

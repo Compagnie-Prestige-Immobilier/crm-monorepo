@@ -144,6 +144,82 @@ func analyticsEgal(b *banc, quoi string, valeur any, attendu float64) {
 	}
 }
 
+func analyticsTravailImport(b *banc, kind string) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "import_jobs" ("id","kind","status","mode","requestedById","fileName","fileBytes","storagePath","expiresAt","updatedAt")
+		VALUES ($1,$2::"ImportKind",'succeeded','APPLY',$3,'classeur.xlsx',1,'/tmp/x',now() + interval '1 day',now())`, id, kind, b.userID)
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "id" = $1`, id) })
+	return id
+}
+
+func analyticsTotalMarketing(b *banc, quoi string) float64 {
+	b.t.Helper()
+	analyticsViderCache()
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/prospects/marketing", nil, false)
+	b.attend(statut, http.StatusOK, quoi, body)
+	return analyticsNombre(b, body["total"], quoi)
+}
+
+// Un lead inscrit sur la plateforme n'attend pas de distribution : il se compte à part.
+func TestSupervisionMarketingCompteAPartLesInscritsDeLaPlateforme(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	releve := analyticsTravailImport(b, "PROSPECTS_GRAND_PUBLIC")
+	lire := func(quoi string) map[string]any {
+		analyticsViderCache()
+		statut, body := b.appel(http.MethodGet, "/api/v1/supervision/prospects/marketing", nil, false)
+		b.attend(statut, http.StatusOK, quoi, body)
+		return body
+	}
+	lead := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, lead, releve)
+	avant := lire("marketing avant l'inscription")
+
+	inscription := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$1,'Nom','Prenom','etape-0',$2,'{}'::jsonb,now(),now())`, inscription, lead)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+	apres := lire("marketing après l'inscription")
+	analyticsEgal(b, "pas encore distribuées", apres["nonDistribues"], analyticsNombre(b, avant["nonDistribues"], "avant")-1)
+	analyticsEgal(b, "suivies sur la plateforme", apres["surPlateforme"], analyticsNombre(b, avant["surPlateforme"], "avant")+1)
+	analyticsEgal(b, "total", apres["total"], analyticsNombre(b, avant["total"], "avant"))
+}
+
+// Le pôle marketing ne compte que les prospects qu'un canal amène ou qu'un relevé
+// a apportés. Une fiche remise par un représentant ou un classeur CHUES déposé par
+// le pôle déploiement reste hors du compte.
+func TestSupervisionMarketingIgnoreLesFichesDuDeploiement(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	avant := analyticsTotalMarketing(b, "marketing avant le jeu")
+
+	canal := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "canaux_provenance" ("id","code","label","updatedAt") VALUES ($1,$1,'Canal test',now())`, canal)
+	// Laissé en base, ce canal au code aléatoire capterait « fb » au relevé d'un autre test.
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `UPDATE "prospects" SET "canalProvenanceId" = NULL WHERE "canalProvenanceId" = $1`, canal)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "canaux_provenance" WHERE "id" = $1`, canal)
+	})
+	releve := analyticsTravailImport(b, "PROSPECTS_GRAND_PUBLIC")
+	classeurChues := analyticsTravailImport(b, "PROSPECTS")
+
+	analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	parCanal := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "canalProvenanceId" = $2 WHERE "id" = $1`, parCanal, canal)
+	parReleve := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, parReleve, releve)
+	duDeploiement := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, duDeploiement, classeurChues)
+
+	apres := analyticsTotalMarketing(b, "marketing après le jeu")
+	if apres != avant+2 {
+		t.Fatalf("le marketing compte le canal et le relevé, pas le représentant ni le classeur CHUES : %v puis %v", avant, apres)
+	}
+}
+
 func analyticsTexte(b *banc, quoi string, valeur any, attendu string) {
 	b.t.Helper()
 	if valeur != attendu {

@@ -220,21 +220,9 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 	for i := range ventes {
 		ids[i] = ventes[i].ID
 	}
-	idsTexte := make([]string, len(ventes))
-	for i := range ventes {
-		idsTexte[i] = strconv.FormatInt(ventes[i].ID, 10)
-	}
-	saisies, err := s.Q.SaisiesVentes(ctx, idsTexte)
+	parSaisie, err := s.saisiesParVente(ctx, ventes)
 	if err != nil {
 		return nil, err
-	}
-	parSaisie := make(map[int64]time.Time, len(saisies))
-	for _, saisie := range saisies {
-		id, err := strconv.ParseInt(saisie.EntityId, 10, 64)
-		if err != nil {
-			continue
-		}
-		parSaisie[id] = saisie.SaisieLe
 	}
 	versements, err := s.Q.ListerVersementsVentes(ctx, ids)
 	if err != nil {
@@ -248,7 +236,7 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 	}
 	for i := range ventes {
 		dto := venteDTO(&ventes[i], parVente[ventes[i].ID])
-		dto.SaisieLe = saisieLeDe(ventes[i], parSaisie, classeur)
+		dto.SaisieLe = saisieLeDe(&ventes[i], parSaisie, &classeur)
 		if p, ok := prospects[parLigne[i]]; parLigne[i] != "" && ok {
 			dto.ProspectID, dto.Teleconseiller = &p.ID, p.Teleconseiller
 			dto.Parrain = nomParrain(p.ParrainNom, p.ParrainPrenom)
@@ -826,7 +814,25 @@ func jourOuNul(date pgtype.Date) *string {
 
 // La saisie d'une vente SAISIE est sa trace `vente.creer` au journal ; une
 // vente du classeur reprend la date du dépôt.
-func saisieLeDe(vente db.Vente, saisies map[int64]time.Time, classeur db.ClasseurVentesRow) *string {
+func (s *service) saisiesParVente(ctx context.Context, ventes []db.Vente) (map[int64]time.Time, error) {
+	idsTexte := make([]string, len(ventes))
+	for i := range ventes {
+		idsTexte[i] = strconv.FormatInt(ventes[i].ID, 10)
+	}
+	saisies, err := s.Q.SaisiesVentes(ctx, idsTexte)
+	if err != nil {
+		return nil, err
+	}
+	parSaisie := make(map[int64]time.Time, len(saisies))
+	for _, saisie := range saisies {
+		if id, err := strconv.ParseInt(saisie.EntityId, 10, 64); err == nil {
+			parSaisie[id] = saisie.SaisieLe
+		}
+	}
+	return parSaisie, nil
+}
+
+func saisieLeDe(vente *db.Vente, saisies map[int64]time.Time, classeur *db.ClasseurVentesRow) *string {
 	if saisie, ok := saisies[vente.ID]; ok {
 		texte := saisie.UTC().Format(time.RFC3339)
 		return &texte

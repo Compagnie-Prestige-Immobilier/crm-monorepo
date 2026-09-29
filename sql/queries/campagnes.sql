@@ -422,6 +422,7 @@ SELECT COUNT(*)::int
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."statut" <> 'PERDU'
+  AND NOT EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
@@ -452,6 +453,7 @@ SELECT p."id"
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."statut" <> 'PERDU'
+  AND NOT EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et

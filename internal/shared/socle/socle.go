@@ -43,6 +43,12 @@ type Tache struct {
 	Run  func(context.Context) error
 }
 
+// Minuit local d'aujourd'hui, en UTC comme la base le stocke.
+func DebutDuJour(zone *time.Location) time.Time {
+	maintenant := time.Now().In(zone)
+	return time.Date(maintenant.Year(), maintenant.Month(), maintenant.Day(), 0, 0, 0, 0, zone).UTC()
+}
+
 // Un jour saisi par un écran vaut du premier instant local au premier instant
 // du lendemain : une borne posée à minuit perdrait la journée même.
 func BornesDuJour(du, au string, zone *time.Location) (debut, fin *time.Time, err error) {

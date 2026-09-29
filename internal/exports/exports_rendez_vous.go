@@ -17,7 +17,7 @@ const (
 )
 
 var entetesRendezVous = []string{
-	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Venue", "Pris le", "Pris par",
+	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Étape", "Pris le", "Pris par",
 	"Site", "Point de rencontre", "Précision du point",
 }
 
@@ -25,16 +25,29 @@ var entetesRendezVous = []string{
 type ExportRendezVousInput struct {
 	Type   string `query:"type" maxLength:"40"`
 	Search string `query:"search" maxLength:"120"`
-	Issue  string `query:"issue" enum:",HONORE,NON_HONORE,REPORTE,SANS"`
+	Etape  string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
 	Du     string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
 	Au     string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 }
 
-var venues = map[string]string{
-	"HONORE":     "Venu",
-	"NON_HONORE": "Pas venu",
-	"REPORTE":    "Reporté",
-	"":           "À confirmer",
+var etapesRendezVous = map[string]string{
+	"A_CONFIRMER": "À confirmer",
+	"CONFIRMES":   "Confirmé",
+	"A_CLOSER":    "Présent, à closer",
+	"EN_RETARD":   "En retard",
+}
+
+func etapeLisible(l *db.RendezVousObtenusRow) string {
+	switch {
+	case l.Etape != "HISTORIQUE":
+		return etapesRendezVous[l.Etape]
+	case l.Confirmation == "ANNULE":
+		return "Annulé"
+	case l.Issue == "NON_HONORE":
+		return "Absent"
+	default:
+		return "Closing fait"
+	}
 }
 
 func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInput) (*huma.StreamResponse, error) {
@@ -45,7 +58,8 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{
 		TypeCode:  exportNarg(in.Type),
 		Recherche: exportNarg(in.Search),
-		Issue:     exportNarg(in.Issue),
+		Etape:     exportNarg(in.Etape),
+		DebutJour: socle.DebutDuJour(s.Cfg.TimeZone),
 		Du:        du,
 		Au:        au,
 		Prendre:   rendezVousExportMax,
@@ -66,7 +80,7 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 	for i := range lignes {
 		ligne := &lignes[i]
 		if err := f.ecrire(quandLisible(ligne.Quand, s.Cfg.TimeZone), ligne.Prenom+" "+ligne.Nom,
-			exportCelluleTexte(ligne.PhoneE164), ligne.Type, venues[ligne.Issue],
+			exportCelluleTexte(ligne.PhoneE164), ligne.Type, etapeLisible(ligne),
 			c.horodate(ligne.LastCallAt), ligne.PrisPar, ligne.Site, ligne.PointRencontre,
 			ligne.PointRencontreCommentaire); err != nil {
 			return nil, err

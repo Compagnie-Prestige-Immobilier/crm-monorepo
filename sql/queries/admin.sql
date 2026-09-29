@@ -225,6 +225,19 @@ DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = $1
 DELETE FROM "inscriptions_plateforme" i WHERE i."id" = $1 AND i."projet" = $2
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id");
 
+-- name: AnnulerRappelsDesInscrits :exec
+UPDATE "scheduled_callbacks" sc SET "status" = 'CANCELLED', "updatedAt" = now()
+WHERE sc."status" = 'PENDING'
+  AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" i WHERE i."prospectId" = sc."prospectId" AND i."disparueLe" IS NULL);
+
+-- Même geste que 20260915160100_fiches_plateforme : la ligne garde sa place et ses appels,
+-- et sort du dénominateur de la campagne. Une ligne déjà appelée par son attributaire reste à lui.
+-- name: RetirerInscritsDesCampagnes :exec
+UPDATE "lot_export_items" li SET "assigneeId" = NULL
+WHERE li."assigneeId" IS NOT NULL
+  AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" i WHERE i."prospectId" = li."prospectId" AND i."disparueLe" IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM "call_attempts" a WHERE a."prospectId" = li."prospectId" AND a."performedById" = li."assigneeId");
+
 -- name: CandidatsParTelephone :many
 SELECT p."id", p."projet", p."phoneE164", p."whatsappE164", p."clientCreatedAt"
 FROM "prospects" p

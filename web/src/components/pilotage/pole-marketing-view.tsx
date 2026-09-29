@@ -68,10 +68,11 @@ export function PoleMarketingView() {
     },
     {
       label: 'Non appelées (en campagne)',
-      value: Math.max(0, data.total - data.eprouves - data.nonDistribues),
+      value: Math.max(0, data.total - data.eprouves - data.nonDistribues - data.surPlateforme),
       couleur: '#C8921A',
     },
     { label: 'Pas encore distribuées', value: data.nonDistribues, couleur: '#8A8A8A' },
+    { label: 'Suivies sur la plateforme', value: data.surPlateforme, couleur: '#3E6FA8' },
   ];
 
   const lignesCanaux: LigneCroisee[] = (data.parCanal ?? []).map((c) => ({

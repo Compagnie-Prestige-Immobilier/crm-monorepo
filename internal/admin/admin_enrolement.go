@@ -581,7 +581,9 @@ func (s *service) executerTirage(ctx context.Context, projet string) (BilanTirag
 	if err != nil {
 		return bilan, err
 	}
-	return bilan, s.appliquerPurges(ctx, projet, base, jeton)
+	// La plateforme suit ses inscrits : ni rappel promis ici, ni ligne de campagne à tenir.
+	return bilan, errors.Join(s.Q.AnnulerRappelsDesInscrits(ctx), s.Q.RetirerInscritsDesCampagnes(ctx),
+		s.appliquerPurges(ctx, projet, base, jeton))
 }
 
 func (s *service) appliquerPurges(ctx context.Context, projet, base, jeton string) error {

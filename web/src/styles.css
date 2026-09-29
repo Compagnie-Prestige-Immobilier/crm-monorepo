@@ -1091,3 +1091,73 @@ html.dark:has([data-coque='chues']) {
     break-inside: avoid;
   }
 }
+
+/* Agenda des rendez-vous : `react-big-calendar` suit les jetons du thème, clair et sombre. */
+.agenda-rendez-vous .rbc-calendar {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+}
+
+.agenda-rendez-vous .rbc-time-view,
+.agenda-rendez-vous .rbc-time-header-content,
+.agenda-rendez-vous .rbc-time-content,
+.agenda-rendez-vous .rbc-timeslot-group,
+.agenda-rendez-vous .rbc-day-slot .rbc-time-slot,
+.agenda-rendez-vous .rbc-header,
+.agenda-rendez-vous .rbc-time-content > * + * > * {
+  border-color: var(--border);
+}
+
+.agenda-rendez-vous .rbc-time-view {
+  border-radius: 0.5rem;
+  background: var(--card);
+}
+
+.agenda-rendez-vous .rbc-today {
+  background: var(--muted);
+}
+
+.agenda-rendez-vous .rbc-toolbar button {
+  color: var(--foreground);
+  border-color: var(--border);
+  min-height: 2.25rem;
+}
+
+.agenda-rendez-vous .rbc-toolbar button.rbc-active,
+.agenda-rendez-vous .rbc-toolbar button:hover {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: none;
+}
+
+.agenda-rendez-vous .rbc-event,
+.agenda-rendez-vous .rbc-day-slot .rbc-event {
+  border: 0;
+  border-left: 3px solid currentColor;
+  border-radius: 0.375rem;
+  font-weight: 600;
+}
+
+.agenda-rendez-vous .rbc-event .rbc-event-label {
+  display: none;
+}
+
+.agenda-warning {
+  background: var(--warning-surface) !important;
+  color: var(--warning) !important;
+}
+
+.agenda-info {
+  background: var(--info-surface) !important;
+  color: var(--info) !important;
+}
+
+.agenda-success {
+  background: var(--success-surface) !important;
+  color: var(--success) !important;
+}
+
+.agenda-destructive {
+  background: var(--destructive-surface) !important;
+  color: var(--destructive) !important;
+}

@@ -1,20 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { RendezVousComptoir } from '@/components/accueil/rendez-vous-comptoir';
+import { RendezVousListe } from '@/components/accueil/rendez-vous-liste';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefusPermission, type Contexte } from '@/lib/guard';
 import { peut } from '@/lib/types';
-
-const TOUS = 'tous';
-
-/** Les sous-motifs du motif « Rendez-vous » qui amènent quelqu'un au comptoir. */
-const TYPES: readonly { value: string; label: string }[] = [
-  { value: TOUS, label: 'Tous' },
-  { value: 'RV_CPI', label: 'RV CPI' },
-  { value: 'RV_SITE', label: 'RV site' },
-  { value: 'RV_EXTERNE', label: 'RV externe' },
-];
 
 export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
   beforeLoad: ({ context }: Contexte) => {
@@ -22,35 +12,34 @@ export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
       throw new RefusPermission(context.user.role);
     }
   },
-  component: RendezVousAccueilPage,
+  component: RendezVousPage,
 });
 
-/** Les rendez-vous obtenus par les téléconseillers, à confirmer au comptoir. */
-function RendezVousAccueilPage() {
+/** Même liste pour tous : le chargé de clientèle y remplit le closing, le comptoir y enregistre la visite. */
+function RendezVousPage() {
   const { user } = Route.useRouteContext();
-  const [type, setType] = useState<string | null>(null);
-
+  const [historique, setHistorique] = useState(false);
+  const closing = peut(user, 'rendez_vous.closer');
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <Tabs
-        value={type ?? TOUS}
-        onValueChange={(value) => {
-          setType(value === TOUS ? null : value);
+        value={historique ? 'historique' : 'a-traiter'}
+        onValueChange={(valeur) => {
+          setHistorique(valeur === 'historique');
         }}
       >
         <TabsList>
-          {TYPES.map((choix) => (
-            <TabsTrigger key={choix.value} value={choix.value}>
-              {choix.label}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="a-traiter">À traiter</TabsTrigger>
+          <TabsTrigger value="historique">Historique</TabsTrigger>
         </TabsList>
       </Tabs>
-      <RendezVousComptoir
-        type={type}
+      <RendezVousListe
+        key={String(historique)}
+        historique={historique}
         peutNoter={peut(user, 'rendez_vous.suivre')}
+        peutCloser={closing}
         peutExporter={peut(user, 'rendez_vous.exporter')}
-        peutEnregistrerVisite={peut(user, 'accueil.registre')}
+        peutEnregistrerVisite={!closing && peut(user, 'accueil.registre')}
       />
     </div>
   );

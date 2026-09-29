@@ -3,6 +3,8 @@ import {
   ArchiveIcon,
   BellIcon,
   BotIcon,
+  CalendarCheckIcon,
+  CalendarDaysIcon,
   HeartHandshakeIcon,
   ClipboardListIcon,
   ClockIcon,
@@ -191,7 +193,15 @@ const SECTIONS: readonly NavSection[] = [
   {
     coque: 'accueil',
     title: null,
+    // Le chargé de clientèle arrive sur l'agenda, le comptoir sur le registre : la première entrée ouverte fait l'accueil.
     items: [
+      {
+        href: '/accueil/agenda',
+        label: 'Agenda',
+        icon: CalendarDaysIcon,
+        description: 'Les rendez-vous de la semaine, heure par heure',
+        acces: 'rendez_vous.closer',
+      },
       {
         href: '/accueil',
         label: 'Registre des visites',
@@ -202,10 +212,16 @@ const SECTIONS: readonly NavSection[] = [
       {
         href: '/accueil/rendez-vous',
         label: 'Rendez-vous',
-        icon: HeartHandshakeIcon,
-        description: 'Rendez-vous obtenus au téléphone, à confirmer au comptoir',
+        icon: CalendarCheckIcon,
+        description: 'Confirmer, noter la présence, remplir le closing',
         acces: 'rendez_vous.voir',
-        hidden: true,
+      },
+      {
+        href: '/accueil/interesses',
+        label: 'Intéressés et hésitants',
+        icon: HeartHandshakeIcon,
+        description: 'Fiches à amener jusqu’au rendez-vous',
+        acces: 'rendez_vous.closer',
       },
       // Les trois écrans qui suivent sont les ONGLETS du registre
       // (`visites-tabs.tsx`, monté par `accueil/layout.tsx`) : les répéter dans

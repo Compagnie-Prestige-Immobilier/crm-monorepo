@@ -124,7 +124,7 @@ func (s *service) resumer(ctx context.Context, in *ResumeInput) (*ResumeOutput, 
 func (s *service) ficheLisible(ctx context.Context, u *socle.Utilisateur, id string) (db.Prospect, error) {
 	lignes, err := s.Q.ListProspects(ctx, db.ListProspectsParams{
 		ID: &id, ScopeUserID: u.ID, ScopeAll: u.Peut(socle.PermissionPortefeuilleVoirTout),
-		ScopeConverti: u.Peut(socle.PermissionFichesVoirConverties), ScopeRendezVous: u.Peut(socle.PermissionRendezVousSuivre),
+		ScopeConverti: u.Peut(socle.PermissionFichesVoirConverties), ScopeRendezVous: u.Peut(socle.PermissionRendezVousSuivre), ScopeSuivi: u.Peut(socle.PermissionRendezVousCloser),
 		SortBy: "clientCreatedAt", SortOrder: "desc", Taille: 1,
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func (s *service) faitsDeLaFiche(ctx context.Context, fiche *db.Prospect) (faits
 var issuesRendezVous = map[string]string{"HONORE": "honoré", "NON_HONORE": "non honoré", "REPORTE": "reporté", "": "sans issue notée"}
 
 func (s *service) rendezVousEtRappel(ctx context.Context, id string, f *faitsFiche) error {
-	rdv, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &id, Prendre: 1})
+	rdv, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &id, DebutJour: socle.DebutDuJour(s.Cfg.TimeZone), Prendre: 1})
 	if err != nil {
 		return err
 	}
