@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	qualificationCodeRvSite = "RV_SITE"
-	cleReglagesRvSite       = "rv_site.reglages"
-	cheminCreneauxRvSite    = "/api/v1/phase2/rv-site/creneaux"
-	creneauxJoursMax        = 31
+	qualificationCodeRvSite    = "RV_SITE"
+	qualificationCodeRvExterne = "RV_EXTERNE"
+	cleReglagesRvSite          = "rv_site.reglages"
+	cheminCreneauxRvSite       = "/api/v1/phase2/rv-site/creneaux"
+	creneauxJoursMax           = 31
 )
 
 // Sans réglage enregistré : le mardi et le jeudi, de 9 h à 20 h, deux mois à l'avance, sans limite.
@@ -232,6 +233,22 @@ func rvSiteCreneau(quand time.Time, reserves int, capacite *int) RvSiteCreneau {
 func rvSiteHorsSujet(b *QualificationCallAttemptBody) error {
 	if b.SiteID != nil || b.PointRencontreID != nil || b.PointRencontreCommentaire != nil {
 		return rvSiteRefus("PHASE2_RV_SITE_ONLY", "Le site et le point de rencontre ne se saisissent que pour un RV site.")
+	}
+	return nil
+}
+
+func rvExterneVerifier(b *QualificationCallAttemptBody, code string) error {
+	if code != qualificationCodeRvExterne {
+		if b.RvExterneType != nil || b.RvExternePrecision != nil {
+			return rvSiteRefus("PHASE2_RV_EXTERNE_ONLY", "Le type de rendez-vous externe ne se saisit que pour un RV externe.")
+		}
+		return nil
+	}
+	if b.RvExterneType == nil {
+		return rvSiteRefus("PHASE2_RV_EXTERNE_TYPE", "Un RV externe exige son type.")
+	}
+	if *b.RvExterneType == "AUTRE" && qualificationRogne(b.RvExternePrecision) == nil {
+		return rvSiteRefus("PHASE2_RV_EXTERNE_PRECISION", "Précisez le type du rendez-vous externe.")
 	}
 	return nil
 }

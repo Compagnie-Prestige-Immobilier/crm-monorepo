@@ -164,11 +164,13 @@ export function ActionsRendezVous({
   bulle?: boolean;
 }) {
   const client = useQueryClient();
-  const [dialogue, setDialogue] = useState<'reporter' | 'recontacter' | 'annuler' | null>(null);
+  const [dialogue, setDialogue] = useState<
+    'confirmer' | 'reporter' | 'recontacter' | 'annuler' | null
+  >(null);
   const noter = useMutation({
     mutationFn: ({ issue, ...precisions }: { issue: Geste } & Partial<Precisions>) =>
       suivreRendezVous(fiche.id, { issue, ...precisions }),
-    onSuccess: (_, { issue }) => {
+    onSuccess: (_, { issue, reporteAt }) => {
       void client.invalidateQueries({ queryKey: CLE_RENDEZ_VOUS });
       setDialogue(null);
       onFait?.();
@@ -176,12 +178,15 @@ export function ActionsRendezVous({
       if (issue === 'HONORE' && peutCloser) {
         toast.dismiss();
         onCloser({ ...fiche, issue: 'HONORE', etape: 'A_CLOSER' });
+      } else if (issue === 'REPORTE' && reporteAt === undefined) {
+        toast.success('Rendez-vous reporté sans heure. Il attend dans « À recontacter ».');
       } else toast.success(MESSAGES[issue]);
     },
     onError: (error) => toastApiError(error, 'Le rendez-vous n’a pas été mis à jour.'),
   });
   const cliquer = (bouton: Bouton) => {
-    if (bouton === 'REPORTER') setDialogue('reporter');
+    if (bouton === 'CONFIRME') setDialogue('confirmer');
+    else if (bouton === 'REPORTER') setDialogue('reporter');
     else if (bouton === 'RECONTACTER') setDialogue('recontacter');
     else if (bouton === 'ANNULER') setDialogue('annuler');
     else noter.mutate({ issue: bouton });
@@ -237,12 +242,13 @@ export function ActionsRendezVous({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {dialogue === 'reporter' ? (
+      {dialogue === 'reporter' || dialogue === 'confirmer' ? (
         <ReporterRendezVous
           fiche={fiche}
+          confirmation={dialogue === 'confirmer'}
           pending={noter.isPending}
-          onReporter={(reporteAt) => {
-            noter.mutate({ issue: 'REPORTE', reporteAt });
+          onValider={(suivi) => {
+            noter.mutate(suivi);
           }}
           onClose={() => {
             setDialogue(null);

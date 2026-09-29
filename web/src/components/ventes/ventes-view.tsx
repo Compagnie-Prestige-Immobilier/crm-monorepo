@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router';
 import { DownloadIcon, FileSpreadsheetIcon, PlusIcon, SearchIcon } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useCallback, useState, type ReactNode } from 'react';
@@ -124,22 +124,26 @@ function VentesLoaded({
   canaux: readonly CanalVente[];
 }) {
   const navigate = useNavigate();
+  const router = useRouter();
+  const peutRevenir = useCanGoBack();
   const [saisieOuverte, setSaisieOuverte] = useState(vue === 'nouvelle');
   const [venteEditee, setVenteEditee] = useState<Vente | null>(null);
   const [venteDetailId, setVenteDetailId] = useState<number | null>(null);
   const [venteAArchiver, setVenteAArchiver] = useState<Vente | null>(null);
   const [teleconseillerOuvert, setTeleconseillerOuvert] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  // Le parcours ouvert depuis la barre ramène sur le tableau en se fermant,
-  // sinon l'adresse et la surbrillance de la barre resteraient sur lui.
+  // Le parcours ouvert depuis la barre ramène à la page d'où il a été ouvert :
+  // une adresse `/ventes/nouvelle` restée dans l'historique le rouvrirait au retour.
   const fermerSaisie = useCallback(
     (open: boolean) => {
       setSaisieOuverte(open);
       if (open) return;
       setVenteEditee(null);
-      if (vue === 'nouvelle') void navigate({ to: '/ventes' });
+      if (vue !== 'nouvelle') return;
+      if (peutRevenir) router.history.back();
+      else void navigate({ to: '/ventes', replace: true });
     },
-    [navigate, vue],
+    [navigate, router, peutRevenir, vue],
   );
   const archivage = useMutation({
     mutationFn: (vente: Vente) => archiveVente(vente.id),

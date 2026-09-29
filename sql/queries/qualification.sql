@@ -146,11 +146,12 @@ FROM "call_outcome_reasons" WHERE "code" = $1;
 INSERT INTO "call_attempts" (
   "id", "prospectId", "performedById", "reasonId", "method", "comment",
   "email", "fonctionnaire", "engagementEnCours", "dureeEtablissementMois",
-  "rendezVousAt", "clientCreatedAt", "siteId", "pointRencontreId", "pointRencontreCommentaire")
+  "rendezVousAt", "clientCreatedAt", "siteId", "pointRencontreId", "pointRencontreCommentaire",
+  "rvExterneType", "rvExternePrecision")
 VALUES (@id, @prospect_id, @performed_by_id, @reason_id, CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", @comment,
         @email, @fonctionnaire, @engagement_en_cours, @duree_etablissement_mois,
         @rendez_vous_at, @client_created_at, sqlc.narg('site_id'), sqlc.narg('point_rencontre_id'),
-        sqlc.narg('point_rencontre_commentaire'))
+        sqlc.narg('point_rencontre_commentaire'), sqlc.narg('rv_externe_type'), sqlc.narg('rv_externe_precision'))
 ON CONFLICT ("id") DO NOTHING;
 
 -- name: CorrigerProspectParTentative :one

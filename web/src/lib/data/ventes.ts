@@ -184,6 +184,20 @@ export function libelleCredit(vente: Vente): string {
   return `Crédit, ${nombre} échéance${nombre > 1 ? 's' : ''} ${rythme}`;
 }
 
+type Mandataire = Pick<
+  VenteInput,
+  'mandataireNom' | 'mandatairePrenom' | 'mandataireTelephone' | 'mandataireCni'
+>;
+
+/** Le représentant de l'acheteur sur une ligne, vide s'il n'y en a pas. */
+export function mandataireDe(vente: Mandataire): string {
+  const nom = `${vente.mandatairePrenom ?? ''} ${vente.mandataireNom ?? ''}`.trim();
+  const cni = vente.mandataireCni?.trim() ?? '';
+  return [nom, vente.mandataireTelephone?.trim() ?? '', cni === '' ? '' : `CNI ${cni}`]
+    .filter((partie) => partie !== '')
+    .join(' · ');
+}
+
 export function lotsRestants(site: SiteVente): string | null {
   if (site.lotsRestants === null || site.totalLots === null) return null;
   const restants = Math.max(site.lotsRestants, 0);

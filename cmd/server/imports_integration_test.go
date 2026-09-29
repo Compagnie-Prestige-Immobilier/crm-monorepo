@@ -1034,6 +1034,41 @@ func TestImportLeadsIgnoreEtSignaleUneLigneSansTelephone(t *testing.T) {
 		map[string]float64{"PROSPECT_GP_IMPORT_LIGNE_SANS_TELEPHONE": 1})
 }
 
+// Le classeur du marketing écrit parfois une ville à la place du pays : le lead
+// entre quand même, la ville prend la valeur et le rapport l'avertit.
+func TestImportLeadsGardeUnLeadAuPaysInconnu(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	base := time.Now().UnixNano() % 10_000_000
+	courriel := fmt.Sprintf("awa.%d@example.sn", base)
+	telephone := fmt.Sprintf("77%07d", base)
+	nomClasseur := fmt.Sprintf("Leads du 15 sept 2026 %d.xlsx", base)
+	b.nettoyerLeadsTest(nil, nomClasseur)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "email" = $1)`, courriel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "email" = $1`, courriel)
+	})
+
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Pays de résidence"}
+	classeur := classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{{nom: "Leads 15 sept 2026", lignes: [][]any{
+		{"15/09/2026", "Awa Ndiaye", courriel, "Payé", telephone, canalMetaChuesTest, "Mbour"},
+	}}})
+
+	travail := b.releverLeadsTest(classeur, nomClasseur)
+	var ville *string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "villeResidence" FROM "prospects" WHERE "email" = $1 AND "deletedAt" IS NULL`,
+		courriel).Scan(&ville); err != nil {
+		t.Fatalf("le lead au pays inconnu n'est pas entré : %v", err)
+	}
+	if ville == nil || *ville != "Mbour" {
+		t.Fatalf("la valeur du pays inconnu doit passer en ville : %v", ville)
+	}
+	b.attendRapportTest(travail, "total=1 created=1 updated=0 skipped=0 errors=0 warnings=1",
+		map[string]float64{"PROSPECT_GP_IMPORT_PAYS_INCONNU": 1})
+}
+
 func importCompterParCourriel(b *banc, courriel string) int {
 	b.t.Helper()
 	var n int

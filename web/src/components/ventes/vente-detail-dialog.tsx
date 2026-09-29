@@ -14,6 +14,7 @@ import {
   addVenteVersement,
   formatFcfa,
   libelleCredit,
+  mandataireDe,
   totalVerse,
   type Vente,
 } from '@/lib/data/ventes';
@@ -93,6 +94,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
         </dl>
 
         <div className="flex min-h-0 flex-col gap-4 px-6 py-4">
+          <Suivi vente={vente} />
           {vente.soldee ? (
             <p className="flex items-center gap-2 rounded-md bg-success-surface p-3 text-success">
               <CheckCircle2Icon className="size-5" aria-hidden="true" />
@@ -185,6 +187,27 @@ function Etiquettes({ vente }: { vente: Vente }) {
       </Badge>
       {venteDuClasseur(vente) ? <Badge variant="outline">Classeur</Badge> : null}
     </span>
+  );
+}
+
+function Suivi({ vente }: { vente: Vente }) {
+  const lignes: [string, string][] = [
+    ['Téléconseiller', vente.teleconseiller ?? ''],
+    ['Responsable closing', vente.responsableClosing],
+    ['Ambassadeur', vente.representant],
+    ['Représentant', mandataireDe(vente)],
+  ];
+  const renseignees = lignes.filter(([, valeur]) => valeur !== '');
+  if (renseignees.length === 0) return null;
+  return (
+    <dl aria-label="Suivi de la vente" className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      {renseignees.map(([label, valeur]) => (
+        <div key={label} className="contents">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="font-[600]">{valeur}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

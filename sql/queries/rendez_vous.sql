@@ -18,7 +18,13 @@ SELECT
   p."prenom",
   p."nom",
   p."phoneE164",
-  r."label" AS "type",
+  (r."label" || COALESCE(' · ' || CASE dernier."rvExterneType"
+    WHEN 'PERSONNE' THEN 'Personne'
+    WHEN 'COOPERATIVE' THEN 'Coopérative'
+    WHEN 'ENTREPRISE' THEN 'Entreprise'
+    WHEN 'VISITE_BIEN' THEN 'Visite bien'
+    WHEN 'AUTRE' THEN 'Autres : ' || dernier."rvExternePrecision"
+  END, ''))::text AS "type",
   r."code" AS "typeCode",
   -- sqlc tient la colonne d'une jointure externe pour non nulle : un NULL scanné en date échouerait.
   COALESCE(to_char(rdv."quand", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "quand",
@@ -43,7 +49,8 @@ JOIN rdv ON rdv."id" = p."id"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
 LEFT JOIN "users" rp ON rp."id" = p."rendezVousRecontacterPar"
 LEFT JOIN LATERAL (
-  SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
+  SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire", a."rvExterneType", a."rvExternePrecision"
+  FROM "call_attempts" a
   WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
 ) dernier ON true
 LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
@@ -97,12 +104,16 @@ INSERT INTO "rendez_vous_closings" AS c (
   "prospectId", "localite", "superficie", "natureJuridique", "etatSite", "position", "auNomDe",
   "pieceIdentiteVerifiee", "paiementAcompte", "origineFondsJustifiee", "freinPrincipal", "autresPromoteurs",
   "parrain", "chargeDeClientele", "prochaineAction", "dateRelance", "compteRendu", "auteurId",
-  "titulaires", "personnePolitiquementExposee"
+  "titulaires", "personnePolitiquementExposee", "qualification", "qualificationCommentaire",
+  "qualificationExterne", "dateVisite", "heureVisite", "pointRencontre", "siteInteresse", "moyensUtilises",
+  "accompagnement", "agent", "chauffeur"
 ) VALUES (
   @prospect_id, @localite, @superficie, @nature_juridique, @etat_site, @position, @au_nom_de,
   @piece_identite_verifiee, @paiement_acompte, @origine_fonds_justifiee, @frein_principal, @autres_promoteurs,
   @parrain, @charge_de_clientele, @prochaine_action, @date_relance, @compte_rendu, @auteur_id,
-  @titulaires, @personne_politiquement_exposee
+  @titulaires, @personne_politiquement_exposee, @qualification, @qualification_commentaire,
+  @qualification_externe, @date_visite, @heure_visite, @point_rencontre, @site_interesse, @moyens_utilises,
+  @accompagnement, @agent, @chauffeur
 )
 ON CONFLICT ("prospectId") DO UPDATE SET
   "localite" = EXCLUDED."localite", "superficie" = EXCLUDED."superficie",
@@ -115,6 +126,11 @@ ON CONFLICT ("prospectId") DO UPDATE SET
   "dateRelance" = EXCLUDED."dateRelance", "compteRendu" = EXCLUDED."compteRendu",
   "titulaires" = EXCLUDED."titulaires",
   "personnePolitiquementExposee" = EXCLUDED."personnePolitiquementExposee",
+  "qualification" = EXCLUDED."qualification", "qualificationCommentaire" = EXCLUDED."qualificationCommentaire",
+  "qualificationExterne" = EXCLUDED."qualificationExterne", "dateVisite" = EXCLUDED."dateVisite",
+  "heureVisite" = EXCLUDED."heureVisite", "pointRencontre" = EXCLUDED."pointRencontre",
+  "siteInteresse" = EXCLUDED."siteInteresse", "moyensUtilises" = EXCLUDED."moyensUtilises",
+  "accompagnement" = EXCLUDED."accompagnement", "agent" = EXCLUDED."agent", "chauffeur" = EXCLUDED."chauffeur",
   "auteurId" = EXCLUDED."auteurId", "updatedAt" = CURRENT_TIMESTAMP
 RETURNING *;
 

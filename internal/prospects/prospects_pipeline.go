@@ -10,7 +10,7 @@ import (
 )
 
 type ProspectPipelineInput struct {
-	AppelePar string `query:"appelePar" format:"uuid" doc:"Téléconseiller ; hors encadrement, toujours soi-même."`
+	AppelePar string `query:"appelePar" format:"uuid" doc:"Téléconseiller ; absent, toute l'équipe pour l'encadrement ; hors encadrement, toujours soi-même."`
 	Projet    string `query:"projet" enum:"CHUES,GRAND_PUBLIC"`
 }
 
@@ -28,9 +28,9 @@ type ProspectPipelineOutput struct {
 // Le parcours d'un téléconseiller sur ses contacts, de l'appel à la vente.
 func (s *service) prospectPipeline(ctx context.Context, in *ProspectPipelineInput) (*ProspectPipelineOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	appelePar := u.ID
-	if in.AppelePar != "" && u.Peut(socle.PermissionPortefeuilleVoirTout) {
-		appelePar = in.AppelePar
+	appelePar := &u.ID
+	if u.Peut(socle.PermissionPortefeuilleVoirTout) {
+		appelePar = prospectVide(in.AppelePar)
 	}
 	ligne, err := s.Q.PipelineDesContacts(ctx, db.PipelineDesContactsParams{
 		AppelePar: appelePar, Projet: prospectTypeEnum[db.Projet](in.Projet),

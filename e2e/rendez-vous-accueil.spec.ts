@@ -96,6 +96,10 @@ test.describe('rendez-vous au comptoir', () => {
 
     // Chaque geste reste sur la même ligne : la suivante apparaît sans changer d'écran.
     await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
+    await page
+      .getByRole('dialog', { name: `Confirmation du rendez-vous de Awa ${nom}` })
+      .getByRole('button', { name: 'Enregistrer' })
+      .click();
     await expect(ligne.getByText('Confirmé', { exact: true })).toBeVisible();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
     await expect(ligne.getByText('Présent, closing à compléter')).toBeVisible();
@@ -180,16 +184,28 @@ test.describe('closing par le chargé de clientèle', () => {
     await page.keyboard.press('Escape');
     await expect(fiche).toHaveCount(0);
 
-    await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
-    await page.getByRole('menuitem', { name: 'Reporter' }).click();
+    // Reporté sans date : il attend dans « À recontacter » avec le commentaire.
+    await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
+    const confirmation = page.getByRole('dialog', {
+      name: `Confirmation du rendez-vous de Awa ${nom}`,
+    });
+    await confirmation.getByRole('radio', { name: 'Reporté' }).check();
+    await confirmation.getByLabel('Commentaire (facultatif)').fill('En voyage, rappellera');
+    await confirmation.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(ligne.getByText('À recontacter', { exact: true })).toBeVisible();
+    await expect(ligne.getByText(/En voyage, rappellera/u)).toBeVisible();
+
+    await ligne.getByRole('button', { name: `Reporter : Awa ${nom}` }).click();
     const report = page.getByRole('dialog', { name: /^Reporter le rendez-vous/u });
     const apres = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
-    await report.getByLabel('Nouvelle date (heure de Dakar)').fill(`${apres}T10:00`);
+    await report.getByLabel('Nouvelle date (facultatif)').fill(apres);
+    await report.getByLabel('Heure (facultatif)').fill('10:00');
     await report.getByRole('button', { name: 'Reporter' }).click();
     await expect(ligne.getByText('Reporté, à confirmer')).toBeVisible();
 
     // Présent : le closing s'ouvre de lui-même, en trois étapes, rien d'obligatoire.
     await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
+    await confirmation.getByRole('button', { name: 'Enregistrer' }).click();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
     const closing = page.getByRole('dialog', { name: `Closing de Awa ${nom}` });
     await closing.getByRole('combobox', { name: 'Superficie du lot' }).click();
@@ -197,6 +213,12 @@ test.describe('closing par le chargé de clientèle', () => {
     await closing.getByLabel('Superficie du lot, précision').fill('400 m²');
     await closing.getByRole('button', { name: 'Suivant' }).click();
     await closing.getByRole('button', { name: 'Suivant' }).click();
+    await closing.getByRole('combobox', { name: 'Qualification', exact: true }).click();
+    await page.getByRole('option', { name: 'Partenariat' }).click();
+    await closing.getByLabel('Commentaire sur le partenariat').fill('Mutuelle des enseignants');
+    await expect(closing.getByRole('group', { name: 'Qualification du RV externe' })).toHaveCount(
+      0,
+    );
     await closing.getByRole('combobox', { name: 'Prochaine action' }).click();
     await page.getByRole('option', { name: 'Signature / encaissement acompte' }).click();
     await closing.getByRole('button', { name: 'Enregistrer et fermer' }).click();
@@ -205,11 +227,19 @@ test.describe('closing par le chargé de clientèle', () => {
 
     await page.getByRole('tab', { name: 'Historique' }).click();
     await expect(ligne.getByText('Closing enregistré')).toBeVisible();
-    const [enregistre = { superficie: '' }] = await lire<{ superficie: string }>(
-      'SELECT "superficie" FROM "rendez_vous_closings" WHERE "prospectId" = $1',
+    const [enregistre] = await lire<{
+      superficie: string;
+      qualification: string;
+      qualificationCommentaire: string;
+    }>(
+      'SELECT "superficie", "qualification", "qualificationCommentaire" FROM "rendez_vous_closings" WHERE "prospectId" = $1',
       [convoque],
     );
-    expect(enregistre.superficie).toBe('400 m²');
+    expect(enregistre).toEqual({
+      superficie: '400 m²',
+      qualification: 'Partenariat',
+      qualificationCommentaire: 'Mutuelle des enseignants',
+    });
   });
 });
 
@@ -250,7 +280,7 @@ test.describe('rendez-vous site pris en console', () => {
     ).json()) as { creneaux: { quand: string; restantes: number | null }[] };
     [complet = '', libre = ''] = creneaux.filter((c) => c.restantes === 2).map((c) => c.quand);
     expect(libre, 'deux heures libres demain').not.toBe('');
-    for (const rang of [1, 2, 3]) {
+    for (const rang of [1, 2, 3, 4]) {
       const id = await creerProspect(api, {
         nom: `${nom} ${String(rang)}`,
         prenom: 'Awa',
@@ -258,7 +288,7 @@ test.describe('rendez-vous site pris en console', () => {
         projet: 'GRAND_PUBLIC',
       });
       prospects.push(id);
-      if (rang === 3) continue;
+      if (rang >= 3) continue;
       const appel = await api.post('/api/v1/phase2/call-attempts', {
         data: {
           id: randomUUID(),
@@ -298,6 +328,9 @@ test.describe('rendez-vous site pris en console', () => {
       .getByRole('button', { name: /Rendez-vous/u })
       .click();
     await page.getByRole('button', { name: /RV site/u }).click();
+    await expect(
+      page.getByLabel('Commentaire sur le point de rencontre, facultatif'),
+    ).toBeVisible();
 
     if (demain.slice(0, 7) !== new Date().toISOString().slice(0, 7)) {
       await page.getByRole('button', { name: 'Mois suivant' }).click();
@@ -315,6 +348,42 @@ test.describe('rendez-vous site pris en console', () => {
     await expect(creneauLibre).toBeEnabled();
     await creneauLibre.click();
     await expect(creneauLibre).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('un RV externe se prend à une date saisie, avec son type', async ({ page }) => {
+    await page.goto('/teleconseil/console');
+    await page.getByLabel('Quel prospect avez-vous appelé ?').fill(`${nom} 4`);
+    await page.getByRole('button', { name: new RegExp(`${nom} 4`, 'u') }).click();
+    await page
+      .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
+      .getByRole('button', { name: /Oui, elle a répondu/u })
+      .click();
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page
+      .getByRole('group', { name: 'Qu’a dit la personne ?' })
+      .getByRole('button', { name: /Rendez-vous/u })
+      .click();
+    await page.getByRole('button', { name: /RV externe/u }).click();
+
+    await expect(page.getByRole('button', { name: /Demain 9 h/u })).toHaveCount(0);
+    await page.getByLabel('Autre échéance').fill(`${demain}T10:00`);
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await expect(page.getByText('Choisissez le type avant la date.')).toBeVisible();
+    await page.getByLabel('Type de rendez-vous externe').selectOption('Autres');
+    await page.getByLabel('Autre type').fill('Mairie de Pikine');
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page.getByRole('button', { name: /^Enregistrer l’appel/u }).click();
+
+    await expect
+      .poll(async () => {
+        const [appel] = await lire<{ type: string; precision: string }>(
+          `SELECT "rvExterneType" AS type, "rvExternePrecision" AS precision
+           FROM "call_attempts" WHERE "prospectId" = $1`,
+          [prospects[3]],
+        );
+        return appel === undefined ? '' : `${appel.type} ${appel.precision}`;
+      })
+      .toBe('AUTRE Mairie de Pikine');
   });
 });
 
@@ -356,7 +425,8 @@ test.describe('rendez-vous à recontacter', () => {
     await ligne.getByRole('button', { name: `Reporter : Awa ${nom}` }).click();
     const report = page.getByRole('dialog', { name: /^Reporter le rendez-vous/u });
     const apres = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
-    await report.getByLabel('Nouvelle date (heure de Dakar)').fill(`${apres}T10:00`);
+    await report.getByLabel('Nouvelle date (facultatif)').fill(apres);
+    await report.getByLabel('Heure (facultatif)').fill('10:00');
     await report.getByRole('button', { name: 'Reporter' }).click();
     await expect(ligne.getByText('Reporté, à confirmer')).toBeVisible();
     await expect(ligne.getByText(/Deuil/u)).toHaveCount(0);

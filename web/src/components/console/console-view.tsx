@@ -1239,21 +1239,6 @@ function PasStatut({
   );
 }
 
-/** Le site et le point de rencontre d'un RV site se choisissent avant sa date. */
-function contenuRvSite(
-  rvSite: RvSiteConsole,
-  callbackAt: string | null,
-  onEcheance: (at: string) => void,
-): ReactNode {
-  if (rvSite.champs === null) return null;
-  return (
-    <div className="flex flex-col gap-4">
-      {rvSite.champs}
-      {rvSite.calendrier(callbackAt, onEcheance)}
-    </div>
-  );
-}
-
 /** Le seul pas à l'écran. */
 function CorpsPas({
   pas,
@@ -1386,7 +1371,8 @@ function CorpsPas({
           choisi={callbackAt}
           surDossier={conversion !== null}
           titre={titre}
-          contenu={contenuRvSite(rvSite, callbackAt, onEcheance)}
+          champs={rvSite.champs}
+          contenu={rvSite.calendrier(callbackAt, onEcheance)}
           disabled={disabled}
           inputRef={callbackRef}
           onChoisir={onEcheance}

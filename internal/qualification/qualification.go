@@ -741,6 +741,8 @@ type QualificationCallAttemptBody struct {
 	SiteID                    *string           `json:"siteId,omitempty" format:"uuid"`
 	PointRencontreID          *string           `json:"pointRencontreId,omitempty" format:"uuid"`
 	PointRencontreCommentaire *string           `json:"pointRencontreCommentaire,omitempty" maxLength:"500"`
+	RvExterneType             *string           `json:"rvExterneType,omitempty" enum:"PERSONNE,COOPERATIVE,ENTREPRISE,VISITE_BIEN,AUTRE"`
+	RvExternePrecision        *string           `json:"rvExternePrecision,omitempty" maxLength:"200" doc:"Exigée quand le type vaut AUTRE."`
 	Nom                       *string           `json:"nom,omitempty" minLength:"1" maxLength:"120"`
 	Prenom                    *string           `json:"prenom,omitempty" maxLength:"120"`
 	Profession                *string           `json:"profession,omitempty" maxLength:"120"`
@@ -982,6 +984,9 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	if err := s.qualificationProspectAttribue(ctx, u, b.ProspectID); err != nil {
 		return "", vide, err
 	}
+	if err := rvExterneVerifier(b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); err != nil {
+		return "", vide, err
+	}
 	var statut string
 	var etat QualificationProspectPhase2StateDTO
 	err = qualificationTx(ctx, s, func(q *db.Queries) error {
@@ -1156,6 +1161,7 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 		DureeEtablissementMois: b.DureeEtablissementMois, RendezVousAt: t.rendezVousAt,
 		ClientCreatedAt: b.ClientCreatedAt.UTC(), SiteID: b.SiteID, PointRencontreID: b.PointRencontreID,
 		PointRencontreCommentaire: qualificationRogne(b.PointRencontreCommentaire),
+		RvExterneType:             b.RvExterneType, RvExternePrecision: qualificationRogne(b.RvExternePrecision),
 	})
 	if err == nil && n == 0 {
 		return socle.Problem(http.StatusConflict, "PHASE2_ATTEMPT_RACE", "Cette tentative vient d’être enregistrée. Réessayez.")
