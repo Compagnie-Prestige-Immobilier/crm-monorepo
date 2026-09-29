@@ -21,7 +21,7 @@ function RendezVousPage() {
   const [historique, setHistorique] = useState(false);
   const closing = peut(user, 'rendez_vous.closer');
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+    <div className="flex flex-col gap-5">
       <Tabs
         value={historique ? 'historique' : 'a-traiter'}
         onValueChange={(valeur) => {

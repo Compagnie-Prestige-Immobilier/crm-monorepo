@@ -77,10 +77,10 @@ test.describe('rendez-vous au comptoir', () => {
       'aria-selected',
       'true',
     );
-    const ligne = page
-      .getByRole('region', { name: 'Demain' })
-      .getByRole('listitem')
-      .filter({ hasText: nom });
+    const tableau = page.getByRole('table', { name: 'Rendez-vous' });
+    await expect(tableau.getByRole('columnheader', { name: 'Statut' })).toBeVisible();
+    await expect(tableau.getByRole('row', { name: /^Demain \(/u })).toBeVisible();
+    const ligne = tableau.getByRole('row').filter({ hasText: nom });
     await expect(ligne).toHaveCount(1);
     await expect(ligne.getByText('À confirmer', { exact: true })).toBeVisible();
     await expect(ligne.getByRole('link', { name: /^\+221 77 / })).toBeVisible();
@@ -165,13 +165,13 @@ test.describe('closing par le chargé de clientèle', () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/accueil\/agenda$/u);
-    await expect(page.getByRole('button', { name: 'Semaine' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Semaine' })).toBeVisible();
     const onglets = page.getByRole('navigation', { name: 'Visites' }).getByRole('link');
     await expect(onglets.first()).toHaveText('Agenda');
     await expect(page.getByRole('link', { name: 'Intéressés et hésitants' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Rendez-vous', exact: true }).first().click();
-    const ligne = page.getByRole('listitem').filter({ hasText: nom });
+    const ligne = page.getByRole('row').filter({ hasText: nom });
 
     await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
     await page.getByRole('menuitem', { name: 'Reporter' }).click();
