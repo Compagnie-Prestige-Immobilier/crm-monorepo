@@ -27,11 +27,11 @@ import { compte, formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { PROSPECT_TYPE_LABELS } from '@/lib/data/grand-public';
 import {
   enrollmentMethodLabel,
+  etatRendezVousFiche,
   MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
   PROSPECT_ORIGIN_LABELS,
   PROSPECT_STATUT_LABELS,
-  RENDEZ_VOUS_ISSUE_LABELS,
   statutForProjet,
   TYPE_BIEN_LABELS,
   TYPE_CONTRAT_LABELS,
@@ -69,11 +69,18 @@ function Empty() {
 function LigneIssue({
   prospect,
 }: {
-  prospect: Pick<ProspectRow, 'rendezVousIssue' | 'rendezVousReporteAt' | 'suiteRencontre'>;
+  prospect: Pick<
+    ProspectRow,
+    | 'phase2Status'
+    | 'rendezVousIssue'
+    | 'rendezVousConfirmation'
+    | 'rendezVousReporteAt'
+    | 'suiteRencontre'
+  >;
 }) {
-  const { rendezVousIssue, rendezVousReporteAt, suiteRencontre } = prospect;
-  if (rendezVousIssue === null) return null;
-  const libelle = RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue;
+  if (prospect.phase2Status !== 'APPOINTMENT' && prospect.rendezVousIssue === null) return null;
+  const libelle = etatRendezVousFiche(prospect);
+  const { rendezVousReporteAt, suiteRencontre } = prospect;
   return (
     <p className="truncate font-[600]" title={libelle}>
       {libelle}
