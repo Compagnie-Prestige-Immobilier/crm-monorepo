@@ -300,7 +300,7 @@ type ProspectListInput struct {
 	MesFiches              bool   `query:"mesFiches"`
 	Attribue               bool   `query:"attribue"`
 	ResteAAppeler          bool   `query:"resteAAppeler"`
-	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
+	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt,dateRendezVous"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" maximum:"10000" default:"1"`
 	PageSize               int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`

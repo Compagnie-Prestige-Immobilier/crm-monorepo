@@ -307,6 +307,7 @@ export const PROSPECT_SORT_FIELDS = [
   'prenom',
   'statut',
   'lastCallAt',
+  'dateRendezVous',
 ] as const satisfies readonly ListeProspectsQuery['sortBy'][];
 
 export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];

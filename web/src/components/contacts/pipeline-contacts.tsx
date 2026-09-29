@@ -32,13 +32,13 @@ const ETAPES: readonly {
 const part = (valeur: number, total: number): string =>
   total === 0 ? '' : `${String(Math.round((valeur / total) * 100))} % des appelées`;
 
-/** Le parcours du téléconseiller sur ses contacts, de l'appel à la vente. */
+/** Le parcours du téléconseiller sur ses contacts, de l'appel à la vente ; `null`, celui de l'équipe. */
 export function PipelineContactsBande({
   appelePar,
   projet,
   masquee,
 }: {
-  appelePar: string;
+  appelePar: string | null;
   projet: Projet | null;
   /** L'onglet Représentants n'a pas de parcours de vente. */
   masquee: boolean;
@@ -64,7 +64,9 @@ export function PipelineContactsBande({
             label={etape.label}
             value={formatNumber(data[etape.cle])}
             hint={
-              etape.cle === 'appelees' ? 'depuis le début' : part(data[etape.cle], data.appelees)
+              etape.cle === 'appelees'
+                ? `${appelePar === null ? 'toute l’équipe, ' : ''}depuis le début`
+                : part(data[etape.cle], data.appelees)
             }
             icon={etape.icon}
           />

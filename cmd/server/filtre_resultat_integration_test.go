@@ -51,4 +51,14 @@ func TestFiltreResultatSuitLeStatutDuFormulaire(t *testing.T) {
 	if dates[information] != nil {
 		t.Fatalf("une fiche sans rendez-vous n'a pas de date : %v", dates[information])
 	}
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects?mesFiches=true&sortBy=dateRendezVous&sortOrder=asc", nil)
+	b.attend(statut, http.StatusOK, "liste triée par date de rendez-vous", body)
+	items, _ = body["items"].([]any)
+	if len(items) != 3 {
+		t.Fatalf("trois fiches attendues : %v", items)
+	}
+	if premiere, _ := items[0].(map[string]any); premiere["id"] != rendezVous {
+		t.Fatalf("le tri par date de rendez-vous place les fiches sans date après : %v", items)
+	}
 }

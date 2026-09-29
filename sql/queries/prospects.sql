@@ -34,14 +34,17 @@ SELECT
   (SELECT string_agg(l."name", ' · ' ORDER BY l."createdAt" DESC, l."id" DESC)
    FROM "lot_export_items" li JOIN "lots_export" l ON l."id" = li."lotId"
    WHERE li."prospectId" = p."id") AS campagne_noms,
-  -- Le dernier rendez-vous posé en appel, tous motifs : c'est la date que
-  -- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
-  (SELECT a."rendezVousAt" FROM "call_attempts" a
-   WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
-   ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS rendez_vous_at,
+  pose."rendezVousAt" AS rendez_vous_at,
   -- sqlc tient la colonne d'une jointure externe pour non nulle : la date passe en texte ISO, vide sans rappel.
   COALESCE(to_char(rdv."scheduledAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), '')::text AS rendez_vous_rappel
 FROM "prospects" p
+-- Le dernier rendez-vous posé en appel, tous motifs : c'est la date que
+-- l'écran et l'export affichent, pas celle du suivi ni celle du rappel.
+LEFT JOIN LATERAL (
+  SELECT a."rendezVousAt" FROM "call_attempts" a
+  WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
+  ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
+) pose ON TRUE
 -- Le rappel qui porte la date d'un rendez-vous, comme l'écran Rendez-vous : un
 -- rappel annulé la garde, un rappel supplanté jamais. Le report passe devant.
 LEFT JOIN LATERAL (
@@ -254,6 +257,13 @@ WHERE p."deletedAt" IS NULL
   )
 ORDER BY
   CASE WHEN sqlc.arg('reste_a_appeler')::boolean THEN p."remiseATraiterAt" END DESC NULLS LAST,
+  -- Même ordre de préférence que prospectDateRendezVous : report, rappel, date posée.
+  CASE WHEN sqlc.arg('sort_by')::text = 'dateRendezVous' AND sqlc.arg('sort_order')::text = 'asc' THEN
+    COALESCE(CASE WHEN p."phase2Status" = 'APPOINTMENT' THEN p."rendezVousReporteAt" END, rdv."scheduledAt", pose."rendezVousAt")
+  END ASC NULLS LAST,
+  CASE WHEN sqlc.arg('sort_by')::text = 'dateRendezVous' AND sqlc.arg('sort_order')::text = 'desc' THEN
+    COALESCE(CASE WHEN p."phase2Status" = 'APPOINTMENT' THEN p."rendezVousReporteAt" END, rdv."scheduledAt", pose."rendezVousAt")
+  END DESC NULLS LAST,
   CASE WHEN sqlc.arg('sort_order')::text = 'asc' THEN CASE sqlc.arg('sort_by')::text
     WHEN 'nom' THEN p."nom" WHEN 'prenom' THEN p."prenom" WHEN 'statut' THEN p."statut"::text END END ASC,
   CASE WHEN sqlc.arg('sort_order')::text = 'desc' THEN CASE sqlc.arg('sort_by')::text
@@ -666,7 +676,8 @@ SELECT COUNT(*)::int AS appelees,
 FROM "prospects" p
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = p."lastReasonId"
 WHERE p."deletedAt" IS NULL
-  AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = @appele_par::text)
+  AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id"
+              AND (sqlc.narg('appele_par')::text IS NULL OR ca."performedById" = sqlc.narg('appele_par')::text))
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'));
 
 -- Une fiche confiée par « Affecter à » passe en tête du reste à appeler.

@@ -310,6 +310,15 @@ function computeLastCallId(canFilter: boolean, filtreId: string | null, userId: 
   return filtreId ?? userId;
 }
 
+/** Sans téléconseiller choisi, l'encadrement lit les indicateurs de toute l'équipe. */
+function appeleParIndicateurs(
+  canFilter: boolean,
+  filtreId: string | null,
+  userId: string,
+): string | null {
+  return canFilter ? filtreId : userId;
+}
+
 function MesContactsTabsToggle({
   avecRepresentants,
   onglet,
@@ -436,7 +445,7 @@ export function MesContactsView({
       />
 
       <PipelineContactsBande
-        appelePar={lastCallById}
+        appelePar={appeleParIndicateurs(canFilter, filtreId, userId)}
         projet={targetProjet}
         masquee={onglet !== 'PROSPECTS'}
       />

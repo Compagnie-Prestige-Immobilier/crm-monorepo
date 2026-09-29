@@ -352,4 +352,18 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
     await page.goto('/teleconseil/prospects');
     await expect(page.getByRole('button', { name: 'Exporter' })).toBeVisible();
   });
+
+  test('le superviseur trie les prospects par date de rendez-vous', async ({ page }) => {
+    await page.goto('/teleconseil/prospects');
+    await page.getByRole('button', { name: 'Date de rendez-vous', exact: true }).click();
+    await expect(page).toHaveURL(/sortBy=dateRendezVous/);
+  });
+
+  // Sans téléconseiller choisi, ses propres appels le laissaient devant des zéros.
+  test('les indicateurs de Mes contacts lisent toute l’équipe pour le superviseur', async ({
+    page,
+  }) => {
+    await page.goto('/teleconseil/mes-contacts');
+    await expect(page.getByText('toute l’équipe, depuis le début')).toBeVisible();
+  });
 });
