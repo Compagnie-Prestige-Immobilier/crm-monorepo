@@ -344,24 +344,38 @@ WHERE i."lotId" = $1
 -- name: LotLignesRepresentants :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", r."fullName", r."phoneE164",
        d."name" AS departement, ief."name" AS ief, c."fullName" AS commercial,
-       r."notes", r."clientCreatedAt"
+       r."notes", r."clientCreatedAt",
+       sq."label" AS "statutQualification", r."lastCallAt", lc."fullName" AS "appelePar",
+       (SELECT COUNT(*) FROM "rep_call_attempts" a WHERE a."representantId" = r."id")::int AS "nombreAppels",
+       (SELECT a."comment" FROM "rep_call_attempts" a
+        WHERE a."representantId" = r."id" AND btrim(COALESCE(a."comment", '')) <> ''
+        ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "dernierCommentaire"
 FROM "lot_export_items" i
 INNER JOIN "representants" r ON r."id" = i."representantId"
 INNER JOIN "departements" d ON d."id" = r."departementId"
 INNER JOIN "users" c ON c."id" = r."createdById"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "iefs" ief ON ief."id" = r."iefId"
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
+LEFT JOIN "users" lc ON lc."id" = r."lastCallById"
 WHERE i."lotId" = $1 AND r."deletedAt" IS NULL
 ORDER BY i."position";
 
 -- name: LotLignesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", p."nom", p."prenom", p."phoneE164",
        b."name" AS banque, s."sigle" AS syndicat, rep."fullName" AS representant,
-       d."name" AS departement, c."fullName" AS commercial, p."clientCreatedAt"
+       d."name" AS departement, c."fullName" AS commercial, p."clientCreatedAt",
+       sq."label" AS "statutQualification", p."lastCallAt", lc."fullName" AS "appelePar",
+       (SELECT COUNT(*) FROM "call_attempts" a WHERE a."prospectId" = p."id")::int AS "nombreAppels",
+       (SELECT a."comment" FROM "call_attempts" a
+        WHERE a."prospectId" = p."id" AND btrim(COALESCE(a."comment", '')) <> ''
+        ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "dernierCommentaire"
 FROM "lot_export_items" i
 INNER JOIN "prospects" p ON p."id" = i."prospectId"
 INNER JOIN "users" c ON c."id" = p."createdById"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
+LEFT JOIN "call_outcome_reasons" sq ON sq."id" = p."lastReasonId"
+LEFT JOIN "users" lc ON lc."id" = p."lastCallById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "syndicats" s ON s."id" = p."syndicatId"
 LEFT JOIN "representants" rep ON rep."id" = p."representantId"
