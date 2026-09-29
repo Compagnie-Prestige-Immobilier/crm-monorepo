@@ -45,9 +45,10 @@ INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client"
     "reliquat", "partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "periodiciteMois", "jourVersement",
     "premierVersement", "soldeeManuellement",
     "email", "numeroCni", "dateDelivranceCni", "autrePiece", "demeurantA", "profession",
-    "adresseProfessionnelle", "representant", "nomTeleconseiller", "responsableClosing")
+    "adresseProfessionnelle", "representant", "nomTeleconseiller", "responsableClosing",
+    "mandataireNom", "mandatairePrenom", "mandataireTelephone", "mandataireCni")
 VALUES ('SAISIE', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
 RETURNING "id";
 
 -- name: ModifierVente :exec
@@ -59,7 +60,8 @@ SET "canal" = $2, "dateSouscription" = $3, "client" = $4, "telephone" = $5, "sit
     "soldeeManuellement" = $19, "email" = $20, "numeroCni" = $21, "dateDelivranceCni" = $22,
     "autrePiece" = $23, "demeurantA" = $24, "profession" = $25, "adresseProfessionnelle" = $26,
     "representant" = $27, "nomTeleconseiller" = $28, "responsableClosing" = $29,
-    "periodiciteMois" = $30, "jourVersement" = $31, "premierVersement" = $32
+    "periodiciteMois" = $30, "jourVersement" = $31, "premierVersement" = $32,
+    "mandataireNom" = $33, "mandatairePrenom" = $34, "mandataireTelephone" = $35, "mandataireCni" = $36
 WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ArchiverVente :exec

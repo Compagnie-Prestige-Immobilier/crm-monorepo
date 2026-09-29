@@ -2,6 +2,7 @@ package ventes
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/database"
@@ -139,8 +140,6 @@ type VenteDTO struct {
 	Parrain *string `json:"parrain"`
 }
 
-// Le classement par téléconseiller jusqu'à qui a amené le client : seules les
-// ventes rattachées à une fiche comptent, les autres n'ont pas d'auteur à créditer.
 type IdentiteClientDTO struct {
 	Email                  string  `json:"email"`
 	NumeroCni              string  `json:"numeroCni"`
@@ -152,6 +151,10 @@ type IdentiteClientDTO struct {
 	Representant           string  `json:"representant"`
 	NomTeleconseiller      string  `json:"nomTeleconseiller"`
 	ResponsableClosing     string  `json:"responsableClosing"`
+	MandataireNom          string  `json:"mandataireNom"`
+	MandatairePrenom       string  `json:"mandatairePrenom"`
+	MandataireTelephone    string  `json:"mandataireTelephone"`
+	MandataireCni          string  `json:"mandataireCni"`
 }
 
 type VenteParTeleconseillerDTO struct {
@@ -238,7 +241,7 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 		dto := venteDTO(&ventes[i], parVente[ventes[i].ID])
 		dto.SaisieLe = saisieLeDe(&ventes[i], parSaisie, &classeur)
 		if p, ok := prospects[parLigne[i]]; parLigne[i] != "" && ok {
-			dto.ProspectID, dto.Teleconseiller = &p.ID, p.Teleconseiller
+			dto.ProspectID, dto.Teleconseiller = &p.ID, cmp.Or(dto.Teleconseiller, p.Teleconseiller)
 			dto.Parrain = nomParrain(p.ParrainNom, p.ParrainPrenom)
 		}
 		out.Body.Ventes = append(out.Body.Ventes, dto)
@@ -370,6 +373,11 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 	for _, versement := range versements {
 		encaisse += versement.Montant
 	}
+	// Le téléconseiller choisi à la saisie prime sur celui de la fiche au même téléphone.
+	var teleconseiller *string
+	if v.NomTeleconseiller != "" {
+		teleconseiller = new(v.NomTeleconseiller)
+	}
 	return VenteDTO{
 		ID: v.ID, Origine: v.Origine, Numero: v.Numero, Canal: v.Canal, DateSouscription: jourOuNul(v.DateSouscription), Client: v.Client,
 		Telephone: v.Telephone, Site: v.Site, NombreLots: v.NombreLots, NumerosLots: v.NumerosLots,
@@ -378,12 +386,14 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 		PeriodiciteMois: v.PeriodiciteMois, JourVersement: v.JourVersement, PremierVersement: jourOuNul(v.PremierVersement),
 		SoldeeManuellement: v.SoldeeManuellement, Soldee: v.SoldeeManuellement || encaisse >= v.PrixTotal,
 		PartProprietaire: v.PartProprietaire,
-		PartApporteur:    v.PartApporteur, PartCpi: v.PartCpi, Versements: versements,
+		PartApporteur:    v.PartApporteur, PartCpi: v.PartCpi, Versements: versements, Teleconseiller: teleconseiller,
 		IdentiteClientDTO: IdentiteClientDTO{
 			Email: v.Email, NumeroCni: v.NumeroCni, DateDelivranceCni: jourOuNul(v.DateDelivranceCni),
 			AutrePiece: v.AutrePiece, DemeurantA: v.DemeurantA, Profession: v.Profession,
 			AdresseProfessionnelle: v.AdresseProfessionnelle, Representant: v.Representant,
 			NomTeleconseiller: v.NomTeleconseiller, ResponsableClosing: v.ResponsableClosing,
+			MandataireNom: v.MandataireNom, MandatairePrenom: v.MandatairePrenom,
+			MandataireTelephone: v.MandataireTelephone, MandataireCni: v.MandataireCni,
 		},
 	}
 }

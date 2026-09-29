@@ -56,6 +56,10 @@ type IdentiteClient struct {
 	Representant           string `json:"representant,omitempty" maxLength:"200"`
 	NomTeleconseiller      string `json:"nomTeleconseiller,omitempty" maxLength:"200"`
 	ResponsableClosing     string `json:"responsableClosing,omitempty" maxLength:"200"`
+	MandataireNom          string `json:"mandataireNom,omitempty" maxLength:"120"`
+	MandatairePrenom       string `json:"mandatairePrenom,omitempty" maxLength:"120"`
+	MandataireTelephone    string `json:"mandataireTelephone,omitempty" maxLength:"40"`
+	MandataireCni          string `json:"mandataireCni,omitempty" maxLength:"60"`
 }
 
 type creerVenteInput struct {
@@ -165,6 +169,8 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 			AdresseProfessionnelle: preparee.Vente.AdresseProfessionnelle,
 			Representant:           preparee.Vente.Representant, NomTeleconseiller: preparee.Vente.NomTeleconseiller,
 			ResponsableClosing: preparee.Vente.ResponsableClosing,
+			MandataireNom:      preparee.Vente.MandataireNom, MandatairePrenom: preparee.Vente.MandatairePrenom,
+			MandataireTelephone: preparee.Vente.MandataireTelephone, MandataireCni: preparee.Vente.MandataireCni,
 		}); err != nil {
 			return err
 		}
@@ -342,6 +348,10 @@ func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, a
 			Representant:           strings.TrimSpace(in.Representant),
 			NomTeleconseiller:      strings.TrimSpace(in.NomTeleconseiller),
 			ResponsableClosing:     strings.TrimSpace(in.ResponsableClosing),
+			MandataireNom:          strings.TrimSpace(in.MandataireNom),
+			MandatairePrenom:       strings.TrimSpace(in.MandatairePrenom),
+			MandataireTelephone:    strings.TrimSpace(in.MandataireTelephone),
+			MandataireCni:          strings.TrimSpace(in.MandataireCni),
 		},
 	}
 	sortie.TelephoneE164, _ = database.NormaliserTelephone(contexte.telephone, s.Cfg.PhoneRegion)

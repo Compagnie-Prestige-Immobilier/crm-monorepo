@@ -58,6 +58,23 @@ test.describe('ventes, sommes dues et relances', () => {
     expect(contenu.subarray(0, 2).toString(), 'un classeur xlsx est une archive zip').toBe('PK');
   });
 
+  test('fermer une nouvelle vente ramène à « Par site » sans piéger le retour', async ({
+    page,
+  }) => {
+    await page.goto('/ventes');
+    await page.getByRole('link', { name: 'Par site' }).click();
+    await expect(page).toHaveURL(/\/ventes\/sites$/u);
+    await page.getByRole('link', { name: 'Nouvelle vente' }).click();
+    await page
+      .getByRole('dialog', { name: 'Nouvelle vente' })
+      .getByRole('button', { name: 'Annuler' })
+      .click();
+    await expect(page).toHaveURL(/\/ventes\/sites$/u);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/ventes$/u);
+  });
+
   test('la vente en retard se relance sur WhatsApp ou par téléphone', async ({ page }) => {
     await page.goto('/ventes');
     await page.getByRole('link', { name: 'Échéances en retard' }).click();

@@ -119,6 +119,7 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		"email": "Client.Saisie@Exemple.sn", "numeroCni": "1 234 1990 01234", "dateDelivranceCni": "2021-03-04",
 		"demeurantA": "Dakar, Sacré-Cœur", "profession": "Enseignant", "representant": "Awa Ndiaye",
 		"nomTeleconseiller": "Moussa Diop", "responsableClosing": "Fatou Sarr",
+		"mandataireNom": "Ba", "mandatairePrenom": "Ousmane", "mandataireTelephone": "77 111 22 33", "mandataireCni": "1 555 1985 00042",
 	}
 	venteID = venteSaisieCalculee(t, b, corps)
 
@@ -126,6 +127,9 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 	b.attend(statut, http.StatusOK, "lecture de la vente saisie", liste)
 	if len(liste["ventes"].([]any)) == 0 {
 		t.Fatalf("la vente saisie doit apparaître dans la liste : %v", liste)
+	}
+	if saisie := venteDeLaListe(liste, venteID); saisie["teleconseiller"] != "Moussa Diop" || saisie["mandataireCni"] != "1 555 1985 00042" {
+		t.Fatalf("le téléconseiller et le représentant choisis à la saisie doivent apparaître dans la liste : %v", saisie)
 	}
 
 	corps["client"] = client + " MODIFIE"
@@ -585,9 +589,20 @@ func TestRenommerSiteSuitLesVentes(t *testing.T) {
 func exigerIdentiteClient(t *testing.T, vente map[string]any) {
 	t.Helper()
 	if vente["email"] != "client.saisie@exemple.sn" || vente["dateDelivranceCni"] != "2021-03-04" ||
-		vente["autrePiece"] != "Passeport A0123456" || vente["responsableClosing"] != "Fatou Sarr" {
+		vente["autrePiece"] != "Passeport A0123456" || vente["responsableClosing"] != "Fatou Sarr" ||
+		vente["mandataireNom"] != "Ba" || vente["mandatairePrenom"] != "Ousmane" ||
+		vente["mandataireTelephone"] != "77 111 22 33" || vente["mandataireCni"] != "1 555 1985 00042" {
 		t.Fatalf("identité du client et suivi de la vente : %v", vente)
 	}
+}
+
+func venteDeLaListe(liste map[string]any, id int64) map[string]any {
+	for _, item := range liste["ventes"].([]any) {
+		if vente, _ := item.(map[string]any); vente["id"] == float64(id) {
+			return vente
+		}
+	}
+	return nil
 }
 
 func venteSaisieCalculee(t *testing.T, b *banc, corps map[string]any) int64 {
