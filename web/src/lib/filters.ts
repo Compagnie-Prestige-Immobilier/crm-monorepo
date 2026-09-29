@@ -167,6 +167,11 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
   };
 }
 
+function ouiNon(value: boolean | null): string | null {
+  if (value === null) return null;
+  return value ? 'oui' : 'non';
+}
+
 export function serializeProspectFilters(filters: ProspectFilters): URLSearchParams {
   const params = new URLSearchParams();
   const put = (key: string, value: string | null): void => {
@@ -185,7 +190,7 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('phase2Status', filters.phase2Status);
   put('enrollmentMethod', filters.enrollmentMethod);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
-  if (filters.revue !== null) put('revue', filters.revue ? 'oui' : 'non');
+  put('revue', ouiNon(filters.revue));
   put('sansMotif', filters.sansMotif);
   put('motif', filters.motif);
   put('campagneId', filters.campagneId);
@@ -201,9 +206,8 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('typeContrat', filters.typeContrat);
   put('modeEpargne', filters.modeEpargne);
   put('rendezVousIssue', filters.rendezVousIssue);
-  if (filters.avecRdv !== null) put('avecRdv', filters.avecRdv ? 'oui' : 'non');
-  if (filters.avecCommentaire !== null)
-    put('avecCommentaire', filters.avecCommentaire ? 'oui' : 'non');
+  put('avecRdv', ouiNon(filters.avecRdv));
+  put('avecCommentaire', ouiNon(filters.avecCommentaire));
   put('appelePar', filters.appelePar);
   put('lastCallById', filters.lastCallById);
   put('dateFrom', filters.dateFrom);

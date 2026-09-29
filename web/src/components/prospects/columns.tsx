@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { SEGMENT_LISIBLE } from '@/components/prospects/segment';
-import { ISSUES, SUITES } from '@/components/prospects/suivi-rendez-vous';
+import { SUITES } from '@/components/prospects/suivi-rendez-vous';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -64,6 +64,23 @@ export interface ProspectRowActions {
 
 function Empty() {
   return <span className="text-muted-foreground/60 italic">–</span>;
+}
+
+function LigneIssue({
+  prospect,
+}: {
+  prospect: Pick<ProspectRow, 'rendezVousIssue' | 'rendezVousReporteAt' | 'suiteRencontre'>;
+}) {
+  const { rendezVousIssue, rendezVousReporteAt, suiteRencontre } = prospect;
+  if (rendezVousIssue === null) return null;
+  const libelle = RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue;
+  return (
+    <p className="truncate font-[600]" title={libelle}>
+      {libelle}
+      {rendezVousReporteAt === null ? '' : ` au ${formatDate(rendezVousReporteAt)}`}
+      {suiteRencontre === null ? '' : ` · ${SUITES[suiteRencontre]}`}
+    </p>
+  );
 }
 
 export function prospectColumns(actions: ProspectRowActions): ColumnDef<ProspectRow>[] {
@@ -488,15 +505,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'rendezVousIssue',
       header: 'Suivi',
       cell: ({ row }) => {
-        const {
-          rendezVousIssue,
-          rendezVousReporteAt,
-          suiteRencontre,
-          aRevoirAt,
-          revueAt,
-          revueByName,
-          callAttemptCount,
-        } = row.original;
+        const { rendezVousIssue, aRevoirAt, revueAt, revueByName, callAttemptCount } = row.original;
         if (
           rendezVousIssue === null &&
           aRevoirAt === null &&
@@ -506,16 +515,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
           return <Empty />;
         return (
           <div className="min-w-0 max-w-52">
-            {rendezVousIssue === null ? null : (
-              <p
-                className="truncate font-[600]"
-                title={RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue}
-              >
-                {RENDEZ_VOUS_ISSUE_LABELS[rendezVousIssue] ?? rendezVousIssue}
-                {rendezVousReporteAt === null ? '' : ` au ${formatDate(rendezVousReporteAt)}`}
-                {suiteRencontre === null ? '' : ` · ${SUITES[suiteRencontre]}`}
-              </p>
-            )}
+            <LigneIssue prospect={row.original} />
             {aRevoirAt === null ? null : (
               <p className="text-[0.75rem] text-muted-foreground tabular-nums">
                 À revoir {formatDate(aRevoirAt)}
