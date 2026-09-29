@@ -31,6 +31,7 @@ type CompteursProspects struct {
 	Representants int32
 	Fiches        int32
 	FichesJointes int32
+	Rdv           int32
 }
 
 type ligneParTeleconseiller struct {
@@ -140,6 +141,8 @@ type CompteursDActivite struct {
 	Fiches                 int      `json:"fiches"`
 	FichesJointes          int      `json:"fichesJointes"`
 	FicheReachRate         *float64 `json:"ficheReachRate"`
+	RendezVous             int      `json:"rendezVous"`
+	RendezVousRate         *float64 `json:"rendezVousRate"`
 	ProspectsCreated       int      `json:"prospectsCreated"`
 	RepresentantsContacted int      `json:"representantsContacted"`
 	RepCalls               int      `json:"repCalls"`
@@ -392,7 +395,8 @@ func (perimetre perimetreSupervision) fichesProspects(p *parametresSQL) string {
 	SELECT DISTINCT ON (ca."prospectId")
 	  ca."performedById"                                AS "userId",
 	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
-	  (` + ProspectJoint + `)::int AS joint
+	  (` + ProspectJoint + `)::int AS joint,
+	  (ca."rendezVousAt" IS NOT NULL)::int AS rdv
 	FROM "call_attempts" ca
 	` + JointureMotifIssue + `
 	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
@@ -478,7 +482,7 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	p := &parametresSQL{}
 	sql := `WITH actes AS (` + perimetre.actes(p) + `),
 	fiches AS (
-	  SELECT "userId", bucket, COUNT(*)::int AS fiches, SUM(joint)::int AS "fichesJointes"
+	  SELECT "userId", bucket, COUNT(*)::int AS fiches, SUM(joint)::int AS "fichesJointes", SUM(rdv)::int AS rdv
 	  FROM (` + perimetre.fichesProspects(p) + `) f GROUP BY 1, 2
 	)
 	SELECT
@@ -495,7 +499,8 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	  SUM(a.prospect)::int                AS prospects,
 	  COUNT(DISTINCT a.representant)::int AS representants,
 	  COALESCE(MAX(f.fiches), 0)::int          AS fiches,
-	  COALESCE(MAX(f."fichesJointes"), 0)::int AS "fichesJointes"
+	  COALESCE(MAX(f."fichesJointes"), 0)::int AS "fichesJointes",
+	  COALESCE(MAX(f.rdv), 0)::int             AS rdv
 	FROM actes a
 	INNER JOIN "users" u ON u."id" = a."userId"
 	LEFT JOIN fiches f ON f."userId" = a."userId" AND f.bucket = a.bucket
@@ -583,7 +588,7 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	p := &parametresSQL{}
 	sql := `WITH actes AS (` + perimetre.actes(p) + `),
 	fiches AS (
-	  SELECT COUNT(*)::int AS fiches, COALESCE(SUM(f.joint), 0)::int AS "fichesJointes"
+	  SELECT COUNT(*)::int AS fiches, COALESCE(SUM(f.joint), 0)::int AS "fichesJointes", COALESCE(SUM(f.rdv), 0)::int AS rdv
 	  FROM (` + perimetre.fichesProspects(p) + `) f
 	  WHERE ` + perimetre.membreDeLEquipe(p, `f."userId"`) + `
 	)
@@ -598,7 +603,8 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  COALESCE(SUM(a.prospect), 0)::int    AS prospects,
 	  COUNT(DISTINCT a.representant)::int  AS representants,
 	  MAX(f.fiches)::int                   AS fiches,
-	  MAX(f."fichesJointes")::int          AS "fichesJointes"
+	  MAX(f."fichesJointes")::int          AS "fichesJointes",
+	  MAX(f.rdv)::int                      AS rdv
 	FROM fiches f
 	LEFT JOIN actes a ON ` + perimetre.membreDeLEquipe(p, `a."userId"`)
 	return ligneAgregat[CompteursProspects](ctx, s, sql, p.args)
@@ -983,6 +989,8 @@ func compteursDActivite(prospects CompteursProspects, representants CompteursRep
 		Fiches:                 int(prospects.Fiches),
 		FichesJointes:          int(prospects.FichesJointes),
 		FicheReachRate:         tauxOuNul(int(prospects.FichesJointes), int(prospects.Fiches)),
+		RendezVous:             int(prospects.Rdv),
+		RendezVousRate:         tauxOuNul(int(prospects.Rdv), int(prospects.FichesJointes)),
 		ProspectsCreated:       int(prospects.Prospects),
 		RepresentantsContacted: int(prospects.Representants),
 		RepCalls:               int(representants.Appels),

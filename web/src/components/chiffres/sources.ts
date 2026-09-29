@@ -277,6 +277,39 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
 });
 
+/** Nombre de rendez-vous posés et taux (posés ÷ fiches jointes), par téléconseiller. Le pied reprend `totals`, calculé par le serveur. */
+function tableauRendezVous(activite: ChiffresActivite): DonneesSource {
+  const poses = new Map<string, number>();
+  const joints = new Map<string, number>();
+  for (const ligne of activite.items) {
+    poses.set(ligne.teleconseillerId, (poses.get(ligne.teleconseillerId) ?? 0) + ligne.rendezVous);
+    joints.set(
+      ligne.teleconseillerId,
+      (joints.get(ligne.teleconseillerId) ?? 0) + ligne.fichesJointes,
+    );
+  }
+  const cellules = (rdv: number, fichesJointes: number): EquipeLigne['cellules'] => [
+    { cle: 'Rendez-vous', texte: formatNumber(rdv) },
+    { cle: 'Taux', texte: taux(part(rdv, fichesJointes)) },
+  ];
+  return {
+    forme: 'equipe',
+    donnee: {
+      colonnes: ['Rendez-vous', 'Taux'],
+      lignes: activite.teleconseillers.map((personne) => ({
+        id: personne.id,
+        nom: personne.fullName,
+        cellules: cellules(poses.get(personne.id) ?? 0, joints.get(personne.id) ?? 0),
+      })),
+      pied: {
+        id: 'equipe',
+        nom: 'Équipe',
+        cellules: cellules(activite.totals.rendezVous, activite.totals.fichesJointes),
+      },
+    },
+  };
+}
+
 /** La même phrase que le détail d'une campagne : appelées sur confiées, appels consignés. */
 function couvertureDeLaCampagne(campagne: CouvertureCampagne): string {
   const pluriel = (nombre: number): string => (nombre > 1 ? 's' : '');
@@ -650,6 +683,15 @@ const SOURCES_CHIFFRES = {
           ),
   },
   'par-teleconseiller': parTeleconseiller(false),
+  'rendez-vous-par-teleconseiller': {
+    label: 'Rendez-vous par téléconseiller',
+    forme: 'equipe',
+    jeu: 'activite',
+    description:
+      'Rendez-vous posés et taux de rendez-vous (posés ÷ fiches jointes), par téléconseiller. Équipe en pied.',
+    groupe: 'Équipe',
+    extraire: ({ activite }) => (activite === undefined ? null : tableauRendezVous(activite)),
+  },
   'fiches-ouvertes': {
     label: 'Fiches ouvertes',
     forme: 'matrice',
