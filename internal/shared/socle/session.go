@@ -49,6 +49,8 @@ type Utilisateur struct {
 	// Role reste le rôle de base, qui porte les données ; RoleID donne les permissions.
 	RoleID      string `json:"roleId"`
 	RoleLibelle string `json:"roleLibelle"`
+	// L'administrateur qui a ouvert cette session au nom du compte.
+	UsurpePar   *string `json:"usurpePar"`
 	permissions map[Permission]bool
 }
 
@@ -75,7 +77,7 @@ func UtilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, 
 	}
 	u := Utilisateur{
 		ID: row.ID, Email: row.Email, Username: row.Username, FullName: row.FullName, Role: Role(row.Role),
-		PhoneE164: row.PhoneE164, RoleID: row.RoleId, RoleLibelle: row.RoleLibelle,
+		PhoneE164: row.PhoneE164, RoleID: row.RoleId, RoleLibelle: row.RoleLibelle, UsurpePar: row.UsurpePar,
 	}
 	if err := a.Attribuer(ctx, q, &u); err != nil {
 		return Utilisateur{}, err

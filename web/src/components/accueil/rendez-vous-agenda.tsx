@@ -14,8 +14,9 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon, FileTextIcon, PhoneIcon } from 'lucide-react';
+import Link from 'next/link';
+import { createContext, useContext, useState } from 'react';
 import {
   Calendar,
   dateFnsLocalizer,
@@ -29,8 +30,8 @@ import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CLE_RENDEZ_VOUS,
@@ -72,6 +73,9 @@ interface Evenement {
   end: Date;
   fiche: RendezVousObtenu;
 }
+
+// Le closing s'ouvre hors de la bulle : la bulle se referme dès que « Présent » est noté.
+const OuvrirClosing = createContext<(fiche: RendezVousObtenu) => void>(() => undefined);
 
 const jour = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -130,80 +134,95 @@ function Barre({ label, onNavigate, view, onView }: ToolbarProps<Evenement>) {
   );
 }
 
-function Rendu({ event }: EventProps<Evenement>) {
+function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void }) {
+  const ouvrirClosing = useContext(OuvrirClosing);
+  const etat = etatDe(fiche);
   return (
-    <div className="flex flex-col gap-0.5 leading-tight">
-      <span className="text-[0.6875rem] tabular-nums opacity-80">
-        {format(event.start, 'HH:mm')}
-      </span>
-      <span className="truncate font-[600]">{event.title}</span>
-      <span className="truncate text-[0.6875rem] opacity-80">{event.fiche.type}</span>
+    <div className="flex flex-col gap-3">
+      <div>
+        <p className="font-display text-[1.0625rem] font-[700]">
+          {fiche.prenom} {fiche.nom}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {fiche.quand === null ? '' : formatDateTime(fiche.quand)} · {fiche.type}
+          {fiche.site === '' ? '' : ` · ${fiche.site}`}
+        </p>
+        <Badge variant={etat.ton} className="mt-2">
+          {etat.texte}
+        </Badge>
+      </div>
+      <ActionsRendezVous
+        fiche={fiche}
+        peutNoter
+        peutCloser
+        bulle
+        onCloser={(choisie) => {
+          onFait();
+          ouvrirClosing(choisie);
+        }}
+        onEnregistrerVisite={null}
+        onFait={onFait}
+      />
+      <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+        <Link
+          href={`/teleconseil/prospects/${fiche.id}`}
+          className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
+        >
+          <FileTextIcon className="size-4" aria-hidden="true" />
+          Ouvrir la fiche
+        </Link>
+        {fiche.phoneE164 === null ? null : (
+          <a
+            href={`tel:${fiche.phoneE164}`}
+            aria-label={`Appeler ${formatPhone(fiche.phoneE164)}`}
+            className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
+          >
+            <PhoneIcon className="size-4" aria-hidden="true" />
+            Appeler
+          </a>
+        )}
+      </div>
     </div>
   );
 }
 
-function Detail({
-  fiche,
-  onClose,
-  onCloser,
-}: {
-  fiche: RendezVousObtenu | null;
-  onClose: () => void;
-  onCloser: (fiche: RendezVousObtenu) => void;
-}) {
-  if (fiche === null) return null;
-  const etat = etatDe(fiche);
+function Rendu({ event }: EventProps<Evenement>) {
+  const [ouvert, setOuvert] = useState(false);
+  const etat = etatDe(event.fiche);
   return (
-    <Dialog
-      open
-      onOpenChange={(ouvert) => {
-        if (!ouvert) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {fiche.prenom} {fiche.nom}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-1 text-sm">
-          <p className="font-[600]">{fiche.quand === null ? '' : formatDateTime(fiche.quand)}</p>
-          <p className="text-muted-foreground">
-            {fiche.type}
-            {fiche.site === '' ? '' : ` · ${fiche.site}`}
-          </p>
-          {fiche.phoneE164 === null ? null : (
-            <a href={`tel:${fiche.phoneE164}`} className="w-fit font-mono text-primary">
-              {formatPhone(fiche.phoneE164)}
-            </a>
-          )}
-          <Badge variant={etat.ton} className="mt-1 w-fit">
-            {etat.texte}
-          </Badge>
-        </div>
-        <ActionsRendezVous
-          fiche={fiche}
-          peutNoter
-          peutCloser
-          onCloser={(choisie) => {
-            onClose();
-            onCloser(choisie);
+    <Popover open={ouvert} onOpenChange={setOuvert}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`${event.title}, ${etat.texte}`}
+            className="flex h-full w-full flex-col gap-0.5 text-left leading-tight"
+          />
+        }
+      >
+        <span className="text-[0.6875rem] tabular-nums opacity-80">
+          {format(event.start, 'HH:mm')} · {etat.texte}
+        </span>
+        <span className="truncate font-[600]">{event.title}</span>
+        <span className="truncate text-[0.6875rem] opacity-80">{event.fiche.type}</span>
+      </PopoverTrigger>
+      <PopoverContent side="right" className="w-80">
+        <Bulle
+          fiche={event.fiche}
+          onFait={() => {
+            setOuvert(false);
           }}
-          onEnregistrerVisite={null}
-          onFait={onClose}
         />
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   );
 }
 
 export function RendezVousAgenda() {
   const [date, setDate] = useState(() => new Date());
   const [vue, setVue] = useState<View>(() => (window.innerWidth < 640 ? 'day' : 'week'));
-  const [choisie, setChoisie] = useState<RendezVousObtenu | null>(null);
   const [closingDe, setClosingDe] = useState<RendezVousObtenu | null>(null);
-  const lundi = startOfWeek(date, { weekStartsOn: 1 });
-  const du = jour(lundi);
+  const du = jour(startOfWeek(date, { weekStartsOn: 1 }));
   const au = jour(endOfWeek(date, { weekStartsOn: 1 }));
   const semaine = useQuery({
     queryKey: [...CLE_RENDEZ_VOUS, 'agenda', du, au],
@@ -218,59 +237,51 @@ export function RendezVousAgenda() {
   const { min, max } = heures(evenements);
 
   return (
-    <div className="agenda-rendez-vous flex flex-col gap-3">
-      {semaine.isError ? (
-        <QueryErrorState error={semaine.error} onRetry={() => void semaine.refetch()} />
-      ) : null}
-      {(semaine.data?.total ?? 0) > evenements.length ? (
-        <p className="text-sm text-warning">
-          Plus de 200 rendez-vous cette semaine : seuls les 200 premiers sont affichés.
-        </p>
-      ) : null}
-      <ul aria-label="Légende" className="flex flex-wrap gap-2">
-        {LEGENDE.map((item) => (
-          <li key={item.texte}>
-            <Badge variant={item.ton}>{item.texte}</Badge>
-          </li>
-        ))}
-      </ul>
-      <Calendar<Evenement>
-        localizer={localisateur}
-        culture="fr"
-        events={evenements}
-        date={date}
-        view={vue}
-        views={['week', 'day']}
-        onNavigate={setDate}
-        onView={setVue}
-        min={min}
-        max={max}
-        scrollToTime={min}
-        step={30}
-        timeslots={2}
-        formats={FORMATS}
-        components={{ toolbar: Barre, event: Rendu }}
-        onSelectEvent={(evenement) => {
-          setChoisie(evenement.fiche);
-        }}
-        eventPropGetter={(evenement) => ({
-          className: `agenda-${etatDe(evenement.fiche).ton}`,
-        })}
-        style={{ height: 'calc(100dvh - 13rem)', minHeight: 520 }}
-      />
-      <Detail
-        fiche={choisie}
-        onClose={() => {
-          setChoisie(null);
-        }}
-        onCloser={setClosingDe}
-      />
-      <ClosingDialog
-        rendezVous={closingDe}
-        onClose={() => {
-          setClosingDe(null);
-        }}
-      />
-    </div>
+    <OuvrirClosing.Provider value={setClosingDe}>
+      <div className="agenda-rendez-vous flex flex-col gap-3">
+        {semaine.isError ? (
+          <QueryErrorState error={semaine.error} onRetry={() => void semaine.refetch()} />
+        ) : null}
+        {(semaine.data?.total ?? 0) > evenements.length ? (
+          <p className="text-sm text-warning">
+            Plus de 200 rendez-vous cette semaine : seuls les 200 premiers sont affichés.
+          </p>
+        ) : null}
+        <ul aria-label="Légende" className="flex flex-wrap gap-2">
+          {LEGENDE.map((item) => (
+            <li key={item.texte}>
+              <Badge variant={item.ton}>{item.texte}</Badge>
+            </li>
+          ))}
+        </ul>
+        <Calendar<Evenement>
+          localizer={localisateur}
+          culture="fr"
+          events={evenements}
+          date={date}
+          view={vue}
+          views={['week', 'day']}
+          onNavigate={setDate}
+          onView={setVue}
+          min={min}
+          max={max}
+          scrollToTime={min}
+          step={30}
+          timeslots={2}
+          formats={FORMATS}
+          components={{ toolbar: Barre, event: Rendu }}
+          eventPropGetter={(evenement) => ({
+            className: `agenda-${etatDe(evenement.fiche).ton}`,
+          })}
+          style={{ height: 'calc(100dvh - 9rem)', minHeight: 520 }}
+        />
+        <ClosingDialog
+          rendezVous={closingDe}
+          onClose={() => {
+            setClosingDe(null);
+          }}
+        />
+      </div>
+    </OuvrirClosing.Provider>
   );
 }

@@ -77,7 +77,9 @@ type Closing struct {
 	EtatSite              string `json:"etatSite" maxLength:"120"`
 	Position              string `json:"position" maxLength:"120"`
 	AuNomDe               string `json:"auNomDe" maxLength:"120"`
+	Titulaires            string `json:"titulaires" maxLength:"200"`
 	PieceIdentiteVerifiee string `json:"pieceIdentiteVerifiee" maxLength:"120"`
+	PersonneExposee       string `json:"personnePolitiquementExposee" maxLength:"120"`
 	PaiementAcompte       string `json:"paiementAcompte" maxLength:"120"`
 	OrigineFondsJustifiee string `json:"origineFondsJustifiee" maxLength:"120"`
 	FreinPrincipal        string `json:"freinPrincipal" maxLength:"120"`
@@ -156,6 +158,7 @@ func (s *service) closingEnregistrer(ctx context.Context, in *ClosingEnregistrer
 			PaiementAcompte: b.PaiementAcompte, OrigineFondsJustifiee: b.OrigineFondsJustifiee, FreinPrincipal: b.FreinPrincipal,
 			AutresPromoteurs: b.AutresPromoteurs, Parrain: b.Parrain, ChargeDeClientele: b.ChargeDeClientele,
 			ProchaineAction: strings.TrimSpace(b.ProchaineAction), DateRelance: relance, CompteRendu: b.CompteRendu, AuteurID: u.ID,
+			Titulaires: b.Titulaires, PersonnePolitiquementExposee: b.PersonneExposee,
 		}); err != nil {
 			return err
 		}
@@ -174,6 +177,7 @@ func closingDe(l *db.RendezVousClosing) Closing {
 		PaiementAcompte: l.PaiementAcompte, OrigineFondsJustifiee: l.OrigineFondsJustifiee, FreinPrincipal: l.FreinPrincipal,
 		AutresPromoteurs: l.AutresPromoteurs, Parrain: l.Parrain, ChargeDeClientele: l.ChargeDeClientele,
 		ProchaineAction: l.ProchaineAction, DateRelance: jourOuVide(l.DateRelance), CompteRendu: l.CompteRendu,
+		Titulaires: l.Titulaires, PersonneExposee: l.PersonnePolitiquementExposee,
 	}
 }
 

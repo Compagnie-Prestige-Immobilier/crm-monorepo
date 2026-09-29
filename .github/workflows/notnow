@@ -1,0 +1,32 @@
+name: deploy
+
+# Déploie la production via Dokploy dès qu'une PR est fusionnée dans `prod`.
+# Les contrôles de `ci` ont déjà tourné sur la PR avant la fusion.
+on:
+  pull_request:
+    branches: [prod]
+    types: [closed]
+
+permissions: {}
+
+# Deux fusions rapprochées : on les déploie l'une après l'autre, sans annuler.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  dokploy:
+    name: déclencher Dokploy
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      # L'URL porte le jeton du webhook : elle reste dans un secret, jamais en clair.
+      - name: Appeler le webhook Dokploy
+        env:
+          DOKPLOY_DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+        run: |
+          test -n "$DOKPLOY_DEPLOY_URL" || { echo "::error::secret DOKPLOY_DEPLOY_URL absent"; exit 1; }
+          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors \
+            -X POST "$DOKPLOY_DEPLOY_URL"

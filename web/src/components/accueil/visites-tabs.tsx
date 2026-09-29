@@ -77,8 +77,12 @@ export function VisitesTabs() {
   const { data: user } = useQuery(meQueryOptions);
   const tabs = TABS.filter((tab) => tab.permission === null || peut(user, tab.permission));
   return (
-    <nav aria-label="Visites" className="print:hidden">
-      <ul className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+    // Sur écran large, une colonne au bord droit : la bande du haut mangeait la hauteur de l'agenda.
+    <nav
+      aria-label="Visites"
+      className="print:hidden md:fixed md:top-1/2 md:right-3 md:z-30 md:w-56 md:-translate-y-1/2"
+    >
+      <ul className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1 md:flex md:flex-col md:items-stretch md:shadow-elev-sm">
         {tabs.map((tab) => {
           const active = pathname === tab.href;
           const Icon = tab.icon;
@@ -89,7 +93,7 @@ export function VisitesTabs() {
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-[0.875rem] font-[600]',
+                  'inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-[0.875rem] font-[600] md:w-full',
                   'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                   active
                     ? 'bg-card text-foreground shadow-elev-xs'

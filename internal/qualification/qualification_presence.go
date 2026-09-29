@@ -46,6 +46,9 @@ func (s *service) presenceBattement(ctx context.Context, _ *struct{}) (*struct{}
 	u := socle.UtilisateurCourant(ctx)
 	maintenant := time.Now().UTC()
 	recu := &struct{}{}
+	if u.UsurpePar != nil {
+		return recu, nil
+	}
 	if presenceBattements.tropTot(u.ID, maintenant, presenceBattementMinimum) {
 		return recu, nil
 	}

@@ -19,7 +19,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const echellesIdentifiant = 3
+const (
+	echellesIdentifiant = 3
+	cheminUsurpation    = "/api/v1/auth/usurpation"
+)
 
 type service struct {
 	*socle.Deps
@@ -127,7 +130,7 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 		return nil, socle.Problem(http.StatusUnauthorized, "ACCOUNT_DISABLED", "Ce compte est désactivé. Contactez un administrateur.")
 	}
 	slog.Info("connexion", "userId", u.ID, "username", u.Username, "role", u.Role, "adresse", adresse)
-	return s.ouvrirSession(ctx, in.UserAgent, &u)
+	return s.ouvrirSession(ctx, in.UserAgent, &u, nil)
 }
 
 func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOutput, error) {
@@ -152,10 +155,75 @@ func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOu
 	if !u.IsActive || u.Role != profil.role {
 		return nil, socle.Problem(http.StatusServiceUnavailable, "DEMO_NOT_AVAILABLE", "Ce profil de démonstration n'est pas disponible.")
 	}
-	return s.ouvrirSession(ctx, in.UserAgent, &u)
+	return s.ouvrirSession(ctx, in.UserAgent, &u, nil)
 }
 
-func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.UserForLoginRow) (*SessionOutput, error) {
+type UsurpationInput struct {
+	CookieInput
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
+		UserID string `json:"userId" minLength:"1" maxLength:"64"`
+	}
+}
+
+func (s *service) usurper(ctx context.Context, in *UsurpationInput) (*SessionOutput, error) {
+	admin := socle.UtilisateurCourant(ctx)
+	if admin.UsurpePar != nil || in.Body.UserID == admin.ID {
+		return nil, socle.Problem(http.StatusForbidden, "USURPATION_INTERDITE", "Impossible d'ouvrir ce compte depuis cette session.")
+	}
+	cible, err := s.Q.UserForLoginByID(ctx, in.Body.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Compte introuvable.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !cible.IsActive {
+		return nil, socle.Problem(http.StatusConflict, "ACCOUNT_DISABLED", "Ce compte est désactivé.")
+	}
+	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton(ctx))); err != nil {
+		return nil, err
+	}
+	u := db.UserForLoginRow(cible)
+	out, err := s.ouvrirSession(ctx, in.UserAgent, &u, &admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("usurpation", "adminId", admin.ID, "userId", cible.ID, "username", cible.Username)
+	return out, database.Auditer(ctx, s.Q, admin.ID, "user.impersonate", "user", cible.ID, nil, nil)
+}
+
+type FinUsurpationInput struct {
+	CookieInput
+	UserAgent string `header:"User-Agent"`
+}
+
+func (s *service) finirUsurpation(ctx context.Context, in *FinUsurpationInput) (*SessionOutput, error) {
+	usurpe := socle.UtilisateurCourant(ctx)
+	if usurpe.UsurpePar == nil {
+		return nil, socle.Problem(http.StatusConflict, "PAS_D_USURPATION", "Cette session n'est pas ouverte au nom d'un autre compte.")
+	}
+	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton(ctx))); err != nil {
+		return nil, err
+	}
+	admin, err := s.Q.UserForLoginByID(ctx, *usurpe.UsurpePar)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !admin.IsActive) {
+		return nil, socle.Problem(http.StatusUnauthorized, "ACCOUNT_DISABLED", "Votre compte n'est plus actif.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	u := db.UserForLoginRow(admin)
+	out, err := s.ouvrirSession(ctx, in.UserAgent, &u, nil)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("fin d'usurpation", "adminId", admin.ID, "userId", usurpe.ID)
+	return out, database.Auditer(ctx, s.Q, admin.ID, "user.impersonate_end", "user", usurpe.ID, nil, nil)
+}
+
+// Une session usurpée ne touche pas la dernière connexion du compte.
+func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.UserForLoginRow, usurpePar *string) (*SessionOutput, error) {
 	brut := make([]byte, 32)
 	if _, err := rand.Read(brut); err != nil {
 		return nil, err
@@ -167,17 +235,19 @@ func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.Use
 	}
 	if err := s.Q.InsertSession(ctx, db.InsertSessionParams{
 		ID: id.String(), UserId: u.ID, TokenHash: socle.Empreinte(jeton),
-		ExpiresAt: time.Now().Add(s.Cfg.SessionTTL), UserAgent: stringPtr(userAgent),
+		ExpiresAt: time.Now().Add(s.Cfg.SessionTTL), UserAgent: stringPtr(userAgent), UsurpePar: usurpePar,
 	}); err != nil {
 		return nil, err
 	}
-	if err := s.Q.TouchLastLogin(ctx, u.ID); err != nil {
-		return nil, err
+	if usurpePar == nil {
+		if err := s.Q.TouchLastLogin(ctx, u.ID); err != nil {
+			return nil, err
+		}
 	}
 	out := &SessionOutput{SetCookie: cookieSession(ctx, jeton, int(s.Cfg.SessionTTL.Seconds()))}
 	connecte := socle.Utilisateur{
 		ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role),
-		PhoneE164: u.PhoneE164, RoleID: u.RoleId, RoleLibelle: u.RoleLibelle,
+		PhoneE164: u.PhoneE164, RoleID: u.RoleId, RoleLibelle: u.RoleLibelle, UsurpePar: usurpePar,
 	}
 	if err := s.Attributions.Attribuer(ctx, s.Q, &connecte); err != nil {
 		return nil, err
@@ -251,6 +321,8 @@ func Monter(api huma.API, d *socle.Deps) error {
 	huma.Post(api, "/api/v1/auth/demo-login", s.demoLogin)
 	huma.Get(api, "/api/v1/auth/me", s.me)
 	huma.Get(api, "/api/v1/auth/bases", s.bases)
+	huma.Post(api, cheminUsurpation, s.usurper)
+	huma.Delete(api, cheminUsurpation, s.finirUsurpation)
 	huma.Register(api, huma.Operation{OperationID: "logout", Method: http.MethodPost, Path: "/api/v1/auth/logout", DefaultStatus: http.StatusNoContent}, s.logout)
 	huma.Register(api, huma.Operation{OperationID: "change-password", Method: http.MethodPost, Path: "/api/v1/auth/password", DefaultStatus: http.StatusNoContent}, s.changerMotDePasse)
 	huma.Register(api, huma.Operation{OperationID: "changeMyPassword", Method: http.MethodPut, Path: "/api/v1/auth/me/password"}, s.changerMotDePasseOk)
@@ -314,6 +386,8 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/auth/me":          socle.PermissionPanneauAcceder,
 	"POST /api/v1/auth/password":   socle.PermissionPanneauAcceder,
 	"PUT /api/v1/auth/me/password": socle.PermissionPanneauAcceder,
+	"POST " + cheminUsurpation:     socle.PermissionComptesAdministrer,
+	"DELETE " + cheminUsurpation:   socle.PermissionPanneauAcceder,
 	// La garde répondrait en JSON : `autoriser` renvoie lui-même vers la connexion ou GLPI.
 	"GET /api/v1/auth/glpi/ouvrir":    socle.PermissionSupportPlateforme,
 	"GET /api/v1/auth/glpi/autoriser": socle.Publique,

@@ -8,15 +8,23 @@ WHERE u."deletedAt" IS NULL
 ORDER BY u."createdAt", u."id"
 LIMIT 1;
 
+-- name: UserForLoginByID :one
+SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."isActive", u."passwordHash",
+       u."roleId", r."libelle" AS role_libelle
+FROM "users" u
+JOIN "roles" r ON r."id" = u."roleId"
+WHERE u."deletedAt" IS NULL AND u."id" = $1;
+
 -- name: TouchLastLogin :exec
 UPDATE "users" SET "lastLoginAt" = now(), "updatedAt" = now() WHERE "id" = $1;
 
 -- name: InsertSession :exec
-INSERT INTO "refresh_tokens" ("id", "userId", "tokenHash", "familyId", "expiresAt", "userAgent")
-VALUES ($1, $2, $3, $1, $4, $5);
+INSERT INTO "refresh_tokens" ("id", "userId", "tokenHash", "familyId", "expiresAt", "userAgent", "usurpePar")
+VALUES ($1, $2, $3, $1, $4, $5, $6);
 
 -- name: UserBySession :one
-SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."roleId", r."libelle" AS role_libelle
+SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."roleId", r."libelle" AS role_libelle,
+       rt."usurpePar"
 FROM "refresh_tokens" rt
 JOIN "users" u ON u."id" = rt."userId"
 JOIN "roles" r ON r."id" = u."roleId"

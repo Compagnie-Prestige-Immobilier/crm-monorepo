@@ -14,6 +14,15 @@ async function fetchMe(): Promise<SessionUser | null> {
   return unwrap(result);
 }
 
+export async function usurper(userId: string): Promise<SessionUser> {
+  const result = await clientSansRenvoi.POST('/api/v1/auth/usurpation', { body: { userId } });
+  return unwrap(result).user;
+}
+
+export async function finirUsurpation(): Promise<SessionUser> {
+  return unwrap(await clientSansRenvoi.DELETE('/api/v1/auth/usurpation')).user;
+}
+
 export const meQueryOptions = queryOptions({
   queryKey: ['auth', 'me'],
   queryFn: fetchMe,

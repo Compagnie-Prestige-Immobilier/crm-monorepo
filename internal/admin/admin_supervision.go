@@ -93,9 +93,9 @@ type comptePlateau struct {
 const requeteComptesPlateau = `
 SELECT u."id", u."fullName", u."username", u."email", u."role", u."isActive", u."lastLoginAt",
   (SELECT COUNT(*) FROM "refresh_tokens" rt
-   WHERE rt."userId" = u."id" AND rt."revokedAt" IS NULL AND rt."expiresAt" > now()),
+   WHERE rt."userId" = u."id" AND rt."revokedAt" IS NULL AND rt."expiresAt" > now() AND rt."usurpePar" IS NULL),
   (SELECT MAX(rt."createdAt") FROM "refresh_tokens" rt
-   WHERE rt."userId" = u."id" AND rt."revokedAt" IS NULL AND rt."expiresAt" > now()),
+   WHERE rt."userId" = u."id" AND rt."revokedAt" IS NULL AND rt."expiresAt" > now() AND rt."usurpePar" IS NULL),
   h."lastPullAt", h."lastPushAt", h."pendingOps", h."appVersion", h."journalAppelsAutorise",
   GREATEST(
     (SELECT MAX(ca."createdAt") FROM "call_attempts" ca

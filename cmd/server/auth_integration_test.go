@@ -432,6 +432,70 @@ func TestLimiteurParIdentifiantNeCompteQueLesEchecs(t *testing.T) {
 	}
 }
 
+// Ni dernière connexion, ni présence, ni session administrateur restée ouverte.
+func usurpationSansTrace(b *banc, cibleID string) {
+	b.t.Helper()
+	var dernier *time.Time
+	if err := b.pool.QueryRow(b.ctx, `SELECT "lastLoginAt" FROM "users" WHERE "id" = $1`, cibleID).Scan(&dernier); err != nil || dernier != nil {
+		b.t.Fatalf("la dernière connexion du compte usurpé ne bouge pas : %v %v", dernier, err)
+	}
+	if b.compteSessions(false) != 0 {
+		b.t.Fatalf("la session administrateur doit être révoquée")
+	}
+	statut, body := b.appel(http.MethodPost, "/api/v1/presence/beat", nil, true)
+	b.attend(statut, http.StatusNoContent, "battement usurpé", body)
+	var battements int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "agent_heartbeats" WHERE "userId" = $1`, cibleID).Scan(&battements); err != nil || battements != 0 {
+		b.t.Fatalf("une session usurpée ne marque pas la présence : %d %v", battements, err)
+	}
+}
+
+func TestUsurpation(t *testing.T) {
+	b := adminConnecte(t)
+	cibleID, cibleEmail := adminCompte(b, "COMMERCIAL")
+	autreAdminID, _ := adminCompte(b, "ADMIN")
+	usurper := func(qui *banc, id string) (int, map[string]any) {
+		return qui.appel(http.MethodPost, "/api/v1/auth/usurpation", map[string]string{"userId": id}, true)
+	}
+
+	teleconseiller := adminSession(b, cibleEmail)
+	statut, body := usurper(teleconseiller, autreAdminID)
+	b.attend(statut, http.StatusForbidden, "usurpation sans comptes.administrer", body)
+	statut, body = usurper(b, b.userID)
+	b.attend(statut, http.StatusForbidden, "usurpation de soi", body)
+	adminExec(b, `UPDATE "users" SET "lastLoginAt" = NULL WHERE "id" = $1`, cibleID)
+
+	statut, body = usurper(b, cibleID)
+	b.attend(statut, http.StatusOK, "usurpation", body)
+	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
+	b.attend(statut, http.StatusOK, "me usurpé", body)
+	if body["id"] != cibleID || body["usurpePar"] != b.userID {
+		t.Fatalf("la session doit être celle du compte usurpé, marquée : %v", body)
+	}
+	usurpationSansTrace(b, cibleID)
+
+	statut, body = b.appel(http.MethodDelete, "/api/v1/auth/usurpation", nil, true)
+	b.attend(statut, http.StatusOK, "retour", body)
+	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
+	b.attend(statut, http.StatusOK, "me après retour", body)
+	if body["id"] != b.userID || body["usurpePar"] != nil {
+		t.Fatalf("le retour rend la session administrateur : %v", body)
+	}
+	if adminCompterAudit(b, "user.impersonate", cibleID) != 1 || adminCompterAudit(b, "user.impersonate_end", cibleID) != 1 {
+		t.Fatalf("début et fin d'usurpation doivent être tracés")
+	}
+	statut, body = b.appel(http.MethodDelete, "/api/v1/auth/usurpation", nil, true)
+	b.attend(statut, http.StatusConflict, "retour hors usurpation", body)
+
+	statut, body = usurper(b, autreAdminID)
+	b.attend(statut, http.StatusOK, "usurpation d'un autre administrateur", body)
+	statut, body = usurper(b, cibleID)
+	b.attend(statut, http.StatusForbidden, "usurpation en chaîne", body)
+	if body["code"] != "USURPATION_INTERDITE" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
 func TestRouteInconnueEtChampInconnu(t *testing.T) {
 	b := nouveauBanc(t, "CHARGE_CLIENTELE")
 	statut, body := b.appel(http.MethodGet, "/api/v1/inconnue", nil, false)
