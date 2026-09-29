@@ -891,15 +891,20 @@ WHERE "id" = @prospect_id;
 -- name: SuivreRendezVous :one
 UPDATE "prospects" p SET
   "rendezVousConfirmation" = CASE sqlc.arg('issue')::text
-    WHEN 'CONFIRME' THEN 'CONFIRME' WHEN 'ANNULE' THEN 'ANNULE' WHEN 'REPORTE' THEN NULL
-    ELSE p."rendezVousConfirmation" END,
+    WHEN 'CONFIRME' THEN 'CONFIRME' WHEN 'ANNULE' THEN 'ANNULE' WHEN 'A_RECONTACTER' THEN 'A_RECONTACTER'
+    WHEN 'REPORTE' THEN NULL
+    ELSE NULLIF(p."rendezVousConfirmation", 'A_RECONTACTER') END,
   "rendezVousIssue" = CASE
     WHEN sqlc.arg('issue')::text IN ('HONORE', 'NON_HONORE') THEN sqlc.arg('issue')::text
-    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."rendezVousIssue" END,
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE', 'A_RECONTACTER') THEN p."rendezVousIssue" END,
   "rendezVousReporteAt" = COALESCE(sqlc.narg('reporte_at')::timestamp, p."rendezVousReporteAt"),
+  "rendezVousRecontacterNote" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN sqlc.narg('note')::text END,
+  "rendezVousRecontacterLe" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN sqlc.narg('recontacter_le')::date END,
+  "rendezVousRecontacterAt" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN now() END,
+  "rendezVousRecontacterPar" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN sqlc.narg('par')::text END,
   "suiteRencontre" = CASE
     WHEN sqlc.arg('issue')::text = 'HONORE' THEN sqlc.narg('suite')::text
-    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE') THEN p."suiteRencontre" END,
+    WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE', 'A_RECONTACTER') THEN p."suiteRencontre" END,
   "rev" = p."rev" + 1, "updatedAt" = now()
 FROM "prospects" avant
 WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'

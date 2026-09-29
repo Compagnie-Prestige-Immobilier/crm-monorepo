@@ -48,6 +48,7 @@ function repere(quand: Date, now: number, prospect: ProspectRow) {
   if (prospect.rendezVousIssue === 'NON_HONORE' || prospect.rendezVousConfirmation === 'ANNULE') {
     return { ton: TON.manque, texte: etat };
   }
+  if (prospect.rendezVousConfirmation === 'A_RECONTACTER') return { ton: TON.anoter, texte: etat };
   const ecart = joursEntre(now, quand.getTime());
   if (ecart < 0) {
     const passe = ecart === -1 ? 'Hier' : `Il y a ${String(-ecart)} jours`;

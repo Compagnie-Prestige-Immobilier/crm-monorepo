@@ -6,6 +6,7 @@ import {
   CheckIcon,
   ClipboardPenIcon,
   MoreHorizontalIcon,
+  PhoneForwardedIcon,
   PlusIcon,
   UserCheckIcon,
   UserXIcon,
@@ -14,6 +15,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { RecontacterRendezVous } from '@/components/accueil/recontacter-rendez-vous';
 import { ReporterRendezVous } from '@/components/accueil/reporter-rendez-vous';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -27,8 +29,9 @@ import { suivreRendezVous } from '@/lib/data/prospects';
 import { CLE_RENDEZ_VOUS, type RendezVousObtenu } from '@/lib/data/rendez-vous';
 import { toastApiError } from '@/lib/mutation-feedback';
 
-type Geste = 'CONFIRME' | 'ANNULE' | 'HONORE' | 'NON_HONORE' | 'REPORTE';
-type Bouton = 'CONFIRME' | 'HONORE' | 'NON_HONORE' | 'REPORTER' | 'ANNULER';
+type Geste = 'CONFIRME' | 'ANNULE' | 'HONORE' | 'NON_HONORE' | 'REPORTE' | 'A_RECONTACTER';
+type Precisions = { reporteAt: string; commentaire: string; recontacterLe: string };
+type Bouton = 'CONFIRME' | 'HONORE' | 'NON_HONORE' | 'REPORTER' | 'RECONTACTER' | 'ANNULER';
 
 const MESSAGES: Record<Geste, string> = {
   CONFIRME: 'Rendez-vous confirmé.',
@@ -36,6 +39,7 @@ const MESSAGES: Record<Geste, string> = {
   HONORE: 'Présence notée.',
   NON_HONORE: 'Absence notée.',
   REPORTE: 'Rendez-vous reporté. Il revient à confirmer.',
+  A_RECONTACTER: 'Rendez-vous à recontacter. Il quitte l’agenda.',
 };
 
 const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
@@ -43,15 +47,21 @@ const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
   HONORE: { label: 'Présent', Icon: UserCheckIcon },
   NON_HONORE: { label: 'Absent', Icon: UserXIcon },
   REPORTER: { label: 'Reporter', Icon: CalendarClockIcon },
+  RECONTACTER: { label: 'À recontacter', Icon: PhoneForwardedIcon },
   ANNULER: { label: 'Annuler', Icon: XIcon },
 };
 
 /** Le geste attendu reste visible ; le reste passe dans le menu « … ». */
 function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[] } {
   if (fiche.etape === 'A_CONFIRMER')
-    return { visibles: ['CONFIRME'], menu: ['REPORTER', 'ANNULER'] };
+    return { visibles: ['CONFIRME'], menu: ['REPORTER', 'RECONTACTER', 'ANNULER'] };
+  if (fiche.etape === 'A_RECONTACTER')
+    return { visibles: ['REPORTER'], menu: ['RECONTACTER', 'ANNULER'] };
   if (fiche.etape === 'EN_RETARD' && fiche.confirmation === '') {
-    return { visibles: ['CONFIRME'], menu: ['HONORE', 'NON_HONORE', 'REPORTER', 'ANNULER'] };
+    return {
+      visibles: ['CONFIRME'],
+      menu: ['HONORE', 'NON_HONORE', 'REPORTER', 'RECONTACTER', 'ANNULER'],
+    };
   }
   if (fiche.etape === 'CONFIRMES' || fiche.etape === 'EN_RETARD') {
     return { visibles: ['HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
@@ -154,10 +164,10 @@ export function ActionsRendezVous({
   bulle?: boolean;
 }) {
   const client = useQueryClient();
-  const [dialogue, setDialogue] = useState<'reporter' | 'annuler' | null>(null);
+  const [dialogue, setDialogue] = useState<'reporter' | 'recontacter' | 'annuler' | null>(null);
   const noter = useMutation({
-    mutationFn: ({ issue, reporteAt }: { issue: Geste; reporteAt?: string }) =>
-      suivreRendezVous(fiche.id, { issue, ...(reporteAt === undefined ? {} : { reporteAt }) }),
+    mutationFn: ({ issue, ...precisions }: { issue: Geste } & Partial<Precisions>) =>
+      suivreRendezVous(fiche.id, { issue, ...precisions }),
     onSuccess: (_, { issue }) => {
       void client.invalidateQueries({ queryKey: CLE_RENDEZ_VOUS });
       setDialogue(null);
@@ -172,6 +182,7 @@ export function ActionsRendezVous({
   });
   const cliquer = (bouton: Bouton) => {
     if (bouton === 'REPORTER') setDialogue('reporter');
+    else if (bouton === 'RECONTACTER') setDialogue('recontacter');
     else if (bouton === 'ANNULER') setDialogue('annuler');
     else noter.mutate({ issue: bouton });
   };
@@ -232,6 +243,22 @@ export function ActionsRendezVous({
           pending={noter.isPending}
           onReporter={(reporteAt) => {
             noter.mutate({ issue: 'REPORTE', reporteAt });
+          }}
+          onClose={() => {
+            setDialogue(null);
+          }}
+        />
+      ) : null}
+      {dialogue === 'recontacter' ? (
+        <RecontacterRendezVous
+          fiche={fiche}
+          pending={noter.isPending}
+          onRecontacter={(commentaire, recontacterLe) => {
+            noter.mutate({
+              issue: 'A_RECONTACTER',
+              commentaire,
+              ...(recontacterLe === '' ? {} : { recontacterLe }),
+            });
           }}
           onClose={() => {
             setDialogue(null);

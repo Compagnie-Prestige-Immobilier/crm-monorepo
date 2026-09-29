@@ -222,7 +222,7 @@ type Prospect struct {
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
-	RendezVousConfirmation   *string           `json:"rendezVousConfirmation" enum:"CONFIRME,ANNULE"`
+	RendezVousConfirmation   *string           `json:"rendezVousConfirmation" enum:"CONFIRME,ANNULE,A_RECONTACTER"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
 	Campagne                 *string           `json:"campagne" doc:"Campagnes d'appels qui ont confié la fiche, dernières d'abord."`

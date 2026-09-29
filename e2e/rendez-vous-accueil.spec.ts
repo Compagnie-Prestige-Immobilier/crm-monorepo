@@ -317,3 +317,48 @@ test.describe('rendez-vous site pris en console', () => {
     await expect(creneauLibre).toHaveAttribute('aria-pressed', 'true');
   });
 });
+
+test.describe('rendez-vous à recontacter', () => {
+  test.use({ storageState: compteDe('CHARGE_CLIENTELE').etat });
+
+  let convoque = '';
+  const nom = `Recontact ${suffixe()}`;
+
+  test.beforeAll(async () => {
+    convoque = await poserRendezVous(nom, '198.51.100.97');
+  });
+
+  test.afterAll(async () => {
+    await purger({ prospects: [convoque] });
+  });
+
+  test('sans engagement la veille, il attend en tête avec ce qu’a dit la personne, puis se reporte', async ({
+    page,
+  }) => {
+    await page.goto('/accueil/rendez-vous');
+    const ligne = page.getByRole('row').filter({ hasText: nom });
+    await ligne.getByRole('button', { name: `Autres actions : Awa ${nom}` }).click();
+    await page.getByRole('menuitem', { name: 'À recontacter' }).click();
+    const fenetre = page.getByRole('dialog', { name: `À recontacter : Awa ${nom}` });
+    const valider = fenetre.getByRole('button', { name: 'Mettre à recontacter' });
+    await expect(valider).toBeDisabled();
+    await fenetre
+      .getByLabel('Ce que la personne a dit')
+      .fill('Deuil, rappellera la semaine prochaine');
+    await valider.click();
+
+    const groupe = page.getByRole('row', { name: /^À recontacter \(/u });
+    await expect(groupe).toBeVisible();
+    await expect(ligne.getByText('À recontacter', { exact: true })).toBeVisible();
+    await expect(ligne.getByText(/Deuil, rappellera la semaine prochaine/u)).toBeVisible();
+    await expect(ligne.getByText('Date à fixer')).toBeVisible();
+
+    await ligne.getByRole('button', { name: `Reporter : Awa ${nom}` }).click();
+    const report = page.getByRole('dialog', { name: /^Reporter le rendez-vous/u });
+    const apres = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+    await report.getByLabel('Nouvelle date (heure de Dakar)').fill(`${apres}T10:00`);
+    await report.getByRole('button', { name: 'Reporter' }).click();
+    await expect(ligne.getByText('Reporté, à confirmer')).toBeVisible();
+    await expect(ligne.getByText(/Deuil/u)).toHaveCount(0);
+  });
+});
