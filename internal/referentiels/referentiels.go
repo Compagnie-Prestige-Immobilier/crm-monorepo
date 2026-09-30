@@ -901,7 +901,7 @@ type ReferentielsCreerStatutInput struct {
 }
 
 // Le code se lit dans le libellé puis se fige : l'historique le référence.
-func referentielsCodeDepuisLibelle(label string) string {
+func CodeDepuisLibelle(label string) string {
 	return referentielsEspaces.ReplaceAllString(strings.ToUpper(referentielsDiacritiques.Replace(strings.ToLower(label))), "_")
 }
 
@@ -982,7 +982,7 @@ func (s *service) referentielsEffetDuStatut(ctx context.Context, in *Referentiel
 
 func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsCreerStatutInput) (*ReferentielsStatutOutput, error) {
 	label := strings.TrimSpace(in.Body.Label)
-	code := referentielsCodeDepuisLibelle(label)
+	code := CodeDepuisLibelle(label)
 	if !referentielsCodeValide.MatchString(code) {
 		return nil, socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_LABEL_UNUSABLE",
 			"« "+label+" » ne donne aucun code utilisable : commencez par une lettre et n'employez que des lettres, des chiffres et des espaces.")

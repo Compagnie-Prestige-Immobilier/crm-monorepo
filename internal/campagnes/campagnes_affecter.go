@@ -3,9 +3,11 @@ package campagnes
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/notifications"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 
@@ -68,7 +70,23 @@ func (s *service) campagneAffecterProspect(ctx context.Context, in *CampagneAffe
 	if err != nil {
 		return nil, err
 	}
+	s.aviserNouveauTitulaire(ctx, &u, vers, in.ID, fiche.NomComplet)
 	return campagneAffectationFaite(vers, campagnes), nil
+}
+
+// L'affectation est déjà faite : un avis manqué se journalise sans l'annuler.
+func (s *service) aviserNouveauTitulaire(ctx context.Context, auteur *socle.Utilisateur, vers, prospectID, nomComplet string) {
+	if vers == auteur.ID {
+		return
+	}
+	_, err := notifications.Composer(ctx, s.Deps, auteur.ID, &notifications.CreationNotification{
+		Title: "Fiche confiée", Body: auteur.FullName + " vous a confié la fiche de " + nomComplet + ".",
+		Category: string(db.NotificationCategoryDOSSIER), Route: "/teleconseil/prospects/" + prospectID,
+		Audience: string(db.NotificationAudienceUSERS), AudienceUserIDs: []string{vers},
+	})
+	if err != nil {
+		slog.Error("fiche affectée, avis au nouveau titulaire non émis", "prospectId", prospectID, "err", err)
+	}
 }
 
 func (s *service) campagneAffecterRepresentant(ctx context.Context, in *CampagneAffecterInput) (*CampagneAffecterOutput, error) {

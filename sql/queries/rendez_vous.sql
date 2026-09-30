@@ -18,6 +18,7 @@ SELECT
   p."prenom",
   p."nom",
   p."phoneE164",
+  p."createdById" AS "titulaireId",
   (r."label" || COALESCE(' · ' || CASE dernier."rvExterneType"
     WHEN 'PERSONNE' THEN 'Personne'
     WHEN 'COOPERATIVE' THEN 'Coopérative'

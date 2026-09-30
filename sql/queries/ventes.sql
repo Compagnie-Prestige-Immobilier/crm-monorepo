@@ -189,3 +189,8 @@ LIMIT @taille::bigint;
 SELECT "site", SUM("nombreLots")::integer AS "lots" FROM "ventes"
 WHERE "archiveeLe" IS NULL AND "site" = ANY(@sites::text[]) AND "id" <> @exclue::bigint
 GROUP BY "site";
+
+-- name: AjouterProfessionSiAbsente :exec
+INSERT INTO "professions" ("id", "code", "label", "position", "updatedAt")
+VALUES (@id, @code, @label, (SELECT COALESCE(MAX("position"), 0) + 1 FROM "professions"), now())
+ON CONFLICT DO NOTHING;

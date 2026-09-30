@@ -1286,6 +1286,10 @@ func TestAffectationDUneFicheSuitCampagneEtRappel(t *testing.T) {
 	if n := qualificationCompte(avant, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1 AND "performedById" = $2`, fiche, avant.userID); n != 1 {
 		t.Fatalf("l'appel passé reste à son auteur : %d", n)
 	}
+	if n := qualificationCompte(avant, `SELECT count(*) FROM "notification_deliveries" d JOIN "notifications" n ON n."id" = d."notificationId"
+		WHERE d."userId" = $1 AND n."route" = $2`, apres.userID, "/teleconseil/prospects/"+fiche); n != 1 {
+		t.Fatalf("le nouveau titulaire est avisé dans le panneau : %d", n)
+	}
 }
 
 func TestAffectationDUnRepresentant(t *testing.T) {

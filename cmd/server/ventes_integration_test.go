@@ -204,6 +204,21 @@ func TestVenteCorrectionGardeSesParts(t *testing.T) {
 	if vente["partProprietaire"] != float64(500000) || vente["partApporteur"] != float64(50000) || vente["partCpi"] != float64(450000) {
 		t.Fatalf("les parts doivent rester celles de la saisie malgré la nouvelle règle du site : %v", vente)
 	}
+
+	profession := "Profession vente " + b.userID[:8]
+	t.Cleanup(func() { b.exec(`DELETE FROM "professions" WHERE lower("label") = lower($1)`, profession) })
+	for _, saisie := range []string{profession, strings.ToUpper(profession)} {
+		corps["profession"] = saisie
+		statut, vente = appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
+		b.attend(statut, http.StatusOK, "profession absente du référentiel", vente)
+	}
+	var professions int
+	if err := b.pool.QueryRow(b.ctx, `SELECT COUNT(*) FROM "professions" WHERE lower("label") = lower($1) AND "isActive"`, profession).Scan(&professions); err != nil {
+		t.Fatal(err)
+	}
+	if professions != 1 {
+		t.Fatalf("une profession inconnue saisie à la vente entre une seule fois au référentiel, trouvé %d", professions)
+	}
 }
 
 // Le classeur fait foi pour ses ventes : le panneau ne les corrige pas, ne les archive pas et n'y verse rien.
