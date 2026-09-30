@@ -85,6 +85,9 @@ const CALCULS_PRESET: Record<PeriodePreset, (reference: Date) => Plage> = {
   },
 };
 
+/** « Aujourd'hui » part de l'ouverture du plateau : la nuit n'y entre pas. */
+export const DEBUT_D_AUJOURDHUI = '08:00';
+
 export function plageDuPreset(preset: PeriodePreset, reference: Date): Plage {
   return CALCULS_PRESET[preset](reference);
 }

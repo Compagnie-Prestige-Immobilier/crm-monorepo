@@ -400,6 +400,11 @@ CROSS JOIN LATERAL (
 ) deja
 WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
        OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
+  AND (CAST(sqlc.narg('lot_id') AS text) IS NULL
+       OR EXISTS (
+         SELECT 1 FROM "lot_export_items" li
+         WHERE li."lotId" = CAST(sqlc.narg('lot_id') AS text)
+           AND (li."prospectId" = o."prospectId" OR li."representantId" = o."representantId")))
   AND o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
   AND o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
 GROUP BY 1, 2, 3
