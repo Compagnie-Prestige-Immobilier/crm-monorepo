@@ -13,7 +13,8 @@ SELECT u."id", u."email", u."username", u."fullName", u."role", u."isActive",
        u."phoneE164", u."lastLoginAt", u."createdAt",
        (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = u."id")::int AS prospect_count,
        (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count,
-       u."roleId", ro."libelle" AS role_libelle
+       u."roleId", ro."libelle" AS role_libelle,
+       ARRAY(SELECT up."permission" FROM "user_permissions" up WHERE up."userId" = u."id" ORDER BY up."permission")::text[] AS permissions_supplementaires
 FROM "users" u
 JOIN "roles" ro ON ro."id" = u."roleId"
 WHERE u."deletedAt" IS NULL
@@ -31,7 +32,8 @@ SELECT u."id", u."email", u."username", u."fullName", u."role", u."isActive",
        u."phoneE164", u."lastLoginAt", u."createdAt",
        (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = u."id")::int AS prospect_count,
        (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count,
-       u."roleId", ro."libelle" AS role_libelle
+       u."roleId", ro."libelle" AS role_libelle,
+       ARRAY(SELECT up."permission" FROM "user_permissions" up WHERE up."userId" = u."id" ORDER BY up."permission")::text[] AS permissions_supplementaires
 FROM "users" u
 JOIN "roles" ro ON ro."id" = u."roleId"
 WHERE u."id" = $1 AND u."deletedAt" IS NULL;

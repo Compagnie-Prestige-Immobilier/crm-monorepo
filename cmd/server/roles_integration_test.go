@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Gel repris le 18 septembre 2026 : le rôle CCP et les deux bornes plateforme
-// ont quitté l'application, le suivi des inscrits se fait sur les plateformes.
+// Gel repris le 30 septembre 2026 : l'observateur n'ouvre que le panneau, et les
+// permissions accordées à un compte s'administrent comme celles des rôles.
 func TestMatriceRolesInchangee(t *testing.T) {
 	var attendu map[string][]socle.Role
-	contenu, err := os.ReadFile("testdata/matrice-roles-2026-09-18.json")
+	contenu, err := os.ReadFile("testdata/matrice-roles-2026-09-30.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,4 +440,48 @@ func TestDernierAdministrateurDesRoles(t *testing.T) {
 	if restants != 1 {
 		t.Fatalf("%d administrateurs des rôles restants, 1 attendu", restants)
 	}
+}
+
+// Deux observateurs du même rôle : la permission accordée à l'un n'ouvre rien à l'autre.
+func TestPermissionAccordeeAUnSeulCompte(t *testing.T) {
+	b := adminConnecte(t)
+	unID, unEmail := compteDuRole(b, string(socle.Observateur))
+	_, autreEmail := compteDuRole(b, string(socle.Observateur))
+	un, autre := adminSession(b, unEmail), adminSession(b, autreEmail)
+	chemin := "/api/v1/users/" + unID + "/permissions"
+	lecture := string(socle.PermissionProspectsLire)
+
+	statut, body := adminAppel(un, http.MethodGet, "/api/v1/prospects", nil)
+	un.attend(statut, http.StatusForbidden, "observateur sans permission", body)
+
+	statut, body = adminAppel(b, http.MethodPut, chemin, map[string]any{"permissions": []string{lecture}})
+	b.attend(statut, http.StatusOK, "accorder la lecture", body)
+	if accordees, _ := body["supplementaires"].([]any); !slices.Equal(accordees, []any{lecture}) {
+		t.Fatalf("permissions accordées : %v", body)
+	}
+	statut, body = adminAppel(un, http.MethodGet, "/api/v1/prospects", nil)
+	un.attend(statut, http.StatusOK, "la permission accordée ouvre la route", body)
+	statut, body = adminAppel(autre, http.MethodGet, "/api/v1/prospects", nil)
+	autre.attend(statut, http.StatusForbidden, "l'autre observateur reste fermé", body)
+	statut, body = adminAppel(un, http.MethodGet, "/api/v1/auth/me", nil)
+	if permissions, _ := body["permissions"].([]any); statut != http.StatusOK || !slices.Contains(permissions, any(lecture)) {
+		t.Fatalf("session : %d %v", statut, body)
+	}
+	statut, body = adminAppel(b, http.MethodGet, "/api/v1/users/"+unID, nil)
+	if accordees, _ := body["permissionsSupplementaires"].([]any); statut != http.StatusOK || !slices.Equal(accordees, []any{lecture}) {
+		t.Fatalf("compte : %d %v", statut, body)
+	}
+
+	statut, body = adminAppel(b, http.MethodPut, chemin, map[string]any{"permissions": []string{"inventee.lire"}})
+	b.attend(statut, http.StatusUnprocessableEntity, "permission inconnue", body)
+	gestionnaireRole := creerRolePersonnalise(b, "Gestion "+uuid.NewString()[:8], socle.Admin,
+		[]string{string(socle.PermissionPanneauAcceder), string(socle.PermissionComptesAdministrer)})
+	_, gestionnaireEmail := compteDuRole(b, gestionnaireRole)
+	statut, body = adminAppel(adminSession(b, gestionnaireEmail), http.MethodPut, chemin, map[string]any{"permissions": []string{}})
+	b.attend(statut, http.StatusForbidden, "gérer les comptes ne suffit pas à accorder", body)
+
+	statut, body = adminAppel(b, http.MethodPut, chemin, map[string]any{"permissions": []string{}})
+	b.attend(statut, http.StatusOK, "retirer l'accord", body)
+	statut, body = adminAppel(un, http.MethodGet, "/api/v1/prospects", nil)
+	un.attend(statut, http.StatusForbidden, "le retrait vaut dès la requête suivante", body)
 }

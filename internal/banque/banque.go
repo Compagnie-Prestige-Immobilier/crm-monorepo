@@ -1424,16 +1424,16 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 }
 
 var Garde = map[string]socle.Permission{
-	"GET /api/v1/bank-cases":                        socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases":                        socle.PermissionBanqueDossiersLire,
 	"POST /api/v1/bank-cases":                       socle.PermissionBanqueDossiers,
-	"GET /api/v1/bank-cases/a-ouvrir":               socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases/a-ouvrir":               socle.PermissionBanqueDossiersLire,
 	"GET /api/v1/bank-cases/analytics":              socle.PermissionBanqueLire,
 	"GET /api/v1/bank-cases/prospect-search":        socle.PermissionBanqueDossiers,
 	"GET /api/v1/bank-cases/rejection-reasons":      socle.PermissionBanqueLire,
-	"GET /api/v1/bank-cases/{id}":                   socle.PermissionBanqueDossiers,
-	"GET /api/v1/bank-inscriptions/{id}/pieces":     socle.PermissionBanqueDossiers,
-	"GET /api/v1/bank-inscriptions/{id}/piece":      socle.PermissionBanqueDossiers,
-	"GET /api/v1/bank-inscriptions/{id}/pieces.zip": socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases/{id}":                   socle.PermissionBanqueDossiersLire,
+	"GET /api/v1/bank-inscriptions/{id}/pieces":     socle.PermissionBanqueDossiersLire,
+	"GET /api/v1/bank-inscriptions/{id}/piece":      socle.PermissionBanqueDossiersLire,
+	"GET /api/v1/bank-inscriptions/{id}/pieces.zip": socle.PermissionBanqueDossiersLire,
 	"PATCH /api/v1/bank-cases/{id}":                 socle.PermissionBanqueDossiers,
 	"POST /api/v1/bank-cases/{id}/transitions":      socle.PermissionBanqueDossiers,
 	"POST /api/v1/bank-cases/{id}/corrections":      socle.PermissionBanqueAdministrer,
@@ -1443,8 +1443,8 @@ var Garde = map[string]socle.Permission{
 	"PATCH /api/v1/bank-case-stages/{id}":           socle.PermissionBanqueAdministrer,
 	"POST /api/v1/bank-case-stages/{id}/active":     socle.PermissionBanqueAdministrer,
 	"POST /api/v1/client-requests":                  socle.PermissionBanqueDossiers,
-	"GET /api/v1/client-requests":                   socle.PermissionBanqueDossiers,
-	"GET /api/v1/client-requests/{id}":              socle.PermissionBanqueDossiers,
+	"GET /api/v1/client-requests":                   socle.PermissionBanqueDossiersLire,
+	"GET /api/v1/client-requests/{id}":              socle.PermissionBanqueDossiersLire,
 	"POST /api/v1/client-requests/{id}/approve":     socle.PermissionBanqueAdministrer,
 	"POST /api/v1/client-requests/{id}/reject":      socle.PermissionBanqueAdministrer,
 }

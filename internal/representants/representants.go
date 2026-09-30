@@ -1363,16 +1363,16 @@ func (s *service) representantEffacer(ctx context.Context, auteur, id string, ex
 }
 
 var Garde = map[string]socle.Permission{
-	"GET /api/v1/representants":                              socle.PermissionFichesTenir,
-	"GET /api/v1/representants/lookup":                       socle.PermissionFichesTenir,
+	"GET /api/v1/representants":                              socle.PermissionRepresentantsLire,
+	"GET /api/v1/representants/lookup":                       socle.PermissionRepresentantsLire,
 	"POST /api/v1/representants":                             socle.PermissionFichesTenir,
-	"GET /api/v1/representants/{id}":                         socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}":                         socle.PermissionRepresentantsLire,
 	"PATCH /api/v1/representants/{id}":                       socle.PermissionFichesTenir,
 	"DELETE /api/v1/representants/{id}":                      socle.PermissionFichesTenir,
-	"GET /api/v1/representants/{id}/relation-history":        socle.PermissionFichesTenir,
-	"GET /api/v1/representants/{id}/call-attempts":           socle.PermissionFichesTenir,
-	"GET /api/v1/representants/{id}/fiche-history":           socle.PermissionFichesTenir,
-	"GET /api/v1/representants/{id}/comments":                socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}/relation-history":        socle.PermissionRepresentantsLire,
+	"GET /api/v1/representants/{id}/call-attempts":           socle.PermissionRepresentantsLire,
+	"GET /api/v1/representants/{id}/fiche-history":           socle.PermissionRepresentantsLire,
+	"GET /api/v1/representants/{id}/comments":                socle.PermissionRepresentantsLire,
 	"POST /api/v1/representants/{id}/comments":               socle.PermissionFichesTenir,
 	"DELETE /api/v1/representants/{id}/comments/{commentId}": socle.PermissionComptesAdministrer,
 }

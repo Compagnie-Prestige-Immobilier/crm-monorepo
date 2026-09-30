@@ -240,13 +240,15 @@ export function DashboardVisitesView() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <BoutonReinitialiser
-            disposition={dispositionQuery.data}
-            pending={resetMutation.isPending}
-            onReset={() => {
-              resetMutation.mutate();
-            }}
-          />
+          {peutDisposer ? (
+            <BoutonReinitialiser
+              disposition={dispositionQuery.data}
+              pending={resetMutation.isPending}
+              onReset={() => {
+                resetMutation.mutate();
+              }}
+            />
+          ) : null}
           <Button
             type="button"
             variant="outline"

@@ -17,7 +17,7 @@ const MESSAGE_IMPOSE: Readonly<Record<number, string>> = {
 
 /** Repli par statut quand le serveur n'a pas motivé son refus. */
 const REPLI_PAR_STATUT: Readonly<Record<number, string>> = {
-  403: 'Cette action est réservée à un autre rôle.',
+  403: 'Action non autorisée pour ce compte.',
   404: 'Élément introuvable. Rafraîchissez la liste.',
   409: 'Un enregistrement existe déjà avec ces valeurs.',
 };

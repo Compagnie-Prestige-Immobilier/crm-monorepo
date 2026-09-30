@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/pilotage')({
-  beforeLoad: guardPermission('chiffres.voir_montants'),
+  beforeLoad: guardPermission('chiffres.voir_montants', 'chiffres.consulter'),
   component: TableauDePilotage,
   pendingComponent: Loading,
 });

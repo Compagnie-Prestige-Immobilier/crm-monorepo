@@ -6,6 +6,7 @@ import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'l
 import { useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import {
   FilterableTableHead,
   type FiltreColonne,
@@ -57,6 +58,7 @@ import {
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
   PROSPECT_SORT_FIELDS,
+  peut,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   RENDEZ_VOUS_ISSUE_LABELS,
@@ -428,9 +430,11 @@ export function ProspectsTable({
     placeholderData: (previous) => previous,
   });
 
+  const { data: session } = useQuery(meQueryOptions);
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
-    queryFn: () => fetchReferenceData(),
+    queryFn: () => fetchReferenceData(session ?? undefined),
+    enabled: session !== undefined && session !== null,
     staleTime: 5 * 60_000,
   });
 
@@ -443,6 +447,7 @@ export function ProspectsTable({
   const campagnes = useQuery({
     queryKey: queryKeys.lotsExport({ page: 1, pageSize: CAMPAGNES_PAR_PAGE }),
     queryFn: () => campagnesOptions(),
+    enabled: peut(session, 'campagnes.superviser'),
     staleTime: 5 * 60_000,
   });
 

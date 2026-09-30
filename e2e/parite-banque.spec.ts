@@ -325,9 +325,7 @@ async function attendreRefus(page: Page, ecran: Ecran, libelle: string): Promise
 
   const refus = page.getByRole('alert').filter({ hasText: 'Accès refusé' });
   await expect(refus.getByRole('heading', { name: 'Accès refusé', level: 2 })).toBeVisible();
-  await expect(refus).toContainText(
-    `Cet écran demande une permission que le rôle ${libelle} n’a pas.`,
-  );
+  await expect(refus).toContainText('Cet écran demande une permission que ce compte n’a pas.');
   const retour = refus.getByRole('link', { name: 'Retour à l’accueil' });
   await expect(retour).toHaveAttribute('href', /^\/(teleconseil|finance|accueil)/);
   expect(chargees, `${route} a chargé des données métier pour ${libelle}`).toEqual([]);

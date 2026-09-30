@@ -60,4 +60,5 @@ export const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
   CHARGE_CLIENTELE: 'Chargé de clientèle',
+  OBSERVATEUR: 'Observateur',
 };

@@ -333,8 +333,12 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
 
   const projet: Projet | null = filters.projet;
   const voitLesMontants = peut(user, 'chiffres.voir_montants');
-  const voitLEnrolement = peut(user, 'enrolement.administrer');
-  const catalogue = catalogueDe({ chues: true, voitLesMontants, voitLEnrolement, projet });
+  const catalogue = catalogueDe({
+    chues: true,
+    voitLesMontants,
+    peut: (permission) => peut(user, permission),
+    projet,
+  });
 
   const plage = plageDeFiltres(filters);
   const perimetre: PerimetreChiffres = {

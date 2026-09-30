@@ -4,11 +4,17 @@ import { FiltersBarSkeleton } from '@/components/filters/filters-bar';
 import { ProspectsTableSkeleton } from '@/components/prospects/prospects-table';
 import { ProspectsView } from '@/components/prospects/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardPermission } from '@/lib/guard';
+import { lecteurSeul } from '@/components/layout/nav-items';
+import { type Contexte, RefusPermission } from '@/lib/guard';
 import { canExportProspects, peut, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/prospects/')({
-  beforeLoad: guardPermission('prospects.superviser'),
+  beforeLoad: ({ context }: Contexte) => {
+    const { user } = context;
+    if (!peut(user, 'prospects.superviser') && !lecteurSeul(user, 'prospects.lire')) {
+      throw new RefusPermission(user);
+    }
+  },
   component: TeleconseilProspectsPage,
   pendingComponent: Loading,
 });

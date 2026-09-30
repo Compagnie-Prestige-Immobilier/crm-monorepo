@@ -16,6 +16,7 @@ import {
 import { DeactivateUserDialog } from '@/components/commerciaux/deactivate-user-dialog';
 import { DeleteUsersDialog } from '@/components/commerciaux/delete-users-dialog';
 import { PasswordDialog } from '@/components/commerciaux/password-dialog';
+import { PermissionsCompteDialog } from '@/components/commerciaux/permissions-compte-dialog';
 import { useUserFilters } from '@/components/commerciaux/use-user-filters';
 import { UserFormDialog } from '@/components/commerciaux/user-form-dialog';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -25,7 +26,7 @@ import { formatNumber } from '@/lib/format';
 import { homePath } from '@/lib/nav';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { UserRow } from '@/lib/types';
+import { peut, type UserRow } from '@/lib/types';
 import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +51,8 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [deactivating, setDeactivating] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState<UserRow[]>([]);
+  const [permissionsDe, setPermissionsDe] = useState<UserRow | null>(null);
+  const { data: session } = useQuery(meQueryOptions);
 
   const liste = useQuery({
     queryKey: queryKeys.commerciaux(filters),
@@ -143,6 +146,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
       setFormOpen(true);
     },
     onResetPassword: setPasswordTarget,
+    onPermissions: peut(session, 'roles.administrer') ? setPermissionsDe : null,
     onToggleActive: (user) => {
       if (user.isActive) setDeactivating(user);
       else toggleActive.mutate({ user, isActive: true });
@@ -260,6 +264,12 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           if (!open) setPasswordTarget(null);
         }}
         user={passwordTarget}
+      />
+      <PermissionsCompteDialog
+        user={permissionsDe}
+        onOpenChange={(open) => {
+          if (!open) setPermissionsDe(null);
+        }}
       />
     </div>
   );

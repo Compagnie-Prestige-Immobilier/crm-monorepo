@@ -20,7 +20,10 @@ import (
 const (
 	cheminRoles = "/api/v1/roles"
 	cheminRole  = "/api/v1/roles/{id}"
-	entiteRole  = "role"
+
+	cheminPermissionsCompte = "/api/v1/users/{id}/permissions"
+	entiteRole              = "role"
+	clePermissions          = "permissions"
 )
 
 var GardeRoles = map[string]socle.Permission{
@@ -29,6 +32,8 @@ var GardeRoles = map[string]socle.Permission{
 	"PATCH " + cheminRole:                socle.PermissionRolesAdministrer,
 	"DELETE " + cheminRole:               socle.PermissionRolesAdministrer,
 	"PUT " + cheminRole + "/permissions": socle.PermissionRolesAdministrer,
+	"GET " + cheminPermissionsCompte:     socle.PermissionRolesAdministrer,
+	"PUT " + cheminPermissionsCompte:     socle.PermissionRolesAdministrer,
 }
 
 // Retirer l'une ou l'autre à ADMIN couperait l'accès à l'écran qui répare.
@@ -40,12 +45,14 @@ func monterRoles(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{OperationID: "updateRole", Method: http.MethodPatch, Path: cheminRole}, s.modifierRole)
 	huma.Register(api, huma.Operation{OperationID: "deleteRole", Method: http.MethodDelete, Path: cheminRole}, s.supprimerRole)
 	huma.Register(api, huma.Operation{OperationID: "replaceRolePermissions", Method: http.MethodPut, Path: cheminRole + "/permissions"}, s.remplacerPermissions)
+	huma.Register(api, huma.Operation{OperationID: "getUserPermissions", Method: http.MethodGet, Path: cheminPermissionsCompte}, s.lirePermissionsCompte)
+	huma.Register(api, huma.Operation{OperationID: "replaceUserPermissions", Method: http.MethodPut, Path: cheminPermissionsCompte}, s.remplacerPermissionsCompte)
 }
 
 type RoleDTO struct {
 	ID            string     `json:"id"`
 	Libelle       string     `json:"libelle"`
-	RoleDeBase    socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+	RoleDeBase    socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 	Systeme       bool       `json:"systeme"`
 	Comptes       int        `json:"comptes"`
 	ComptesActifs int        `json:"comptesActifs"`
@@ -191,7 +198,7 @@ func (s *service) ecrireRoles(ctx context.Context, geste func(*db.Queries) error
 type CreerRoleInput struct {
 	Body struct {
 		Libelle     string     `json:"libelle" minLength:"2" maxLength:"60"`
-		RoleDeBase  socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+		RoleDeBase  socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 		Permissions *[]string  `json:"permissions,omitempty"`
 	}
 }
@@ -238,7 +245,7 @@ type ModifierRoleInput struct {
 	ID   string `path:"id"`
 	Body struct {
 		Libelle    *string     `json:"libelle,omitempty" minLength:"2" maxLength:"60"`
-		RoleDeBase *socle.Role `json:"roleDeBase,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+		RoleDeBase *socle.Role `json:"roleDeBase,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 	}
 }
 
@@ -351,7 +358,7 @@ func (s *service) remplacerPermissions(ctx context.Context, in *RemplacerPermiss
 			return err
 		}
 		return database.Auditer(ctx, q, acteur.ID, "role.permissions_change", entiteRole, in.ID,
-			map[string]any{"permissions": avant}, map[string]any{"permissions": apres.Permissions})
+			map[string]any{clePermissions: avant}, map[string]any{clePermissions: apres.Permissions})
 	})
 	if err != nil {
 		return nil, err
@@ -388,14 +395,23 @@ func (s *service) compteDansSesDroits(ctx context.Context, compteID string, nouv
 			roles = append(roles, existant.RoleId)
 		}
 	}
+	permissions := []map[socle.Permission]bool{s.Attributions.PermissionsDuCompte(compteID)}
 	for _, roleID := range roles {
-		for p := range s.Attributions.PermissionsDuRole(roleID) {
-			if !acteur.Peut(p) {
-				return socle.Problem(http.StatusForbidden, "ROLE_HORS_DROITS", "Ce rôle donne des accès que vous n’avez pas.")
-			}
-		}
+		permissions = append(permissions, s.Attributions.PermissionsDuRole(roleID))
+	}
+	if slices.ContainsFunc(permissions, func(p map[socle.Permission]bool) bool { return depasse(&acteur, p) }) {
+		return socle.Problem(http.StatusForbidden, "ROLE_HORS_DROITS", "Ce rôle donne des accès que vous n’avez pas.")
 	}
 	return nil
+}
+
+func depasse(acteur *socle.Utilisateur, permissions map[socle.Permission]bool) bool {
+	for p := range permissions {
+		if !acteur.Peut(p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *service) compteSupprimable(ctx context.Context, id string) (db.UserRoleForUpdateRow, error) {
@@ -453,4 +469,74 @@ func roleDuCompte(ctx context.Context, q *db.Queries, roleID *string, role *socl
 	}
 	roleDeBase := socle.Role(ligne.RoleDeBase)
 	return &ligne.ID, &roleDeBase, nil
+}
+
+type PermissionsCompte struct {
+	Role            []string `json:"role"`
+	Supplementaires []string `json:"supplementaires"`
+}
+
+type PermissionsCompteOutput struct {
+	Body PermissionsCompte
+}
+
+func permissionsCompte(ctx context.Context, q *db.Queries, id string) (PermissionsCompte, error) {
+	compte, err := q.UserRoleForUpdate(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PermissionsCompte{}, socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Compte introuvable.")
+	}
+	if err != nil {
+		return PermissionsCompte{}, err
+	}
+	duRole, err := q.RolePermissions(ctx, compte.RoleId)
+	if err != nil {
+		return PermissionsCompte{}, err
+	}
+	supplementaires, err := q.UserPermissions(ctx, id)
+	if err != nil {
+		return PermissionsCompte{}, err
+	}
+	return PermissionsCompte{Role: duRole, Supplementaires: supplementaires}, nil
+}
+
+type LirePermissionsCompteInput struct {
+	ID string `path:"id"`
+}
+
+func (s *service) lirePermissionsCompte(ctx context.Context, in *LirePermissionsCompteInput) (*PermissionsCompteOutput, error) {
+	permissions, err := permissionsCompte(ctx, s.Q, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &PermissionsCompteOutput{Body: permissions}, nil
+}
+
+func (s *service) remplacerPermissionsCompte(ctx context.Context, in *RemplacerPermissionsInput) (*PermissionsCompteOutput, error) {
+	acteur := socle.UtilisateurCourant(ctx)
+	permissions, err := permissionsValides(in.Body.Permissions)
+	if err != nil {
+		return nil, err
+	}
+	var apres PermissionsCompte
+	err = s.ecrireRoles(ctx, func(q *db.Queries) error {
+		avant, err := permissionsCompte(ctx, q, in.ID)
+		if err != nil {
+			return err
+		}
+		if err := q.DeleteUserPermissions(ctx, in.ID); err != nil {
+			return err
+		}
+		if err := q.InsertUserPermissions(ctx, db.InsertUserPermissionsParams{UserID: in.ID, Permissions: permissions, AccordePar: acteur.ID}); err != nil {
+			return err
+		}
+		if apres, err = permissionsCompte(ctx, q, in.ID); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur.ID, "user.permissions_change", "user", in.ID,
+			map[string]any{clePermissions: avant.Supplementaires}, map[string]any{clePermissions: apres.Supplementaires})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PermissionsCompteOutput{Body: apres}, nil
 }

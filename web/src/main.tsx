@@ -1,3 +1,4 @@
+import { ApiError } from '@crm/api-client/query';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -26,7 +27,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: (echecs, erreur) =>
+        echecs < 1 && !(erreur instanceof ApiError && erreur.status === 403),
       // Hors ligne, une requête doit échouer et le dire, pas rester en pause sur un squelette.
       networkMode: 'always',
     },

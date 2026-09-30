@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/tableau-de-bord')({
-  beforeLoad: guardPermission('analytics.superviser'),
+  beforeLoad: guardPermission('analytics.superviser', 'chiffres.consulter'),
   component: TeleconseilTableauDeBordPage,
   pendingComponent: Loading,
 });

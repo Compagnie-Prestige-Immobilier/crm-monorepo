@@ -19,6 +19,7 @@ const (
 	Direction       Role = "DIRECTION"
 	Accueil         Role = "ACCUEIL"
 	ChargeClientele Role = "CHARGE_CLIENTELE"
+	Observateur     Role = "OBSERVATEUR"
 	Public          Role = "PUBLIC"
 )
 

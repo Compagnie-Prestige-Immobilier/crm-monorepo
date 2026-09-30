@@ -40,7 +40,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { type Permission, peut, type SessionUser } from '@/lib/types';
+import { type Permission, peut, readsOnly, type SessionUser } from '@/lib/types';
 
 /** Écran de choix, seul atterrissage après connexion. */
 export const HUB_PATH = '/espaces';
@@ -88,21 +88,24 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Accueil',
     path: '/accueil',
     description: 'Registre des visites du comptoir',
-    acces: 'accueil.registre',
+    acces: 'accueil.consulter',
   },
   {
     id: 'teleconseil',
     label: 'Commercial',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
-    acces: 'fiches.tenir',
+    acces: (visiteur) =>
+      (
+        ['fiches.tenir', 'prospects.lire', 'representants.lire', 'analytics.superviser'] as const
+      ).some((permission) => peut(visiteur, permission)),
   },
   {
     id: 'finance',
     label: 'Banque & Finance',
     path: '/finance',
     description: 'Dossiers bancaires et demandes de création de client',
-    acces: 'banque.lire',
+    acces: (visiteur) => peut(visiteur, 'banque.lire') || peut(visiteur, 'banque.dossiers_lire'),
   },
   {
     id: 'ventes',
@@ -152,6 +155,13 @@ export interface NavSection {
 const TERRAIN: Permission = 'fiches.tenir';
 const ENCADREMENT: Permission = 'analytics.superviser';
 
+const voitLeTableau = (visiteur: Visiteur, permission: Permission): boolean =>
+  peut(visiteur, permission) && peut(visiteur, 'chiffres.consulter');
+
+/** Un compte qui lit sans tenir de fiche, comme l'observateur. */
+export const lecteurSeul = (visiteur: Visiteur, permission: Permission): boolean =>
+  readsOnly(visiteur) && peut(visiteur, permission);
+
 /**
  * Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la
  * règle. L'ordre des entrées EST l'ordre de la barre ; les entrées `secondary`
@@ -175,7 +185,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Registre des visites',
         icon: ClipboardListIcon,
         description: 'Visites du jour et saisie',
-        acces: 'accueil.registre',
+        acces: 'accueil.consulter',
       },
       {
         href: '/accueil/rendez-vous',
@@ -199,7 +209,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Affluence et motifs de visite',
-        acces: 'chiffres.disposer',
+        acces: 'chiffres.consulter',
         hidden: true,
       },
       {
@@ -243,14 +253,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de pilotage',
         icon: GaugeIcon,
         description: 'Ventes, encaissements, objectifs, Banque & Finance et risques',
-        acces: 'chiffres.voir_montants',
+        acces: (visiteur) => voitLeTableau(visiteur, 'chiffres.voir_montants'),
       },
       {
         href: '/teleconseil/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Appels, adhésions et encaissements',
-        acces: 'analytics.superviser',
+        acces: (visiteur) => voitLeTableau(visiteur, 'analytics.superviser'),
       },
       {
         href: '/teleconseil/campagnes',
@@ -355,7 +365,8 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Les fiches déjà notées',
         // Le téléconseiller et le chargé de clientèle appellent depuis leur
         // console : cette liste suit le travail des autres.
-        acces: 'prospects.superviser',
+        acces: (visiteur) =>
+          peut(visiteur, 'prospects.superviser') || lecteurSeul(visiteur, 'prospects.lire'),
         secondary: true,
       },
       {
@@ -387,7 +398,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Les enseignants déjà appelés',
-        acces: TERRAIN,
+        acces: 'representants.lire',
         secondary: true,
       },
       {
@@ -424,7 +435,8 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Dossiers bancaires',
         icon: FolderOpenIcon,
         description: 'Dossiers déposés en banque',
-        acces: 'banque.dossiers',
+        acces: (visiteur) =>
+          peut(visiteur, 'banque.dossiers_lire') && peut(visiteur, 'banque.lire'),
       },
       {
         href: '/finance/dossiers/nouveau',
@@ -438,7 +450,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Clients à créer',
         icon: UserPlusIcon,
         description: 'Créations de client demandées',
-        acces: 'banque.dossiers',
+        acces: 'banque.dossiers_lire',
       },
       {
         href: '/finance/dossiers/export',
@@ -525,7 +537,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de pilotage',
         icon: GaugeIcon,
         description: 'Ventes, encaissements, objectifs, Banque & Finance et risques',
-        acces: 'chiffres.voir_montants',
+        acces: (visiteur) => voitLeTableau(visiteur, 'chiffres.voir_montants'),
       },
       {
         href: '/admin/commerciaux',
@@ -701,10 +713,15 @@ function navItems(visiteur: Visiteur, coque: Coque): NavItem[] {
   return navSections(visiteur, coque).flatMap((section) => section.items);
 }
 
-/** Premier écran d'une coque pour ce rôle : le premier de la barre qui vit dans la coque, replis exclus. */
+/**
+ * Premier écran d'une coque pour ce rôle : le premier de la barre qui vit dans la coque.
+ * Les replis ne servent que si rien d'autre n'est ouvert, comme pour un observateur.
+ */
 export function coqueHomePath(visiteur: Visiteur, coque: Coque): string {
-  const principaux = navItems(visiteur, coque).filter((item) => item.secondary !== true);
-  const first = principaux.find((item) => coqueOf(item.href) === coque) ?? principaux[0];
+  const ouverts = navItems(visiteur, coque);
+  const principaux = ouverts.filter((item) => item.secondary !== true);
+  const first =
+    principaux.find((item) => coqueOf(item.href) === coque) ?? principaux[0] ?? ouverts[0];
   return first?.href ?? HUB_PATH;
 }
 
@@ -713,9 +730,9 @@ const ATTERRISSAGES: readonly { href: string; acces: Acces }[] = [
     href: '/admin/pilotage',
     acces: (v) => peut(v, 'comptes.administrer') && peut(v, 'chiffres.voir_montants'),
   },
-  { href: '/teleconseil/tableau-de-bord', acces: 'analytics.superviser' },
+  { href: '/teleconseil/tableau-de-bord', acces: (v) => voitLeTableau(v, 'analytics.superviser') },
   { href: '/teleconseil', acces: 'fiches.tenir' },
-  { href: '/accueil', acces: 'accueil.registre' },
+  { href: '/accueil', acces: 'accueil.consulter' },
   { href: '/finance', acces: 'banque.lire' },
 ];
 

@@ -373,6 +373,7 @@ function RequestProspectLink({
   request: ClientRequest;
   canReview: boolean;
 }) {
+  const { data: user } = useQuery(meQueryOptions);
   if (request.createdProspectId === null) return null;
 
   // Un LIEN habillé en bouton : la primitive `Button` de Base UI
@@ -388,6 +389,7 @@ function RequestProspectLink({
     );
   }
 
+  if (!peut(user, 'banque.dossiers')) return null;
   return (
     <Link href="/finance/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
       Ouvrir un dossier pour ce client
