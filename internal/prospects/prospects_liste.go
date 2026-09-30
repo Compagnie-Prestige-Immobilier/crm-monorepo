@@ -122,7 +122,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		LastCallAt: prospectISOPtr(p.LastCallAt), LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		HomonymeTelephone: l.HomonymeTelephone, HomonymeAppeleAt: prospectISOPtr(l.HomonymeAppeleAt), HomonymeAppelePar: l.HomonymeAppelePar,
-		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
+		Origin: p.Origin, OriginLabel: p.OriginLabel, CampagneMarketing: p.CampagneMarketing, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		RendezVousIssue: p.RendezVousIssue, RendezVousConfirmation: p.RendezVousConfirmation, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		// string_agg ne rend rien hors campagne : le vide devient un tiret.
 		Campagne: prospectVide(string(l.CampagneNoms)), RendezVousAt: prospectISOPtr(l.RendezVousAt),
@@ -194,10 +194,16 @@ func (s *service) prospectCharger(ctx context.Context, arg *db.ListProspectsPara
 	for i := range tentatives {
 		derniere[tentatives[i].ProspectID] = &tentatives[i]
 	}
+	u := socle.UtilisateurCourant(ctx)
+	voitOrigine := u.Peut(socle.PermissionFichesVoirOrigine)
 	items := make([]Prospect, 0, len(lignes))
 	for i := range lignes {
 		id := lignes[i].Prospect.ID
-		items = append(items, prospectDepuisLigne(&lignes[i], parProspect[id], derniere[id]))
+		item := prospectDepuisLigne(&lignes[i], parProspect[id], derniere[id])
+		if !voitOrigine {
+			item.Origin, item.OriginLabel, item.CampagneMarketing, item.Campagne = nil, nil, nil, nil
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }

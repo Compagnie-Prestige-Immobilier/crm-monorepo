@@ -17,6 +17,9 @@ func provenanceEtDateGrandPublicImport(ligne *ligneGrandPublicImport, cellules m
 	canal := cellules[enteteGrandPublicImport(8)]
 	provenance := provenanceGrandPublicImport(canal, cellules[enteteGrandPublicImport(23)], etat)
 	ligne.canalID, ligne.projet = provenance.canalID, provenance.projet
+	if nom := strings.TrimSpace(canal); nom != "" {
+		ligne.campagne = &nom
+	}
 	if !provenance.sure {
 		ligne.avertissements = append(ligne.avertissements, *refusImport(ligne.numero, enteteGrandPublicImport(8), codeCanalAVerifierImport,
 			fmt.Sprintf("Canal « %s » non reconnu : la fiche reste Grand Public, vérifiez le projet.", canal)))
