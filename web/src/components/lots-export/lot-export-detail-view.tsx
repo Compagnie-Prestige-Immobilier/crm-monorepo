@@ -25,7 +25,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { BoutonTri, SortableTableHead, ariaSortDe } from '@/components/ui/sortable-table-head';
+import { InfoPopover } from '@/components/ui/info-popover';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { BoutonAjoutTeleconseiller } from '@/components/lots-export/lot-ajout-teleconseiller';
 import { LotExportFiches } from '@/components/lots-export/lot-export-fiches';
@@ -794,17 +795,42 @@ const COLONNES_PERFORMANCE = {
   objectif: (ligne: LotExportDetail['performance'][number]) => ligne.objectif,
   traitees: (ligne: LotExportDetail['performance'][number]) => ligne.treated,
   couverture: (ligne: LotExportDetail['performance'][number]) => ligne.completionRate,
-  appelsAttribues: (ligne: LotExportDetail['performance'][number]) => ligne.assignedCalls,
+  appelsPasses: (ligne: LotExportDetail['performance'][number]) => ligne.assignedCalls,
   horsAttribution: (ligne: LotExportDetail['performance'][number]) => ligne.outsideAssignmentCalls,
 };
 
 const ENTETES_PERFORMANCE = [
   { id: 'teleconseiller', label: 'Téléconseiller' },
-  { id: 'objectif', label: 'Objectif par jour', className: 'text-right' },
-  { id: 'traitees', label: 'Traitées', className: 'text-right' },
-  { id: 'couverture', label: 'Couverture', className: 'text-right' },
-  { id: 'appelsAttribues', label: 'Appels attribués', className: 'text-right' },
-  { id: 'horsAttribution', label: 'Hors attribution', className: 'text-right' },
+  {
+    id: 'objectif',
+    label: 'Objectif par jour',
+    className: 'text-right',
+    aide: 'Nombre de fiches que le téléconseiller doit traiter chaque jour dans cette campagne.',
+  },
+  {
+    id: 'traitees',
+    label: 'Traitées',
+    className: 'text-right',
+    aide: 'Fiches différentes sur lesquelles il a consigné au moins un appel, sur le nombre de fiches qui lui sont confiées. Cliquer sur le chiffre ouvre ses fiches.',
+  },
+  {
+    id: 'couverture',
+    label: 'Couverture',
+    className: 'text-right',
+    aide: 'Part de ses fiches déjà traitées.',
+  },
+  {
+    id: 'appelsPasses',
+    label: 'Appels passés',
+    className: 'text-right',
+    aide: 'Tous les appels consignés sur ses fiches depuis le lancement, rappels compris. Plus d’appels que de fiches traitées veut dire qu’il a rappelé certaines personnes.',
+  },
+  {
+    id: 'horsAttribution',
+    label: 'Hors attribution',
+    className: 'text-right',
+    aide: 'Appels qu’il a passés sur des fiches confiées à un collègue dans cette campagne.',
+  },
 ] as const;
 
 function CartePerformance({
@@ -843,16 +869,38 @@ function CartePerformance({
         <Table aria-label="Performance de la campagne">
           <TableHeader>
             <TableRow>
-              {ENTETES_PERFORMANCE.map((colonne) => (
-                <SortableTableHead
-                  key={colonne.id}
-                  column={colonne}
-                  className={'className' in colonne ? colonne.className : undefined}
-                  sortBy={tri.sortBy}
-                  sortDir={tri.sortDir}
-                  onToggle={tri.toggle}
-                />
-              ))}
+              {ENTETES_PERFORMANCE.map((colonne) =>
+                'aide' in colonne ? (
+                  <TableHead
+                    key={colonne.id}
+                    className={colonne.className}
+                    aria-sort={ariaSortDe({
+                      column: colonne,
+                      sortBy: tri.sortBy,
+                      sortDir: tri.sortDir,
+                      onToggle: tri.toggle,
+                    })}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <BoutonTri
+                        column={colonne}
+                        sortBy={tri.sortBy}
+                        sortDir={tri.sortDir}
+                        onToggle={tri.toggle}
+                      />
+                      <InfoPopover label={colonne.label} description={colonne.aide} />
+                    </span>
+                  </TableHead>
+                ) : (
+                  <SortableTableHead
+                    key={colonne.id}
+                    column={colonne}
+                    sortBy={tri.sortBy}
+                    sortDir={tri.sortDir}
+                    onToggle={tri.toggle}
+                  />
+                ),
+              )}
               {peutRegler ? (
                 <TableHead scope="col" className="text-right">
                   <span className="sr-only">Retirer de la campagne</span>
@@ -884,12 +932,6 @@ function CartePerformance({
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatRate(ligne.completionRate)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
                   <Button
                     type="button"
                     variant="link"
@@ -899,8 +941,14 @@ function CartePerformance({
                       onVoirFiches(ligne.teleconseillerId);
                     }}
                   >
-                    {formatNumber(ligne.assignedCalls)}
+                    {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
                   </Button>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatRate(ligne.completionRate)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatNumber(ligne.assignedCalls)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {ligne.outsideAssignmentCalls === 0 ? (
