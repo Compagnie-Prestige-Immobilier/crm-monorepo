@@ -93,6 +93,7 @@ const (
 	PermissionBanqueVoirTousPortefeuilles Permission = "banque.voir_tous_portefeuilles"
 	PermissionCampagnesAttributionsToutes Permission = "campagnes.attributions_toutes"
 	PermissionExportsVoirTout             Permission = "exports.voir_tout"
+	PermissionFichesVoirOrigine           Permission = "fiches.voir_origine"
 )
 
 var Catalogue = map[Permission]definitionPermission{
@@ -159,6 +160,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionBanqueVoirTousPortefeuilles: {domaineBanque, "Voir les demandes de tous les portefeuilles", AdminSeul},
 	PermissionCampagnesAttributionsToutes: {domaineCampagnes, "Voir toutes les attributions", []Role{Admin, Superviseur, Direction, BanqueFinance, Accueil}},
 	PermissionExportsVoirTout:             {domaineExports, "Exporter le portefeuille d'un autre", Encadrement},
+	PermissionFichesVoirOrigine:           {domaineFiches, "Voir d'où vient une fiche : campagne publicitaire et campagnes d'appels", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
 }
 
 var permissionsDePortee = map[Permission]bool{
@@ -178,6 +180,7 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionCampagnesAttributionsToutes: true,
 	PermissionExportsVoirTout:             true,
 	PermissionProspectsReaffecterTout:     true,
+	PermissionFichesVoirOrigine:           true,
 }
 
 // Chaque base porte sa table `role_permissions` ; sa garde lit ses propres

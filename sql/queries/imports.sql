@@ -184,15 +184,17 @@ UPDATE "prospects" SET
   "nom" = CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
   "prenom" = CASE WHEN "prenom" = '' THEN @prenom::text ELSE "prenom" END,
   "email" = COALESCE("email", sqlc.narg('email')),
+  "campagneMarketing" = COALESCE("campagneMarketing", sqlc.narg('campagne_marketing')),
   "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL
-  AND ("canalProvenanceId", "remarqueImport", "nom", "prenom", "email")
+  AND ("canalProvenanceId", "remarqueImport", "nom", "prenom", "email", "campagneMarketing")
       IS DISTINCT FROM
       (COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),
        COALESCE(sqlc.narg('remarque_import'), "remarqueImport"),
        CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
        CASE WHEN "prenom" = '' THEN @prenom::text ELSE "prenom" END,
-       COALESCE("email", sqlc.narg('email')));
+       COALESCE("email", sqlc.narg('email')),
+       COALESCE("campagneMarketing", sqlc.narg('campagne_marketing')));
 
 -- name: ImportVisitesConnues :many
 SELECT "visitedAt", "timeKnown", "visitorName", "entrepriseId" FROM "visites"
@@ -231,7 +233,7 @@ INSERT INTO "prospects" (
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
   "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
-  "createdById", "clientCreatedAt", "importJobId", "importFeuille", "remarqueImport", "updatedAt"
+  "createdById", "clientCreatedAt", "importJobId", "importFeuille", "remarqueImport", "campagneMarketing", "updatedAt"
 ) VALUES (@id, @projet, @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
@@ -240,7 +242,7 @@ INSERT INTO "prospects" (
           sqlc.narg('ville_residence'), @whatsapp_status, sqlc.narg('whatsapp_e164'),
           sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'),
           @created_by_id, @client_created_at, @import_job_id, sqlc.narg('import_feuille'),
-          sqlc.narg('remarque_import'), now())
+          sqlc.narg('remarque_import'), sqlc.narg('campagne_marketing'), now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectJourney :batchexec
