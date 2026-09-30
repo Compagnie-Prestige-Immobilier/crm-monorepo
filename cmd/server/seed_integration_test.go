@@ -237,40 +237,50 @@ func TestSeedFactoryTableauxDeBord(t *testing.T) {
 		for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
 			seedVerifierTableau(b, projet, jour)
 		}
-		for table, attendu := range map[string]int{
-			"prospects": factoryProspects, "representants": factoryRepresentants, "call_attempts": factoryProspects,
-			"rep_call_attempts": factoryRepresentants, "visites": factoryVisites, "ouvertures_fiche": factoryProspects,
-		} {
-			var nombre int
-			if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
-				t.Fatal(err)
-			}
-			if nombre != attendu {
-				t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
-			}
-		}
-		var rappelsAVenir int
-		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "scheduled_callbacks" WHERE "scheduledAt" > now() + interval '300 days'`).Scan(&rappelsAVenir); err != nil {
-			t.Fatal(err)
-		}
-		if rappelsAVenir == 0 {
-			t.Fatalf("passage %d : aucun rappel programmé à plus de 300 jours", passage)
-		}
-		var honores, confirmes, closings int
-		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FILTER (WHERE "rendezVousIssue"='HONORE'), count(*) FILTER (WHERE "rendezVousConfirmation"='CONFIRME'),
-			(SELECT count(*) FROM "rendez_vous_closings")
-			FROM "prospects" WHERE "phase2Status"='APPOINTMENT' AND id LIKE '0199f100-%'`).Scan(&honores, &confirmes, &closings); err != nil {
-			t.Fatal(err)
-		}
-		var sansSite int
-		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "call_attempts" a JOIN "prospects" p ON p.id=a."prospectId" WHERE p."phase2Status"='APPOINTMENT' AND p.id LIKE '0199f100-%' AND (a."siteId" IS NULL OR a."pointRencontreId" IS NULL)`).Scan(&sansSite); err != nil {
-			t.Fatal(err)
-		}
-		if honores == 0 || confirmes == 0 || closings == 0 || sansSite != 0 {
-			t.Fatalf("passage %d : rendez-vous honorés %d, confirmés %d, closings %d", passage, honores, confirmes, closings)
-		}
+		seedVerifierVolumes(b, passage)
+		seedVerifierRendezVous(b, passage)
 		seedVerifierInscriptionsAOuvrir(b, passage)
 		seedVerifierVentes(b, passage)
+	}
+}
+
+func seedVerifierVolumes(b *banc, passage int) {
+	b.t.Helper()
+	for table, attendu := range map[string]int{
+		"prospects": factoryProspects, "representants": factoryRepresentants, "call_attempts": factoryProspects,
+		"rep_call_attempts": factoryRepresentants, "visites": factoryVisites, "ouvertures_fiche": factoryProspects,
+	} {
+		var nombre int
+		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
+			b.t.Fatal(err)
+		}
+		if nombre != attendu {
+			b.t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
+		}
+	}
+	var rappelsAVenir int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "scheduled_callbacks" WHERE "scheduledAt" > now() + interval '300 days'`).Scan(&rappelsAVenir); err != nil {
+		b.t.Fatal(err)
+	}
+	if rappelsAVenir == 0 {
+		b.t.Fatalf("passage %d : aucun rappel programmé à plus de 300 jours", passage)
+	}
+}
+
+func seedVerifierRendezVous(b *banc, passage int) {
+	b.t.Helper()
+	var honores, confirmes, closings int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FILTER (WHERE "rendezVousIssue"='HONORE'), count(*) FILTER (WHERE "rendezVousConfirmation"='CONFIRME'),
+		(SELECT count(*) FROM "rendez_vous_closings")
+		FROM "prospects" WHERE "phase2Status"='APPOINTMENT' AND id LIKE '0199f100-%'`).Scan(&honores, &confirmes, &closings); err != nil {
+		b.t.Fatal(err)
+	}
+	var sansSite int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "call_attempts" a JOIN "prospects" p ON p.id=a."prospectId" WHERE p."phase2Status"='APPOINTMENT' AND p.id LIKE '0199f100-%' AND (a."siteId" IS NULL OR a."pointRencontreId" IS NULL)`).Scan(&sansSite); err != nil {
+		b.t.Fatal(err)
+	}
+	if honores == 0 || confirmes == 0 || closings == 0 || sansSite != 0 {
+		b.t.Fatalf("passage %d : rendez-vous honorés %d, confirmés %d, closings %d", passage, honores, confirmes, closings)
 	}
 }
 
