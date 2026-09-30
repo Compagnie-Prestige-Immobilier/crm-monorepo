@@ -730,7 +730,7 @@ type ligneGrandPublicImport struct {
 	typeContrat                                            *db.TypeContrat
 	modeEpargne                                            *db.ModeEpargne
 	paysID, villeResidence, whatsapp, relaisNom, relaisTel *string
-	feuille, remarque                                      *string
+	feuille, remarque, campagne                            *string
 	// Le Canal cite une plateforme d'enrôlement : la personne n'existe que
 	// là-bas, sa ligne se compte sans jamais entrer dans les fiches.
 	plateforme bool
@@ -1345,7 +1345,7 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			WhatsappStatus: statut, WhatsappE164: numero, RelaisNom: ligne.relaisNom,
 			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur,
 			ClientCreatedAt: ligne.creeLe, ImportJobID: &c.jobID, ImportFeuille: ligne.feuille,
-			RemarqueImport: ligne.remarque,
+			RemarqueImport: ligne.remarque, CampagneMarketing: ligne.campagne,
 		})
 	}
 	if err := executerLotImport(q.InsertImportProspectGrandPublic(ctx, fiches).Exec); err != nil {
@@ -1416,7 +1416,7 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 	}
 	rangs, err := q.ImportMettreAJourProspectGrandPublic(ctx, db.ImportMettreAJourProspectGrandPublicParams{
 		ID: connue.id, CanalProvenanceID: ligne.canalID, RemarqueImport: ligne.remarque,
-		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email,
+		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email, CampagneMarketing: ligne.campagne,
 	})
 	if err != nil || rangs == 0 {
 		return false, err
@@ -1424,7 +1424,7 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 	if err := database.Auditer(ctx, q, c.demandeur, "prospect.import", "prospect", connue.id, nil,
 		map[string]any{
 			"canalProvenanceId": ligne.canalID, "remarqueImport": ligne.remarque,
-			"onglet": ligne.feuille,
+			"onglet": ligne.feuille, "campagneMarketing": ligne.campagne,
 		}); err != nil {
 		return false, err
 	}

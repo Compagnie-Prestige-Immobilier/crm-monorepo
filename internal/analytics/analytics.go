@@ -116,6 +116,7 @@ type FiltreDesAnalyses struct {
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById"`
+	LotID                  string `query:"lotId" doc:"Fiches confiées par cette campagne d'appels."`
 	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
@@ -226,6 +227,10 @@ func filtresComposes(f *FiltreDesAnalyses, p *parametresSQL) []string {
 		conditions = append(conditions, `EXISTS (SELECT 1 FROM "call_attempts" ca
 			WHERE ca."prospectId" = p."id" AND ca."performedById" = `+p.marque(f.AppelePar)+`)`)
 	}
+	if f.LotID != "" {
+		conditions = append(conditions, `EXISTS (SELECT 1 FROM "lot_export_items" li
+			WHERE li."prospectId" = p."id" AND li."lotId" = `+p.marque(f.LotID)+`)`)
+	}
 	return conditions
 }
 
@@ -290,7 +295,7 @@ func (s *service) cleDeCacheDesAnalyses(ctx context.Context, route string, f *Fi
 	return s.Cfg.Base + ":" + route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
 		f.Search, f.RepresentantID, f.BanqueID, f.SyndicatID, f.DepartementID, f.CommercialID,
 		f.Projet, f.Type, f.CanalProvenanceID, f.Statut, f.Segment, f.Phase2Status,
-		f.EnrollmentMethod, f.AppelePar, f.EnrollmentCapturedByID, f.Origin,
+		f.EnrollmentMethod, f.AppelePar, f.EnrollmentCapturedByID, f.LotID, f.Origin,
 		f.DateFrom, f.DateTo, f.Revue, strconv.FormatBool(f.IncludeDeleted),
 	}, "|")
 }

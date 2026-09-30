@@ -41,11 +41,28 @@ export function useVoitLeSegment(): boolean {
   return peut(user, 'fiches.voir_segment');
 }
 
+/** La première campagne d'appels est la plus ancienne : le serveur les rend des plus récentes aux plus anciennes. */
+function premiereCampagneAppels(prospect: ProspectRow): string | null {
+  return prospect.campagne?.split(' · ').at(-1) ?? null;
+}
+
+function origineDe(prospect: ProspectRow): string {
+  const publicite = [prospect.canalProvenanceLabel, prospect.campagneMarketing]
+    .filter((partie) => partie !== null && partie !== '')
+    .join(' · ');
+  const campagneAppels = premiereCampagneAppels(prospect);
+  const candidats = [
+    prospect.representantName === null ? null : `Apporté par ${prospect.representantName}`,
+    prospect.origin === 'BANQUE' ? `Banque ${ouVide(prospect.originLabel)}` : null,
+    prospect.origin === 'FORMULAIRE_PUBLIC' ? 'Formulaire public' : null,
+    publicite === '' ? null : publicite,
+    campagneAppels === null ? null : `Campagne d’appels ${campagneAppels}`,
+  ];
+  return candidats.find((candidat) => candidat !== null) ?? 'Origine non renseignée';
+}
+
 function evenementCreation(prospect: ProspectRow): EvenementHistorique {
-  const origine =
-    prospect.representantName === null
-      ? ouVide(prospect.originLabel, 'Origine non renseignée')
-      : `Apporté par ${prospect.representantName}`;
+  const origine = origineDe(prospect);
   return {
     id: `creation-${prospect.id}`,
     categorie: 'fiche',
@@ -65,7 +82,10 @@ function evenementCreation(prospect: ProspectRow): EvenementHistorique {
         <Champ label="Téléconseiller">{prospect.ownedByCommercialName}</Champ>
         <Champ label="Le">{formatDateTime(prospect.clientCreatedAt)}</Champ>
         <Champ label="Représentant">{ouVide(prospect.representantName)}</Champ>
-        <Champ label="Origine">{ouVide(prospect.originLabel)}</Champ>
+        <Champ label="Origine">{origine}</Champ>
+        <Champ label="Canal">{ouVide(prospect.canalProvenanceLabel)}</Champ>
+        <Champ label="Campagne publicitaire">{ouVide(prospect.campagneMarketing)}</Champ>
+        <Champ label="Campagnes d’appels">{ouVide(prospect.campagne)}</Champ>
       </dl>
     ),
   };

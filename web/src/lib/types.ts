@@ -223,6 +223,7 @@ export const PERMISSIONS = [
   'fiches.parametres_reserves',
   'fiches.tenir',
   'fiches.voir_converties',
+  'fiches.voir_origine',
   'fiches.voir_segment',
   'formulaires.administrer',
   'imports.administrer',

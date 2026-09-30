@@ -52,11 +52,16 @@ export interface PerimetreChiffres {
   commercialId: string | null;
   /** Une seule campagne d'appels prospects, ou toutes. */
   lotId: string | null;
+  /** Heure « HH:MM » où commence le premier jour ; null pour minuit. */
+  heureDebut: string | null;
 }
 
-const bornes = (plage: ActivityRange): { actFrom: string; actTo: string } => ({
-  actFrom: `${plage.from}T00:00:00.000Z`,
-  actTo: `${plage.to}T23:59:59.999Z`,
+export const premierInstant = (perimetre: PerimetreChiffres): string =>
+  `${perimetre.plage.from}T${perimetre.heureDebut ?? '00:00'}:00.000Z`;
+
+const bornes = (perimetre: PerimetreChiffres): { actFrom: string; actTo: string } => ({
+  actFrom: premierInstant(perimetre),
+  actTo: `${perimetre.plage.to}T23:59:59.999Z`,
 });
 
 /**
@@ -66,17 +71,24 @@ const bornes = (plage: ActivityRange): { actFrom: string; actTo: string } => ({
  */
 const filtresProspect = (
   perimetre: PerimetreChiffres,
-): { projet?: Projet; dateFrom: string; dateTo: string; commercialId?: string } => ({
+): {
+  projet?: Projet;
+  dateFrom: string;
+  dateTo: string;
+  commercialId?: string;
+  lotId?: string;
+} => ({
   ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
-  dateFrom: perimetre.plage.from,
+  dateFrom: perimetre.heureDebut === null ? perimetre.plage.from : premierInstant(perimetre),
   dateTo: perimetre.plage.to,
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+  ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
 });
 
 const filtresSupervision = (
   perimetre: PerimetreChiffres,
 ): { actFrom: string; actTo: string; projet?: Projet; commercialId?: string; lotId?: string } => ({
-  ...bornes(perimetre.plage),
+  ...bornes(perimetre),
   ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
   ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
