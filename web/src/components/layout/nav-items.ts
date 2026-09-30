@@ -474,19 +474,21 @@ const SECTIONS: readonly NavSection[] = [
     coque: 'ventes',
     title: null,
     items: [
-      {
-        href: '/ventes/nouvelle',
-        label: 'Nouvelle vente',
-        icon: PlusCircleIcon,
-        description: 'Enregistrer une vente pas à pas',
-        acces: 'ventes.gerer',
-      },
+      // La première entrée est la porte de l'espace : une page, jamais la saisie,
+      // dont la fermeture ramènerait hors de l'espace.
       {
         href: '/ventes',
         label: 'Toutes les ventes',
         icon: FileSpreadsheetIcon,
         description: 'Ventes, échéances et sites',
         acces: 'ventes.lire',
+      },
+      {
+        href: '/ventes/nouvelle',
+        label: 'Nouvelle vente',
+        icon: PlusCircleIcon,
+        description: 'Enregistrer une vente pas à pas',
+        acces: 'ventes.gerer',
       },
       {
         href: '/ventes/echeances',
