@@ -220,6 +220,7 @@ type Prospect struct {
 	HomonymeAppeleAt         *string           `json:"homonymeAppeleAt" doc:"Dernier appel de cette fiche homonyme."`
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
 	OriginLabel              *string           `json:"originLabel"`
+	CampagneMarketing        *string           `json:"campagneMarketing" doc:"Campagne publicitaire nommée par la colonne Canal du classeur des leads."`
 	ARevoirAt                *string           `json:"aRevoirAt"`
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
 	RendezVousConfirmation   *string           `json:"rendezVousConfirmation" enum:"CONFIRME,ANNULE,A_RECONTACTER"`

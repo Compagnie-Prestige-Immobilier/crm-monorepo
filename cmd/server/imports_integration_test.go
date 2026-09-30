@@ -810,6 +810,7 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	}}
 	travail = b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{douze, treize}), nomClasseur)
 	verifierSecondReleveLeadsTest(b, travail, tels[0], lotID)
+	verifierOrigineDuLeadTest(b, a.id)
 
 	commercial := adminSession(b, commercialEmail)
 	statut, body := adminAppel(commercial, http.MethodPost, "/api/v1/ouvertures", ouvertureFiche(a.id))
@@ -817,6 +818,23 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 		t.Fatalf("le rappel promis doit rester ouvrable par le téléconseiller : %d %v", statut, body)
 	}
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
+}
+
+// La campagne publicitaire du premier relevé reste l'origine ; sans la permission, elle ne sort pas.
+func verifierOrigineDuLeadTest(b *banc, prospectID string) {
+	b.t.Helper()
+	statut, fiche := adminAppel(b, http.MethodGet, "/api/v1/prospects/"+prospectID, nil)
+	if statut != http.StatusOK || fiche["campagneMarketing"] != strings.TrimSpace(canalMetaChuesTest) || fiche["campagne"] != "Campagne CHUES test" {
+		b.t.Fatalf("origine du lead : %d %v %v", statut, fiche["campagneMarketing"], fiche["campagne"])
+	}
+	roleID := creerRolePersonnalise(b, "Lecteur sans origine "+uuid.NewString()[:8], socle.Admin, []string{
+		string(socle.PermissionPanneauAcceder), string(socle.PermissionProspectsLire), string(socle.PermissionPortefeuilleVoirTout),
+	})
+	_, email := compteDuRole(b, roleID)
+	statut, fiche = adminAppel(adminSession(b, email), http.MethodGet, "/api/v1/prospects/"+prospectID, nil)
+	if statut != http.StatusOK || fiche["campagneMarketing"] != nil || fiche["campagne"] != nil {
+		b.t.Fatalf("sans fiches.voir_origine : %d %v %v", statut, fiche["campagneMarketing"], fiche["campagne"])
+	}
 }
 
 // « oct », « nov » et « déc » font reconnaître l'onglet, qui corrige alors l'inversion jour/mois.
