@@ -57,3 +57,16 @@ SELECT pg_advisory_xact_lock(hashtext('roles.administrer'));
 SELECT COUNT(*)::int FROM "users" u
 JOIN "role_permissions" rp ON rp."roleId" = u."roleId" AND rp."permission" = 'roles.administrer'
 WHERE u."isActive" AND u."deletedAt" IS NULL;
+
+-- name: ListUserPermissions :many
+SELECT "userId", "permission" FROM "user_permissions" ORDER BY "userId", "permission";
+
+-- name: UserPermissions :many
+SELECT "permission" FROM "user_permissions" WHERE "userId" = $1 ORDER BY "permission";
+
+-- name: DeleteUserPermissions :exec
+DELETE FROM "user_permissions" WHERE "userId" = $1;
+
+-- name: InsertUserPermissions :exec
+INSERT INTO "user_permissions" ("userId", "permission", "accordePar")
+SELECT sqlc.arg('user_id')::text, unnest(sqlc.arg('permissions')::text[]), sqlc.arg('accorde_par')::text;

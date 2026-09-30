@@ -29,13 +29,20 @@ type (
 // fils que l'appelant ne voit pas. Ce porteur redescend l'identité pour que la
 // ligne dise qui a agi, sans quoi un journal d'incident ne nomme personne.
 type auteurRequete struct {
-	id   string
-	role Role
+	id                string
+	role              Role
+	permissionRefusee Permission
 }
 
 func noterAuteur(ctx context.Context, u *Utilisateur) {
 	if a, ok := ctx.Value(cleAuteur{}).(*auteurRequete); ok {
 		a.id, a.role = u.ID, u.Role
+	}
+}
+
+func noterRefus(ctx context.Context, p Permission) {
+	if a, ok := ctx.Value(cleAuteur{}).(*auteurRequete); ok {
+		a.permissionRefusee = p
 	}
 }
 
@@ -174,6 +181,9 @@ func journaliserRequete(r *http.Request, motif string, auteur *auteurRequete, st
 	} else {
 		champs = append(champs, "userId", "anonyme")
 	}
+	if auteur.permissionRefusee != "" {
+		champs = append(champs, "permissionRefusee", string(auteur.permissionRefusee))
+	}
 	if adresse, _ := r.Context().Value(CleAdresse{}).(string); adresse != "" && statut >= http.StatusBadRequest {
 		champs = append(champs, "adresse", adresse)
 	}
@@ -234,6 +244,7 @@ var routesInterditesEnDemo = map[string]bool{
 	"PATCH /api/v1/roles/{id}":           true,
 	"DELETE /api/v1/roles/{id}":          true,
 	"PUT /api/v1/roles/{id}/permissions": true,
+	"PUT /api/v1/users/{id}/permissions": true,
 	"POST /api/v1/auth/usurpation":       true,
 	"POST /api/v1/admin/purge":           true,
 }
@@ -275,11 +286,12 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions, base string
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
 			return
 		}
+		noterAuteur(r.Context(), &u)
 		if !u.Peut(permission) {
+			noterRefus(r.Context(), permission)
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Accès refusé."))
 			return
 		}
-		noterAuteur(r.Context(), &u)
 		mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), cleUtilisateur{}, u)))
 	})
 }

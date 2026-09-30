@@ -5,6 +5,7 @@ import (
 	"cpi-go/db"
 	"errors"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -76,6 +77,11 @@ const (
 	PermissionRendezVousCloser         Permission = "rendez_vous.closer"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
+	PermissionAnalyticsLire            Permission = "analytics.lire"
+	PermissionRepresentantsLire        Permission = "representants.lire"
+	PermissionBanqueDossiersLire       Permission = "banque.dossiers_lire"
+	PermissionAccueilConsulter         Permission = "accueil.consulter"
+	PermissionChiffresConsulter        Permission = "chiffres.consulter"
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
@@ -97,7 +103,7 @@ const (
 )
 
 var Catalogue = map[Permission]definitionPermission{
-	PermissionPanneauAcceder:           {"Panneau", "Accéder au panneau", Tous},
+	PermissionPanneauAcceder:           {"Panneau", "Accéder au panneau", append(slices.Clone(Tous), Observateur)},
 	PermissionFichesTenir:              {domaineFiches, "Lire et modifier les fiches de son portefeuille", Parcours},
 	PermissionCampagnesSuperviser:      {domaineCampagnes, "Superviser les campagnes", Encadrement},
 	PermissionCampagnesAdministrer:     {domaineCampagnes, "Supprimer une campagne", AdminSeul},
@@ -122,7 +128,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionParametresAdministrer:    {"Paramètres", "Régler les objectifs et les tableaux de bord par défaut", AdminSeul},
 	PermissionBasesAdministrer:         {"Bases", "Créer et supprimer les bases de démonstration", AdminSeul},
 	PermissionBanqueDossiers:           {domaineBanque, "Traiter les dossiers Banque & Finance", Banque},
-	PermissionBanqueLire:               {domaineBanque, "Lire les dossiers Banque & Finance", BanqueLecture},
+	PermissionBanqueLire:               {domaineBanque, "Voir la vue d'ensemble Banque & Finance", BanqueLecture},
 	PermissionAccueilRegistre:          {domaineAccueil, "Tenir le registre des visites", Registre},
 	PermissionAccueilListes:            {domaineAccueil, "Gérer les listes de visites et les imports", Encadrement},
 	PermissionCampagnesGerer:           {domaineCampagnes, "Créer et modifier les campagnes", Encadrement},
@@ -143,6 +149,11 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Superviseur, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", Encadrement},
+	PermissionAnalyticsLire:            {domaineChiffres, "Consulter les indicateurs de prospection", Parcours},
+	PermissionRepresentantsLire:        {"Représentants", "Consulter les représentants et leur historique", Parcours},
+	PermissionBanqueDossiersLire:       {domaineBanque, "Consulter les dossiers et les demandes de création de client", Banque},
+	PermissionAccueilConsulter:         {domaineAccueil, "Consulter le registre des visites et ses chiffres", Registre},
+	PermissionChiffresConsulter:        {domaineChiffres, "Voir le tableau de bord", []Role{Admin, Direction, Superviseur, Accueil}},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
@@ -186,7 +197,8 @@ var permissionsDePortee = map[Permission]bool{
 // Chaque base porte sa table `role_permissions` ; sa garde lit ses propres
 // attributions, rechargées d'un bloc après chaque écriture.
 type Attributions struct {
-	parRole atomic.Pointer[map[string]map[Permission]bool]
+	parRole        atomic.Pointer[map[string]map[Permission]bool]
+	parUtilisateur atomic.Pointer[map[string]map[Permission]bool]
 	// Deux rechargements concurrents ne doivent pas ranger une lecture plus ancienne en dernier.
 	chargement sync.Mutex
 }
@@ -210,8 +222,50 @@ func (a *Attributions) Charger(ctx context.Context, q *db.Queries) error {
 			parRole[ligne.RoleID][Permission(*ligne.Permission)] = true
 		}
 	}
+	parUtilisateur, err := permissionsParCompte(ctx, q)
+	if err != nil {
+		return err
+	}
 	a.parRole.Store(&parRole)
+	a.parUtilisateur.Store(&parUtilisateur)
 	return nil
+}
+
+func permissionsParCompte(ctx context.Context, q *db.Queries) (map[string]map[Permission]bool, error) {
+	lignes, err := q.ListUserPermissions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	parUtilisateur := map[string]map[Permission]bool{}
+	for _, ligne := range lignes {
+		if !permissionConnue(Permission(ligne.Permission)) {
+			continue
+		}
+		if parUtilisateur[ligne.UserId] == nil {
+			parUtilisateur[ligne.UserId] = map[Permission]bool{}
+		}
+		parUtilisateur[ligne.UserId][Permission(ligne.Permission)] = true
+	}
+	return parUtilisateur, nil
+}
+
+// Les permissions accordées au compte en plus de son rôle.
+func (a *Attributions) PermissionsDuCompte(userID string) map[Permission]bool {
+	if carte := a.parUtilisateur.Load(); carte != nil {
+		return (*carte)[userID]
+	}
+	return nil
+}
+
+func (a *Attributions) duCompte(roleID, userID string) map[Permission]bool {
+	duRole := a.duRole(roleID)
+	accordees := a.PermissionsDuCompte(userID)
+	if len(accordees) == 0 {
+		return duRole
+	}
+	union := maps.Clone(duRole)
+	maps.Copy(union, accordees)
+	return union
 }
 
 func (a *Attributions) PermissionsDuRole(roleID string) map[Permission]bool {

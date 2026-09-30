@@ -5,6 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon, FolderOpenIcon, PlusIcon } from 'luc
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { meQueryOptions } from '@/api/auth';
 import { BankExportMenu } from '@/components/bank/bank-export-menu';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { StageBadge } from '@/components/bank/stage-badge';
@@ -42,11 +43,18 @@ import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import {
   BANK_CASE_SORT_FIELDS,
+  peut,
   type BankCase,
   type BankCaseSortField,
   type Projet,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+
+function descriptionSansDossier(filtre: boolean, peutOuvrir: boolean): string {
+  if (filtre) return 'Élargissez la période ou retirez un critère.';
+  if (peutOuvrir) return 'Ouvrez un dossier depuis « À ouvrir (plateforme) ».';
+  return 'Les dossiers apparaissent ici dès leur ouverture.';
+}
 
 const SORTABLE: readonly { id: BankCaseSortField; label: string }[] = [
   { id: 'reference', label: 'Référence' },
@@ -63,6 +71,8 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
   const { filters, setFilters } = useBankFilters(projet);
   const router = useRouter();
   const base = bankBasePath(projet);
+  const { data: user } = useQuery(meQueryOptions);
+  const peutOuvrir = peut(user, 'banque.dossiers');
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.bankCases(filters),
@@ -128,9 +138,11 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
           <BankExportMenu filters={filters} />
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
-            <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
-          </Link>
+          {peutOuvrir ? (
+            <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
+              <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -159,13 +171,12 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
                       ? 'Aucun dossier bancaire'
                       : 'Aucun dossier ne correspond à ces filtres'
                   }
-                  description={
-                    countActiveBankFilters(filters) === 0
-                      ? 'Ouvrez un dossier depuis « À ouvrir (plateforme) ».'
-                      : 'Élargissez la période ou retirez un critère.'
-                  }
+                  description={descriptionSansDossier(
+                    countActiveBankFilters(filters) > 0,
+                    peutOuvrir,
+                  )}
                   action={
-                    countActiveBankFilters(filters) === 0 ? (
+                    countActiveBankFilters(filters) === 0 && peutOuvrir ? (
                       <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
                         <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
                       </Link>

@@ -616,7 +616,7 @@ var GardeCourriels = map[string]socle.Permission{
 	"GET /api/v1/courriels":                             socle.PermissionCourrielsAdministrer,
 	"GET /api/v1/courriels/reglages":                    socle.PermissionCourrielsAdministrer,
 	"PUT /api/v1/courriels/reglages":                    socle.PermissionCourrielsAdministrer,
-	"GET /api/v1/courriels/objet/{objetType}/{objetId}": socle.PermissionBanqueDossiers,
+	"GET /api/v1/courriels/objet/{objetType}/{objetId}": socle.PermissionBanqueDossiersLire,
 	"POST /api/v1/courriels/{id}/renvoyer":              socle.PermissionBanqueDossiers,
 	"POST /api/v1/webhooks/brevo":                       socle.Publique,
 }

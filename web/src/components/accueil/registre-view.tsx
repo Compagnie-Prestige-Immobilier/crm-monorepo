@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useId, useRef, useState, type ReactNode } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { ArchiverVisite } from '@/components/accueil/archiver-visite';
 import { ImpressionDialog } from '@/components/accueil/impression-dialog';
 import { VisiteForm } from '@/components/accueil/visite-form';
@@ -70,7 +71,7 @@ import {
 } from '@/lib/data/visites';
 import { buildVisitesExportUrl, visitesExportFileName } from '@/lib/data/visites-import';
 import { formatDate, formatNumber } from '@/lib/format';
-import type { FilterOption } from '@/lib/types';
+import { type FilterOption, peut } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
 
@@ -271,6 +272,7 @@ function RegistreCorps({
   onCorriger,
   onAnnulerCorrection,
   onCorrige,
+  peutEcrire,
 }: {
   isPending: boolean;
   isError: boolean;
@@ -289,6 +291,7 @@ function RegistreCorps({
   onCorriger: (id: string) => void;
   onAnnulerCorrection: () => void;
   onCorrige: () => void;
+  peutEcrire: boolean;
 }): ReactNode {
   if (isPending) return <Skeleton className="h-64 w-full" />;
   if (isError)
@@ -348,7 +351,7 @@ function RegistreCorps({
                 }
               />
             ))}
-            <TableHead className="print:hidden">CORRIGER</TableHead>
+            {peutEcrire ? <TableHead className="print:hidden">CORRIGER</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -369,6 +372,7 @@ function RegistreCorps({
                 key={visite.id}
                 visite={visite}
                 colonnesImprimees={colonnesImprimees}
+                peutEcrire={peutEcrire}
                 onCorriger={() => {
                   onCorriger(visite.id);
                 }}
@@ -468,13 +472,44 @@ function VisitesKpiCards({
   );
 }
 
+function ExporterRegistre({
+  filters,
+  today,
+  vide,
+}: {
+  filters: VisiteFilters;
+  today: string;
+  vide: boolean;
+}) {
+  const telechargement = useFileDownload();
+  const periode = visiteDateRange(filters, today);
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={vide || telechargement.pending}
+      onClick={() => {
+        void telechargement.download({
+          url: buildVisitesExportUrl({ ...filters, from: periode.dateFrom, to: periode.dateTo }),
+          fileName: visitesExportFileName(),
+          failureMessage: 'Le registre n’a pas pu être exporté.',
+        });
+      }}
+    >
+      <DownloadIcon aria-hidden="true" />
+      Exporter
+    </Button>
+  );
+}
+
 export function RegistreView() {
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(meQueryOptions);
+  const peutEcrire = peut(user, 'accueil.registre');
   const { filters, setFilters, resetFilters } = useUrlFilters(ADAPTER);
   const duId = useId();
   const auId = useId();
   const [today] = useState(() => dakarNow().date);
-  const telechargement = useFileDownload();
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
   const nomVisiteurRef = useRef<HTMLInputElement>(null);
@@ -505,7 +540,6 @@ export function RegistreView() {
   });
 
   const visites = visitesTriees(registre.data, filters.sortBy);
-  const periode = visiteDateRange(filters, today);
   const { total, page, pageCount, premiere, derniere } = pagination(
     registre.data,
     filters.pageSize,
@@ -545,15 +579,17 @@ export function RegistreView() {
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-wrap items-end gap-2">
-            <Button
-              type="button"
-              onClick={() => {
-                setAjoutOuvert(true);
-              }}
-            >
-              <PlusIcon aria-hidden="true" />
-              Ajouter une visite
-            </Button>
+            {peutEcrire ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setAjoutOuvert(true);
+                }}
+              >
+                <PlusIcon aria-hidden="true" />
+                Ajouter une visite
+              </Button>
+            ) : null}
 
             <fieldset className="flex items-center gap-1.5 rounded-lg bg-muted p-1">
               <legend className="sr-only">Période</legend>
@@ -628,25 +664,9 @@ export function RegistreView() {
               <PrinterIcon aria-hidden="true" />
               Imprimer
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={visites.length === 0 || telechargement.pending}
-              onClick={() => {
-                void telechargement.download({
-                  url: buildVisitesExportUrl({
-                    ...filters,
-                    from: periode.dateFrom,
-                    to: periode.dateTo,
-                  }),
-                  fileName: visitesExportFileName(),
-                  failureMessage: 'Le registre n’a pas pu être exporté.',
-                });
-              }}
-            >
-              <DownloadIcon aria-hidden="true" />
-              Exporter
-            </Button>
+            {peutEcrire ? (
+              <ExporterRegistre filters={filters} today={today} vide={visites.length === 0} />
+            ) : null}
           </div>
         </div>
 
@@ -704,6 +724,7 @@ export function RegistreView() {
           setCorrigeeId(null);
           rafraichir();
         }}
+        peutEcrire={peutEcrire}
       />
 
       {pageCount > 1 ? (
@@ -782,10 +803,12 @@ export function RegistreView() {
 function LigneVisite({
   visite,
   colonnesImprimees,
+  peutEcrire,
   onCorriger,
 }: {
   visite: Visite;
   colonnesImprimees: ReadonlySet<ImpressionColonne>;
+  peutEcrire: boolean;
   onCorriger: () => void;
 }) {
   const printClassName = (colonne: ImpressionColonne): string | undefined =>
@@ -858,21 +881,23 @@ function LigneVisite({
       >
         {visite.comment ?? ''}
       </TableCell>
-      <TableCell className="text-right print:hidden">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label={`Modifier la visite de ${visite.visitorName}`}
-            onClick={onCorriger}
-          >
-            <PencilIcon aria-hidden="true" />
-            Modifier
-          </Button>
-          <ArchiverVisite visiteId={visite.id} visiteur={visite.visitorName} />
-        </div>
-      </TableCell>
+      {peutEcrire ? (
+        <TableCell className="text-right print:hidden">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Modifier la visite de ${visite.visitorName}`}
+              onClick={onCorriger}
+            >
+              <PencilIcon aria-hidden="true" />
+              Modifier
+            </Button>
+            <ArchiverVisite visiteId={visite.id} visiteur={visite.visitorName} />
+          </div>
+        </TableCell>
+      ) : null}
     </TableRow>
   );
 }

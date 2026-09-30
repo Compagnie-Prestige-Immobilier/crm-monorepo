@@ -43,3 +43,25 @@ export async function replacePermissions(
     }),
   );
 }
+
+export type PermissionsCompte = components['schemas']['PermissionsCompte'];
+
+export async function fetchPermissionsCompte(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<PermissionsCompte> {
+  return unwrap(await client.GET('/api/v1/users/{id}/permissions', { params: { path: { id } } }));
+}
+
+export async function replacePermissionsCompte(
+  id: string,
+  permissions: string[],
+  client: ApiClient = getApiClient(),
+): Promise<PermissionsCompte> {
+  return unwrap(
+    await client.PUT('/api/v1/users/{id}/permissions', {
+      params: { path: { id } },
+      body: { permissions },
+    }),
+  );
+}

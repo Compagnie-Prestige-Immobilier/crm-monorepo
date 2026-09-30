@@ -26,8 +26,10 @@ const DEV_ROLES = [
   'CHARGE_CLIENTELE',
 ] as const satisfies readonly Role[];
 
+type RoleDeDev = (typeof DEV_ROLES)[number];
+
 /** Les comptes que `make db` sème : l'administrateur et les fixtures. */
-const FIXTURE_IDENTIFIERS: Record<Exclude<Role, 'ADMIN'>, string> = {
+const FIXTURE_IDENTIFIERS: Record<Exclude<RoleDeDev, 'ADMIN'>, string> = {
   COMMERCIAL: 'fixture.awa@cpi.sn',
   BANQUE_FINANCE: 'fixture.banque@cpi.sn',
   SUPERVISEUR: 'fixture.superviseur@cpi.sn',
@@ -37,7 +39,7 @@ const FIXTURE_IDENTIFIERS: Record<Exclude<Role, 'ADMIN'>, string> = {
 };
 
 // Hors `vite dev`, les mots de passe viennent seulement de `web/.env.local` : aucun défaut dans le bundle.
-function accountForRole(role: Role): { identifier: string; password: string } {
+function accountForRole(role: RoleDeDev): { identifier: string; password: string } {
   if (role === 'ADMIN') {
     return {
       identifier: import.meta.env.VITE_SEED_ADMIN_EMAIL ?? 'admin@cpi.sn',
@@ -64,7 +66,7 @@ function useDevLogin(next: string | null | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   const loginAs = useCallback(
-    async (targetRole: Role): Promise<void> => {
+    async (targetRole: RoleDeDev): Promise<void> => {
       setPending(targetRole);
       setError(null);
       try {
@@ -163,9 +165,10 @@ export function DevRoleSwitcher({
       <Select
         value={selectedRole}
         onValueChange={(value) => {
-          if (typeof value === 'string' && DEV_ROLES.includes(value as Role)) {
-            setSelectedRole(value as Role);
-            void loginAs(value as Role);
+          const role = DEV_ROLES.find((candidat) => candidat === value);
+          if (role !== undefined) {
+            setSelectedRole(role);
+            void loginAs(role);
           }
         }}
         items={DEV_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }))}

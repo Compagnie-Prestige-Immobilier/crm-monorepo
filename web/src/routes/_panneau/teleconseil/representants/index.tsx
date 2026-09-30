@@ -6,7 +6,7 @@ import { guardPermission } from '@/lib/guard';
 import { canExportRepresentants, peut, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/representants/')({
-  beforeLoad: guardPermission('fiches.tenir'),
+  beforeLoad: guardPermission('representants.lire'),
   component: TeleconseilRepresentantsPage,
   pendingComponent: Loading,
 });

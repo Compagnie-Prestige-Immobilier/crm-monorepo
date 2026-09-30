@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { AdvanceDialog, RejectDialog } from '@/components/bank/bank-case-detail-view';
 import {
   ContenuDossier,
@@ -31,7 +32,13 @@ import {
 import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankCase, BankCaseStage, InscriptionAOuvrir, Projet } from '@/lib/types';
+import {
+  peut,
+  type BankCase,
+  type BankCaseStage,
+  type InscriptionAOuvrir,
+  type Projet,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const PLAFOND_CARTES = 200;
@@ -161,6 +168,8 @@ function Tableau({
   inscriptions: InscriptionAOuvrir[];
 }) {
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(meQueryOptions);
+  const peutAvancer = peut(user, 'banque.dossiers');
   const base = bankBasePath(projet);
   const [boite, setBoite] = useState<Boite>(null);
   const [brouillon, setBrouillon] = useState<Carte[] | null>(null);
@@ -253,7 +262,13 @@ function Tableau({
         onDragEnd={deposer}
       >
         {(colonne) => (
-          <ColonneKanban key={colonne.id} colonne={colonne} cartes={cartes} base={base} />
+          <ColonneKanban
+            key={colonne.id}
+            colonne={colonne}
+            cartes={cartes}
+            base={base}
+            peutAvancer={peutAvancer}
+          />
         )}
       </KanbanProvider>
       <BoitesKanban boite={boite} fermer={fermer} invalider={invalider} />
@@ -261,14 +276,22 @@ function Tableau({
   );
 }
 
+function colonneVide(colonne: Colonne, peutAvancer: boolean): string {
+  if (colonne.etape === null) return 'Aucun dossier complet en attente d’ouverture.';
+  if (!peutAvancer) return 'Aucun dossier à cette étape.';
+  return 'Déposez une carte ici pour passer un dossier à cette étape.';
+}
+
 function ColonneKanban({
   colonne,
   cartes,
   base,
+  peutAvancer,
 }: {
   colonne: Colonne;
   cartes: Carte[];
   base: string;
+  peutAvancer: boolean;
 }) {
   const siennes = cartes.filter((carte) => carte.column === colonne.id);
   const encaisse = colonne.etape?.type === 'CASHED';
@@ -296,9 +319,7 @@ function ColonneKanban({
       </KanbanHeader>
       {siennes.length === 0 ? (
         <p className="mx-2.5 mt-2.5 rounded-lg border border-border/70 border-dashed p-4 text-center text-[0.75rem] text-muted-foreground">
-          {colonne.etape === null
-            ? 'Aucun dossier complet en attente d’ouverture.'
-            : 'Déposez une carte ici pour passer un dossier à cette étape.'}
+          {colonneVide(colonne, peutAvancer)}
         </p>
       ) : null}
       <KanbanCards<Carte> id={colonne.id}>
@@ -306,7 +327,7 @@ function ColonneKanban({
           <KanbanCard<Carte>
             key={carte.id}
             {...carte}
-            disabled={carte.dossier === null || carte.dossier.isTerminal}
+            disabled={!peutAvancer || carte.dossier === null || carte.dossier.isTerminal}
           >
             <ContenuCarte carte={carte} base={base} />
           </KanbanCard>

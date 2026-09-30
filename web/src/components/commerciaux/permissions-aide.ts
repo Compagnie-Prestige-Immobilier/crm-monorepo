@@ -1,8 +1,11 @@
 import type { Permission } from '@/lib/types';
 
 export const AIDE_PERMISSIONS: Record<Permission, string> = {
+  'accueil.consulter': 'Consulter le registre des visites et ses chiffres, sans rien saisir.',
   'accueil.listes': 'Modifier les listes de choix du registre des visites et importer des visites.',
   'accueil.registre': 'Enregistrer les visites à l’accueil et les archiver.',
+  'analytics.lire':
+    'Voir l’entonnoir, les délais, le rendement par département et les ouvertures de fiches.',
   'analytics.superviser':
     'Ouvrir les tableaux de bord de supervision : activité, entonnoir, pôle marketing.',
   'assistant.tout_lire':
@@ -11,7 +14,9 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
     'Poser des questions sur les appels, les conversions et les conversions à venir.',
   'banque.administrer': 'Régler les étapes des dossiers Banque & Finance et valider les dossiers.',
   'banque.dossiers': 'Faire avancer les dossiers Banque & Finance de son portefeuille.',
-  'banque.lire': 'Consulter les dossiers Banque & Finance, sans les modifier.',
+  'banque.dossiers_lire':
+    'Consulter les dossiers et les demandes de création de client, sans les faire avancer.',
+  'banque.lire': 'Voir la vue d’ensemble Banque & Finance : encaissements, rejets et délais.',
   'banque.voir_tous_portefeuilles':
     'Voir les demandes Banque & Finance de tous les portefeuilles, pas seulement le sien.',
   'bases.administrer': 'Créer et supprimer les bases de démonstration.',
@@ -19,6 +24,7 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'campagnes.attributions_toutes': 'Voir qui a reçu quelle fiche dans toutes les campagnes.',
   'campagnes.gerer': 'Créer et modifier les campagnes d’appels.',
   'campagnes.superviser': 'Suivre l’avancement des campagnes d’appels.',
+  'chiffres.consulter': 'Ouvrir un tableau de bord, sans changer ses cartes.',
   'chiffres.disposer': 'Choisir les blocs du tableau de bord et leur disposition.',
   'chiffres.voir_montants': 'Afficher les montants (ventes, paiements) dans les chiffres.',
   'comptes.administrer': 'Créer, modifier et désactiver les comptes.',
@@ -62,6 +68,7 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'prospects.revoir': 'Traiter une demande de révision sur une fiche.',
   'prospects.superviser': 'Régler les segments et paramètres CHUES, et requalifier une fiche.',
   'qualification.rappels': 'Reporter ou annuler ses propres rappels.',
+  'representants.lire': 'Consulter les représentants, leurs appels et leur historique.',
   'referentiels.superviser': 'Modifier les listes de référence : motifs, statuts, départements.',
   'rendez_vous.suivre': 'Confirmer, reporter ou annuler un rendez-vous et noter la présence.',
   'rendez_vous.closer': 'Remplir le formulaire de closing après un rendez-vous honoré.',

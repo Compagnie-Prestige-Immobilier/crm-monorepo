@@ -15,8 +15,10 @@ export interface Contexte {
   context: { user: SessionUser };
 }
 
-export function guardPermission(permission: Permission) {
+export function guardPermission(...permissions: readonly Permission[]) {
   return ({ context }: Contexte): void => {
-    if (!peut(context.user, permission)) throw new RefusPermission(context.user);
+    if (!permissions.every((permission) => peut(context.user, permission))) {
+      throw new RefusPermission(context.user);
+    }
   };
 }

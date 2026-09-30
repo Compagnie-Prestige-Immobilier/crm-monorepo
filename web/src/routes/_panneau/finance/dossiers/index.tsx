@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/dossiers/')({
-  beforeLoad: guardPermission('banque.dossiers'),
+  beforeLoad: guardPermission('banque.dossiers_lire', 'banque.lire'),
   component: DossiersPage,
   pendingComponent: Loading,
 });

@@ -23,7 +23,7 @@ import type {
 import type { ComptageOuvertures } from '@/lib/data/ouvertures';
 import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
-import type { Projet } from '@/lib/types';
+import type { Permission, Projet } from '@/lib/types';
 
 type ChiffreSource = DashboardSource;
 
@@ -41,6 +41,22 @@ export type Jeu =
   | 'representants'
   | 'ouvertures'
   | 'enrolement';
+
+/** La permission de la route qui rend chaque jeu : une carte sans elle n'est pas proposée. */
+const PERMISSION_DU_JEU: Record<Jeu, Permission> = {
+  activite: 'analytics.superviser',
+  entonnoir: 'analytics.lire',
+  delais: 'analytics.lire',
+  rendement: 'analytics.lire',
+  methodes: 'analytics.lire',
+  banques: 'analytics.lire',
+  campagne: 'campagnes.superviser',
+  campagnes: 'analytics.superviser',
+  creneaux: 'analytics.superviser',
+  representants: 'analytics.superviser',
+  ouvertures: 'analytics.lire',
+  enrolement: 'enrolement.administrer',
+};
 
 export interface Jeux {
   activite?: ChiffresActivite;
@@ -1040,11 +1056,7 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
 const SOURCES_MONTANTS: readonly string[] = ['encaisse', 'de-l-appel-a-l-encaissement'];
 
-/**
- * Ce que les plateformes d'enrôlement rendent ne sort pas de la cellule
- * pilotage, qui tient le rôle ADMIN. L'API qui alimente ces cartes refuse tout
- * autre rôle : ce filtre évite de proposer une carte qui répondrait 403.
- */
+/** Les chiffres d'enrôlement sont ceux d'un projet : sans projet choisi, pas de carte. */
 const SOURCES_ENROLEMENT: readonly string[] = [
   'enrolement-inscriptions',
   'enrolement-taux-rapprochement',
@@ -1057,17 +1069,16 @@ const SOURCES_ENROLEMENT: readonly string[] = [
 export function catalogueDe(input: {
   chues: boolean;
   voitLesMontants: boolean;
-  voitLEnrolement: boolean;
+  peut: (permission: Permission) => boolean;
   projet: Projet | null;
 }): Record<string, SourceChiffre> {
-  const entrees = Object.entries(SOURCES_CHIFFRES).filter(([cle]) => {
+  const sources = { ...SOURCES_CHIFFRES, 'par-teleconseiller': parTeleconseiller(input.chues) };
+  const entrees = Object.entries(sources).filter(([cle, source]) => {
+    if (!input.peut(PERMISSION_DU_JEU[source.jeu])) return false;
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
-    if (!input.voitLEnrolement && SOURCES_ENROLEMENT.includes(cle)) return false;
     if (input.projet === null && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });
-  const catalogue = Object.fromEntries(entrees);
-  catalogue['par-teleconseiller'] = parTeleconseiller(input.chues);
-  return catalogue;
+  return Object.fromEntries(entrees);
 }

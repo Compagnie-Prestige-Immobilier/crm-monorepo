@@ -184,13 +184,16 @@ export function statutForProjet(prospect: ProspectRow, projet: Projet | null): P
 
 /** Catalogue fermé, tenu égal à `internal/shared/socle/permissions.go` par un test d'intégration. */
 export const PERMISSIONS = [
+  'accueil.consulter',
   'accueil.listes',
   'accueil.registre',
+  'analytics.lire',
   'analytics.superviser',
   'assistant.tout_lire',
   'assistant.utiliser',
   'banque.administrer',
   'banque.dossiers',
+  'banque.dossiers_lire',
   'banque.lire',
   'banque.voir_tous_portefeuilles',
   'bases.administrer',
@@ -198,6 +201,7 @@ export const PERMISSIONS = [
   'campagnes.attributions_toutes',
   'campagnes.gerer',
   'campagnes.superviser',
+  'chiffres.consulter',
   'chiffres.disposer',
   'chiffres.voir_montants',
   'comptes.administrer',
@@ -236,6 +240,7 @@ export const PERMISSIONS = [
   'prospects.superviser',
   'qualification.rappels',
   'referentiels.superviser',
+  'representants.lire',
   'rendez_vous.suivre',
   'rendez_vous.exporter',
   'rendez_vous.voir',
@@ -264,6 +269,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
   CHARGE_CLIENTELE: 'Chargé de clientèle',
+  OBSERVATEUR: 'Observateur',
 };
 
 export const readsOnly = (user: Pick<SessionUser, 'permissions'> | null | undefined): boolean =>

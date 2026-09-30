@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord')({
-  beforeLoad: guardPermission('chiffres.disposer'),
+  beforeLoad: guardPermission('chiffres.consulter'),
   component: TableauDeBordVisitesPage,
   pendingComponent: Loading,
 });
