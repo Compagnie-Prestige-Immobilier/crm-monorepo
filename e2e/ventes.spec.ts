@@ -58,6 +58,13 @@ test.describe('ventes, sommes dues et relances', () => {
     expect(contenu.subarray(0, 2).toString(), 'un classeur xlsx est une archive zip').toBe('PK');
   });
 
+  test('l’espace Ventes s’ouvre sur la liste, pas sur la saisie', async ({ page }) => {
+    await page.goto('/espaces');
+    await page.getByRole('link', { name: /^Ventes/u }).click();
+    await expect(page).toHaveURL(/\/ventes$/u);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('fermer une nouvelle vente ramène à « Par site » sans piéger le retour', async ({
     page,
   }) => {
