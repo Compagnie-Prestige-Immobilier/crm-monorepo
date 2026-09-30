@@ -13,6 +13,7 @@ import { useState, type ReactNode } from 'react';
 import { meQueryOptions } from '@/api/auth';
 import { QuestionsEpinglees } from '@/components/assistant/questions';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
+import { DEBUT_D_AUJOURDHUI } from '@/components/accueil/tableau-de-bord/periode';
 import {
   plageDeFiltres,
   periodeAffichee,
@@ -61,6 +62,7 @@ import {
   fetchChiffresMethodes,
   fetchChiffresRendement,
   fetchChiffresRepresentants,
+  premierInstant,
   type PerimetreChiffres,
   type Projet,
 } from '@/lib/data/chiffres';
@@ -93,7 +95,7 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   representants: fetchChiffresRepresentants,
   ouvertures: (perimetre) =>
     fetchComptageOuvertures({
-      from: perimetre.plage.from,
+      from: perimetre.heureDebut === null ? perimetre.plage.from : premierInstant(perimetre),
       to: perimetre.plage.to,
       ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
       ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
@@ -107,6 +109,7 @@ const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] =
   perimetre.projet,
   perimetre.plage.from,
   perimetre.plage.to,
+  perimetre.heureDebut,
   perimetre.commercialId,
   perimetre.lotId,
 ];
@@ -339,6 +342,7 @@ export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
     plage: { from: plage.du, to: plage.au },
     commercialId: filters.teleconseiller,
     lotId: filters.campagne,
+    heureDebut: filters.preset === 'aujourdhui' ? DEBUT_D_AUJOURDHUI : null,
   };
 
   const tableau = useTableauDeBord(ecran, plage);

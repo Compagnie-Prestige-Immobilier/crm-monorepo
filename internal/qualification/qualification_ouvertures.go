@@ -546,7 +546,7 @@ func qualificationBrouillonRefuse(ctx context.Context, q *db.Queries, u *socle.U
 }
 
 type QualificationComptageInput struct {
-	From       string `query:"from" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
+	From       string `query:"from" pattern:"^\\d{4}-\\d{2}-\\d{2}(T[0-9:.]+Z)?$" doc:"Un jour, ou l'instant ISO où la période commence."`
 	To         string `query:"to" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
 	OpenedByID string `query:"openedById" maxLength:"64"`
 	LotID      string `query:"lotId" maxLength:"64" doc:"Ouvertures des fiches confiées par cette campagne d'appels."`
@@ -613,7 +613,7 @@ func qualificationPeriodeComptage(du, au string, zone *time.Location) (depuis, j
 	if du == "" || au == "" {
 		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_REQUISE", "Indiquez le premier et le dernier jour de la période.")
 	}
-	if depuis, err = qualificationBorneJour(du, false, zone); err != nil {
+	if depuis, err = qualificationBorneDebut(du, zone); err != nil {
 		return nil, nil, err
 	}
 	if jusqua, err = qualificationBorneJour(au, true, zone); err != nil {
@@ -623,6 +623,18 @@ func qualificationPeriodeComptage(du, au string, zone *time.Location) (depuis, j
 		return nil, nil, socle.Problem(http.StatusBadRequest, "PERIODE_INVALIDE", "La période va d'un jour à un an, le premier jour avant le dernier.")
 	}
 	return depuis, jusqua, nil
+}
+
+func qualificationBorneDebut(iso string, zone *time.Location) (*time.Time, error) {
+	if !strings.Contains(iso, "T") {
+		return qualificationBorneJour(iso, false, zone)
+	}
+	instant, err := time.Parse(time.RFC3339, iso)
+	if err != nil {
+		return nil, socle.Problem(http.StatusBadRequest, "BAD_REQUEST", "Date invalide : "+iso)
+	}
+	borne := instant.UTC()
+	return &borne, nil
 }
 
 func qualificationComptageDTO(r *db.ComptageOuverturesRow) QualificationComptageJourDTO {
