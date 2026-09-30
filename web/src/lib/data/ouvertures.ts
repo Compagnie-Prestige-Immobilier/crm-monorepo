@@ -49,7 +49,7 @@ export async function enregistrerBrouillon(
 }
 
 export async function fetchComptageOuvertures(
-  query: { from?: string; to?: string; openedById?: string } = {},
+  query: { from?: string; to?: string; openedById?: string; lotId?: string } = {},
   client: ApiClient = getApiClient(),
 ): Promise<ComptageOuvertures[]> {
   const page = unwrap(await client.GET('/api/v1/ouvertures/comptage', { params: { query } }));

@@ -549,6 +549,7 @@ type QualificationComptageInput struct {
 	From       string `query:"from" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
 	To         string `query:"to" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
 	OpenedByID string `query:"openedById" maxLength:"64"`
+	LotID      string `query:"lotId" maxLength:"64" doc:"Ouvertures des fiches confiées par cette campagne d'appels."`
 }
 
 type QualificationComptageJourDTO struct {
@@ -586,6 +587,9 @@ func (s *service) qualificationComptage(ctx context.Context, in *QualificationCo
 	}
 	if borne != "" {
 		p.OpenedByID = &borne
+	}
+	if in.LotID != "" {
+		p.LotID = &in.LotID
 	}
 	var err error
 	if p.Depuis, p.Jusqua, err = qualificationPeriodeComptage(in.From, in.To, s.Cfg.TimeZone); err != nil {

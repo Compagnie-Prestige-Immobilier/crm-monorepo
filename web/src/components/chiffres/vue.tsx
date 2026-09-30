@@ -96,6 +96,7 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
       from: perimetre.plage.from,
       to: perimetre.plage.to,
       ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
+      ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
     }),
   enrolement: fetchChiffresEnrolement,
 };

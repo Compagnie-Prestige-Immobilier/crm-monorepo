@@ -66,11 +66,18 @@ const bornes = (plage: ActivityRange): { actFrom: string; actTo: string } => ({
  */
 const filtresProspect = (
   perimetre: PerimetreChiffres,
-): { projet?: Projet; dateFrom: string; dateTo: string; commercialId?: string } => ({
+): {
+  projet?: Projet;
+  dateFrom: string;
+  dateTo: string;
+  commercialId?: string;
+  lotId?: string;
+} => ({
   ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
   dateFrom: perimetre.plage.from,
   dateTo: perimetre.plage.to,
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+  ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
 });
 
 const filtresSupervision = (
