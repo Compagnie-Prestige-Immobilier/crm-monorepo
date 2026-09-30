@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
 import { useCallback } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
@@ -45,6 +46,7 @@ export function FiltersBar({
   viewerId?: string | undefined;
 }) {
   const { filters, setFilters, resetFilters } = useProspectFilters();
+  const { data: session } = useQuery(meQueryOptions);
 
   const {
     data: reference,
@@ -54,7 +56,8 @@ export function FiltersBar({
     refetch,
   } = useQuery({
     queryKey: queryKeys.reference,
-    queryFn: () => fetchReferenceData(),
+    queryFn: () => fetchReferenceData(session ?? undefined),
+    enabled: session !== undefined && session !== null,
     staleTime: 5 * 60_000,
   });
 

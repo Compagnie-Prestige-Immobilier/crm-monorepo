@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { getApiClient } from '@/lib/api/browser';
 import { formatNumber, formatPhone } from '@/lib/format';
+import { peut, type SessionUser } from '@/lib/types';
 import type {
   Banque,
   Departement,
@@ -116,20 +117,26 @@ async function representantsComplets(client: ApiClient): Promise<FilterOption[]>
   return options.concat(...suites.map((suite) => listeFacultative(suite, optionRepresentant)));
 }
 
+/** Sans la session, tout est demandé : un refus 403 rend alors une liste vide. */
 export async function fetchReferenceData(
+  session?: Pick<SessionUser, 'permissions'>,
   client: ApiClient = getApiClient(),
 ): Promise<ReferenceData> {
+  const lit = (permission: Parameters<typeof peut>[1]): boolean =>
+    session === undefined || peut(session, permission);
   const [bundle, iefs, users, representants] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/referentiels/{kind}', {
       params: { path: { kind: 'iefs' }, query: { activeOnly: false } },
     }),
-    client.GET('/api/v1/users', { params: { query: { pageSize: 200 } } }),
-    representantsComplets(client),
+    lit('comptes.lister')
+      ? client.GET('/api/v1/users', { params: { query: { pageSize: 200 } } })
+      : null,
+    lit('representants.lire') ? representantsComplets(client) : [],
   ]);
 
   const referentiels = unwrap(bundle);
-  const comptes = comptesFacultatifs(users);
+  const comptes = users === null ? [] : comptesFacultatifs(users);
 
   return {
     regions: referentiels.regions,
