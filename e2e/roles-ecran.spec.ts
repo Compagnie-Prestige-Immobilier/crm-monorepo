@@ -12,9 +12,15 @@ const COMPTE = {
   email: `chef.${cle}@cpi.sn`,
   motDePasse: MOT_DE_PASSE,
 };
+const OBSERVATEUR = {
+  nom: `Observateur ${cle}`,
+  identifiant: `observateur.${cle}`,
+  email: `observateur.${cle}@cpi.sn`,
+  motDePasse: MOT_DE_PASSE,
+};
 
 test.afterAll(async () => {
-  await ecrire(`DELETE FROM "users" WHERE "email" = $1`, [COMPTE.email]);
+  await ecrire(`DELETE FROM "users" WHERE "email" = ANY($1)`, [[COMPTE.email, OBSERVATEUR.email]]);
   await ecrire(`DELETE FROM "roles" WHERE "libelle" = $1`, [ROLE]);
 });
 
@@ -99,6 +105,54 @@ test.describe('parcours utilisateurs et rôles', () => {
         [COMPTE.email],
       );
       expect(compte?.role).toBe('SUPERVISEUR');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('une permission accordée à un observateur lui ouvre la lecture, sans rien d’autre', async ({
+    page,
+    browser,
+  }) => {
+    await page.goto('/admin/commerciaux');
+    await page.getByRole('button', { name: 'Nouvel utilisateur' }).click();
+    const formulaire = page.getByRole('dialog');
+    await formulaire.getByLabel('Nom complet').fill(OBSERVATEUR.nom);
+    await formulaire.getByLabel('Adresse e-mail').fill(OBSERVATEUR.email);
+    await formulaire.getByLabel('Identifiant').fill(OBSERVATEUR.identifiant);
+    await formulaire.getByLabel('Rôle').click();
+    await page.getByRole('option', { name: 'Observateur' }).click();
+    await formulaire.getByLabel('Mot de passe').fill(OBSERVATEUR.motDePasse);
+    await formulaire.getByRole('button', { name: 'Créer le compte' }).click();
+    await expect(page.getByText(`Compte de ${OBSERVATEUR.nom} créé.`)).toBeVisible();
+
+    await page.getByPlaceholder('Nom, e-mail, identifiant…').fill(OBSERVATEUR.nom);
+    await page.getByRole('button', { name: `Actions pour ${OBSERVATEUR.nom}` }).click();
+    await page.getByRole('menuitem', { name: 'Permissions du compte' }).click();
+    const accord = page.getByRole('dialog');
+    await accord
+      .getByRole('checkbox', { name: `Lire les prospects pour ${OBSERVATEUR.nom}` })
+      .check();
+    await accord
+      .getByRole('checkbox', { name: `Voir tous les portefeuilles pour ${OBSERVATEUR.nom}` })
+      .check();
+    await accord.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByText(`Permissions de ${OBSERVATEUR.nom} enregistrées.`)).toBeVisible();
+    await expect(
+      page.getByRole('row').filter({ hasText: OBSERVATEUR.nom }).getByText('+2 permissions'),
+    ).toBeVisible();
+
+    const { contexte, vue } = await sessionDe(browser, '198.51.99.22', OBSERVATEUR);
+    try {
+      await vue.goto('/teleconseil/prospects');
+      await expect(vue.getByRole('table')).toBeVisible();
+      await expect(vue.getByRole('button', { name: /Nouveau prospect/u })).toHaveCount(0);
+      await vue.goto('/teleconseil/tableau-de-bord');
+      await expect(vue.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+      await vue.goto('/admin/commerciaux');
+      await expect(vue.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+      const representants = await vue.request.get(`${BASE_URL}/api/v1/representants`);
+      expect(representants.status()).toBe(403);
     } finally {
       await contexte.close();
     }

@@ -50,17 +50,14 @@ func litToutLeTravail(u *socle.Utilisateur) bool {
 	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
-// Une entrée par rôle attribué pour ceux qui voient tout (un rôle personnalisé n'a
-// pas forcément les permissions de sa base) ; un téléconseiller a la sienne.
+// Ceux qui voient tout partagent une entrée par jeu de permissions : deux comptes
+// du même rôle diffèrent dès qu'une permission leur est accordée en propre.
 func porteeDeCache(ctx context.Context) string {
 	u := socle.UtilisateurCourant(ctx)
 	if !litToutLeTravail(&u) {
 		return u.ID
 	}
-	if u.RoleID != "" {
-		return u.RoleID
-	}
-	return string(u.Role)
+	return strings.Join(u.Permissions(), ",")
 }
 
 func teleconseillerLisible(u *socle.Utilisateur, demande string) string {
@@ -814,13 +811,13 @@ func (s *service) rendementParDepartement(ctx context.Context, f *FiltreDesAnaly
 }
 
 var Garde = map[string]socle.Permission{
-	"GET /api/v1/analytics/funnel":                  socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/delays":                  socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/departement-yield":       socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/by-enrollment-method":    socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/by-banque":               socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/by-departement":          socle.PermissionFichesTenir,
-	"GET /api/v1/analytics/by-syndicat":             socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/funnel":                  socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/delays":                  socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/departement-yield":       socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/by-enrollment-method":    socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/by-banque":               socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/by-departement":          socle.PermissionAnalyticsLire,
+	"GET /api/v1/analytics/by-syndicat":             socle.PermissionAnalyticsLire,
 	"GET /api/v1/supervision/representants":         socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/supervision/representants/qualite": socle.PermissionAnalyticsSuperviser,
 	"GET /api/v1/supervision/prospects/marketing":   socle.PermissionAnalyticsSuperviser,

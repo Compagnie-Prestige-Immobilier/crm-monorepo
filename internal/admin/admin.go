@@ -83,7 +83,7 @@ var Garde = map[string]socle.Permission{
 	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
 	"POST /api/v1/enrolement/{projet}/tirage":                     socle.PermissionEnrolementAdministrer,
 	"POST /api/v1/webhooks/enrolement/{projet}":                   socle.Publique,
-	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
+	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            socle.PermissionChiffresConsulter,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"DELETE /api/v1/tableaux-de-bord/{ecran}/disposition":         rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": socle.PermissionParametresAdministrer,
@@ -167,7 +167,7 @@ type Compte struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	FullName      string     `json:"fullName"`
-	Role          socle.Role `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+	Role          socle.Role `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 	RoleID        string     `json:"roleId"`
 	RoleLibelle   string     `json:"roleLibelle"`
 	IsActive      bool       `json:"isActive"`
@@ -177,7 +177,8 @@ type Compte struct {
 	ProspectCount int        `json:"prospectCount"`
 	// Compte aussi dans la reprise de portefeuille : un compte sans prospect
 	// mais avec des représentants gèlerait ses fiches.
-	RepresentantCount int `json:"representantCount"`
+	RepresentantCount          int      `json:"representantCount"`
+	PermissionsSupplementaires []string `json:"permissionsSupplementaires"`
 }
 
 type CompteOutput struct {
@@ -189,7 +190,7 @@ func versCompte(r *db.UserDetailRow) Compte {
 		ID: r.ID, Email: r.Email, Username: r.Username, FullName: r.FullName,
 		Role: socle.Role(r.Role), RoleID: r.RoleId, RoleLibelle: r.RoleLibelle, IsActive: r.IsActive, PhoneE164: r.PhoneE164,
 		LastLoginAt: r.LastLoginAt, CreatedAt: r.CreatedAt, ProspectCount: int(r.ProspectCount),
-		RepresentantCount: int(r.RepresentantCount),
+		RepresentantCount: int(r.RepresentantCount), PermissionsSupplementaires: r.PermissionsSupplementaires,
 	}
 }
 
@@ -206,7 +207,7 @@ func compteAdmin(ctx context.Context, q *db.Queries, id string) (Compte, error) 
 
 type ListerComptesInput struct {
 	Search   string `query:"search" maxLength:"120"`
-	Role     string `query:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+	Role     string `query:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 	IsActive string `query:"isActive" enum:"true,false"`
 	Page     int32  `query:"page" minimum:"1" default:"1"`
 	PageSize int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
@@ -279,7 +280,7 @@ type CreerCompteInput struct {
 		Username string      `json:"username" minLength:"3" maxLength:"40" pattern:"^[a-zA-Z0-9._-]+$"`
 		FullName string      `json:"fullName" minLength:"2" maxLength:"160"`
 		Password string      `json:"password" minLength:"1" maxLength:"1024"`
-		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}
@@ -380,7 +381,7 @@ type ModifierCompteInput struct {
 		Email    *string     `json:"email,omitempty" format:"email" maxLength:"254"`
 		Username *string     `json:"username,omitempty" minLength:"3" maxLength:"40" pattern:"^[a-zA-Z0-9._-]+$"`
 		FullName *string     `json:"fullName,omitempty" minLength:"2" maxLength:"160"`
-		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,OBSERVATEUR"`
 		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}

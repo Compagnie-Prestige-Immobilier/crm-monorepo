@@ -4,6 +4,7 @@ import {
   KeyRoundIcon,
   LogInIcon,
   MoreHorizontalIcon,
+  ShieldPlusIcon,
   PencilIcon,
   PowerIcon,
   PowerOffIcon,
@@ -35,6 +36,7 @@ import { cn } from '@/lib/utils';
 export interface ActionsCompte {
   onEdit: (user: UserRow) => void;
   onResetPassword: (user: UserRow) => void;
+  onPermissions: ((user: UserRow) => void) | null;
   onToggleActive: (user: UserRow) => void;
   onDelete: (user: UserRow) => void;
   onUsurper: (user: UserRow) => void;
@@ -158,6 +160,12 @@ function LigneCompte({
               {user.fullName}
             </span>
             <Badge variant="secondary">{user.roleLibelle}</Badge>
+            {user.permissionsSupplementaires.length > 0 ? (
+              <Badge variant="outline">
+                +{user.permissionsSupplementaires.length} permission
+                {user.permissionsSupplementaires.length > 1 ? 's' : ''}
+              </Badge>
+            ) : null}
             {user.isActive ? null : <Badge variant="destructive">Désactivé</Badge>}
           </div>
           <span className="truncate text-[0.8125rem] md:hidden">{user.email}</span>
@@ -213,6 +221,12 @@ function MenuCompte({
           <PencilIcon aria-hidden="true" />
           Modifier
         </DropdownMenuItem>
+        {actions.onPermissions === null ? null : (
+          <DropdownMenuItem onClick={() => actions.onPermissions?.(user)}>
+            <ShieldPlusIcon aria-hidden="true" />
+            Permissions du compte
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => actions.onResetPassword(user)}>
           <KeyRoundIcon aria-hidden="true" />
           Réinitialiser le mot de passe

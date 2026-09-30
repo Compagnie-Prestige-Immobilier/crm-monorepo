@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MailIcon, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,7 +20,7 @@ import {
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { Courriel } from '@/lib/types';
+import { peut, type Courriel } from '@/lib/types';
 
 const VARIANTE_STATUT: Record<
   Courriel['statut'],
@@ -49,6 +50,7 @@ export function BankCourriels({
   objetId: string;
 }) {
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(meQueryOptions);
   const courriels = useQuery({
     queryKey: queryKeys.courriels(objetType, objetId),
     queryFn: () => fetchCourriels(objetType, objetId),
@@ -110,7 +112,7 @@ export function BankCourriels({
               </div>
               <div className="flex items-center gap-2">
                 <StatutCourriel courriel={courriel} />
-                {courriel.statut === 'ECHEC' ? (
+                {courriel.statut === 'ECHEC' && peut(user, 'banque.dossiers') ? (
                   <Button
                     type="button"
                     variant="outline"

@@ -4,7 +4,7 @@ import { VisitesTabs } from '@/components/accueil/visites-tabs';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil')({
-  beforeLoad: guardPermission('accueil.registre'),
+  beforeLoad: guardPermission('accueil.consulter'),
   component: AccueilLayout,
 });
 

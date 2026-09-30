@@ -1,14 +1,17 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { BuildingIcon, ClockIcon, FolderPlusIcon } from 'lucide-react';
 import Link from 'next/link';
 
+import { meQueryOptions } from '@/api/auth';
 import { nomClient } from '@/components/bank/bank-a-ouvrir-view';
 import { AnimatedNumber } from '@/components/live/animated-number';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { initials } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import {
+  peut,
   stageBadgeVariant,
   type BankCase,
   type BankCaseStage,
@@ -138,6 +141,7 @@ export function ContenuInscription({
   inscription: InscriptionAOuvrir;
   base: string;
 }) {
+  const { data: user } = useQuery(meQueryOptions);
   return (
     <div className="flex flex-col gap-2.5">
       <p className="truncate font-semibold text-[0.9375rem] leading-tight">
@@ -147,13 +151,15 @@ export function ContenuInscription({
         <BuildingIcon className="size-3.5 shrink-0" aria-hidden="true" />
         <span className="truncate">{inscription.banqueName ?? 'Banque à choisir'}</span>
       </p>
-      <Link
-        href={`${base}/dossiers/nouveau?ouvrir=${inscription.id}`}
-        className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 font-semibold text-[0.75rem] text-primary transition-colors hover:bg-primary/15"
-      >
-        <FolderPlusIcon className="size-3.5" aria-hidden="true" />
-        Créer le dossier
-      </Link>
+      {peut(user, 'banque.dossiers') ? (
+        <Link
+          href={`${base}/dossiers/nouveau?ouvrir=${inscription.id}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 font-semibold text-[0.75rem] text-primary transition-colors hover:bg-primary/15"
+        >
+          <FolderPlusIcon className="size-3.5" aria-hidden="true" />
+          Créer le dossier
+        </Link>
+      ) : null}
     </div>
   );
 }

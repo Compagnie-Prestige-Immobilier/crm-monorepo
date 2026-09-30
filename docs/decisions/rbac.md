@@ -10,6 +10,19 @@ matrice est repris à `cmd/server/testdata/matrice-roles-2026-09-18.json`, 225
 routes. Ce qui suit décrit la construction du RBAC et garde le vocabulaire de
 l'époque : les mentions de `CCP` y sont historiques.
 
+Le 30 septembre 2026, le propriétaire a tranché deux points (D11, D12) et le
+gel est repris à `cmd/server/testdata/matrice-roles-2026-09-30.json`.
+
+| #   | Décision                                                                                                                                                                                                                                                | Raison                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| D11 | Un compte peut recevoir des permissions en plus de celles de son rôle, dans `user_permissions`. Jamais un retrait. Les accorder exige `roles.administrer`, chaque écriture est auditée (`user.permissions_change`), l'effet vaut à la requête suivante. | Des demandes d'accès dépassent le rôle d'une seule personne ; créer un rôle par personne multiplierait les rôles.  |
+| D12 | Le rôle système `OBSERVATEUR` n'a par défaut que `panneau.acceder` et n'apparaît dans aucune donnée par rôle (plateau, notifications, téléconseillers).                                                                                                 | Un rôle personnalisé hérite des données de sa base : un observateur de base DIRECTION apparaîtrait sur le plateau. |
+
+Chaque lecture qui empruntait une permission d'écriture a reçu la sienne, donnée
+par migration à tout rôle qui tenait l'écriture : `analytics.lire`,
+`representants.lire`, `banque.dossiers_lire`, `accueil.consulter`,
+`chiffres.consulter`. Aucun compte existant ne gagne ni ne perd d'accès.
+
 Plan d'exécution, écrit le 16 septembre 2026 après cinq audits en lecture seule
 (points de décision Go, panneau web, base, preuves, conception). Il s'adresse
 à un agent qui exécute une phase à la fois, sans contexte préalable. Chaque
@@ -41,7 +54,7 @@ permissions, elles, sont les siennes. Un rôle de base COMMERCIAL avec la
 permission `plateforme.saisir` peut saisir sur une fiche plateforme, mais
 aucun rappel plateforme ne lui est routé : la file suit la base CCP.
 
-Idées différées, à ne pas coder : permissions par utilisateur en plus du rôle ;
+Idées différées, à ne pas coder : retrait d'une permission par utilisateur ;
 historique consultable des matrices (le journal d'audit suffit) ; rôle sans
 rôle de base.
 

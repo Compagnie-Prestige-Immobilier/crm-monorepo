@@ -41,6 +41,7 @@ const ROLE_HINTS: Record<Role, string> = {
   DIRECTION: 'Passe les trois appels, suit toute l’activité et tient le registre des visites.',
   ACCUEIL: 'Tient le registre des visites, et rien d’autre.',
   CHARGE_CLIENTELE: 'Passe les trois appels, relit et revoit toute demande convertie.',
+  OBSERVATEUR: 'Lit seulement ce qui lui est accordé, sans rien modifier.',
 };
 
 const TEXTES = {

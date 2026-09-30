@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/statistiques')({
-  beforeLoad: guardPermission('analytics.superviser'),
+  beforeLoad: guardPermission('analytics.superviser', 'chiffres.consulter'),
   component: ChiffresGrandPublicPage,
   pendingComponent: Loading,
 });

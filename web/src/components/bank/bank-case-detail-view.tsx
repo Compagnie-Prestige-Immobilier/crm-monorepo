@@ -188,6 +188,7 @@ function BankCaseActions({
       </p>
     );
   }
+  if (!peut(user, 'banque.dossiers')) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
