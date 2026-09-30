@@ -8,7 +8,7 @@ VALUES ('OBSERVATEUR', 'panneau.acceder')
 ON CONFLICT DO NOTHING;
 
 -- Permissions accordées à un compte en plus de celles de son rôle ; jamais un retrait.
-CREATE TABLE public.user_permissions (
+CREATE TABLE IF NOT EXISTS public.user_permissions (
     "userId" text NOT NULL REFERENCES public.users ("id") ON DELETE CASCADE,
     "permission" text NOT NULL,
     "accordePar" text REFERENCES public.users ("id") ON DELETE SET NULL,
