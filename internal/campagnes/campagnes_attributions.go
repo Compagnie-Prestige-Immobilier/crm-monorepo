@@ -72,7 +72,7 @@ func (s *service) campagneImports(ctx context.Context, _ *struct{}) (*CampagneIm
 		}
 		out.Body.Items = append(out.Body.Items, CampagneImport{
 			ID: r.ID, FileName: r.FileName, Feuille: feuille, Libelle: libelle,
-			ImportedAt: lotISO(r.FinishedAt), Fiches: int(r.FichesChues + r.FichesGp),
+			ImportedAt: lotISO(r.ReleveLe), Fiches: int(r.FichesChues + r.FichesGp),
 			FichesChues: int(r.FichesChues), FichesGrandPublic: int(r.FichesGp),
 			Appelees: int(r.AppeleesChues + r.AppeleesGp),
 		})

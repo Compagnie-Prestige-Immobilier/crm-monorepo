@@ -60,7 +60,7 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 -- baisser la part appelée d'un onglet déjà traité. "rang" 1 est le premier jour.
 -- name: ImportsAvecFiches :many
 WITH fiches AS (
-  SELECT j."id" AS "jobId", j."fileName", j."createdAt", j."finishedAt", p."importFeuille",
+  SELECT j."id" AS "jobId", j."fileName", j."createdAt", p."importFeuille",
          p."lastCallAt" IS NOT NULL AS appelee,
          p."projet" = 'GRAND_PUBLIC' AS gp,
          p."projet" = 'CHUES' AS chues
@@ -71,7 +71,7 @@ SELECT MAX("jobId")::text AS "id",
        MAX("fileName")::text AS "fileName",
        "importFeuille",
        MIN("createdAt")::timestamp AS "createdAt",
-       MAX("finishedAt")::timestamp AS "finishedAt",
+       MAX("createdAt")::timestamp AS "releveLe",
        COUNT(*) FILTER (WHERE gp)::int AS "fichesGp",
        COUNT(*) FILTER (WHERE gp AND appelee)::int AS "appeleesGp",
        COUNT(*) FILTER (WHERE chues)::int AS "fichesChues",
@@ -80,8 +80,20 @@ SELECT MAX("jobId")::text AS "id",
                           ORDER BY MIN("createdAt"))::int AS "rang"
 FROM fiches
 GROUP BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille", "createdAt"::date
-ORDER BY MAX("finishedAt") DESC, MAX("jobId") DESC
+ORDER BY MAX("createdAt") DESC, MAX("jobId") DESC
 LIMIT 1000;
+
+-- Le relevé choisi pour une campagne, et s'il vient après le premier jour où
+-- l'onglet a eu des fiches : la campagne le dit dans son nom.
+-- name: ReleveDeLOnglet :one
+SELECT ja."createdAt"::timestamp AS "releve",
+       (ja."createdAt"::date > COALESCE(MIN(jb."createdAt")::date, ja."createdAt"::date))::boolean AS "tardif"
+FROM "import_jobs" ja
+LEFT JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+  AND EXISTS (SELECT 1 FROM "prospects" p
+              WHERE p."importJobId" = jb."id" AND p."importFeuille" = @import_feuille::text AND p."deletedAt" IS NULL)
+WHERE ja."id" = @id
+GROUP BY ja."createdAt";
 
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;

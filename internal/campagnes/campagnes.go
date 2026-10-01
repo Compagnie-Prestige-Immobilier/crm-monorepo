@@ -216,6 +216,7 @@ type lotFiltres struct {
 	ImportFeuille  string          `json:"importFeuille,omitempty"`
 	IncludeDeleted *bool           `json:"includeDeleted,omitempty"`
 	Injoignables   bool            `json:"injoignables,omitempty"`
+	ReleveTardif   *time.Time      `json:"releveTardif,omitempty"`
 	Distribution   lotDistribution `json:"distribution"`
 }
 
@@ -298,6 +299,9 @@ func lotScopeLabel(cible string, f *lotFiltres) string {
 	}
 	if f.ImportJobID != "" {
 		if libelle := libelleFeuilleImport(f.ImportFeuille); libelle != "" {
+			if f.ReleveTardif != nil {
+				libelle += ", relevé du " + jourEnLettres(*f.ReleveTardif)
+			}
 			return lotSiVide(f.Projet, "Tous projets") + ", " + libelle
 		}
 		return lotSiVide(f.Projet, "Tous projets") + ", fiches importées"
@@ -517,6 +521,38 @@ func lotRepresentantsCible(cible string, f *lotFiltres) db.CompterRepresentantsC
 	}
 }
 
+// Une ligne complétée après coup dans le classeur entre à un relevé plus tardif
+// et sort sur sa propre ligne du sélecteur : la campagne tirée de cette ligne
+// garde le jour de ce relevé, sinon son nom se confond avec celle de l'onglet.
+func lotNoterReleveTardif(ctx context.Context, q *db.Queries, f *lotFiltres) error {
+	if f.ImportJobID == "" || f.ImportFeuille == "" {
+		return nil
+	}
+	releve, err := q.ReleveDeLOnglet(ctx, db.ReleveDeLOngletParams{ImportFeuille: f.ImportFeuille, ID: f.ImportJobID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if releve.Tardif {
+		f.ReleveTardif = &releve.Releve
+	}
+	return nil
+}
+
+// Les filtres tels que la campagne les garde : critères, relevé tardif et répartition.
+func lotFiltresEnregistres(ctx context.Context, q *db.Queries, body *CampagneCreationBody,
+	distribution lotDistribution,
+) ([]byte, error) {
+	filtres := lotFiltresDuCorps(body)
+	if err := lotNoterReleveTardif(ctx, q, filtres); err != nil {
+		return nil, err
+	}
+	filtres.Distribution = distribution
+	return json.Marshal(filtres)
+}
+
 // Les deux axes du segment se lisent sur les référentiels, jamais sur une
 // colonne : un identifiant mis en cache deviendrait faux à la première correction.
 func lotProspectsCible(f *lotFiltres) db.CompterProspectsCibleParams {
@@ -567,9 +603,13 @@ func (s *service) campagneApercu(ctx context.Context, in *CampagneCreationInput)
 	if err != nil {
 		return nil, err
 	}
+	f := lotFiltresDuCorps(&in.Body)
+	if err := lotNoterReleveTardif(ctx, s.Q, f); err != nil {
+		return nil, err
+	}
 	out := &CampagneApercuOutput{}
 	out.Body.Eligible = eligible
-	out.Body.ScopeLabel = lotScopeLabel(in.Body.Cible, lotFiltresDuCorps(&in.Body))
+	out.Body.ScopeLabel = lotScopeLabel(in.Body.Cible, f)
 	out.Body.Places = places
 	out.Body.Retenues = min(eligible, places)
 	out.Body.ParTeleconseiller = int(math.Ceil(float64(out.Body.Retenues) / float64(len(equipe))))
@@ -635,14 +675,12 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	}
 	lotAffectations := lotRepartir(len(fiches), membres, in.Body.Distribution.Jours)
 
-	filtres := lotFiltresDuCorps(&in.Body)
-	filtres.Distribution = lotDistribution{
+	brut, err := lotFiltresEnregistres(ctx, q, &in.Body, lotDistribution{
 		TeleconseillerIds: lotIdsDe(equipe),
 		FichesParJour:     in.Body.Distribution.FichesParJour,
 		Jours:             in.Body.Distribution.Jours,
 		Objectifs:         objectifs,
-	}
-	brut, err := json.Marshal(filtres)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -677,7 +715,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 		map[string]any{
 			lotCleNom: strings.TrimSpace(in.Body.Name), "cible": in.Body.Cible,
 			"projet": lotProjetTexte(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
-			"teleconseillerIds": filtres.Distribution.TeleconseillerIds,
+			"teleconseillerIds": lotIdsDe(equipe),
 		}); err != nil {
 		return "", err
 	}
