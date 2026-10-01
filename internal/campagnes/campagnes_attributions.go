@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/internal/shared/socle"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +32,16 @@ func libelleFeuilleImport(feuille string) string {
 	return fmt.Sprintf("Leads %d %s %d", date.Day(), socle.MoisEnLettres[date.Month()-1], date.Year())
 }
 
+// « 1er octobre », « 18 septembre » : le jour du relevé qui a fait entrer des
+// lignes complétées après coup dans un onglet déjà relevé.
+func jourEnLettres(t time.Time) string {
+	jour := strconv.Itoa(t.Day())
+	if t.Day() == 1 {
+		jour = "1er"
+	}
+	return jour + " " + socle.MoisEnLettres[t.Month()-1]
+}
+
 type CampagneImportsOutput struct {
 	Body struct {
 		Items []CampagneImport `json:"items"`
@@ -56,9 +67,12 @@ func (s *service) campagneImports(ctx context.Context, _ *struct{}) (*CampagneIm
 		if libelle == "" {
 			libelle = r.FileName
 		}
+		if r.Rang > 1 {
+			libelle += ", relevé du " + jourEnLettres(r.CreatedAt)
+		}
 		out.Body.Items = append(out.Body.Items, CampagneImport{
 			ID: r.ID, FileName: r.FileName, Feuille: feuille, Libelle: libelle,
-			ImportedAt: lotISO(r.FinishedAt), Fiches: int(r.FichesChues + r.FichesGp),
+			ImportedAt: lotISO(r.ReleveLe), Fiches: int(r.FichesChues + r.FichesGp),
 			FichesChues: int(r.FichesChues), FichesGrandPublic: int(r.FichesGp),
 			Appelees: int(r.AppeleesChues + r.AppeleesGp),
 		})
