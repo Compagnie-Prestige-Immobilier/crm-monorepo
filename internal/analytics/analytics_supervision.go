@@ -381,7 +381,9 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 	jourProgramme := `(date_trunc('day', l."createdAt") + (i."day" - 1) * interval '1 day')`
 	fenetre := []string{}
 	if perimetre.depuis != nil {
-		fenetre = append(fenetre, jourProgramme+" >= "+p.marque(*perimetre.depuis))
+		// Un jour de programme court de minuit à minuit : « Aujourd'hui » part de
+		// l'ouverture du plateau (08:00), et le jour de minuit ne doit pas en sortir.
+		fenetre = append(fenetre, "("+jourProgramme+" + interval '1 day') > "+p.marque(*perimetre.depuis))
 	}
 	if perimetre.jusqua != nil {
 		fenetre = append(fenetre, jourProgramme+" <= "+p.marque(*perimetre.jusqua))
