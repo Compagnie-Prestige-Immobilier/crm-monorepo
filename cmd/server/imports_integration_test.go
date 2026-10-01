@@ -351,7 +351,8 @@ func TestImportEchuEstExpireEtSonClasseurDetruit(t *testing.T) {
 	chemin := ecrireClasseurSurDisque(t, dossier, []byte("PK\x03\x04 classeur"))
 	travail := b.travailImport(chemin, "DRY_RUN", 0)
 	if _, err := b.pool.Exec(b.ctx,
-		`UPDATE "import_jobs" SET "expiresAt" = now() - interval '1 hour', "report" = '{"errors":[]}'::jsonb WHERE "id" = $1`, travail); err != nil {
+		`UPDATE "import_jobs" SET "expiresAt" = now() - interval '1 hour', "finishedAt" = '2026-09-18 10:00:05',
+		                          "report" = '{"errors":[]}'::jsonb WHERE "id" = $1`, travail); err != nil {
 		t.Fatal(err)
 	}
 	if err := imports.BalayerImports(b.ctx, moteur); err != nil {
@@ -360,11 +361,16 @@ func TestImportEchuEstExpireEtSonClasseurDetruit(t *testing.T) {
 
 	var statut string
 	var rapport []byte
-	if err := b.pool.QueryRow(b.ctx, `SELECT "status","report" FROM "import_jobs" WHERE "id" = $1`, travail).Scan(&statut, &rapport); err != nil {
+	var fin time.Time
+	if err := b.pool.QueryRow(b.ctx, `SELECT "status","report","finishedAt" FROM "import_jobs" WHERE "id" = $1`, travail).
+		Scan(&statut, &rapport, &fin); err != nil {
 		t.Fatal(err)
 	}
 	if statut != "expired" || rapport == nil {
 		t.Fatalf("échéance : statut %s, le rapport doit survivre au classeur, reçu %s", statut, rapport)
+	}
+	if fin.Format(time.DateTime) != "2026-09-18 10:00:05" {
+		t.Fatalf("l'échéance garde l'heure de fin du travail, reçu %s", fin)
 	}
 	if _, err := os.Stat(chemin); !os.IsNotExist(err) {
 		t.Fatalf("le classeur échu doit être détruit : %v", err)
