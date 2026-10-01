@@ -58,7 +58,6 @@ import {
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
   PROSPECT_SORT_FIELDS,
-  peut,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   RENDEZ_VOUS_ISSUE_LABELS,
@@ -447,7 +446,6 @@ export function ProspectsTable({
   const campagnes = useQuery({
     queryKey: queryKeys.lotsExport({ page: 1, pageSize: CAMPAGNES_PAR_PAGE }),
     queryFn: () => campagnesOptions(),
-    enabled: peut(session, 'campagnes.superviser'),
     staleTime: 5 * 60_000,
   });
 
