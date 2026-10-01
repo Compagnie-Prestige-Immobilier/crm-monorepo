@@ -43,6 +43,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv("SEED_FIXTURE_PASSWORD") == "" {
 		_ = os.Setenv("SEED_FIXTURE_PASSWORD", uuid.NewString())
 	}
+	factoryVolumes = volumesEssai
 	supprimer, err := baseEssaiNeuve(context.Background())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "base d'essai :", err)

@@ -9,32 +9,40 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const (
-	factoryJours               = 600
-	factoryJoursFuturs         = 600
-	factoryRepresentants       = 24000
-	factoryProspects           = 48000
-	factoryProspectsConvertis  = 24000
-	factoryProspectsRappel     = 36000
-	factoryProspectsRendezVous = 6000
-	factoryVisites             = 18000
-	factoryVentes              = 12000
+type volumesFactory struct {
+	jours, joursFuturs, representants, prospects, convertis, rappel, rendezVous, visites, ventes int
+}
+
+// Les bases de démonstration montrent un gros volume ; chaque test d'intégration
+// en monte une et passe au volume d'essai, sinon la suite dépasse le délai de la CI.
+var (
+	volumesDemo = volumesFactory{
+		jours: 600, joursFuturs: 600, representants: 24000, prospects: 48000, convertis: 24000,
+		rappel: 36000, rendezVous: 6000, visites: 18000, ventes: 12000,
+	}
+	volumesEssai = volumesFactory{
+		jours: 60, joursFuturs: 600, representants: 240, prospects: 600, convertis: 240,
+		rappel: 360, rendezVous: 120, visites: 180, ventes: 120,
+	}
+	factoryVolumes = volumesDemo
 )
 
-var factoryJetons = strings.NewReplacer(
-	"{J}", strconv.Itoa(factoryJours),
-	"{J2}", strconv.Itoa(2*factoryJours),
-	"{FUTUR}", strconv.Itoa(factoryJoursFuturs),
-	"{REP}", strconv.Itoa(factoryRepresentants),
-	"{REPBLOC}", strconv.Itoa(factoryRepresentants/4),
-	"{PROS}", strconv.Itoa(factoryProspects),
-	"{CONV}", strconv.Itoa(factoryProspectsConvertis),
-	"{CONVH}", strconv.Itoa(factoryProspectsConvertis/2),
-	"{RAPPEL}", strconv.Itoa(factoryProspectsRappel),
-	"{RDVDEBUT}", strconv.Itoa(factoryProspects-factoryProspectsRendezVous),
-	"{VIS}", strconv.Itoa(factoryVisites),
-	"{VENTES}", strconv.Itoa(factoryVentes),
-)
+func (v volumesFactory) jetons() *strings.Replacer {
+	return strings.NewReplacer(
+		"{J}", strconv.Itoa(v.jours),
+		"{J2}", strconv.Itoa(2*v.jours),
+		"{FUTUR}", strconv.Itoa(v.joursFuturs),
+		"{REP}", strconv.Itoa(v.representants),
+		"{REPBLOC}", strconv.Itoa(v.representants/4),
+		"{PROS}", strconv.Itoa(v.prospects),
+		"{CONV}", strconv.Itoa(v.convertis),
+		"{CONVH}", strconv.Itoa(v.convertis/2),
+		"{RAPPEL}", strconv.Itoa(v.rappel),
+		"{RDVDEBUT}", strconv.Itoa(v.prospects-v.rendezVous),
+		"{VIS}", strconv.Itoa(v.visites),
+		"{VENTES}", strconv.Itoa(v.ventes),
+	)
+}
 
 // Les identifiants fixes réactualisent les fixtures autour d’aujourd’hui : 600 jours de passé, rappels sur 600 jours à venir.
 func seedFactory(ctx context.Context, tx pgx.Tx) error {
@@ -242,8 +250,9 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		WHERE v."classeurId"='0199f100-0000-7021-8000-000000000001'`,
 		`INSERT INTO "visite_import_changes" ("id","importJobId","sheet","rowNumber","kind","reference","visiteId","label","fields") SELECT '0199f100-0000-701d-8000-000000000001','0199f100-0000-700c-8000-000000000001','Visites',2,'CREATE'::"VisiteImportChangeKind",'DEV-VISITE-001','0199f100-0000-7007-8000-000000000001','Visite de démonstration','{}'::jsonb ON CONFLICT DO NOTHING`,
 	}
+	jetons := factoryVolumes.jetons()
 	for i, statement := range statements {
-		statement = factoryJetons.Replace(statement)
+		statement = jetons.Replace(statement)
 		if _, err := tx.Exec(ctx, statement); err != nil {
 			return fmt.Errorf("factory statement %d (%s): %w", i+1, statement, err)
 		}
