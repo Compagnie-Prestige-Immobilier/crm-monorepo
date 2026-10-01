@@ -120,6 +120,8 @@ type FiltreDesAnalyses struct {
 	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
+	ActFrom                string `query:"actFrom" doc:"Fiches appelées à partir de cette date ou de cet instant : borne la date de l'appel, là où dateFrom borne la saisie de la fiche."`
+	ActTo                  string `query:"actTo" doc:"Fiches appelées jusqu'à cette date ou cet instant."`
 	Revue                  string `query:"revue" enum:"true,false"`
 	IncludeDeleted         bool   `query:"includeDeleted"`
 }
@@ -253,7 +255,38 @@ func filtresDePeriode(f *FiltreDesAnalyses, p *parametresSQL, tz *time.Location)
 		}
 		conditions = append(conditions, `p."clientCreatedAt"`+borne.operateur+p.marque(instant))
 	}
-	return conditions, nil
+	acte, err := filtreDActe(f, p, tz)
+	if err != nil {
+		return nil, err
+	}
+	return append(conditions, acte...), nil
+}
+
+// La fenêtre de l'ACTE : les fiches appelées dans la période, quelle que soit leur
+// date de saisie. Une fiche importée en septembre et appelée aujourd'hui y entre.
+func filtreDActe(f *FiltreDesAnalyses, p *parametresSQL, tz *time.Location) ([]string, error) {
+	bornes := []struct {
+		valeur, champ, operateur string
+		fin                      bool
+	}{
+		{f.ActFrom, "actFrom", ` >= `, false},
+		{f.ActTo, "actTo", ` <= `, true},
+	}
+	appels := []string{`ca."prospectId" = p."id"`}
+	for _, borne := range bornes {
+		if borne.valeur == "" {
+			continue
+		}
+		instant, ok := borneDuJour(borne.valeur, tz, borne.fin)
+		if !ok {
+			return nil, erreurDateInvalide(borne.champ)
+		}
+		appels = append(appels, `ca."clientCreatedAt"`+borne.operateur+p.marque(instant))
+	}
+	if len(appels) == 1 {
+		return nil, nil
+	}
+	return []string{`EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ` + strings.Join(appels, etSQL) + `)`}, nil
 }
 
 func (s *service) filtreRechercheLibre(brut string, p *parametresSQL) string {
@@ -296,7 +329,7 @@ func (s *service) cleDeCacheDesAnalyses(ctx context.Context, route string, f *Fi
 		f.Search, f.RepresentantID, f.BanqueID, f.SyndicatID, f.DepartementID, f.CommercialID,
 		f.Projet, f.Type, f.CanalProvenanceID, f.Statut, f.Segment, f.Phase2Status,
 		f.EnrollmentMethod, f.AppelePar, f.EnrollmentCapturedByID, f.LotID, f.Origin,
-		f.DateFrom, f.DateTo, f.Revue, strconv.FormatBool(f.IncludeDeleted),
+		f.DateFrom, f.DateTo, f.ActFrom, f.ActTo, f.Revue, strconv.FormatBool(f.IncludeDeleted),
 	}, "|")
 }
 
