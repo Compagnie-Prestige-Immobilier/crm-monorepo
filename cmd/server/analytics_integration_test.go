@@ -282,6 +282,31 @@ func TestAnalyticsRepartitionsEtFiltres(t *testing.T) {
 	b.attend(statut, http.StatusBadRequest, "date invalide", body)
 }
 
+// `actFrom`/`actTo` bornent la date de l'appel, `dateFrom`/`dateTo` celle de la saisie :
+// une fiche saisie en 2020 et appelée le jour J compte pour le jour J, une fiche
+// saisie le jour J mais jamais appelée n'y compte pas.
+func TestAnalyticsBorneParLaDateDeLAppel(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	ancienneAppelee := analyticsProspect(b, &jeu, b.userID, vieuxAnalytics, false)
+	analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsAppel(b, ancienneAppelee, "REACHED")
+
+	portee := "?commercialId=" + b.userID + "&departementId=" + jeu.departement
+	statut, body := b.appel(http.MethodGet, "/api/v1/analytics/by-departement"+portee+
+		"&actFrom="+jourAnalytics+"&actTo="+jourAnalytics, nil, false)
+	b.attend(statut, http.StatusOK, "répartition bornée à l'appel", body)
+	analyticsEgal(b, "seule la fiche appelée le jour J compte", body["total"], 1)
+
+	statut, body = b.appel(http.MethodGet, "/api/v1/analytics/by-departement"+portee+
+		"&dateFrom="+jourAnalytics+"&dateTo="+jourAnalytics, nil, false)
+	b.attend(statut, http.StatusOK, "répartition bornée à la saisie", body)
+	analyticsEgal(b, "la saisie du jour J ne retient pas la fiche de 2020", body["total"], 1)
+
+	statut, body = b.appel(http.MethodGet, "/api/v1/analytics/by-departement"+portee+"&actFrom=pas-une-date", nil, false)
+	b.attend(statut, http.StatusBadRequest, "date d'appel invalide", body)
+}
+
 // `total` ne compte que les porteurs d'une méthode, et les quatre méthodes
 // proposées sont rendues même à zéro.
 func TestAnalyticsMethodesDEnrolement(t *testing.T) {

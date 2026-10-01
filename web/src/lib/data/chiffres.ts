@@ -85,6 +85,31 @@ const filtresProspect = (
   ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
 });
 
+/**
+ * Les mêmes filtres, mais bornés à la date de l'APPEL : les fiches travaillées dans
+ * la période, qu'elles aient été saisies hier ou le mois dernier. Pour tout ce qui
+ * se lit sur le travail du plateau ; `filtresProspect` reste pour ce qui compte des
+ * saisies (prospects saisis, méthodes d'adhésion).
+ */
+const filtresActe = (
+  perimetre: PerimetreChiffres,
+): {
+  projet?: Projet;
+  actFrom: string;
+  actTo: string;
+  commercialId?: string;
+  lotId?: string;
+} => {
+  const { actFrom, actTo } = bornes(perimetre);
+  return {
+    ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
+    actFrom,
+    actTo,
+    ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+    ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
+  };
+};
+
 const filtresSupervision = (
   perimetre: PerimetreChiffres,
 ): { actFrom: string; actTo: string; projet?: Projet; commercialId?: string; lotId?: string } => ({
@@ -184,7 +209,7 @@ export async function fetchChiffresEntonnoir(
   client: ApiClient = getApiClient(),
 ): Promise<ChiffresEntonnoir> {
   return unwrap(
-    await client.GET('/api/v1/analytics/funnel', { params: { query: filtresProspect(perimetre) } }),
+    await client.GET('/api/v1/analytics/funnel', { params: { query: filtresActe(perimetre) } }),
   );
 }
 
@@ -193,7 +218,7 @@ export async function fetchChiffresDelais(
   client: ApiClient = getApiClient(),
 ): Promise<ChiffresDelais> {
   return unwrap(
-    await client.GET('/api/v1/analytics/delays', { params: { query: filtresProspect(perimetre) } }),
+    await client.GET('/api/v1/analytics/delays', { params: { query: filtresActe(perimetre) } }),
   );
 }
 
@@ -203,7 +228,7 @@ export async function fetchChiffresRendement(
 ): Promise<ChiffresRendement> {
   return unwrap(
     await client.GET('/api/v1/analytics/departement-yield', {
-      params: { query: filtresProspect(perimetre) },
+      params: { query: filtresActe(perimetre) },
     }),
   );
 }
@@ -225,7 +250,7 @@ export async function fetchChiffresBanques(
 ): Promise<ChiffresBanques> {
   return unwrap(
     await client.GET('/api/v1/analytics/by-banque', {
-      params: { query: filtresProspect(perimetre) },
+      params: { query: filtresActe(perimetre) },
     }),
   );
 }
