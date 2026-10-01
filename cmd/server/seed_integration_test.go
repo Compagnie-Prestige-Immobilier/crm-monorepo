@@ -247,8 +247,8 @@ func TestSeedFactoryTableauxDeBord(t *testing.T) {
 func seedVerifierVolumes(b *banc, passage int) {
 	b.t.Helper()
 	for table, attendu := range map[string]int{
-		"prospects": factoryProspects, "representants": factoryRepresentants, "call_attempts": factoryProspects,
-		"rep_call_attempts": factoryRepresentants, "visites": factoryVisites, "ouvertures_fiche": factoryProspects,
+		"prospects": factoryVolumes.prospects, "representants": factoryVolumes.representants, "call_attempts": factoryVolumes.prospects,
+		"rep_call_attempts": factoryVolumes.representants, "visites": factoryVolumes.visites, "ouvertures_fiche": factoryVolumes.prospects,
 	} {
 		var nombre int
 		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
@@ -307,7 +307,7 @@ func seedVerifierVentes(b *banc, passage int) {
 		FROM "ventes" WHERE "classeurId"='0199f100-0000-7021-8000-000000000001'`).Scan(&ventes, &credit, &enRetard); err != nil {
 		b.t.Fatal(err)
 	}
-	if ventes != factoryVentes || credit == 0 || enRetard == 0 {
+	if ventes != factoryVolumes.ventes || credit == 0 || enRetard == 0 {
 		b.t.Fatalf("passage %d : %d ventes, %d à crédit, %d sans versement", passage, ventes, credit, enRetard)
 	}
 }
