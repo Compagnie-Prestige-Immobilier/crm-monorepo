@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 import { RecontacterRendezVous } from '@/components/accueil/recontacter-rendez-vous';
 import { ReporterRendezVous } from '@/components/accueil/reporter-rendez-vous';
+import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -216,6 +217,13 @@ export function ActionsRendezVous({
         peutCloser={peutCloser}
         onCloser={onCloser}
         onEnregistrerVisite={onEnregistrerVisite}
+      />
+      <AffecterFiche
+        cible="prospect"
+        id={fiche.id}
+        nom={nom}
+        titulaireId={fiche.titulaireId}
+        onAffectee={() => void client.invalidateQueries({ queryKey: CLE_RENDEZ_VOUS })}
       />
       {menu.length === 0 ? null : (
         <DropdownMenu>

@@ -21,24 +21,29 @@ import {
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { matchesSearch } from '@/lib/search';
 import type { Pays } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export interface CallingCountry {
   code: string;
   label: string;
+  nom: string;
 }
 
 const COUNTRIES = [
-  { code: '221', label: '🇸🇳 +221' },
-  { code: '33', label: '🇫🇷 +33' },
-  { code: '225', label: '🇨🇮 +225' },
-  { code: '223', label: '🇲🇱 +223' },
-  { code: '224', label: '🇬🇳 +224' },
-  { code: '220', label: '🇬🇲 +220' },
-  { code: '222', label: '🇲🇷 +222' },
-  { code: '226', label: '🇧🇫 +226' },
+  { code: '221', label: '🇸🇳 +221', nom: 'Sénégal' },
+  { code: '33', label: '🇫🇷 +33', nom: 'France' },
+  { code: '225', label: '🇨🇮 +225', nom: 'Côte d’Ivoire' },
+  { code: '223', label: '🇲🇱 +223', nom: 'Mali' },
+  { code: '224', label: '🇬🇳 +224', nom: 'Guinée' },
+  { code: '220', label: '🇬🇲 +220', nom: 'Gambie' },
+  { code: '222', label: '🇲🇷 +222', nom: 'Mauritanie' },
+  { code: '226', label: '🇧🇫 +226', nom: 'Burkina Faso' },
 ] as const;
+
+const filtrerPays = (valeur: string, recherche: string): number =>
+  matchesSearch(valeur, recherche) ? 1 : 0;
 
 /** Deux lettres ISO 3166-1 alpha-2 en drapeau, par indicateurs régionaux. */
 function drapeau(iso2: string): string {
@@ -60,6 +65,7 @@ export function callingCountriesFrom(pays: readonly Pays[]): CallingCountry[] {
     .map((entry) => ({
       code: entry.indicatif ?? '',
       label: `${drapeau(entry.code ?? '')} +${entry.indicatif ?? ''}`,
+      nom: entry.label ?? entry.name ?? '',
     }));
 }
 
@@ -137,14 +143,14 @@ export function InternationalPhoneField({
               {selected?.label ?? `+${callingCode}`}⌄
             </PopoverTrigger>
             <PopoverContent className="w-64 overflow-hidden p-0">
-              <Command>
+              <Command filter={filtrerPays}>
                 <CommandInput placeholder="Chercher un pays ou un indicatif…" />
                 <CommandEmpty>Aucun pays trouvé.</CommandEmpty>
                 <CommandList>
                   {liste.map((country) => (
                     <CommandItem
                       key={country.code}
-                      value={`${country.label} ${country.code}`}
+                      value={`${country.nom} +${country.code} ${country.code}`}
                       onSelect={() => {
                         onCallingCodeChange(country.code);
                         setOpen(false);
@@ -157,7 +163,8 @@ export function InternationalPhoneField({
                           country.code === callingCode ? 'opacity-100' : 'opacity-0',
                         )}
                       />
-                      {country.label}
+                      <span className="flex-1 truncate">{country.nom}</span>
+                      <span className="text-muted-foreground">{country.label}</span>
                     </CommandItem>
                   ))}
                 </CommandList>

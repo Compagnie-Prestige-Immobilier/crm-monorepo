@@ -237,20 +237,50 @@ func TestSeedFactoryTableauxDeBord(t *testing.T) {
 		for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
 			seedVerifierTableau(b, projet, jour)
 		}
-		for table, attendu := range map[string]int{
-			"prospects": 480, "representants": 240, "call_attempts": 480,
-			"rep_call_attempts": 240, "visites": 180, "ouvertures_fiche": 480,
-		} {
-			var nombre int
-			if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
-				t.Fatal(err)
-			}
-			if nombre != attendu {
-				t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
-			}
-		}
+		seedVerifierVolumes(b, passage)
+		seedVerifierRendezVous(b, passage)
 		seedVerifierInscriptionsAOuvrir(b, passage)
 		seedVerifierVentes(b, passage)
+	}
+}
+
+func seedVerifierVolumes(b *banc, passage int) {
+	b.t.Helper()
+	for table, attendu := range map[string]int{
+		"prospects": factoryVolumes.prospects, "representants": factoryVolumes.representants, "call_attempts": factoryVolumes.prospects,
+		"rep_call_attempts": factoryVolumes.representants, "visites": factoryVolumes.visites, "ouvertures_fiche": factoryVolumes.prospects,
+	} {
+		var nombre int
+		if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
+			b.t.Fatal(err)
+		}
+		if nombre != attendu {
+			b.t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
+		}
+	}
+	var rappelsAVenir int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "scheduled_callbacks" WHERE "scheduledAt" > now() + interval '300 days'`).Scan(&rappelsAVenir); err != nil {
+		b.t.Fatal(err)
+	}
+	if rappelsAVenir == 0 {
+		b.t.Fatalf("passage %d : aucun rappel programmé à plus de 300 jours", passage)
+	}
+}
+
+func seedVerifierRendezVous(b *banc, passage int) {
+	b.t.Helper()
+	var honores, confirmes, closings int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FILTER (WHERE "rendezVousIssue"='HONORE'), count(*) FILTER (WHERE "rendezVousConfirmation"='CONFIRME'),
+		(SELECT count(*) FROM "rendez_vous_closings")
+		FROM "prospects" WHERE "phase2Status"='APPOINTMENT' AND id LIKE '0199f100-%'`).Scan(&honores, &confirmes, &closings); err != nil {
+		b.t.Fatal(err)
+	}
+	var sansSite int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "call_attempts" a JOIN "prospects" p ON p.id=a."prospectId" WHERE p."phase2Status"='APPOINTMENT' AND p.id LIKE '0199f100-%' AND (a."siteId" IS NULL OR a."pointRencontreId" IS NULL)`).Scan(&sansSite); err != nil {
+		b.t.Fatal(err)
+	}
+	if honores == 0 || confirmes == 0 || closings == 0 || sansSite != 0 {
+		b.t.Fatalf("passage %d : rendez-vous honorés %d, confirmés %d, closings %d", passage, honores, confirmes, closings)
 	}
 }
 
@@ -277,7 +307,7 @@ func seedVerifierVentes(b *banc, passage int) {
 		FROM "ventes" WHERE "classeurId"='0199f100-0000-7021-8000-000000000001'`).Scan(&ventes, &credit, &enRetard); err != nil {
 		b.t.Fatal(err)
 	}
-	if ventes != 120 || credit == 0 || enRetard == 0 {
+	if ventes != factoryVolumes.ventes || credit == 0 || enRetard == 0 {
 		b.t.Fatalf("passage %d : %d ventes, %d à crédit, %d sans versement", passage, ventes, credit, enRetard)
 	}
 }

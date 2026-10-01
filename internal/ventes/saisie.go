@@ -3,6 +3,7 @@ package ventes
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/referentiels"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -99,7 +101,7 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if err := verrouillerStock(ctx, q, &preparee, nil); err != nil {
+		if err := verrouillerStockEtProfession(ctx, q, &preparee, nil); err != nil {
 			return err
 		}
 		preparee.Vente.Numero, err = q.ProchainNumeroVente(ctx)
@@ -143,7 +145,7 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 		if err != nil {
 			return err
 		}
-		if err := verrouillerStock(ctx, q, &preparee, &avant); err != nil {
+		if err := verrouillerStockEtProfession(ctx, q, &preparee, &avant); err != nil {
 			return err
 		}
 		versements, err := q.TotalVersementsVente(ctx, id)
@@ -184,6 +186,24 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 	}
 	s.Live.Emettre("ventes")
 	return s.sortie(ctx, id)
+}
+
+// Une profession saisie à la vente rejoint le référentiel si elle n'y est pas encore.
+func verrouillerStockEtProfession(ctx context.Context, q *db.Queries, preparee *ventePreparee, avant *db.Vente) error {
+	if err := verrouillerStock(ctx, q, preparee, avant); err != nil {
+		return err
+	}
+	libelle := preparee.Vente.Profession
+	if libelle == "" {
+		return nil
+	}
+	id, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	return q.AjouterProfessionSiAbsente(ctx, db.AjouterProfessionSiAbsenteParams{
+		ID: id.String(), Code: referentiels.CodeDepuisLibelle(libelle), Label: libelle,
+	})
 }
 
 func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInput) (*VenteOutput, error) {

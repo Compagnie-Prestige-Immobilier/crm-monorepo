@@ -987,6 +987,88 @@ func TestCampagneOngletReparitiEntrePlusieursReleves(t *testing.T) {
 	}
 }
 
+// Une ligne complétée dans le classeur après coup entre à un relevé plus tardif : l'onglet
+// sort en deux lignes, et chacune ne tire que ses fiches. Sinon les fiches neuves font
+// baisser la part appelée d'un onglet déjà traité.
+func TestCampagneOngletSepareParJourDeReleve(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Leads 18 sept " + uuid.NewString()
+	classeur := "Leads du 10 sept 2026 " + uuid.NewString() + ".xlsx"
+	ancien, recent := b.travailDImport(classeur), b.travailDImport(classeur)
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "import_jobs" SET "createdAt" = date_trunc('day', now()) - CASE WHEN "id" = $1 THEN interval '12 days' ELSE interval '0' END,
+		                          "finishedAt" = now()
+		 WHERE "id" IN ($1, $2)`, ancien, recent); err != nil {
+		t.Fatal(err)
+	}
+	issue := "PAS_DE_REPONSE"
+	appelee := b.prospect(feuille, "GRAND_PUBLIC", &issue, "NOUVEAU")
+	neuve := b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
+	for fiche, travail := range map[string]string{appelee: ancien, neuve: recent} {
+		if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, fiche, travail); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	lignes := b.lignesDeLOnglet(feuille)
+	if len(lignes) != 2 || lignes[ancien]["appelees"] != float64(1) || lignes[recent]["appelees"] != float64(0) {
+		t.Fatalf("l'onglet sort en une ligne par jour de relevé : %v", lignes)
+	}
+	if libelle, _ := lignes[recent]["libelle"].(string); !strings.Contains(libelle, ", relevé du ") {
+		t.Fatalf("la ligne tardive dit son relevé : %q", libelle)
+	}
+	if libelle, _ := lignes[ancien]["libelle"].(string); strings.Contains(libelle, "relevé") {
+		t.Fatalf("la première ligne garde le nom de l'onglet : %q", libelle)
+	}
+	// La purge d'un import expiré réécrivait sa fin : l'heure affichée est celle du relevé.
+	attendu := time.Now().UTC().AddDate(0, 0, -12).Format(time.DateOnly)
+	if importe, _ := lignes[ancien]["importedAt"].(string); !strings.HasPrefix(importe, attendu) {
+		t.Fatalf("la ligne d'origine porte l'heure de son relevé (%s) : %q", attendu, importe)
+	}
+
+	corps := func(travail string) map[string]any {
+		return map[string]any{
+			"name": "Campagne relevé", "cible": "PROSPECTS",
+			"prospects": map[string]any{"importFeuille": feuille, "importJobId": travail, "projet": "GRAND_PUBLIC"},
+			"distribution": map[string]any{
+				"teleconseillerIds": []string{b.agentA}, "fichesParJour": 3, "jours": 1,
+			},
+		}
+	}
+	origine := b.apercuEligible(corps(ancien), 0, "la ligne d'origine ne tire pas la fiche arrivée plus tard")
+	b.nomDeCampagne(origine, false, "la campagne de la ligne d'origine garde le nom de l'onglet")
+	tardive := b.apercuEligible(corps(recent), 1, "la ligne tardive tire sa fiche")
+	b.nomDeCampagne(tardive, true, "la campagne de la ligne tardive dit son relevé")
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps(recent))
+	b.attend(statut, http.StatusCreated, "campagne de la ligne tardive", body)
+	lotID, _ := body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
+	b.nomDeCampagne(body, true, "la campagne créée garde le jour du relevé")
+}
+
+// Les lignes du sélecteur d'import pour un onglet, par identifiant d'import.
+func (b *bancCampagne) lignesDeLOnglet(feuille string) map[string]map[string]any {
+	b.t.Helper()
+	statut, body := b.appelCampagne(http.MethodGet, "/api/v1/lots-export/imports", nil)
+	b.attend(statut, http.StatusOK, "liste des imports", body)
+	lignes := map[string]map[string]any{}
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		if ligne, _ := item.(map[string]any); ligne["feuille"] == feuille {
+			id, _ := ligne["id"].(string)
+			lignes[id] = ligne
+		}
+	}
+	return lignes
+}
+
+func (b *bancCampagne) nomDeCampagne(body map[string]any, tardif bool, etape string) {
+	b.t.Helper()
+	if libelle, _ := body["scopeLabel"].(string); strings.Contains(libelle, ", relevé du ") != tardif {
+		b.t.Fatalf("%s : %q", etape, libelle)
+	}
+}
+
 // Un parrainage Grand Public ouvre une campagne CONTACTS_RECOMMANDES sur des fiches prospects, pas représentants.
 func TestCampagneParrainageGrandPublic(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)

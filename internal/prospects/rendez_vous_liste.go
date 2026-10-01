@@ -28,6 +28,7 @@ type RendezVousObtenu struct {
 	Prenom                    string  `json:"prenom"`
 	Nom                       string  `json:"nom"`
 	PhoneE164                 *string `json:"phoneE164"`
+	TitulaireID               string  `json:"titulaireId"`
 	Type                      string  `json:"type"`
 	TypeCode                  string  `json:"typeCode"`
 	Quand                     *string `json:"quand" doc:"Date du rendez-vous : la date reportée, sinon celle du rappel promis."`
@@ -120,7 +121,7 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 
 func rendezVousDe(l *db.RendezVousObtenusRow) RendezVousObtenu {
 	return RendezVousObtenu{
-		ID: l.ID, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: l.PhoneE164, Type: l.Type, TypeCode: l.TypeCode,
+		ID: l.ID, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: l.PhoneE164, TitulaireID: l.TitulaireId, Type: l.Type, TypeCode: l.TypeCode,
 		Quand: prospectVide(l.Quand), PrisLe: rendezVousInstant(l.LastCallAt), PrisPar: l.PrisPar,
 		Issue: l.Issue, Confirmation: l.Confirmation, Reporte: l.Reporte, Etape: l.Etape, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
 		PointRencontreCommentaire: l.PointRencontreCommentaire,

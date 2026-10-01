@@ -55,9 +55,12 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 -- Les fiches créées par chaque import, pour le projet de la campagne à monter.
 -- Un classeur de leads porte un onglet par jour et garde le nom de fichier du
 -- premier : le lot se compte par onglet, sinon les trois jours se confondent.
+-- Une ligne complétée dans le classeur après coup entre à un relevé plus tardif :
+-- l'onglet se compte aussi par jour de relevé, sinon ces fiches neuves font
+-- baisser la part appelée d'un onglet déjà traité. "rang" 1 est le premier jour.
 -- name: ImportsAvecFiches :many
 WITH fiches AS (
-  SELECT j."id" AS "jobId", j."fileName", j."createdAt", j."finishedAt", p."importFeuille",
+  SELECT j."id" AS "jobId", j."fileName", j."createdAt", p."importFeuille",
          p."lastCallAt" IS NOT NULL AS appelee,
          p."projet" = 'GRAND_PUBLIC' AS gp,
          p."projet" = 'CHUES' AS chues
@@ -68,15 +71,29 @@ SELECT MAX("jobId")::text AS "id",
        MAX("fileName")::text AS "fileName",
        "importFeuille",
        MIN("createdAt")::timestamp AS "createdAt",
-       MAX("finishedAt")::timestamp AS "finishedAt",
+       MAX("createdAt")::timestamp AS "releveLe",
        COUNT(*) FILTER (WHERE gp)::int AS "fichesGp",
        COUNT(*) FILTER (WHERE gp AND appelee)::int AS "appeleesGp",
        COUNT(*) FILTER (WHERE chues)::int AS "fichesChues",
-       COUNT(*) FILTER (WHERE chues AND appelee)::int AS "appeleesChues"
+       COUNT(*) FILTER (WHERE chues AND appelee)::int AS "appeleesChues",
+       ROW_NUMBER() OVER (PARTITION BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille"
+                          ORDER BY MIN("createdAt"))::int AS "rang"
 FROM fiches
-GROUP BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille"
-ORDER BY MAX("finishedAt") DESC, MAX("jobId") DESC
+GROUP BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille", "createdAt"::date
+ORDER BY MAX("createdAt") DESC, MAX("jobId") DESC
 LIMIT 1000;
+
+-- Le relevé choisi pour une campagne, et s'il vient après le premier jour où
+-- l'onglet a eu des fiches : la campagne le dit dans son nom.
+-- name: ReleveDeLOnglet :one
+SELECT ja."createdAt"::timestamp AS "releve",
+       (ja."createdAt"::date > COALESCE(MIN(jb."createdAt")::date, ja."createdAt"::date))::boolean AS "tardif"
+FROM "import_jobs" ja
+LEFT JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+  AND EXISTS (SELECT 1 FROM "prospects" p
+              WHERE p."importJobId" = jb."id" AND p."importFeuille" = @import_feuille::text AND p."deletedAt" IS NULL)
+WHERE ja."id" = @id
+GROUP BY ja."createdAt";
 
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;
@@ -441,12 +458,13 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
   -- l'onglet du jour se repartit entre eux. Le selecteur les groupe par onglet
-  -- et ne peut rendre qu'un identifiant : borner sur ce seul travail ne tirait
-  -- que sa part, parfois aucune fiche.
+  -- et par jour de releve et ne peut rendre qu'un identifiant : borner sur ce
+  -- seul travail ne tirait que sa part, parfois aucune fiche.
   AND (sqlc.narg('import_job_id')::text IS NULL
        OR p."importJobId" = sqlc.narg('import_job_id')
        OR (sqlc.narg('import_feuille')::text IS NOT NULL
            AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+                         AND jb."createdAt"::date = ja."createdAt"::date
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean
@@ -472,12 +490,13 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
   -- l'onglet du jour se repartit entre eux. Le selecteur les groupe par onglet
-  -- et ne peut rendre qu'un identifiant : borner sur ce seul travail ne tirait
-  -- que sa part, parfois aucune fiche.
+  -- et par jour de releve et ne peut rendre qu'un identifiant : borner sur ce
+  -- seul travail ne tirait que sa part, parfois aucune fiche.
   AND (sqlc.narg('import_job_id')::text IS NULL
        OR p."importJobId" = sqlc.narg('import_job_id')
        OR (sqlc.narg('import_feuille')::text IS NOT NULL
            AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+                         AND jb."createdAt"::date = ja."createdAt"::date
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean

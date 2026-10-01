@@ -8,10 +8,12 @@ import { toast } from 'sonner';
 import { meQueryOptions } from '@/api/auth';
 import {
   callingCountriesFrom,
+  type CallingCountry,
   fromE164,
   InternationalPhoneField,
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -99,7 +101,6 @@ const CHAMPS_IDENTITE: readonly Champ[] = [
   { cle: 'dateDelivranceCni', label: 'Date de délivrance CNI', type: 'date' },
   { cle: 'autrePiece', label: 'Autre pièce', placeholder: 'Ex. passeport n° A0123456' },
   { cle: 'demeurantA', label: 'Demeurant à' },
-  { cle: 'profession', label: 'Profession' },
   { cle: 'adresseProfessionnelle', label: 'Adresse professionnelle' },
 ];
 
@@ -373,12 +374,12 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
     setErreur(null);
     setPas(Math.max(0, Math.min(RECAP, cible)));
   };
-  const continuer = () => {
+  const valider = () => {
     const bloquant = manqueParcours(ecran, draft, callingCode, siteChoisi);
-    if (bloquant === null) aller(pas + 1);
-    else setErreur(bloquant);
+    if (bloquant !== null) setErreur(bloquant);
+    else if (pas === RECAP) enregistrer.mutate();
+    else aller(pas + 1);
   };
-  const valider = () => (pas === RECAP ? enregistrer.mutate() : continuer());
 
   return (
     <Cadre
@@ -399,6 +400,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
         sites={sites}
         site={siteChoisi}
         erreurLots={erreurLots}
+        erreurAffichee={erreur !== null}
         canaux={canaux}
         fiches={fiches.data?.items ?? []}
         countries={callingCountriesFrom(reference.data?.pays ?? [])}
@@ -435,6 +437,7 @@ function EcranCourant({
   sites,
   site,
   erreurLots,
+  erreurAffichee,
   canaux,
   fiches,
   countries,
@@ -449,9 +452,10 @@ function EcranCourant({
   sites: readonly SiteVente[];
   site: SiteVente | undefined;
   erreurLots: string | null;
+  erreurAffichee: boolean;
   canaux: readonly string[];
   fiches: readonly Fiche[];
-  countries: readonly { code: string; label: string }[];
+  countries: readonly CallingCountry[];
   callingCode: string;
   onCallingCode: (callingCode: string) => void;
   onFiche: (fiche: Fiche) => void;
@@ -520,7 +524,14 @@ function EcranCourant({
     case 'paiement':
       return <EcranPaiement draft={draft} changer={changer} />;
     default:
-      return <EcranRecap draft={draft} changer={changer} estNouvelle={estNouvelle} />;
+      return (
+        <EcranRecap
+          draft={draft}
+          changer={changer}
+          estNouvelle={estNouvelle}
+          erreurAffichee={erreurAffichee}
+        />
+      );
   }
 }
 
@@ -727,7 +738,7 @@ function EcranTelephone({
 }: EcranProps & {
   fiches: readonly Fiche[];
   onFiche: (fiche: Fiche) => void;
-  countries: readonly { code: string; label: string }[];
+  countries: readonly CallingCountry[];
   callingCode: string;
   onCallingCode: (callingCode: string) => void;
 }) {
@@ -804,11 +815,28 @@ function EcranIdentite({ draft, changer }: EcranProps) {
   const [represente, setRepresente] = useState(() =>
     CHAMPS_MANDATAIRE.some((champ) => (draft[champ.cle] ?? '') !== ''),
   );
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+  });
+  const professions = (reference.data?.professions ?? [])
+    .filter((profession) => profession.isActive === true)
+    .map((profession) => profession.label ?? '');
+  const profession = draft.profession ?? '';
+  if (profession !== '' && !professions.includes(profession)) professions.push(profession);
   return (
     <Question titre="Qui est le client ?">
       <Champs champs={CHAMPS_IDENTITE} draft={draft} changer={changer} />
+      <FilterCombobox
+        label="Profession"
+        placeholder="Choisir une profession"
+        value={profession === '' ? null : profession}
+        options={professions.map((libelle) => ({ value: libelle, label: libelle }))}
+        onChange={(valeur) => changer({ profession: valeur ?? '' })}
+        onCreate={(libelle) => changer({ profession: libelle })}
+      />
       <Choix
-        label="Représentant"
+        label="Le client est-il représenté par une autre personne ?"
         options={OUI_NON}
         valeur={represente}
         onChoisir={(oui) => {
@@ -830,8 +858,9 @@ function ChoixPersonne({
   changer,
 }: EcranProps & { cle: 'nomTeleconseiller' | 'responsableClosing'; label: string }) {
   const teleconseillers = useQuery({
-    queryKey: queryKeys.lotsExportTeleconseillers,
-    queryFn: () => fetchTeleconseillers(),
+    queryKey: [...queryKeys.lotsExportTeleconseillers, 'avec-administration'],
+    queryFn: () =>
+      fetchTeleconseillers(undefined, ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION', 'ADMIN']),
     staleTime: 5 * 60_000,
   });
   const choisi = draft[cle] ?? '';
@@ -1144,7 +1173,47 @@ function resumeCredit(draft: Draft): string {
   return `${draft.nombreEcheances ?? '?'} échéances ${rythme.toLowerCase()}${premier}`;
 }
 
-function EcranRecap({ draft, changer, estNouvelle }: EcranProps & { estNouvelle: boolean }) {
+function ChampDateVente({
+  valeur,
+  manquante,
+  onChange,
+}: {
+  valeur: string;
+  manquante: boolean;
+  onChange: (valeur: string) => void;
+}) {
+  return (
+    <label htmlFor="parcours-date-vente" className="flex flex-col gap-1.5">
+      <span className="text-[1rem] font-[600]">Date de vente</span>
+      <span className="text-[0.875rem] text-muted-foreground">
+        Jour où la vente a été conclue, même si vous la saisissez plus tard. La saisie est horodatée
+        automatiquement.
+      </span>
+      <Input
+        id="parcours-date-vente"
+        type="date"
+        className="h-14 max-w-64 text-[1.125rem]"
+        max={aujourdhui()}
+        value={valeur}
+        aria-invalid={manquante}
+        aria-describedby={manquante ? 'parcours-date-vente-erreur' : undefined}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {manquante ? (
+        <span id="parcours-date-vente-erreur" className="font-[600] text-destructive">
+          Choisissez la date de la vente avant d’enregistrer.
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+function EcranRecap({
+  draft,
+  changer,
+  estNouvelle,
+  erreurAffichee,
+}: EcranProps & { estNouvelle: boolean; erreurAffichee: boolean }) {
   const [details, setDetails] = useState(false);
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
   const paiement = draft.modePaiement === 'CREDIT' ? resumeCredit(draft) : 'Au comptant';
@@ -1165,21 +1234,11 @@ function EcranRecap({ draft, changer, estNouvelle }: EcranProps & { estNouvelle:
   ].filter((ligne): ligne is [string, string] => ligne[1] !== '');
   return (
     <Question titre="Tout est bon ?">
-      <label htmlFor="parcours-date-vente" className="flex flex-col gap-1.5">
-        <span className="text-[1rem] font-[600]">Date de vente</span>
-        <span className="text-[0.875rem] text-muted-foreground">
-          Jour où la vente a été conclue, même si vous la saisissez plus tard. La saisie est
-          horodatée automatiquement.
-        </span>
-        <Input
-          id="parcours-date-vente"
-          type="date"
-          className="h-14 max-w-64 text-[1.125rem]"
-          max={aujourdhui()}
-          value={draft.dateSouscription}
-          onChange={(e) => changer({ dateSouscription: e.target.value })}
-        />
-      </label>
+      <ChampDateVente
+        valeur={draft.dateSouscription}
+        manquante={erreurAffichee && draft.dateSouscription === ''}
+        onChange={(dateSouscription) => changer({ dateSouscription })}
+      />
       <dl className="divide-y divide-border rounded-md border border-border">
         {lignes.map(([label, valeur]) => (
           <div key={label} className="flex items-baseline justify-between gap-4 px-4 py-2.5">

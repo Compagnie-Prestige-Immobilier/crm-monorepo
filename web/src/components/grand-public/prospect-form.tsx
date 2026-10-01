@@ -13,6 +13,7 @@ import { ETAPES_SAISIE, EtapesProgression, PiedEtapes } from '@/components/grand
 import {
   InternationalPhoneField,
   callingCountriesFrom,
+  type CallingCountry,
   fromE164,
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
@@ -377,7 +378,7 @@ function estEnseignante(
 
 function countriesPourTelephone(
   type: ProspectType | null,
-  paysCountries: readonly { code: string; label: string }[],
+  paysCountries: readonly CallingCountry[],
 ) {
   return type === 'DIASPORA' ? paysCountries : undefined;
 }
@@ -1220,7 +1221,7 @@ function WhatsappField({
   onWhatsappCode,
   onPatch,
 }: ChampSituationProps & {
-  paysCountries: readonly { code: string; label: string }[];
+  paysCountries: readonly CallingCountry[];
   whatsappCode: string;
   onWhatsappCode: (value: string) => void;
 }) {
@@ -1292,7 +1293,7 @@ function ChampsSituation({
   valeurs: Situation;
   reference: ReferenceData | undefined;
   enseignante: boolean;
-  paysCountries: readonly { code: string; label: string }[];
+  paysCountries: readonly CallingCountry[];
   whatsappCode: string;
   onWhatsappCode: (value: string) => void;
   onIndicatifResidence: (indicatif: string) => void;

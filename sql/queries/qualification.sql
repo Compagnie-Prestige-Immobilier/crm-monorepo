@@ -181,7 +181,8 @@ RETURNING "id", "projet", "statut", "rev", "updatedAt", "lastCallAt", "incomeBan
 -- name: ProspectPourRequalification :one
 SELECT p."id", p."projet", p."statut", p."lastCallById", p."createdById",
        COALESCE(cr."label", '')::text AS "motifLabel",
-       COALESCE(t."fullName", '')::text AS "titulaireNom"
+       COALESCE(t."fullName", '')::text AS "titulaireNom",
+       trim(p."prenom" || ' ' || p."nom")::text AS "nomComplet"
 FROM "prospects" p
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = p."lastReasonId"
 LEFT JOIN "users" t ON t."id" = p."createdById"

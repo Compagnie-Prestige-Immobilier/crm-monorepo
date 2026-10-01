@@ -242,16 +242,18 @@ export function lotProgrammeFileName(teleconseillerName: string, jour: number): 
 export interface Teleconseiller {
   id: string;
   fullName: string;
-  role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION';
+  role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION' | 'ADMIN';
 }
 
 const COMPTES_PAR_ROLE = 200;
+const ROLES_EQUIPE = ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const;
 
 export async function fetchTeleconseillers(
   client: ApiClient = getApiClient(),
+  roles: readonly Teleconseiller['role'][] = ROLES_EQUIPE,
 ): Promise<Teleconseiller[]> {
   const pages = await Promise.all(
-    (['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const).map((role) =>
+    roles.map((role) =>
       client.GET('/api/v1/users', {
         // Le maximum de l'API : au-dela d'une page, un teleconseiller actif
         // disparaissait sans un mot du choix d'equipe de la campagne.
