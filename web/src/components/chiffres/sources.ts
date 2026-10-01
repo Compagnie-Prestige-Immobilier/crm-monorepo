@@ -116,17 +116,7 @@ const scalaireDuree = (secondes: number | null, libelle: string): DonneesSource 
   donnee: { libelle, valeur: secondes ?? 0, affichage: formatDuration(secondes) },
 });
 
-const COLONNES_CHUES = [
-  'Appels représentants',
-  'Joignabilité',
-  'Acceptés',
-  'À rappeler',
-  'Acceptation',
-  'Prospects saisis',
-  'Méthodes obtenues',
-] as const;
-
-const COLONNES_GRAND_PUBLIC = [
+const COLONNES_PAR_TELECONSEILLER = [
   'Appels prospects',
   'Joignabilité',
   'Prospects saisis',
@@ -135,26 +125,10 @@ const COLONNES_GRAND_PUBLIC = [
 
 type Cumul = Pick<
   ChiffresTotaux,
-  | 'repCalls'
-  | 'repFiches'
-  | 'repFichesJointes'
-  | 'repFichesAcceptees'
-  | 'repFichesARappeler'
-  | 'repFichesEligibles'
-  | 'calls'
-  | 'fiches'
-  | 'fichesJointes'
-  | 'prospectsCreated'
-  | 'methodObtained'
+  'calls' | 'fiches' | 'fichesJointes' | 'prospectsCreated' | 'methodObtained'
 >;
 
 const CUMUL_VIDE: Cumul = {
-  repCalls: 0,
-  repFiches: 0,
-  repFichesJointes: 0,
-  repFichesAcceptees: 0,
-  repFichesARappeler: 0,
-  repFichesEligibles: 0,
   calls: 0,
   fiches: 0,
   fichesJointes: 0,
@@ -162,25 +136,17 @@ const CUMUL_VIDE: Cumul = {
   methodObtained: 0,
 };
 
-function cellules(cumul: Cumul, chues: boolean): EquipeLigne['cellules'] {
-  const textes = chues
-    ? [
-        formatNumber(cumul.repCalls),
-        taux(part(cumul.repFichesJointes, cumul.repFiches)),
-        formatNumber(cumul.repFichesAcceptees),
-        formatNumber(cumul.repFichesARappeler),
-        taux(part(cumul.repFichesAcceptees, cumul.repFichesEligibles)),
-        formatNumber(cumul.prospectsCreated),
-        formatNumber(cumul.methodObtained),
-      ]
-    : [
-        formatNumber(cumul.calls),
-        taux(part(cumul.fichesJointes, cumul.fiches)),
-        formatNumber(cumul.prospectsCreated),
-        formatNumber(cumul.methodObtained),
-      ];
-  const colonnes = chues ? COLONNES_CHUES : COLONNES_GRAND_PUBLIC;
-  return textes.map((texte, index) => ({ cle: colonnes[index] ?? String(index), texte }));
+function cellules(cumul: Cumul): EquipeLigne['cellules'] {
+  const textes = [
+    formatNumber(cumul.calls),
+    taux(part(cumul.fichesJointes, cumul.fiches)),
+    formatNumber(cumul.prospectsCreated),
+    formatNumber(cumul.methodObtained),
+  ];
+  return textes.map((texte, index) => ({
+    cle: COLONNES_PAR_TELECONSEILLER[index] ?? String(index),
+    texte,
+  }));
 }
 
 /**
@@ -188,7 +154,7 @@ function cellules(cumul: Cumul, chues: boolean): EquipeLigne['cellules'] {
  * les fiches : une fiche n'est attribuée qu'une fois, à qui a posé son dernier
  * statut. Le pied reprend `totals`, calculé par le serveur.
  */
-function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSource {
+function tableauEquipe(activite: ChiffresActivite): DonneesSource {
   const cumul = new Map<string, Cumul>();
   for (const ligne of activite.items) {
     const courant = cumul.get(ligne.teleconseillerId) ?? { ...CUMUL_VIDE };
@@ -199,13 +165,13 @@ function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSourc
   return {
     forme: 'equipe',
     donnee: {
-      colonnes: [...(chues ? COLONNES_CHUES : COLONNES_GRAND_PUBLIC)],
+      colonnes: [...COLONNES_PAR_TELECONSEILLER],
       lignes: activite.teleconseillers.map((personne) => ({
         id: personne.id,
         nom: personne.fullName,
-        cellules: cellules(cumul.get(personne.id) ?? CUMUL_VIDE, chues),
+        cellules: cellules(cumul.get(personne.id) ?? CUMUL_VIDE),
       })),
-      pied: { id: 'equipe', nom: 'Équipe', cellules: cellules(activite.totals, chues) },
+      pied: { id: 'equipe', nom: 'Équipe', cellules: cellules(activite.totals) },
     },
   };
 }
@@ -281,17 +247,15 @@ const partsStock = (parts: ChiffresRepresentants['parDepartement']): DonneesSour
     .map((p) => ({ id: p.id, label: p.label, value: p.count })),
 });
 
-/** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
-const parTeleconseiller = (chues: boolean): SourceChiffre => ({
+const parTeleconseiller: SourceChiffre = {
   label: 'Par téléconseiller',
   forme: 'equipe',
   jeu: 'activite',
-  description: chues
-    ? 'Une ligne par téléconseiller : appels aux représentants, joignabilité, acceptés, à rappeler, acceptation, prospects saisis, méthodes obtenues. Équipe en pied.'
-    : 'Une ligne par téléconseiller, équipe en pied.',
+  description:
+    'Une ligne par téléconseiller : appels aux prospects, joignabilité, prospects saisis, méthodes obtenues. Équipe en pied.',
   groupe: 'Équipe',
-  extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
-});
+  extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite)),
+};
 
 /** Nombre de rendez-vous posés et taux (posés ÷ prospects joints par le téléconseiller). Le pied reprend `totals`, calculé par le serveur. */
 interface CompteRendezVous {
@@ -745,7 +709,7 @@ const SOURCES_CHIFFRES = {
             activite.totals.methodObtained,
           ),
   },
-  'par-teleconseiller': parTeleconseiller(false),
+  'par-teleconseiller': parTeleconseiller,
   'rendez-vous-par-teleconseiller': {
     label: 'Rendez-vous par téléconseiller',
     forme: 'equipe',
@@ -1072,7 +1036,7 @@ export function catalogueDe(input: {
   peut: (permission: Permission) => boolean;
   projet: Projet | null;
 }): Record<string, SourceChiffre> {
-  const sources = { ...SOURCES_CHIFFRES, 'par-teleconseiller': parTeleconseiller(input.chues) };
+  const sources = SOURCES_CHIFFRES;
   const entrees = Object.entries(sources).filter(([cle, source]) => {
     if (!input.peut(PERMISSION_DU_JEU[source.jeu])) return false;
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
