@@ -28,7 +28,7 @@ function Loading() {
 /** La page `(panel)/grand-public/console` de la v1. */
 function GrandPublicConsolePage() {
   const { user } = Route.useRouteContext();
-  const canCreateProspect = peut(user, 'prospects.superviser');
+  const canCreateProspect = peut(user, 'fiches.tenir');
 
   return (
     <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />

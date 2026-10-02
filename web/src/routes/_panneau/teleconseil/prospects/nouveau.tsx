@@ -7,7 +7,7 @@ import { guardPermission } from '@/lib/guard';
 import { readString } from '@/lib/search-params';
 
 export const Route = createFileRoute('/_panneau/teleconseil/prospects/nouveau')({
-  beforeLoad: guardPermission('prospects.superviser'),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: NouveauProspectPage,
   pendingComponent: Loading,
 });

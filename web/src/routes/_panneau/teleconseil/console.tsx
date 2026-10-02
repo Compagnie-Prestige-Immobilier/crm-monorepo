@@ -11,5 +11,5 @@ export const Route = createFileRoute('/_panneau/teleconseil/console')({
 
 function ConsolePage() {
   const { user } = Route.useRouteContext();
-  return <ConsoleView viewerId={user.id} canCreateProspect={peut(user, 'prospects.superviser')} />;
+  return <ConsoleView viewerId={user.id} canCreateProspect={peut(user, 'fiches.tenir')} />;
 }
