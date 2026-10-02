@@ -30,7 +30,10 @@ function LigneClient({ client }: { client: ClientContact }) {
     <TableRow className="h-11">
       <TableCell>
         {client.avecFiche ? (
-          <Link href={`/teleconseil/prospects/${client.id}`} className="font-medium hover:underline">
+          <Link
+            href={`/teleconseil/prospects/${client.id}`}
+            className="font-medium hover:underline"
+          >
             {client.prenom} {client.nom}
           </Link>
         ) : (
