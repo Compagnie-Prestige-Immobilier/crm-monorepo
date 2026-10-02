@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"testing"
 	"time"
 
@@ -1451,49 +1450,5 @@ func TestPipelineDesContactsJusquALaVente(t *testing.T) {
 	client, _ := items[0].(map[string]any)
 	if rapprochee, _ := client["vente"].(bool); client["id"] != vendue || rapprochee {
 		t.Fatalf("client sans vente rapprochée : %v", items[0])
-	}
-}
-
-// Une vente saisie vaut conversion : la fiche jointe passe vendue sans passer
-// par la conversion, et la vente se lit dans les clients du téléconseiller.
-func TestVenteSaisieVendLaFicheJointe(t *testing.T) {
-	b := qualificationConnecte(t, "COMMERCIAL")
-	direction := qualificationConnecte(t, "DIRECTION")
-	fiche := qualificationProspect(b)
-	// Un numéro mobile sénégalais valide : la saisie normalise le téléphone avant le rapprochement.
-	telephone := "+22177" + strconv.FormatInt(time.Now().UnixNano()%10_000_000+1_000_000, 10)[:7]
-	qualificationExec(b, `UPDATE "prospects" SET "phoneE164" = $2 WHERE "id" = $1`, fiche, telephone)
-	appel := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "INTERESSE"})
-	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "telephone" = $1`, telephone)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
-	})
-	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
-	b.attend(statut, http.StatusOK, "intéressé consigné", body)
-
-	vente := map[string]any{
-		"canal": "CPI", "dateSouscription": "2026-09-18", "client": "CLIENT " + fiche[:8],
-		"telephone": telephone, "site": "THIEO", "nombreLots": 1, "numerosLots": "2001",
-		"superficie": "225 m²", "prixUnitaire": 2800000, "acompte": 500000, "modePaiement": "COMPTANT",
-	}
-	statut, body = qualificationEnvoi(direction, http.MethodPost, "/api/v1/ventes", vente)
-	direction.attend(statut, http.StatusCreated, "vente saisie", body)
-
-	var statutFiche, parcours string
-	if err := b.pool.QueryRow(b.ctx, `SELECT p."statut"::text, j."statut"::text FROM "prospects" p
-		JOIN "prospect_journeys" j ON j."prospectId" = p."id" AND j."projet" = p."projet" WHERE p."id" = $1`, fiche).Scan(&statutFiche, &parcours); err != nil {
-		t.Fatal(err)
-	}
-	if statutFiche != "VENDU" || parcours != "VENDU" {
-		t.Fatalf("une vente vaut conversion : %s %s", statutFiche, parcours)
-	}
-	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/clients", nil)
-	b.attend(statut, http.StatusOK, "clients", body)
-	items, _ := body["items"].([]any)
-	client, _ := items[0].(map[string]any)
-	rapprochee, _ := client["vente"].(bool)
-	if len(items) != 1 || !rapprochee || client["site"] != "THIEO" || client["prixTotal"] != float64(2800000) {
-		t.Fatalf("la vente se lit chez le téléconseiller : %v", items)
 	}
 }

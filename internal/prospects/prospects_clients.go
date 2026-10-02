@@ -10,11 +10,12 @@ import (
 )
 
 type ProspectClient struct {
-	ID         string  `json:"id"`
+	ID         string  `json:"id" doc:"La fiche ; « vente-N » pour une vente saisie sans fiche au même téléphone."`
+	AvecFiche  bool    `json:"avecFiche"`
 	Prenom     string  `json:"prenom"`
 	Nom        string  `json:"nom"`
 	PhoneE164  *string `json:"phoneE164"`
-	Projet     string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	Projet     *string `json:"projet" enum:"CHUES,GRAND_PUBLIC" doc:"Absent pour une vente sans fiche."`
 	LastCallAt *string `json:"lastCallAt"`
 	// Faux quand la fiche est vendue sans vente rapprochée par téléphone.
 	Vente            bool    `json:"vente"`
@@ -33,15 +34,23 @@ type ProspectClientsOutput struct {
 	}
 }
 
-// Les clients d'un téléconseiller : ses contacts vendus, avec la vente rapprochée par téléphone.
+// Les clients d'un téléconseiller, comptés comme la page Ventes : ses fiches vendues
+// qu'il a appelées, et les ventes saisies à son nom.
 func (s *service) prospectClients(ctx context.Context, in *ProspectPipelineInput) (*ProspectClientsOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	appelePar := u.ID
-	if in.AppelePar != "" && u.Peut(socle.PermissionPortefeuilleVoirTout) {
-		appelePar = in.AppelePar
+	appelePar, nom := u.ID, u.FullName
+	if in.AppelePar != "" && in.AppelePar != u.ID && u.Peut(socle.PermissionPortefeuilleVoirTout) {
+		noms, err := s.Q.NomsUtilisateurs(ctx, []string{in.AppelePar})
+		if err != nil {
+			return nil, err
+		}
+		appelePar, nom = in.AppelePar, ""
+		if len(noms) == 1 {
+			nom = noms[0].FullName
+		}
 	}
 	lignes, err := s.Q.ClientsDuTeleconseiller(ctx, db.ClientsDuTeleconseillerParams{
-		AppelePar: appelePar, Projet: prospectTypeEnum[db.Projet](in.Projet),
+		AppelePar: appelePar, NomComplet: nom, Projet: prospectVide(in.Projet),
 	})
 	if err != nil {
 		return nil, err
@@ -56,8 +65,8 @@ func (s *service) prospectClients(ctx context.Context, in *ProspectPipelineInput
 			souscription = &jour
 		}
 		out.Body.Items = append(out.Body.Items, ProspectClient{
-			ID: l.ID, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: l.PhoneE164, Projet: string(l.Projet),
-			LastCallAt: prospectISOPtr(l.LastCallAt), Vente: l.Vente, Site: l.Site, DateSouscription: souscription,
+			ID: l.ID, AvecFiche: l.AvecFiche, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: prospectVide(l.PhoneE164),
+			Projet: prospectVide(l.Projet), LastCallAt: prospectVide(l.LastCallAt), Vente: l.Vente, Site: l.Site, DateSouscription: souscription,
 			NombreLots: l.NombreLots, NumerosLots: l.NumerosLots, PrixTotal: l.PrixTotal, Reliquat: l.Reliquat, Canal: l.Canal,
 		})
 	}

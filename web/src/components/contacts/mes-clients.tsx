@@ -29,9 +29,16 @@ function LigneClient({ client }: { client: ClientContact }) {
   return (
     <TableRow className="h-11">
       <TableCell>
-        <Link href={`/teleconseil/prospects/${client.id}`} className="font-medium hover:underline">
-          {client.prenom} {client.nom}
-        </Link>
+        {client.avecFiche ? (
+          <Link
+            href={`/teleconseil/prospects/${client.id}`}
+            className="font-medium hover:underline"
+          >
+            {client.prenom} {client.nom}
+          </Link>
+        ) : (
+          <span className="font-medium">{client.nom}</span>
+        )}
         {client.phoneE164 === null ? null : (
           <NumeroAppel
             phoneE164={client.phoneE164}
@@ -40,7 +47,7 @@ function LigneClient({ client }: { client: ClientContact }) {
         )}
       </TableCell>
       <TableCell>
-        <ProjetBadge projet={client.projet} />
+        {client.projet === null ? SANS_VALEUR : <ProjetBadge projet={client.projet} />}
       </TableCell>
       <TableCell>{client.vente ? client.site : SANS_VALEUR}</TableCell>
       <TableCell>
