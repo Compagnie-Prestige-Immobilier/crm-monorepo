@@ -145,3 +145,15 @@ func (*service) lotEcrireFiltres(ctx context.Context, q *db.Queries, id string, 
 	}
 	return q.EcrireFiltresLot(ctx, db.EcrireFiltresLotParams{ID: id, Filters: brut})
 }
+
+// Un téléconseiller retiré garde ses fiches traitées : la répartition les montre à part.
+func lotHorsEquipe(ordre []string, groupes []db.LotGroupesRow) []string {
+	hors := []string{}
+	for _, groupe := range groupes {
+		id := lotValeurTexte(groupe.AssigneeId)
+		if id != "" && !slices.Contains(ordre, id) && !slices.Contains(hors, id) {
+			hors = append(hors, id)
+		}
+	}
+	return hors
+}

@@ -52,6 +52,12 @@ const BOUTONS: Record<Bouton, { label: string; Icon: typeof CheckIcon }> = {
   ANNULER: { label: 'Annuler', Icon: XIcon },
 };
 
+const AU_TELEPHONE: Partial<Record<Bouton, string>> = { HONORE: 'Joint', NON_HONORE: 'Non joint' };
+
+const libelleDe = (bouton: Bouton, fiche: RendezVousObtenu): string =>
+  (fiche.typeCode === 'RDV_TELEPHONIQUE' ? AU_TELEPHONE[bouton] : undefined) ??
+  BOUTONS[bouton].label;
+
 /** Le geste attendu reste visible ; le reste passe dans le menu « … ». */
 function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[] } {
   if (fiche.etape === 'A_CONFIRMER')
@@ -118,18 +124,20 @@ function Suites({
 
 function BoutonGeste({
   bouton,
+  label,
   nom,
   bulle,
   pending,
   onClick,
 }: {
   bouton: Bouton;
+  label: string;
   nom: string;
   bulle: boolean;
   pending: boolean;
   onClick: () => void;
 }) {
-  const { label, Icon } = BOUTONS[bouton];
+  const { Icon } = BOUTONS[bouton];
   const principal = bouton === 'CONFIRME' || bouton === 'HONORE';
   return (
     <Button
@@ -185,8 +193,12 @@ export function ActionsRendezVous({
     },
     onError: (error) => toastApiError(error, 'Le rendez-vous n’a pas été mis à jour.'),
   });
+  // Non joint au téléphone, le rendez-vous se reporte : il ne sort que par une annulation.
+  const injoignable = (bouton: Bouton) =>
+    bouton === 'NON_HONORE' && fiche.typeCode === 'RDV_TELEPHONIQUE';
   const cliquer = (bouton: Bouton) => {
     if (bouton === 'CONFIRME') setDialogue('confirmer');
+    else if (injoignable(bouton)) setDialogue('reporter');
     else if (bouton === 'REPORTER') setDialogue('reporter');
     else if (bouton === 'RECONTACTER') setDialogue('recontacter');
     else if (bouton === 'ANNULER') setDialogue('annuler');
@@ -204,6 +216,7 @@ export function ActionsRendezVous({
         <BoutonGeste
           key={bouton}
           bouton={bouton}
+          label={libelleDe(bouton, fiche)}
           nom={nom}
           bulle={bulle}
           pending={noter.isPending}
@@ -234,7 +247,7 @@ export function ActionsRendezVous({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             {menu.map((bouton) => {
-              const { label, Icon } = BOUTONS[bouton];
+              const { Icon } = BOUTONS[bouton];
               return (
                 <DropdownMenuItem
                   key={bouton}
@@ -243,7 +256,7 @@ export function ActionsRendezVous({
                   }}
                 >
                   <Icon aria-hidden="true" />
-                  {label}
+                  {libelleDe(bouton, fiche)}
                 </DropdownMenuItem>
               );
             })}

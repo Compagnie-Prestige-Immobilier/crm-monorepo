@@ -10,20 +10,14 @@ const SUIVIS: readonly { value: Phase2Status | 'TOUT'; label: string }[] = [
   { value: 'TOUT', label: 'Tout' },
   { value: 'INTERESTED', label: 'Intéressés' },
   { value: 'HESITANT', label: 'Hésitants' },
-  { value: 'APPOINTMENT', label: 'Rendez-vous (hors téléphonique)' },
+  { value: 'APPOINTMENT', label: 'Rendez-vous' },
 ];
-
-/** Un rendez-vous téléphonique n'est pas un rendez-vous : l'onglet l'écarte. */
-const RENDEZ_VOUS_TELEPHONIQUE = 'RDV_TELEPHONIQUE';
 
 // Le CC suit les rendez-vous sans superviser : il ne voit que cet onglet.
 const suivisDe = (user: SessionUser): typeof SUIVIS =>
   peut(user, 'prospects.superviser')
     ? SUIVIS
     : SUIVIS.filter((suivi) => suivi.value === 'APPOINTMENT');
-
-const sansMotifDe = (statut: Phase2Status | 'TOUT'): string | null =>
-  statut === 'APPOINTMENT' || statut === 'TOUT' ? RENDEZ_VOUS_TELEPHONIQUE : null;
 
 export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
   beforeLoad: (contexte: Contexte & { location: { searchStr: string } }) => {
@@ -38,11 +32,8 @@ export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
         href: `/teleconseil/interesses?phase2Status=${suivisDe(user)[0]?.value ?? 'APPOINTMENT'}`,
       });
     }
-    if (
-      (statut === 'APPOINTMENT' || statut === 'TOUT') &&
-      params.get('sansMotif') !== RENDEZ_VOUS_TELEPHONIQUE
-    ) {
-      params.set('sansMotif', RENDEZ_VOUS_TELEPHONIQUE);
+    if (params.has('sansMotif')) {
+      params.delete('sansMotif');
       throw redirect({ href: `/teleconseil/interesses?${params.toString()}` });
     }
   },
@@ -60,7 +51,7 @@ function TeleconseilInteressesPage() {
         value={filters.phase2Status}
         onValueChange={(value) => {
           const statut = value as Phase2Status | 'TOUT';
-          setFilters({ phase2Status: statut, sansMotif: sansMotifDe(statut) });
+          setFilters({ phase2Status: statut, sansMotif: null });
         }}
       >
         <TabsList>

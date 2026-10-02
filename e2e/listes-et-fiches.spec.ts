@@ -79,9 +79,14 @@ test.afterAll(async () => {
   await purger({ prospects, representants });
 });
 
+// La liste filtrée remplace la précédente à son arrivée : un clic avant détacherait le menu ouvert.
 async function chercher(page: Page, libelle: string): Promise<void> {
+  const filtree = page.waitForResponse(
+    (reponse) => reponse.url().includes(`search=${cle}`) && reponse.ok(),
+  );
   await page.getByLabel(libelle, { exact: true }).fill(cle);
   await expect(page).toHaveURL(new RegExp(`search=${cle}`));
+  await filtree;
 }
 
 async function fermerRappelIntrusif(page: Page): Promise<void> {

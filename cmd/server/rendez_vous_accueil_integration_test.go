@@ -92,6 +92,33 @@ func TestRendezVousFiltresParType(t *testing.T) {
 	}
 }
 
+// Un RV téléphonique est un rendez-vous : le comptoir le suit et le close comme les autres.
+func TestRendezVousTelephoniqueAuComptoir(t *testing.T) {
+	teleconseiller := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(teleconseiller)
+	t.Cleanup(func() {
+		_, _ = teleconseiller.pool.Exec(teleconseiller.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = teleconseiller.pool.Exec(teleconseiller.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = teleconseiller.pool.Exec(teleconseiller.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	quand := time.Now().UTC().Add(48 * time.Hour).Format(time.RFC3339)
+	statut, body := qualificationEnvoi(teleconseiller, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RDV_TELEPHONIQUE", "callbackAt": quand}))
+	teleconseiller.attend(statut, http.StatusOK, "RV téléphonique consigné", body)
+
+	accueil := qualificationConnecte(t, "ACCUEIL")
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&type=RDV_TELEPHONIQUE", nil)
+	accueil.attend(statut, http.StatusOK, "rendez-vous filtrés sur RV téléphonique", body)
+	if !contientFiche(body, fiche) {
+		t.Fatal("le RV téléphonique manque aux rendez-vous du comptoir")
+	}
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, listeRendezVous+"&type=RV_CPI", nil)
+	accueil.attend(statut, http.StatusOK, "rendez-vous filtrés sur RV CPI", body)
+	if contientFiche(body, fiche) {
+		t.Fatal("le filtre RV CPI ne garde pas un RV téléphonique")
+	}
+}
+
 // La venue notée au comptoir sépare les filtres, et le classeur les emporte.
 func TestRendezVousVenuesEtClasseur(t *testing.T) {
 	teleconseiller, fiches, quandRV := rendezVousPoses(t)
@@ -186,11 +213,11 @@ func TestRendezVousDateEstCelleDuDernierRappel(t *testing.T) {
 	}
 }
 
-// Un RDV téléphonique se décale comme un rappel ; un rendez-vous physique non.
-func TestRendezVousTelephoniqueSeReporte(t *testing.T) {
+// Aucun rendez-vous, même téléphonique, ne se décale comme un rappel : il se reporte dans l'Accueil.
+func TestRendezVousNeSeReportePasCommeUnRappel(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	for motif, attendu := range map[string]int{"RDV_TELEPHONIQUE": http.StatusOK, "RV_CPI": http.StatusConflict} {
+	for motif, attendu := range map[string]int{"RDV_TELEPHONIQUE": http.StatusConflict, "RV_CPI": http.StatusConflict} {
 		fiche := qualificationProspect(b)
 		t.Cleanup(func() {
 			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
@@ -303,6 +330,19 @@ func etapeDuRendezVous(b *banc, fiche string) map[string]any {
 	return rdv
 }
 
+// Le rendez-vous et la fiche montrent la qualification posée au closing.
+func qualificationDuClosingVisible(b *banc, fiche, attendue string) {
+	b.t.Helper()
+	if rdv := etapeDuRendezVous(b, fiche); rdv["qualification"] != attendue {
+		b.t.Fatalf("le rendez-vous montre la qualification du closing : %v", rdv)
+	}
+	statut, lue := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche, nil)
+	b.attend(statut, http.StatusOK, "fiche relue", lue)
+	if lue["qualificationClosing"] != attendue {
+		b.t.Fatalf("la fiche montre la qualification du closing : %v", lue["qualificationClosing"])
+	}
+}
+
 func attendreEtape(b *banc, fiche, etape string) {
 	b.t.Helper()
 	if rdv := etapeDuRendezVous(b, fiche); rdv["etape"] != etape {
@@ -387,6 +427,7 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 			t.Fatalf("closing relu, %s : %v", champ, relu[champ])
 		}
 	}
+	qualificationDuClosingVisible(cc, fiche, "Partenariat")
 	if points, _ := body["pointsRencontre"].([]any); len(points) == 0 {
 		t.Fatalf("le closing propose les points de rencontre d'un RV site : %v", body)
 	}
@@ -474,4 +515,88 @@ func TestRendezVousARecontacter(t *testing.T) {
 	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CONFIRMER" || rdv["recontacterNote"] != "" {
 		t.Fatalf("le report remet le rendez-vous à confirmer et efface l'attente : %v", rdv)
 	}
+}
+
+func closingVide() map[string]any {
+	corps := map[string]any{"qualificationExterne": []string{}}
+	for _, champ := range []string{
+		"localite", "superficie", "natureJuridique", "etatSite", "position", "auNomDe", "titulaires",
+		"pieceIdentiteVerifiee", "personnePolitiquementExposee", "paiementAcompte", "origineFondsJustifiee",
+		"freinPrincipal", "autresPromoteurs", "parrain", "chargeDeClientele", "prochaineAction", "dateRelance",
+		"compteRendu", "qualification", "qualificationCommentaire", "dateVisite", "heureVisite", "pointRencontre",
+		"siteInteresse", "moyensUtilises", "accompagnement", "agent", "chauffeur",
+	} {
+		corps[champ] = ""
+	}
+	return corps
+}
+
+// Un rendez-vous reposé repart de zéro : l'attente « à recontacter » et l'ancien closing s'effacent.
+func TestRendezVousReposeRepartDeZero(t *testing.T) {
+	teleconseiller, fiches, quandRV := rendezVousPoses(t)
+	fiche := fiches["RV_CPI"]
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	t.Cleanup(func() {
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "rendez_vous_closings" WHERE "prospectId" = $1`, fiche)
+	})
+	suivi := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
+	closing := "/api/v1/prospects/" + fiche + "/closing"
+
+	statut, body := qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "HONORE"})
+	cc.attend(statut, http.StatusOK, "présent", body)
+	corps := closingVide()
+	corps["compteRendu"] = "Rien de tranché"
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
+	cc.attend(statut, http.StatusOK, "closing sans qualification", body)
+	attendreEtape(cc, fiche, "A_CLOSER")
+	corps["qualification"] = "Va acheter"
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
+	cc.attend(statut, http.StatusOK, "closing qualifié", body)
+	attendreEtape(cc, fiche, "HISTORIQUE")
+
+	reposer := func(raison string) {
+		t.Helper()
+		statut, body := qualificationEnvoi(teleconseiller, http.MethodPost, "/api/v1/phase2/call-attempts",
+			qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quandRV.AddDate(0, 0, 14).Format(time.RFC3339)}))
+		teleconseiller.attend(statut, http.StatusOK, raison, body)
+	}
+	reposer("nouveau rendez-vous après un closing")
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CONFIRMER" || rdv["qualification"] != "" {
+		t.Fatalf("le nouveau rendez-vous ne reprend pas l'ancien closing : %v", rdv)
+	}
+
+	statut, body = qualificationEnvoi(cc, http.MethodPost, suivi,
+		map[string]any{"issue": "A_RECONTACTER", "commentaire": "Rappellera", "recontacterLe": "2026-10-20"})
+	cc.attend(statut, http.StatusOK, "à recontacter", body)
+	reposer("nouveau rendez-vous sur une fiche à recontacter")
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] != "A_CONFIRMER" || rdv["recontacterNote"] != "" {
+		t.Fatalf("le nouveau rendez-vous efface l'attente : %v", rdv)
+	}
+}
+
+// Un rendez-vous annulé ne se note plus ; un RV téléphonique non joint se reporte.
+func TestRendezVousGestesRefuses(t *testing.T) {
+	teleconseiller, fiches, _ := rendezVousPoses(t)
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	annule := "/api/v1/prospects/" + fiches["RV_CPI"] + "/suivi-rendez-vous"
+	statut, body := qualificationEnvoi(cc, http.MethodPost, annule, map[string]any{"issue": "ANNULE"})
+	cc.attend(statut, http.StatusOK, "annulation", body)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, annule, map[string]any{"issue": "HONORE"})
+	cc.attend(statut, http.StatusConflict, "présence sur un rendez-vous annulé", body)
+
+	telephonique := qualificationProspect(teleconseiller)
+	t.Cleanup(func() {
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, telephonique)
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, telephonique)
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, telephonique)
+	})
+	statut, body = qualificationEnvoi(teleconseiller, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(telephonique, map[string]any{
+			"reasonCode": "RDV_TELEPHONIQUE",
+			"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
+		}))
+	teleconseiller.attend(statut, http.StatusOK, "RV téléphonique consigné", body)
+	statut, body = qualificationEnvoi(cc, http.MethodPost, "/api/v1/prospects/"+telephonique+"/suivi-rendez-vous",
+		map[string]any{"issue": "NON_HONORE"})
+	cc.attend(statut, http.StatusConflict, "RV téléphonique noté non joint sans report", body)
 }

@@ -242,6 +242,11 @@ UPDATE "prospects" SET "statut" = 'PERDU'
 WHERE "id" = @id AND "statut" NOT IN ('PERDU', 'CONVERTI', 'VENDU');
 
 -- name: CloreProspectParTentative :exec
+-- Un nouveau rendez-vous repart de zéro : l'ancien closing reste au journal d'audit.
+WITH oubli AS (
+  DELETE FROM "rendez_vous_closings"
+  WHERE "prospectId" = @id AND CAST(@phase2_status AS text) = 'APPOINTMENT'
+)
 UPDATE "prospects" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
   "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
@@ -250,7 +255,11 @@ UPDATE "prospects" SET
   "rendezVousIssue" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousIssue" END,
   "rendezVousConfirmation" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousConfirmation" END,
   "rendezVousReporteAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousReporteAt" END,
-  "suiteRencontre" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "suiteRencontre" END
+  "suiteRencontre" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "suiteRencontre" END,
+  "rendezVousRecontacterNote" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterNote" END,
+  "rendezVousRecontacterLe" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterLe" END,
+  "rendezVousRecontacterAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterAt" END,
+  "rendezVousRecontacterPar" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterPar" END
 WHERE "id" = @id;
 
 -- name: ListerRappels :many
@@ -266,8 +275,8 @@ JOIN "users" u ON u."id" = c."assignedToId"
 LEFT JOIN "call_attempts" a ON a."id" = c."sourceAttemptId"
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE c."status" = 'PENDING'
-  -- Un rendez-vous physique appartient au chargé de clientèle, pas au téléconseiller qui l'a pris.
-  AND (p."phase2Status" IS DISTINCT FROM 'APPOINTMENT' OR cr."code" = 'RDV_TELEPHONIQUE')
+  -- Un rendez-vous, même téléphonique, appartient au chargé de clientèle, pas au téléconseiller qui l'a pris.
+  AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT'
   AND (sqlc.narg('avant')::timestamp IS NULL
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
@@ -288,7 +297,7 @@ JOIN "prospects" p ON p."id" = c."prospectId"
 LEFT JOIN "call_attempts" a ON a."id" = c."sourceAttemptId"
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE c."status" = 'PENDING'
-  AND (p."phase2Status" IS DISTINCT FROM 'APPOINTMENT' OR cr."code" = 'RDV_TELEPHONIQUE')
+  AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT'
   AND (sqlc.narg('avant')::timestamp IS NULL
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
@@ -303,7 +312,7 @@ SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        c."status", p."phoneE164", p."prenom", p."nom", p."projet",
        u."fullName" AS "assignedToName", r."label" AS "reasonLabel", r."code" AS "reasonCode",
        (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous",
-       (p."phase2Status" = 'APPOINTMENT' AND r."code" IS DISTINCT FROM 'RDV_TELEPHONIQUE')::bool AS "rendezVousNonReportable"
+       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVousNonReportable"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 LEFT JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
@@ -549,7 +558,7 @@ WHERE "isActive" ORDER BY "position", "label" LIMIT 100;
 
 -- name: RvSiteReservations :many
 -- La date d'un rendez-vous se lit comme à l'accueil (RendezVousObtenus).
-SELECT rdv."quand"::timestamp AS "quand", count(*)::int AS "nombre"
+SELECT COALESCE(p."rendezVousReporteAt", rdv."quand")::timestamp AS "quand", count(*)::int AS "nombre"
 FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 LEFT JOIN LATERAL (
   SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
@@ -557,8 +566,11 @@ LEFT JOIN LATERAL (
   ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
 ) rdv ON true
 WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
-  AND rdv."quand" >= @du::timestamp AND rdv."quand" < @au::timestamp
-GROUP BY rdv."quand" ORDER BY rdv."quand" LIMIT 1000;
+  -- Annulé, absent ou sans date, le rendez-vous libère sa place.
+  AND COALESCE(p."rendezVousConfirmation", 'CONFIRME') = 'CONFIRME' AND p."rendezVousIssue" IS DISTINCT FROM 'NON_HONORE'
+  AND COALESCE(p."rendezVousReporteAt", rdv."quand") >= @du::timestamp
+  AND COALESCE(p."rendezVousReporteAt", rdv."quand") < @au::timestamp
+GROUP BY 1 ORDER BY 1 LIMIT 1000;
 
 -- name: VerrouCreneauxRvSite :exec
 SELECT pg_advisory_xact_lock(hashtext('rv_site.creneaux'));
@@ -572,7 +584,8 @@ SELECT (SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."i
         ) rdv ON true
         WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
           AND p."id" <> @prospect_id
-          AND rdv."quand" = @quand::timestamp
+          AND COALESCE(p."rendezVousConfirmation", 'CONFIRME') = 'CONFIRME' AND p."rendezVousIssue" IS DISTINCT FROM 'NON_HONORE'
+          AND COALESCE(p."rendezVousReporteAt", rdv."quand") = @quand::timestamp
        )::int AS "reserves",
        EXISTS (SELECT 1 FROM "ventes_sites" v WHERE v."actif" AND v."id" = @site_id) AS "site",
        EXISTS (SELECT 1 FROM "points_rencontre" r WHERE r."isActive" AND r."id" = @point_rencontre_id) AS "point";

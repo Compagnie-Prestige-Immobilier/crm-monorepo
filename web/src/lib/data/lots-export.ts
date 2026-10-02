@@ -242,7 +242,7 @@ export function lotProgrammeFileName(teleconseillerName: string, jour: number): 
 export interface Teleconseiller {
   id: string;
   fullName: string;
-  role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION' | 'ADMIN';
+  role: 'COMMERCIAL' | 'CHARGE_CLIENTELE' | 'SUPERVISEUR' | 'DIRECTION' | 'ADMIN';
 }
 
 const COMPTES_PAR_ROLE = 200;

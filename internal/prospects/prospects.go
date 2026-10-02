@@ -203,6 +203,7 @@ type Prospect struct {
 	RevueByID                *string           `json:"revueById"`
 	RevueByName              *string           `json:"revueByName"`
 	StatutQualification      *string           `json:"statutQualification"`
+	QualificationClosing     *string           `json:"qualificationClosing" doc:"La qualification posée au closing du rendez-vous, absente avant."`
 	LastReasonLabel          *string           `json:"lastReasonLabel"`
 	LastJoignable            *bool             `json:"lastJoignable"`
 	LastComment              *string           `json:"lastComment"`

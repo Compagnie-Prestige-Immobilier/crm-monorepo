@@ -11,23 +11,27 @@ import { formatFcfa, type Vente } from '@/lib/data/ventes';
 export function TeleconseillerDetailDialog({
   nom,
   ventes,
+  gerer,
   onFermer,
 }: {
   nom: string | null;
   ventes: readonly Vente[];
+  gerer: boolean;
   onFermer: () => void;
 }) {
   if (nom === null) return null;
-  return <Detail key={nom} nom={nom} ventes={ventes} onFermer={onFermer} />;
+  return <Detail key={nom} nom={nom} ventes={ventes} gerer={gerer} onFermer={onFermer} />;
 }
 
 function Detail({
   nom,
   ventes,
+  gerer,
   onFermer,
 }: {
   nom: string;
   ventes: readonly Vente[];
+  gerer: boolean;
   onFermer: () => void;
 }) {
   const [venteDetailId, setVenteDetailId] = useState<number | null>(null);
@@ -86,6 +90,7 @@ function Detail({
         </Tabs>
         <VenteDetailDialog
           vente={venteDetail}
+          gerer={gerer}
           open={venteDetail !== null}
           onOpenChange={(open) => (open ? null : setVenteDetailId(null))}
         />

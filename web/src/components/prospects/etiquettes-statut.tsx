@@ -19,6 +19,19 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
   WRONG_NUMBER: 'warning',
 };
 
+const QUALIFICATION_VARIANT: Record<string, BadgeVariant> = {
+  Vendu: 'success',
+  'Va acheter': 'info',
+  'Apporteur d’affaires': 'warning',
+  Partenariat: 'secondary',
+};
+
+/** La qualification posée au closing ; un texte libre vient de « Autre, à préciser ». */
+export function PastilleQualification({ qualification }: { qualification: string | null }) {
+  if (qualification === null || qualification === '') return null;
+  return <Badge variant={QUALIFICATION_VARIANT[qualification] ?? 'outline'}>{qualification}</Badge>;
+}
+
 /** Le statut de qualification de la fiche ; un rendez-vous dit aussi où il en est. */
 export function EtiquettesStatut({
   prospect,
@@ -27,6 +40,7 @@ export function EtiquettesStatut({
     ProspectRow,
     | 'phase2Status'
     | 'statutQualification'
+    | 'qualificationClosing'
     | 'rendezVousIssue'
     | 'rendezVousConfirmation'
     | 'rendezVousReporteAt'
@@ -39,6 +53,7 @@ export function EtiquettesStatut({
       {prospect.phase2Status === 'APPOINTMENT' ? (
         <Badge variant="outline">{etatRendezVousFiche(prospect)}</Badge>
       ) : null}
+      <PastilleQualification qualification={prospect.qualificationClosing} />
     </span>
   );
 }

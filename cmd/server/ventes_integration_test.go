@@ -890,6 +890,11 @@ func TestVenteStockDuSite(t *testing.T) {
 	if lu := stockDuSite(t, b, siteID); lu["lotsVendus"] != float64(3-lotsA) {
 		t.Fatalf("une vente archivée ne compte plus : %v", lu)
 	}
+	statut, refus = appelJSON(b, http.MethodPost, cheminA+"/restaurer", nil, nil)
+	b.attend(statut, http.StatusConflict, "restauration au-delà du stock", refus)
+	if refus["code"] != "VENTE_STOCK_EPUISE" {
+		t.Fatalf("code %v", refus["code"])
+	}
 }
 
 func stockDuSite(t *testing.T, b *banc, id string) map[string]any {
@@ -996,5 +1001,53 @@ func echeancesEnRetard(t *testing.T, b *banc) map[int64]map[string]any {
 		if len(lignes) < 200 {
 			return parVente
 		}
+	}
+}
+
+// La fiche suit la vente : vendue à la saisie, convertie à l'archivage, vendue à la restauration.
+func TestVenteArchiveeRendLaFicheConvertie(t *testing.T) {
+	b := qualificationConnecte(t, "DIRECTION")
+	fiche := qualificationProspect(b)
+	client := "CLIENT FICHE " + b.userID[:8]
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client)
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+	})
+	var telephone string
+	// Un préfixe mobile réel : la vente ne rapproche que les numéros que le normaliseur accepte.
+	numero := "+22177" + strings.TrimPrefix(qualificationNumero(), "+2217")[1:]
+	if err := b.pool.QueryRow(b.ctx, `UPDATE "prospects" SET "statut" = 'CONVERTI', "phoneE164" = $2 WHERE "id" = $1
+		RETURNING "phoneE164"`, fiche, numero).Scan(&telephone); err != nil {
+		t.Fatal(err)
+	}
+	statutDeLaFiche := func() string {
+		t.Helper()
+		var statut string
+		if err := b.pool.QueryRow(b.ctx, `SELECT "statut"::text FROM "prospects" WHERE "id" = $1`, fiche).Scan(&statut); err != nil {
+			t.Fatal(err)
+		}
+		return statut
+	}
+	corps := venteComptant(client)
+	corps["telephone"] = telephone
+	corps["mandataireNom"] = "Diop"
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/ventes", corps)
+	b.attend(statut, http.StatusBadRequest, "représentant sans prénom ni numéro", body)
+	delete(corps, "mandataireNom")
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/ventes", corps)
+	b.attend(statut, http.StatusCreated, "vente saisie", body)
+	vente := fmt.Sprintf("/api/v1/ventes/%d", int64(body["id"].(float64)))
+	if s := statutDeLaFiche(); s != "VENDU" {
+		t.Fatalf("la vente rend la fiche vendue : %s", s)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodDelete, vente, nil)
+	b.attend(statut, http.StatusNoContent, "archivage", body)
+	if s := statutDeLaFiche(); s != "CONVERTI" {
+		t.Fatalf("sans vente active, la fiche redevient convertie : %s", s)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodPost, vente+"/restaurer", nil)
+	b.attend(statut, http.StatusOK, "restauration", body)
+	if s := statutDeLaFiche(); s != "VENDU" {
+		t.Fatalf("la vente restaurée rend la fiche vendue : %s", s)
 	}
 }

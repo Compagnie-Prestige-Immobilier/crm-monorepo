@@ -178,7 +178,7 @@ func exportFiltresFiche(p *exportPredicat, in *ExportProspectsInput) error {
 			p.clauses = append(p.clauses, `p."rendezVousIssue" = `+p.valeur(in.RendezVousIssue))
 		}
 	}
-	exportFiltreAvec(p, in.AvecRdv, `EXISTS (SELECT 1 FROM "call_attempts" ar WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)`)
+	exportFiltreAvec(p, in.AvecRdv, exportDateRendezVous+` IS NOT NULL`)
 	// Comme la liste : le DERNIER appel porte le commentaire, pas un ancien.
 	exportFiltreAvec(p, in.AvecCommentaire, `EXISTS (SELECT 1 FROM "call_attempts" ac WHERE ac."prospectId" = p."id"
 		AND ac."id" = (SELECT ac2."id" FROM "call_attempts" ac2 WHERE ac2."prospectId" = p."id"
@@ -206,14 +206,14 @@ func exportBornesRendezVous(p *exportPredicat, in *ExportProspectsInput) error {
 		if err != nil {
 			return err
 		}
-		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "call_attempts" rf WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= `+p.valeur(du)+")")
+		p.clauses = append(p.clauses, exportDateRendezVous+` >= `+p.valeur(du))
 	}
 	if in.RdvTo != "" {
 		au, err := exportBorneDeJournee(in.RdvTo, true)
 		if err != nil {
 			return err
 		}
-		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "call_attempts" rt WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= `+p.valeur(au)+")")
+		p.clauses = append(p.clauses, exportDateRendezVous+` <= `+p.valeur(au))
 	}
 	return nil
 }
@@ -282,6 +282,8 @@ func exportConditionsProspects(u *socle.Utilisateur, in *ExportProspectsInput, s
 	return p, nil
 }
 
+const exportDateRendezVous = `public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt")`
+
 const exportJointuresProspects = `
 FROM "prospects" p
 LEFT JOIN "representants" r ON r."id" = p."representantId"
@@ -336,7 +338,8 @@ SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
    WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
    ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1),
   p."remarqueImport", COALESCE(p."rendezVousIssue", NULLIF(p."rendezVousConfirmation", 'CONFIRME')), p."rendezVousReporteAt", p."suiteRencontre",
-  (SELECT count(*)::int FROM "call_attempts" ca WHERE ca."prospectId" = p."id")`
+  (SELECT count(*)::int FROM "call_attempts" ca WHERE ca."prospectId" = p."id"),
+  COALESCE((SELECT c."qualification" FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id"), '')::text`
 
 type exportLigneProspect struct {
 	ID                string
@@ -400,6 +403,7 @@ type exportLigneProspect struct {
 	ReporteAu         *time.Time
 	SuiteRencontre    *string
 	NbAppels          int32
+	Qualification     string
 }
 
 // Le suivi ne vit que sur un rendez-vous : hors RDV la colonne reste vide,
@@ -459,7 +463,7 @@ var ExportEntetesProspects = []string{
 	"Tél. relais", "Segment", "Méthode d’enrôlement", "Statut phase 3 (conversion)",
 	exportEnteteDernierResultat, "Dernier commentaire", exportEnteteDernierAppel,
 	"Méthode obtenue par", "Date d’obtention",
-	"Campagne", "RDV posé", "Note du classeur", "Suivi du RDV", "Reporté au", "Suite rencontre",
+	"Campagne", "RDV posé", "Note du classeur", "Suivi du RDV", "Reporté au", "Suite rencontre", "Qualification du closing",
 	"Nb appels", "Email", ExportEnteteEtablissement, "Revenu", "Paiement", "Type de bien",
 	"Origine", "À revoir", "Revue le", "Revue par",
 }
@@ -515,7 +519,7 @@ func exportValeursProspect(c *exportClasseur, l *exportLigneProspect, libres []e
 		l.DerniereIssue, l.DernierCommentair, c.horodate(l.DernierAppel),
 		l.MethodePar, c.horodate(l.MethodeLe),
 		l.Campagne, c.horodate(l.RendezVousAt), exportChaineOuVide(l.RemarqueImport),
-		exportSuiviRendezVous(l.SuiviIssue), c.horodate(l.ReporteAu), exportChaineOuVide(l.SuiteRencontre),
+		exportSuiviRendezVous(l.SuiviIssue), c.horodate(l.ReporteAu), exportChaineOuVide(l.SuiteRencontre), l.Qualification,
 		l.NbAppels, l.Email, l.Etablissement, l.Revenu,
 		exportLibelle(exportLibellesPaiement, l.Paiement), exportLibelle(exportLibellesTypeBien, l.TypeBien),
 		exportOrigineProspect(l), c.horodate(l.ARevoirDepuis), c.horodate(l.RevuLe), l.RevuPar,

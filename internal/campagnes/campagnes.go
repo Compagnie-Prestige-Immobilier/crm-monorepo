@@ -180,6 +180,7 @@ type CampagneDetail struct {
 	CallsByTeleconseiller map[string]int          `json:"callsByTeleconseiller"`
 	Distribution          CampagneDistribution    `json:"distribution"`
 	Repartition           []CampagneRepartition   `json:"repartition"`
+	HorsEquipe            []CampagneRepartition   `json:"horsEquipe" doc:"Fiches gardées par un téléconseiller retiré de l'équipe : ses fiches traitées."`
 	Performance           []CampagnePerformance   `json:"performance"`
 	Reaffectations        []CampagneReaffectation `json:"reaffectations"`
 }
@@ -1009,6 +1010,10 @@ func (s *service) lotAssemblerDetail(ctx context.Context, id string) (CampagneDe
 	if err != nil {
 		return CampagneDetail{}, err
 	}
+	horsEquipe, err := s.lotRepartitionLue(ctx, lotHorsEquipe(ordre, groupes), jours, groupes, recues)
+	if err != nil {
+		return CampagneDetail{}, err
+	}
 	appels, err := s.lotAppelsParAgent(ctx, row)
 	if err != nil {
 		return CampagneDetail{}, err
@@ -1024,7 +1029,7 @@ func (s *service) lotAssemblerDetail(ctx context.Context, id string) (CampagneDe
 	return CampagneDetail{
 		CampagneResume: resume, RecentAttempts: tentatives, CallsByTeleconseiller: appels,
 		Distribution: CampagneDistribution{FichesParJour: fichesParJour, Jours: jours},
-		Repartition:  repartition, Performance: performance, Reaffectations: traces,
+		Repartition:  repartition, HorsEquipe: horsEquipe, Performance: performance, Reaffectations: traces,
 	}, nil
 }
 

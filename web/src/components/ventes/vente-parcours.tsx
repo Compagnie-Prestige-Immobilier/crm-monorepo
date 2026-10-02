@@ -5,7 +5,6 @@ import { CheckIcon, LoaderIcon, MinusIcon, PlusIcon, UserCheckIcon, XIcon } from
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
-import { meQueryOptions } from '@/api/auth';
 import {
   callingCountriesFrom,
   type CallingCountry,
@@ -214,7 +213,12 @@ const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
   nom: (d) => (d.client.trim() === '' ? 'Tapez le nom du client.' : null),
   identite: (d) => {
     const email = d.email?.trim() ?? '';
-    return email === '' || EMAIL_VALIDE.test(email) ? null : 'Indiquez un e-mail valide.';
+    if (email !== '' && !EMAIL_VALIDE.test(email)) return 'Indiquez un e-mail valide.';
+    const representant = [d.mandataireNom, d.mandatairePrenom, d.mandataireTelephone];
+    const rempli = (champ: string | undefined) => (champ ?? '').trim() !== '';
+    return [...representant, d.mandataireCni].some(rempli) && !representant.every(rempli)
+      ? 'Indiquez le nom, le prénom et le numéro du représentant.'
+      : null;
   },
   site: (d) => (d.site === '' ? 'Choisissez un site.' : null),
   canal: (d) => (d.canal === '' ? 'Choisissez un canal.' : null),
@@ -250,13 +254,19 @@ function superficieAChoisir(draft: Draft, site: SiteVente | undefined): boolean 
   return aChoisir && draft.superficie === '' && (draft.prixUnitaire ?? 0) <= 0;
 }
 
+const representantSaisi = (draft: Draft): boolean =>
+  CHAMPS_MANDATAIRE.some((champ) => (draft[champ.cle] ?? '').trim() !== '');
+
 function manqueParcours(
   ecran: Ecran,
   draft: Draft,
   callingCode: string,
   site: SiteVente | undefined,
+  represente: boolean,
 ): string | null {
   if (ecran === 'telephone') return manqueTelephone(draft, callingCode);
+  if (ecran === 'identite' && represente && !representantSaisi(draft))
+    return 'Indiquez le représentant, ou répondez Non.';
   if (ecran === 'lots' && superficieAChoisir(draft, site)) return 'Choisissez la superficie.';
   return MANQUE[ecran]?.(draft) ?? null;
 }
@@ -311,19 +321,15 @@ export function VenteParcours({
 
 function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | null }) {
   const queryClient = useQueryClient();
-  const { data: utilisateur } = useQuery(meQueryOptions);
   const [pas, setPas] = useState(vente === null ? 0 : RECAP);
   const [erreur, setErreur] = useState<string | null>(null);
   const [erreurLots, setErreurLots] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => ({
-    ...brouillonDe(vente),
-    ...(vente === null && utilisateur !== null && utilisateur !== undefined
-      ? { nomTeleconseiller: utilisateur.fullName }
-      : {}),
-  }));
+  // Vide, le téléconseiller est celui qui a appelé la fiche : le serveur le reprend.
+  const [draft, setDraft] = useState<Draft>(() => brouillonDe(vente));
   const [callingCode, setCallingCode] = useState(
     () => fromE164(vente?.telephone ?? '').callingCode,
   );
+  const [represente, setRepresente] = useState(() => representantSaisi(draft));
   const reference = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
@@ -375,7 +381,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
     setPas(Math.max(0, Math.min(RECAP, cible)));
   };
   const valider = () => {
-    const bloquant = manqueParcours(ecran, draft, callingCode, siteChoisi);
+    const bloquant = manqueParcours(ecran, draft, callingCode, siteChoisi, represente);
     if (bloquant !== null) setErreur(bloquant);
     else if (pas === RECAP) enregistrer.mutate();
     else aller(pas + 1);
@@ -394,6 +400,8 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
     >
       <EcranCourant
         ecran={ecran}
+        represente={represente}
+        onRepresente={setRepresente}
         draft={draft}
         changer={changer}
         estNouvelle={vente === null}
@@ -446,8 +454,12 @@ function EcranCourant({
   onFiche,
   onSite,
   onCanal,
+  represente,
+  onRepresente,
 }: EcranProps & {
   ecran: Ecran;
+  represente: boolean;
+  onRepresente: (oui: boolean) => void;
   estNouvelle: boolean;
   sites: readonly SiteVente[];
   site: SiteVente | undefined;
@@ -478,7 +490,14 @@ function EcranCourant({
     case 'nom':
       return <EcranNom draft={draft} changer={changer} />;
     case 'identite':
-      return <EcranIdentite draft={draft} changer={changer} />;
+      return (
+        <EcranIdentite
+          draft={draft}
+          changer={changer}
+          represente={represente}
+          onRepresente={onRepresente}
+        />
+      );
     case 'suivi':
       return (
         <Question titre="Qui a suivi la vente ?">
@@ -811,10 +830,12 @@ function Champs({ champs, draft, changer }: EcranProps & { champs: readonly Cham
   );
 }
 
-function EcranIdentite({ draft, changer }: EcranProps) {
-  const [represente, setRepresente] = useState(() =>
-    CHAMPS_MANDATAIRE.some((champ) => (draft[champ.cle] ?? '') !== ''),
-  );
+function EcranIdentite({
+  draft,
+  changer,
+  represente,
+  onRepresente,
+}: EcranProps & { represente: boolean; onRepresente: (oui: boolean) => void }) {
   const reference = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
@@ -840,7 +861,7 @@ function EcranIdentite({ draft, changer }: EcranProps) {
         options={OUI_NON}
         valeur={represente}
         onChoisir={(oui) => {
-          setRepresente(oui);
+          onRepresente(oui);
           if (!oui) changer(SANS_MANDATAIRE);
         }}
       />
@@ -858,9 +879,15 @@ function ChoixPersonne({
   changer,
 }: EcranProps & { cle: 'nomTeleconseiller' | 'responsableClosing'; label: string }) {
   const teleconseillers = useQuery({
-    queryKey: [...queryKeys.lotsExportTeleconseillers, 'avec-administration'],
+    queryKey: [...queryKeys.lotsExportTeleconseillers, 'ventes'],
     queryFn: () =>
-      fetchTeleconseillers(undefined, ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION', 'ADMIN']),
+      fetchTeleconseillers(undefined, [
+        'COMMERCIAL',
+        'CHARGE_CLIENTELE',
+        'SUPERVISEUR',
+        'DIRECTION',
+        'ADMIN',
+      ]),
     staleTime: 5 * 60_000,
   });
   const choisi = draft[cle] ?? '';

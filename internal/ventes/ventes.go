@@ -336,6 +336,8 @@ func agregerParTeleconseiller(ventes []VenteDTO) []VenteParTeleconseillerDTO {
 	return lignes
 }
 
+const champStatut = "statut"
+
 func marquerProspectsVendus(ctx context.Context, q *db.Queries, userID string, telephones []string) error {
 	if len(telephones) == 0 {
 		return nil
@@ -357,8 +359,8 @@ func marquerProspectsVendus(ctx context.Context, q *db.Queries, userID string, t
 			return err
 		}
 		if err := database.Auditer(ctx, q, userID, "prospect.vendre", "prospect", p.ID,
-			map[string]any{"statut": string(p.Statut)},
-			map[string]any{"statut": string(db.ProspectStatutVENDU)}); err != nil {
+			map[string]any{champStatut: string(p.Statut)},
+			map[string]any{champStatut: string(db.ProspectStatutVENDU)}); err != nil {
 			return err
 		}
 	}

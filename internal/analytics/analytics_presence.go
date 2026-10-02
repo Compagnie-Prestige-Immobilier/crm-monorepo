@@ -499,10 +499,12 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	SELECT sc."assignedToId", ` + perimetre.tronque(`sc."scheduledAt"`) + `,
 	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	  (sc."status" = 'DONE')::int,
-	  (sc."status" = 'PENDING' AND sc."scheduledAt" <= now())::int,
-	  (sc."status" = 'PENDING' AND sc."scheduledAt" > now())::int,
+	  (sc."status" = 'PENDING' AND sc."scheduledAt" <= now() AND NOT rdv.rendez_vous)::int,
+	  (sc."status" = 'PENDING' AND sc."scheduledAt" > now() AND NOT rdv.rendez_vous)::int,
 	  0, 0, 0
 	FROM "scheduled_callbacks" sc
+	CROSS JOIN LATERAL (SELECT EXISTS (SELECT 1 FROM "prospects" pr
+	  WHERE pr."id" = sc."prospectId" AND pr."phase2Status" = 'APPOINTMENT') AS rendez_vous) rdv
 	WHERE ` + perimetre.fenetre(p, `sc."scheduledAt"`) + etSQL + perimetre.ficheDuPerimetre(p, `sc."prospectId"`) + `
 
 	UNION ALL

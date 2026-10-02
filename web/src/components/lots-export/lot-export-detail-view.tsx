@@ -166,6 +166,14 @@ function LotDownloads({
   );
 }
 
+/** Un téléconseiller retiré garde ses fiches traitées : il reste lisible au programme. */
+const avecRetrait = (
+  ligne: LotExportDetail['repartition'][number],
+): LotExportDetail['repartition'][number] => ({
+  ...ligne,
+  teleconseillerName: `${ligne.teleconseillerName} (retiré)`,
+});
+
 function ProgrammesCard({
   repartition,
   colonnes,
@@ -525,7 +533,7 @@ export function LotExportDetailView({
         </TabsContent>
         <TabsContent value="programmes" className="mt-4 flex flex-col gap-6">
           <ProgrammesCard
-            repartition={repartition}
+            repartition={[...repartition, ...lot.data.horsEquipe.map(avecRetrait)]}
             colonnes={colonnes}
             distribution={distribution}
             id={id}

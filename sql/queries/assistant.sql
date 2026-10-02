@@ -187,8 +187,10 @@ SELECT
   u."fullName"::text AS teleconseiller,
   COUNT(*)::int AS promis,
   COUNT(*) FILTER (WHERE sc."status" = 'DONE')::int AS honores,
-  COUNT(*) FILTER (WHERE sc."status" = 'PENDING' AND sc."scheduledAt" < @maintenant::timestamp)::int AS en_retard,
-  COUNT(*) FILTER (WHERE sc."status" = 'PENDING' AND sc."scheduledAt" >= @maintenant::timestamp)::int AS a_venir,
+  COUNT(*) FILTER (WHERE sc."status" = 'PENDING' AND sc."scheduledAt" < @maintenant::timestamp
+    AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT')::int AS en_retard,
+  COUNT(*) FILTER (WHERE sc."status" = 'PENDING' AND sc."scheduledAt" >= @maintenant::timestamp
+    AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT')::int AS a_venir,
   COUNT(*) FILTER (WHERE sc."status" = 'CANCELLED')::int AS annules
 FROM "scheduled_callbacks" sc
 JOIN "users" u ON u."id" = sc."assignedToId"

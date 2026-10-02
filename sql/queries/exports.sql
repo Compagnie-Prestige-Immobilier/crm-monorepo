@@ -137,7 +137,10 @@ LIMIT 1000;
 -- name: ExportGlobalCampagnes :many
 SELECT
   l."id", l."name", l."cible"::text AS cible, COALESCE(l."projet"::text, '')::text AS projet,
-  l."itemCount", l."filters", u."fullName" AS cree_par, l."createdById", l."createdAt"
+  (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id"
+     AND NOT (li."assigneeId" IS NULL AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+                WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
+  l."filters", u."fullName" AS cree_par, l."createdById", l."createdAt"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
 WHERE (sqlc.narg('apres')::text IS NULL OR l."id" > sqlc.narg('apres')::text)

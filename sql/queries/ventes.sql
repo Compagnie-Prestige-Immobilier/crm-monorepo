@@ -25,11 +25,13 @@ LIMIT 20;
 INSERT INTO "ventes_classeurs" ("id", "nomFichier", "contenu", "depuis", "importeParId")
 VALUES ($1, $2, $3, $4, $5);
 
+-- Le classeur ne dit pas le mode de paiement : un reste à payer en fait une vente à crédit.
 -- name: InsererVente :one
 INSERT INTO "ventes" ("classeurId", "origine", "numero", "canal", "dateSouscription", "client", "telephone",
     "site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte",
-    "reliquat", "partProprietaire", "partApporteur", "partCpi")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    "reliquat", "partProprietaire", "partApporteur", "partCpi", "modePaiement")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+    CASE WHEN $15::bigint > 0 THEN 'CREDIT' ELSE 'COMPTANT' END)
 RETURNING "id";
 
 -- Deux saisies simultanées liraient sinon le même MAX("numero").

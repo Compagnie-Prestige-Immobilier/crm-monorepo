@@ -110,7 +110,7 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traite
 			FullName: lotNomEtPrenom(ligne.Nom, ligne.Prenom), PhoneE164: lotValeurTexte(ligne.PhoneE164),
 			TeleconseillerID:   ligne.AssigneeId,
 			TeleconseillerName: lotSiVide(lotValeurTexte(ligne.AssigneeName), "Non attribuée"),
-			Etat:               lotEtatDe(traitees[ligne.Position], false),
+			Etat:               lotEtatDe(traitees[ligne.Position], ligne.ARappeler),
 			StatutLabel:        lotPointeurTexte(ligne.LastReasonLabel),
 		})
 	}

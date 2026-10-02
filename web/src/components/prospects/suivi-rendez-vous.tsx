@@ -1,5 +1,6 @@
 'use client';
 
+import { unwrap } from '@crm/api-client/query';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarCheckIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -18,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getApiClient } from '@/lib/api/browser';
 import { suivreRendezVous } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -59,20 +61,46 @@ export function SuiviRendezVousBadges({ prospect }: { prospect: ProspectRow }) {
   );
 }
 
+const AU_TELEPHONE: Partial<Record<Issue, string>> = { HONORE: 'Joint', NON_HONORE: 'Non joint' };
+
+const ongletsDe = (telephonique: boolean): [string, string][] =>
+  Object.entries(telephonique ? AU_TELEPHONE : ISSUES);
+
+// Non joint au téléphone, le rendez-vous se reporte.
+const issueEnvoyee = (telephonique: boolean, issue: Issue): Issue =>
+  telephonique && issue === 'NON_HONORE' ? 'REPORTE' : issue;
+
+const suiviOuvert = (prospect: ProspectRow): boolean =>
+  prospect.phase2Status === 'APPOINTMENT' && prospect.rendezVousConfirmation !== 'ANNULE';
+
+async function typeDuRendezVous(id: string): Promise<string> {
+  const body = unwrap(
+    await getApiClient().GET('/api/v1/prospects/{id}/rendez-vous', { params: { path: { id } } }),
+  );
+  return body.rendezVous?.typeCode ?? '';
+}
+
 export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
   const { data: user } = useQuery(meQueryOptions);
+  const { data: typeCode } = useQuery({
+    queryKey: ['prospects', prospect.id, 'rendez-vous', 'type'],
+    queryFn: () => typeDuRendezVous(prospect.id),
+    enabled: prospect.phase2Status === 'APPOINTMENT',
+  });
+  const telephonique = typeCode === 'RDV_TELEPHONIQUE';
   const queryClient = useQueryClient();
   const [ouverte, setOuverte] = useState(false);
   const [issue, setIssue] = useState<Issue>(prospect.rendezVousIssue ?? 'HONORE');
   const [suite, setSuite] = useState<Suite | null>(prospect.suiteRencontre);
   const [report, setReport] = useState('');
-  const reporteAt = issue === 'REPORTE' ? dakarLocalToIso(report) : null;
-  const pret = issue !== 'REPORTE' || reporteAt !== null;
+  const envoyee = issueEnvoyee(telephonique, issue);
+  const reporteAt = envoyee === 'REPORTE' ? dakarLocalToIso(report) : null;
+  const pret = envoyee !== 'REPORTE' || reporteAt !== null;
 
   const suivi = useMutation({
     mutationFn: () =>
       suivreRendezVous(prospect.id, {
-        issue,
+        issue: envoyee,
         ...(reporteAt === null ? {} : { reporteAt }),
         ...(issue === 'HONORE' && suite !== null ? { suiteRencontre: suite } : {}),
       }),
@@ -84,7 +112,7 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
     onError: (error) => toastApiError(error, 'Le suivi n’a pas pu être enregistré.'),
   });
 
-  if (!peut(user, 'rendez_vous.suivre') || prospect.phase2Status !== 'APPOINTMENT') return null;
+  if (!peut(user, 'rendez_vous.suivre') || !suiviOuvert(prospect)) return null;
 
   return (
     <>
@@ -112,14 +140,14 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
               }}
             >
               <TabsList className="w-full">
-                {Object.entries(ISSUES).map(([value, label]) => (
+                {ongletsDe(telephonique).map(([value, label]) => (
                   <TabsTrigger key={value} value={value} className="flex-1">
                     {label}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
-            {issue === 'REPORTE' ? (
+            {envoyee === 'REPORTE' ? (
               <div className="grid gap-2">
                 <Label htmlFor="rendez-vous-report">Nouvelle date (heure de Dakar)</Label>
                 <Input

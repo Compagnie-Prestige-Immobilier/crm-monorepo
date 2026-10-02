@@ -7,6 +7,7 @@ export type Question = {
   choix?: readonly string[] | 'sites' | 'chargesDeClientele' | 'pointsRencontre';
   /** Ajoute « Autre, à préciser » à la liste. */
   autre?: true;
+  tuiles?: true;
   long?: true;
   type?: 'date' | 'time';
   si?: (closing: Closing) => boolean;
@@ -116,6 +117,7 @@ const QUALIFICATION: readonly Question[] = [
     label: 'Qualification',
     choix: ['Vendu', 'Va acheter', 'Apporteur d’affaires', 'Partenariat'],
     autre: true,
+    tuiles: true,
   },
   {
     champ: 'qualificationCommentaire',

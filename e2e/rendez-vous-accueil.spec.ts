@@ -213,8 +213,10 @@ test.describe('closing par le chargé de clientèle', () => {
     await closing.getByLabel('Superficie du lot, précision').fill('400 m²');
     await closing.getByRole('button', { name: 'Suivant' }).click();
     await closing.getByRole('button', { name: 'Suivant' }).click();
-    await closing.getByRole('combobox', { name: 'Qualification', exact: true }).click();
-    await page.getByRole('option', { name: 'Partenariat' }).click();
+    await closing
+      .getByRole('group', { name: 'Qualification', exact: true })
+      .getByRole('button', { name: 'Partenariat' })
+      .click();
     await closing.getByLabel('Commentaire sur le partenariat').fill('Mutuelle des enseignants');
     await expect(closing.getByRole('group', { name: 'Qualification du RV externe' })).toHaveCount(
       0,
@@ -227,6 +229,7 @@ test.describe('closing par le chargé de clientèle', () => {
 
     await page.getByRole('tab', { name: 'Historique' }).click();
     await expect(ligne.getByText('Closing enregistré')).toBeVisible();
+    await expect(ligne.getByText('Partenariat')).toBeVisible();
     const [enregistre] = await lire<{
       superficie: string;
       qualification: string;
