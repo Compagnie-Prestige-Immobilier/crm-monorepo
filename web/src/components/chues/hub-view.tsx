@@ -23,11 +23,9 @@ import { NON_QUALIFIES, SANS_PROSPECT } from '@/components/chues/hub-filters';
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
 export function HubView({
-  canCreateProspect,
   encadrement,
 }: {
   prenom: string;
-  canCreateProspect: boolean;
   /** Supervision, direction et administration lisent les rappels des téléconseillers, pas les leurs. */
   encadrement: boolean;
 }) {
@@ -76,28 +74,21 @@ export function HubView({
           }
         />
 
-        {/* Seuls l'encadrement et l'admin saisissent les prospects ; aux autres,
-            une carte sans geste n'apprendrait rien. */}
-        {canCreateProspect ? (
-          <Etape
-            titre="Ajouter un prospect"
-            explication="Le représentant a donné des noms : on les note un par un."
-            chiffre={
-              <Chiffre
-                pending={sansProspect.isPending}
-                failed={sansProspect.isError}
-                valeur={sansProspect.data?.total}
-                legende="ont dit oui, sans contacts notés"
-              />
-            }
-            action={
-              <Geste
-                href="/teleconseil/prospects/nouveau?projet=CHUES"
-                label="Ajouter un prospect"
-              />
-            }
-          />
-        ) : null}
+        <Etape
+          titre="Ajouter un prospect"
+          explication="Le représentant a donné des noms : on les note un par un."
+          chiffre={
+            <Chiffre
+              pending={sansProspect.isPending}
+              failed={sansProspect.isError}
+              valeur={sansProspect.data?.total}
+              legende="ont dit oui, sans contacts notés"
+            />
+          }
+          action={
+            <Geste href="/teleconseil/prospects/nouveau?projet=CHUES" label="Ajouter un prospect" />
+          }
+        />
 
         <Etape
           titre="Fiche prospect"

@@ -187,8 +187,10 @@ const LIBELLES_PAS: Readonly<Record<Pas, string>> = {
 
 const TRANCHES_PAS: readonly Pas[] = ['identite', 'situation', 'revenus'];
 
-function parcoursDe(avecPrecision: boolean, rappelDemande: boolean): Pas[] {
-  const pas: Pas[] = ['contact', 'canal', 'identite', 'situation', 'revenus', 'statut'];
+function parcoursDe(avecCanal: boolean, avecPrecision: boolean, rappelDemande: boolean): Pas[] {
+  const pas: Pas[] = ['contact'];
+  if (avecCanal) pas.push('canal');
+  pas.push('identite', 'situation', 'revenus', 'statut');
   if (avecPrecision) pas.push('precision');
   if (rappelDemande) pas.push('echeance');
   pas.push('note', 'projet');
@@ -221,6 +223,7 @@ export function NouveauProspectConsole({
 
   const [pas, setPas] = useState<Pas>('contact');
   const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
+  const [avecCanal, setAvecCanal] = useState(true);
   const [sansAppel, setSansAppel] = useState(false);
   const [conversion, setConversion] = useState<ConversionDraft>(() => dossierVide('GRAND_PUBLIC'));
   const [phone, setPhone] = useState('');
@@ -250,7 +253,7 @@ export function NouveauProspectConsole({
   const { motif, adhesion, rappelDemande } = qualificationDe(statut, precision, conversion);
   const rvSite = useRvSite(motif?.code);
   const precisions = statut === null ? [] : sousMotifsDe(catalogue, statut.id);
-  const parcours = parcoursDe(precisions.length > 0, rappelDemande);
+  const parcours = parcoursDe(avecCanal, precisions.length > 0, rappelDemande);
   const rang = Math.max(parcours.indexOf(pas), 0);
 
   const save = useMutation({
@@ -389,7 +392,14 @@ export function NouveauProspectConsole({
 
   const choisirTypeContact = (code: string): void => {
     setCanalProvenanceId(canauxActifs.find((canal) => canal.code === code)?.id ?? null);
+    setAvecCanal(true);
     setPas('canal');
+  };
+
+  const choisirSansCanal = (): void => {
+    setCanalProvenanceId(null);
+    setAvecCanal(false);
+    setPas('identite');
   };
 
   const tranche = (rangTranche: number): ReactNode => (
@@ -443,6 +453,9 @@ export function NouveauProspectConsole({
             onClick={() => choisirTypeContact('WHATSAPP')}
           >
             SMS / Whatsapp
+          </Button>
+          <Button variant="outline" className="min-w-52 flex-1" onClick={choisirSansCanal}>
+            Appel émis / Autre
           </Button>
         </div>
       </div>

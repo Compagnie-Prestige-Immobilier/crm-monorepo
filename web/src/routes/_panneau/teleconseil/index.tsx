@@ -40,11 +40,7 @@ function TeleconseilPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <HubView
-        prenom={user.fullName.split(' ')[0] ?? user.fullName}
-        canCreateProspect={encadrement}
-        encadrement={encadrement}
-      />
+      <HubView prenom={user.fullName.split(' ')[0] ?? user.fullName} encadrement={encadrement} />
       <LienFormulairePublic />
     </div>
   );
