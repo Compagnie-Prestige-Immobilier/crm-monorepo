@@ -11,3 +11,4 @@ e2e/.auth/
 e2e/.roles.json
 e2e/fixtures/
 .claude/worktrees
+.playwright-mcp/
