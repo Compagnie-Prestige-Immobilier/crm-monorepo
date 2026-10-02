@@ -11,11 +11,12 @@ import {
   getDay,
   min as auPlusTot,
   parse,
+  startOfHour,
   startOfWeek,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeftIcon, ChevronRightIcon, FileTextIcon, PhoneIcon } from 'lucide-react';
-import { createContext, useContext, useState } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useState } from 'react';
 import {
   Calendar,
   dateFnsLocalizer,
@@ -24,15 +25,17 @@ import {
   type View,
 } from 'react-big-calendar';
 
-import { meQueryOptions } from '@/api/auth';
 import { ClosingDialog } from '@/components/accueil/closing-dialog';
+import {
+  CreneauRendezVous,
+  Ouvrir,
+  tonDuCreneau,
+} from '@/components/accueil/rendez-vous-agenda-creneau';
 import { FichePopup } from '@/components/accueil/fiche-popup';
-import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
-import { PastilleQualification } from '@/components/prospects/etiquettes-statut';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -40,8 +43,6 @@ import {
   lireRendezVousEntre,
   type RendezVousObtenu,
 } from '@/lib/data/rendez-vous';
-import { formatDateTime, formatPhone } from '@/lib/format';
-import { peut } from '@/lib/types';
 
 const localisateur = dateFnsLocalizer({
   format,
@@ -74,14 +75,31 @@ interface Evenement {
   title: string;
   start: Date;
   end: Date;
-  fiche: RendezVousObtenu;
+  fiches: RendezVousObtenu[];
 }
 
-// Closing et fiche s'ouvrent hors de la bulle : elle se referme avant eux.
-const Ouvrir = createContext<{
-  closing: (fiche: RendezVousObtenu) => void;
-  fiche: (id: string) => void;
-}>({ closing: () => undefined, fiche: () => undefined });
+const avantHeure = (fiche: RendezVousObtenu): Date => new Date(fiche.quand ?? 0);
+
+/** En semaine, une heure tient en une carte : sept colonnes étroites rendraient les noms illisibles. */
+function evenementsDe(items: readonly RendezVousObtenu[], parHeure: boolean): Evenement[] {
+  const groupes = new Map<string, RendezVousObtenu[]>();
+  for (const fiche of items) {
+    if (fiche.quand === null) continue;
+    const cle = parHeure ? format(startOfHour(avantHeure(fiche)), "yyyy-MM-dd'T'HH") : fiche.id;
+    groupes.set(cle, [...(groupes.get(cle) ?? []), fiche]);
+  }
+  return [...groupes.values()].map((fiches) => {
+    const premiere = fiches[0] as RendezVousObtenu;
+    const start = parHeure ? startOfHour(avantHeure(premiere)) : avantHeure(premiere);
+    const titre = `${premiere.prenom} ${premiere.nom}`;
+    return {
+      title: fiches.length === 1 ? titre : `${String(fiches.length)} rendez-vous`,
+      start,
+      end: auPlusTot([addHours(start, 1), endOfDay(start)]),
+      fiches,
+    };
+  });
+}
 
 const jour = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -140,90 +158,31 @@ function Barre({ label, onNavigate, view, onView }: ToolbarProps<Evenement>) {
   );
 }
 
-function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void }) {
-  const ouvrir = useContext(Ouvrir);
-  const { data: user } = useQuery(meQueryOptions);
-  const etat = etatDe(fiche);
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <p className="font-display text-[1.0625rem] font-[700]">
-          {fiche.prenom} {fiche.nom}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {fiche.quand === null ? '' : formatDateTime(fiche.quand)} · {fiche.type}
-          {fiche.site === '' ? '' : ` · ${fiche.site}`}
-        </p>
-        <span className="mt-2 inline-flex flex-wrap gap-1.5">
-          <Badge variant={etat.ton}>{etat.texte}</Badge>
-          <PastilleQualification qualification={fiche.qualification} />
-        </span>
-      </div>
-      <ActionsRendezVous
-        fiche={fiche}
-        peutNoter
-        peutCloser
-        bulle
-        onCloser={(choisie) => {
-          onFait();
-          ouvrir.closing(choisie);
-        }}
-        onEnregistrerVisite={null}
-        onFait={onFait}
-      />
-      <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
-        {peut(user, 'prospects.lire') ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 gap-2"
-            onClick={() => {
-              onFait();
-              ouvrir.fiche(fiche.id);
-            }}
-          >
-            <FileTextIcon className="size-4" aria-hidden="true" />
-            Ouvrir la fiche
-          </Button>
-        ) : null}
-        {fiche.phoneE164 === null ? null : (
-          <a
-            href={`tel:${fiche.phoneE164}`}
-            aria-label={`Appeler ${formatPhone(fiche.phoneE164)}`}
-            className={buttonVariants({ variant: 'outline', className: 'h-11 gap-2' })}
-          >
-            <PhoneIcon className="size-4" aria-hidden="true" />
-            Appeler
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Rendu({ event }: EventProps<Evenement>) {
   const [ouvert, setOuvert] = useState(false);
-  const etat = etatDe(event.fiche);
+  const seule = event.fiches.length === 1 ? event.fiches[0] : undefined;
+  const sousTitre =
+    seule === undefined
+      ? event.fiches.map((fiche) => `${fiche.prenom} ${fiche.nom}`).join(', ')
+      : `${format(avantHeure(seule), 'HH:mm')} · ${etatDe(seule).texte}`;
   return (
     <Popover open={ouvert} onOpenChange={setOuvert}>
       <PopoverTrigger
         render={
           <button
             type="button"
-            aria-label={`${event.title}, ${etat.texte}`}
-            title={`${format(event.start, 'HH:mm')} · ${event.title} · ${etat.texte}`}
+            aria-label={`${event.title}, ${sousTitre}`}
+            title={`${event.title} · ${sousTitre}`}
             className="flex h-full w-full min-w-0 flex-col gap-0.5 overflow-hidden text-left leading-tight"
           />
         }
       >
         <span className="truncate font-[600]">{event.title}</span>
-        <span className="truncate text-[0.6875rem] tabular-nums opacity-80">
-          {format(event.start, 'HH:mm')} · {etat.texte}
-        </span>
+        <span className="truncate text-[0.6875rem] tabular-nums opacity-80">{sousTitre}</span>
       </PopoverTrigger>
-      <PopoverContent side="right" className="w-80">
-        <Bulle
-          fiche={event.fiche}
+      <PopoverContent side="right" className="max-h-[80dvh] w-80 overflow-y-auto">
+        <CreneauRendezVous
+          fiches={event.fiches}
           onFait={() => {
             setOuvert(false);
           }}
@@ -244,12 +203,7 @@ export function RendezVousAgenda() {
     queryKey: [...CLE_RENDEZ_VOUS, 'agenda', du, au],
     queryFn: () => lireRendezVousEntre(du, au),
   });
-  const evenements: Evenement[] = (semaine.data?.items ?? []).flatMap((fiche) => {
-    if (fiche.quand === null) return [];
-    const start = new Date(fiche.quand);
-    const end = auPlusTot([addHours(start, 1), endOfDay(start)]);
-    return [{ title: `${fiche.prenom} ${fiche.nom}`, start, end, fiche }];
-  });
+  const evenements = evenementsDe(semaine.data?.items ?? [], vue === 'week');
   const { min, max } = heures(evenements);
 
   return (
@@ -284,10 +238,12 @@ export function RendezVousAgenda() {
           scrollToTime={min}
           step={30}
           timeslots={2}
+          // En vue Jour, les rendez-vous d'une même heure se rangent côte à côte au lieu de se recouvrir.
+          dayLayoutAlgorithm="no-overlap"
           formats={FORMATS}
           components={{ toolbar: Barre, event: Rendu }}
           eventPropGetter={(evenement) => ({
-            className: `agenda-${etatDe(evenement.fiche).ton}`,
+            className: `agenda-${tonDuCreneau(evenement.fiches)}`,
           })}
           style={{ height: 'calc(100dvh - 9rem)', minHeight: 520 }}
         />

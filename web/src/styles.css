@@ -1155,6 +1155,11 @@ html.dark:has([data-coque='chues']) {
   padding: 0.25rem 0.375rem;
 }
 
+/* Côte à côte, deux rendez-vous du même créneau gardent une séparation. */
+.agenda-rendez-vous .rbc-day-slot .rbc-event {
+  box-shadow: 0 0 0 1px var(--card);
+}
+
 .agenda-rendez-vous .rbc-event .rbc-event-label {
   display: none;
 }
