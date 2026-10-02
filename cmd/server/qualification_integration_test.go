@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1477,6 +1478,11 @@ func TestVenteSaisieVendLaFicheJointe(t *testing.T) {
 		"telephone": telephone, "site": "THIEO", "nombreLots": 1, "numerosLots": "2001",
 		"superficie": "225 m²", "prixUnitaire": 2800000, "acompte": 500000, "modePaiement": "COMPTANT",
 	}
+	var nomDirection string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "fullName" FROM "users" WHERE "id" = $1`, direction.userID).Scan(&nomDirection); err != nil {
+		t.Fatal(err)
+	}
+	vente["nomTeleconseiller"] = nomDirection
 	statut, body = qualificationEnvoi(direction, http.MethodPost, "/api/v1/ventes", vente)
 	direction.attend(statut, http.StatusCreated, "vente saisie", body)
 
@@ -1495,5 +1501,31 @@ func TestVenteSaisieVendLaFicheJointe(t *testing.T) {
 	rapprochee, _ := client["vente"].(bool)
 	if len(items) != 1 || !rapprochee || client["site"] != "THIEO" || client["prixTotal"] != float64(2800000) {
 		t.Fatalf("la vente se lit chez le téléconseiller : %v", items)
+	}
+	clientsSaisisASonNom(b, direction, vente, fiche)
+}
+
+// Une vente saisie au nom de quelqu'un est son client, avec ou sans fiche au même téléphone.
+func clientsSaisisASonNom(b, direction *banc, vente map[string]any, fiche string) {
+	b.t.Helper()
+	telephone := fmt.Sprint(vente["telephone"])
+	venteSansFiche := maps.Clone(vente)
+	venteSansFiche["telephone"], venteSansFiche["client"] = "+22176"+telephone[6:], "SANS FICHE "+fiche[:8]
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "client" = $1`, venteSansFiche["client"])
+	})
+	statut, body := qualificationEnvoi(direction, http.MethodPost, "/api/v1/ventes", venteSansFiche)
+	direction.attend(statut, http.StatusCreated, "vente saisie sans fiche", body)
+	statut, body = qualificationEnvoi(direction, http.MethodGet, "/api/v1/prospects/clients", nil)
+	direction.attend(statut, http.StatusOK, "clients de qui a saisi les ventes à son nom", body)
+	saisies := map[string]bool{}
+	for _, item := range body["items"].([]any) {
+		ligne, _ := item.(map[string]any)
+		avecFiche, _ := ligne["avecFiche"].(bool)
+		saisies[fmt.Sprint(ligne["nom"])] = avecFiche
+	}
+	sansFiche, lue := saisies[strings.ToUpper("SANS FICHE "+fiche[:8])]
+	if avecFiche, ok := saisies["Diop"]; !ok || !avecFiche || !lue || sansFiche {
+		b.t.Fatalf("les ventes saisies à son nom sont ses clients, avec ou sans fiche : %v", body["items"])
 	}
 }

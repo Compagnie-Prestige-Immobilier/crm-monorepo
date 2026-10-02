@@ -540,25 +540,56 @@ RETURNING p."id";
 UPDATE "prospect_journeys" SET "statut" = 'CONVERTI'
 WHERE "prospectId" = ANY(@ids::text[]) AND "statut" = 'VENDU';
 
--- Les clients d'un téléconseiller : ses contacts vendus, avec la vente
--- rapprochée par téléphone.
+-- Les clients d'un téléconseiller, comptés comme la page Ventes : ses fiches
+-- vendues qu'il a appelées, et les ventes saisies à son nom, avec ou sans fiche.
 -- name: ClientsDuTeleconseiller :many
-SELECT p."id", p."prenom", p."nom", p."phoneE164", p."projet", p."lastCallAt",
-       (v."id" IS NOT NULL)::bool AS "vente", COALESCE(v."site", '')::text AS "site", v."dateSouscription",
-       COALESCE(v."nombreLots", 0)::int AS "nombreLots", COALESCE(v."numerosLots", '')::text AS "numerosLots",
-       COALESCE(v."prixTotal", 0)::bigint AS "prixTotal", COALESCE(v."reliquat", 0)::bigint AS "reliquat",
-       COALESCE(v."canal", '')::text AS "canal"
-FROM "prospects" p
-LEFT JOIN LATERAL (
-  SELECT v.* FROM "ventes" v
-  WHERE v."archiveeLe" IS NULL AND regexp_replace(v."telephone", '\D', '', 'g') <> ''
-    AND p."phoneE164" LIKE '%' || regexp_replace(v."telephone", '\D', '', 'g')
-  ORDER BY v."dateSouscription" DESC NULLS LAST, v."id" DESC LIMIT 1
-) v ON true
-WHERE p."deletedAt" IS NULL AND p."statut" = 'VENDU'
-  AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = @appele_par::text)
-  AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
-ORDER BY v."dateSouscription" DESC NULLS LAST, p."lastCallAt" DESC
+WITH appeles AS (
+  SELECT p."id", p."prenom", p."nom", p."phoneE164", p."projet"::text AS "projet", p."lastCallAt",
+         v."id" AS "venteId", v."site", v."dateSouscription", v."nombreLots", v."numerosLots",
+         v."prixTotal", v."reliquat", v."canal"
+  FROM "prospects" p
+  LEFT JOIN LATERAL (
+    SELECT v.* FROM "ventes" v
+    WHERE v."archiveeLe" IS NULL AND regexp_replace(v."telephone", '\D', '', 'g') <> ''
+      AND p."phoneE164" LIKE '%' || regexp_replace(v."telephone", '\D', '', 'g')
+    ORDER BY v."dateSouscription" DESC NULLS LAST, v."id" DESC LIMIT 1
+  ) v ON true
+  WHERE p."deletedAt" IS NULL AND p."statut" = 'VENDU'
+    AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = @appele_par::text)
+), saisies AS (
+  SELECT f."id", f."prenom", f."nom", f."phoneE164", f."projet"::text AS "projet", f."lastCallAt",
+         v."id" AS "venteId", v."site", v."dateSouscription", v."nombreLots", v."numerosLots",
+         v."prixTotal", v."reliquat", v."canal", v."client", v."telephone"
+  FROM "ventes" v
+  LEFT JOIN LATERAL (
+    SELECT p.* FROM "prospects" p
+    WHERE p."deletedAt" IS NULL AND regexp_replace(v."telephone", '\D', '', 'g') <> ''
+      AND p."phoneE164" LIKE '%' || regexp_replace(v."telephone", '\D', '', 'g')
+    ORDER BY p."updatedAt" DESC LIMIT 1
+  ) f ON true
+  WHERE v."archiveeLe" IS NULL AND btrim(v."nomTeleconseiller") <> ''
+    AND lower(btrim(v."nomTeleconseiller")) = lower(btrim(@nom_complet::text))
+)
+-- sqlc tient les colonnes pour non nulles : une vente sans fiche n'a ni projet ni appel, rendus vides.
+SELECT c."id"::text AS "id", c."prenom"::text AS "prenom", c."nom"::text AS "nom",
+       COALESCE(c."phoneE164", '')::text AS "phoneE164", c."projet"::text AS "projet",
+       COALESCE(to_char(c."lastCallAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "lastCallAt", true::bool AS "avecFiche",
+       (c."venteId" IS NOT NULL)::bool AS "vente", COALESCE(c."site", '')::text AS "site", c."dateSouscription"::date AS "dateSouscription",
+       COALESCE(c."nombreLots", 0)::int AS "nombreLots", COALESCE(c."numerosLots", '')::text AS "numerosLots",
+       COALESCE(c."prixTotal", 0)::bigint AS "prixTotal", COALESCE(c."reliquat", 0)::bigint AS "reliquat",
+       COALESCE(c."canal", '')::text AS "canal"
+FROM appeles c
+WHERE sqlc.narg('projet')::text IS NULL OR c."projet" = sqlc.narg('projet')::text
+UNION ALL
+SELECT COALESCE(s."id", 'vente-' || s."venteId")::text, COALESCE(s."prenom", '')::text, COALESCE(s."nom", s."client")::text,
+       COALESCE(s."phoneE164", s."telephone", '')::text, COALESCE(s."projet", '')::text,
+       COALESCE(to_char(s."lastCallAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text, (s."id" IS NOT NULL)::bool,
+       true::bool, s."site"::text, s."dateSouscription"::date, s."nombreLots"::int, s."numerosLots"::text,
+       s."prixTotal"::bigint, s."reliquat"::bigint, s."canal"::text
+FROM saisies s
+WHERE (sqlc.narg('projet')::text IS NULL OR s."projet" = sqlc.narg('projet')::text)
+  AND NOT EXISTS (SELECT 1 FROM appeles a WHERE a."venteId" = s."venteId")
+ORDER BY "dateSouscription" DESC NULLS LAST, "lastCallAt" DESC
 LIMIT 200;
 
 -- name: ProspectsVivantsParTelephones :many
