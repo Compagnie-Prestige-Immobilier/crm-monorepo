@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { ChoixOuAutre } from '@/components/accueil/choix-ou-autre';
+import { ChoixOuAutre, Tuiles } from '@/components/accueil/choix-ou-autre';
 import { etapesDe, type Question } from '@/components/accueil/closing-questions';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,8 @@ import { toastApiError } from '@/lib/mutation-feedback';
 
 type Listes = { sites: string[]; chargesDeClientele: string[]; pointsRencontre: string[] };
 
+const AUTRE = 'Autre, à préciser';
+
 function Cases({
   label,
   options,
@@ -42,7 +44,7 @@ function Cases({
     <fieldset className="grid gap-2 sm:col-span-2">
       <legend className="mb-1.5 text-[0.9375rem] font-[600]">{label}</legend>
       <div className="flex flex-wrap gap-x-5 gap-y-1">
-        {[...options, 'Autre, à préciser'].map((option) => {
+        {[...options, AUTRE].map((option) => {
           const estAutre = !options.includes(option);
           return (
             <label key={option} className="flex min-h-9 items-center gap-2 text-[0.875rem]">
@@ -99,6 +101,9 @@ function Saisie({
     return (
       <Cases label={question.label} options={options ?? []} value={value} onChange={onChange} />
     );
+  }
+  if (options !== undefined && question.tuiles === true) {
+    return <Tuiles label={question.label} options={options} value={value} onChange={onChange} />;
   }
   if (options !== undefined) {
     return (

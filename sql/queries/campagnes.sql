@@ -1,5 +1,9 @@
 -- name: LotParId :one
-SELECT l."id", l."name", l."cible", l."projet", l."filters", l."itemCount",
+-- Une fiche rendue à la plateforme sort du total de la campagne.
+SELECT l."id", l."name", l."cible", l."projet", l."filters",
+       (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id"
+         AND NOT (li."assigneeId" IS NULL AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+                    WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
        l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
@@ -21,7 +25,11 @@ WHERE (sqlc.narg('search')::text IS NULL OR concat_ws(' ', l."name", u."fullName
   AND (sqlc.narg('date_to')::timestamp IS NULL OR l."createdAt" <= sqlc.narg('date_to'));
 
 -- name: ListerLots :many
-SELECT l."id", l."name", l."cible", l."projet", l."filters", l."itemCount",
+-- Une fiche rendue à la plateforme sort du total de la campagne.
+SELECT l."id", l."name", l."cible", l."projet", l."filters",
+       (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id"
+         AND NOT (li."assigneeId" IS NULL AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+                    WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
        l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
@@ -61,7 +69,11 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 -- name: ImportsAvecFiches :many
 WITH fiches AS (
   SELECT j."id" AS "jobId", j."fileName", j."createdAt", p."importFeuille",
-         p."lastCallAt" IS NOT NULL AS appelee,
+         -- Ce que le tirage d'une campagne exclut : l'anneau dit ce qui reste à donner.
+         (p."lastCallAt" IS NOT NULL OR p."statut" = 'PERDU'
+          OR EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
+          OR EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+                     WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)) AS appelee,
          p."projet" = 'GRAND_PUBLIC' AS gp,
          p."projet" = 'CHUES' AS chues
   FROM "import_jobs" j
@@ -334,13 +346,19 @@ WHERE i."lotId" = $1
 -- name: LotFichesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
-       COALESCE((SELECT cr."label" FROM "call_outcome_reasons" cr WHERE cr."id" = p."lastReasonId"), '')::text AS "lastReasonLabel"
+       COALESCE((SELECT cr."label" FROM "call_outcome_reasons" cr WHERE cr."id" = p."lastReasonId"), '')::text AS "lastReasonLabel",
+       EXISTS (SELECT 1 FROM "scheduled_callbacks" sc JOIN "prospects" pr ON pr."id" = sc."prospectId"
+                     WHERE sc."prospectId" = i."prospectId" AND sc."status" = 'PENDING'
+                       AND pr."phase2Status" IS DISTINCT FROM 'APPOINTMENT')::boolean AS "aRappeler"
 FROM "lot_export_items" i
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "scheduled_callbacks" sc JOIN "prospects" pr ON pr."id" = sc."prospectId"
+                     WHERE sc."prospectId" = i."prospectId" AND sc."status" = 'PENDING'
+                       AND pr."phase2Status" IS DISTINCT FROM 'APPOINTMENT') THEN 'A_RAPPELER'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -353,6 +371,9 @@ SELECT COUNT(*)::int FROM "lot_export_items" i
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "scheduled_callbacks" sc JOIN "prospects" pr ON pr."id" = sc."prospectId"
+                     WHERE sc."prospectId" = i."prospectId" AND sc."status" = 'PENDING'
+                       AND pr."phase2Status" IS DISTINCT FROM 'APPOINTMENT') THEN 'A_RAPPELER'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -468,7 +489,8 @@ WHERE p."deletedAt" IS NULL
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean
-       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"))
+       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"
+                    AND lr."code" NOT IN ('INJOIGNABLE_DEFINITIF', 'WRONG_NUMBER')))
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
   -- ne se retire pas : deux attributaires appelleraient la même personne.
   AND (sqlc.arg('injoignables')::boolean
@@ -500,7 +522,8 @@ WHERE p."deletedAt" IS NULL
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean
-       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"))
+       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"
+                    AND lr."code" NOT IN ('INJOIGNABLE_DEFINITIF', 'WRONG_NUMBER')))
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
   -- ne se retire pas : deux attributaires appelleraient la même personne.
   AND (sqlc.arg('injoignables')::boolean

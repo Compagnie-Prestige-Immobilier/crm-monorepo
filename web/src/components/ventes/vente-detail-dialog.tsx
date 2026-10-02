@@ -28,16 +28,22 @@ const espaces = (n: number) => (n === 0 ? '' : n.toLocaleString('fr-FR'));
 
 export function VenteDetailDialog({
   vente,
+  gerer,
   open,
   onOpenChange,
 }: {
   vente: Vente | null;
+  gerer: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   if (!open || vente === null) return null;
-  return <Detail key={vente.id} vente={vente} onFermer={() => onOpenChange(false)} />;
+  return <Detail key={vente.id} vente={vente} gerer={gerer} onFermer={() => onOpenChange(false)} />;
 }
+
+/** Une vente du classeur se solde dans le classeur ; sans « ventes.gerer », rien ne se saisit. */
+const versementSaisissable = (vente: Vente, gerer: boolean): boolean =>
+  gerer && !vente.soldee && !venteDuClasseur(vente);
 
 /** Ce qu'un client verse d'habitude : le reste divisé par les échéances qu'il reste. */
 function montantEcheance(vente: Vente, reste: number): number {
@@ -46,7 +52,15 @@ function montantEcheance(vente: Vente, reste: number): number {
   return Math.ceil(reste / echeancesRestantes);
 }
 
-function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
+function Detail({
+  vente,
+  gerer,
+  onFermer,
+}: {
+  vente: Vente;
+  gerer: boolean;
+  onFermer: () => void;
+}) {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(aujourdhui);
   const [montant, setMontant] = useState(0);
@@ -107,7 +121,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
               déposez-le à nouveau.
             </p>
           ) : null}
-          {vente.soldee || classeur ? null : (
+          {versementSaisissable(vente, gerer) ? (
             <form
               className="flex flex-col gap-3"
               onSubmit={(event) => {
@@ -161,7 +175,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
                 </Button>
               </div>
             </form>
-          )}
+          ) : null}
           <Versements vente={vente} />
         </div>
 

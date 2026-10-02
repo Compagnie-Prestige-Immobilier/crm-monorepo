@@ -18,7 +18,7 @@ type CampagneImport struct {
 	Fiches            int    `json:"fiches"`
 	FichesChues       int    `json:"fichesChues"`
 	FichesGrandPublic int    `json:"fichesGrandPublic"`
-	Appelees          int    `json:"appelees" doc:"Fiches de l'import déjà appelées au moins une fois."`
+	Appelees          int    `json:"appelees" doc:"Fiches de l'import qu'une campagne ne peut plus tirer : appelées, distribuées, perdues ou sur la plateforme."`
 }
 
 // « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 11 sept 2026 », « Leads 13 sept » : seule la date compte et

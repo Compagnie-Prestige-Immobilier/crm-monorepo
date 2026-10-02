@@ -5,6 +5,7 @@ import { Fragment, useState } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { FichePopup } from '@/components/accueil/fiche-popup';
+import { PastilleQualification } from '@/components/prospects/etiquettes-statut';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -200,7 +201,10 @@ export function Groupes({
                       </TableCell>
                       <TableCell>{lieuDe(fiche)}</TableCell>
                       <TableCell>
-                        <Badge variant={etat.ton}>{etat.texte}</Badge>
+                        <span className="inline-flex flex-wrap gap-1.5">
+                          <Badge variant={etat.ton}>{etat.texte}</Badge>
+                          <PastilleQualification qualification={fiche.qualification} />
+                        </span>
                       </TableCell>
                       <TableCell>{actions(fiche)}</TableCell>
                     </TableRow>
@@ -231,7 +235,10 @@ export function Groupes({
                       <p className="font-[600]">
                         <NomFiche fiche={fiche} />
                       </p>
-                      <Badge variant={etat.ton}>{etat.texte}</Badge>
+                      <span className="inline-flex flex-wrap justify-end gap-1.5">
+                        <Badge variant={etat.ton}>{etat.texte}</Badge>
+                        <PastilleQualification qualification={fiche.qualification} />
+                      </span>
                     </div>
                     <p className="text-[0.8125rem] text-muted-foreground">
                       {quandDe(fiche)} · {lieuDe(fiche)}

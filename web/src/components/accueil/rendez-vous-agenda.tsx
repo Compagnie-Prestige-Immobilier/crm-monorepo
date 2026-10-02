@@ -30,6 +30,7 @@ import { FichePopup } from '@/components/accueil/fiche-popup';
 import { ActionsRendezVous } from '@/components/accueil/rendez-vous-actions';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
+import { PastilleQualification } from '@/components/prospects/etiquettes-statut';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -153,9 +154,10 @@ function Bulle({ fiche, onFait }: { fiche: RendezVousObtenu; onFait: () => void 
           {fiche.quand === null ? '' : formatDateTime(fiche.quand)} · {fiche.type}
           {fiche.site === '' ? '' : ` · ${fiche.site}`}
         </p>
-        <Badge variant={etat.ton} className="mt-2">
-          {etat.texte}
-        </Badge>
+        <span className="mt-2 inline-flex flex-wrap gap-1.5">
+          <Badge variant={etat.ton}>{etat.texte}</Badge>
+          <PastilleQualification qualification={fiche.qualification} />
+        </span>
       </div>
       <ActionsRendezVous
         fiche={fiche}

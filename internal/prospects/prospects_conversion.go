@@ -210,14 +210,16 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 	if err != nil {
 		return nil, err
 	}
+	if existant.Statut != db.ProspectStatutCONVERTI {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_NOT_CONVERTI",
+			"Seule une fiche convertie peut être marquée vendue.")
+	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
-		lignes, err := q.MarquerProspectVendu(ctx, in.ID)
-		if err != nil {
+		if _, err := q.MarquerProspectVendu(ctx, in.ID); err != nil {
 			return err
 		}
-		if lignes == 0 {
-			return socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_NOT_CONVERTI",
-				"Seule une fiche convertie peut être marquée vendue.")
+		if err := q.MarquerParcoursVendu(ctx, in.ID); err != nil {
+			return err
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.vendre", prospectEntite, in.ID,
 			map[string]any{prospectChampStatut: string(existant.Statut)},

@@ -35,7 +35,7 @@ const (
 	FeuilleLot      = "Répartition"
 	lotFormatDate   = "dd/mm/yyyy hh:mm"
 
-	lotEnteteTeleconseiller = "Téléconseiller"
+	lotEnteteTeleconseiller = "Saisie par"
 	lotEnteteBanque         = "Banque"
 )
 

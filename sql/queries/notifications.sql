@@ -234,6 +234,9 @@ WHERE "id" = ANY(@ids::text[]) AND "status" = 'SENDING' AND "dispatchClaim" = @c
 SELECT sc."assignedToId" AS "userId", u."fullName", count(*)::int AS total
 FROM "scheduled_callbacks" sc
 JOIN "users" u ON u."id" = sc."assignedToId" AND u."isActive" AND u."deletedAt" IS NULL
+-- Un rendez-vous, même téléphonique, se suit dans l'Accueil : son rappel n'est pas à passer.
+JOIN "prospects" p ON p."id" = sc."prospectId" AND p."deletedAt" IS NULL
+  AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT'
 WHERE sc."status" = 'PENDING' AND sc."scheduledAt" <= @day_end
 GROUP BY 1, 2;
 
@@ -324,8 +327,10 @@ WHERE "status" = 'DONE' AND "updatedAt" >= @debut AND "updatedAt" <= @fin;
 
 -- name: CountCallbacksOverdue :one
 SELECT count(*)::int AS total
-FROM "scheduled_callbacks"
-WHERE "status" = 'PENDING' AND "scheduledAt" <= @now;
+FROM "scheduled_callbacks" sc
+JOIN "prospects" p ON p."id" = sc."prospectId" AND p."deletedAt" IS NULL
+  AND p."phase2Status" IS DISTINCT FROM 'APPOINTMENT'
+WHERE sc."status" = 'PENDING' AND sc."scheduledAt" <= @now;
 
 -- name: ActiveUsersByPermission :many
 SELECT u."id", u."fullName"

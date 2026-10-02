@@ -39,14 +39,14 @@ function couleurCompletion(ratio: number): string {
   return 'text-destructive';
 }
 
-/** La part des fiches déjà appelées : un import vert n'a presque plus rien à donner. */
+/** La part des fiches déjà prises : un import vert n'a presque plus rien à donner. */
 function AnneauCompletion({ lot }: { lot: ImportChoisi }) {
   const ratio = lot.fiches === 0 ? 0 : lot.appelees / lot.fiches;
   const pourcent = Math.round(ratio * 100);
   return (
     <span
       role="img"
-      aria-label={`${String(pourcent)} % des fiches déjà appelées`}
+      aria-label={`${String(pourcent)} % des fiches déjà appelées ou distribuées`}
       className="flex shrink-0 items-center gap-1.5"
     >
       <svg viewBox="0 0 20 20" className={cn('size-5 -rotate-90', couleurCompletion(ratio))}>

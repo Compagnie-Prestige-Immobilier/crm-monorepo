@@ -137,15 +137,17 @@ const enregistrer = (page: Page) =>
 
 /**
  * Une fiche rouverte reprend le brouillon de sa dernière ouverture : quand le
- * dossier est resté rempli, Échap le referme et rend les issues.
+ * dossier est resté rempli, l'étape « Réponse » rend les issues. Échap ne suffit
+ * pas : un champ du dossier qui a pris le focus le garde.
  */
 async function revenirAuxIssues(page: Page): Promise<void> {
-  // La fiche est rendue quand son bouton de copie l'est : avant, Échap
-  // fermerait le dialogue d'ouverture et non le dossier.
   await expect(page.getByRole('button', { name: /^Copier/u })).toBeVisible();
   const issues = page.getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' });
   if (await issues.isVisible()) return;
-  await page.keyboard.press('Escape');
+  await page
+    .getByRole('navigation', { name: 'Progression du formulaire' })
+    .getByRole('button', { name: /^Réponse/u })
+    .click();
   await expect(issues).toBeVisible();
 }
 

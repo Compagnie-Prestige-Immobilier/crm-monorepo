@@ -70,6 +70,10 @@ function buildFiltres(page: number, teleconseillerId: string, etat: string) {
   };
 }
 
+/** Un parrainage Grand Public porte des prospects, comme une campagne de prospects. */
+const cibleDesFiches = (lot: LotExportDetail): LotExportDetail['cible'] =>
+  lot.cible === 'CONTACTS_RECOMMANDES' && lot.projet === 'GRAND_PUBLIC' ? 'PROSPECTS' : lot.cible;
+
 const ficheHref = (fiche: LotExportFiche, cible: LotExportDetail['cible']): string | null => {
   if (fiche.ficheId === null) return null;
   return cible === 'PROSPECTS'
@@ -251,7 +255,7 @@ export function LotExportFiches({
 
         <TableFiches
           peutReaffecter={peutReaffecter}
-          cible={lot.cible}
+          cible={cibleDesFiches(lot)}
           lignes={lignes}
           cochables={lignes}
           cochees={cochees}

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { memo, useCallback, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { useFileDownload } from '@/components/exports/download-button';
@@ -42,6 +43,7 @@ import {
 import { formatDate, formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { peut } from '@/lib/types';
 
 /** Les adresses de la barre : une page chacune, ou une fenêtre ouverte d'emblée. */
 export const VUES_VENTES = [
@@ -70,19 +72,35 @@ function SansVente() {
   );
 }
 
-function SansCredit({ onAjouter }: { onAjouter: () => void }) {
+function SansCredit({ onAjouter }: { onAjouter: (() => void) | undefined }) {
   return (
     <EmptyState
       icon={FileSpreadsheetIcon}
       title="Aucune vente à crédit"
       description="Enregistrez une vente à crédit pour suivre ici ses versements et son reste à payer."
-      action={
-        <Button size="lg" onClick={onAjouter}>
-          <PlusIcon aria-hidden="true" /> Nouvelle vente
-        </Button>
-      }
+      action={<NouvelleVente onAjouter={onAjouter} />}
     />
   );
+}
+
+type Ecriture = {
+  onAjouter?: () => void;
+  onEdit?: (vente: Vente) => void;
+  onArchive?: (vente: Vente) => void;
+};
+const SANS_ECRITURE: Ecriture = {};
+
+function NouvelleVente({ onAjouter }: { onAjouter: (() => void) | undefined }) {
+  if (onAjouter === undefined) return null;
+  return (
+    <Button size="lg" onClick={onAjouter}>
+      <PlusIcon aria-hidden="true" /> Nouvelle vente
+    </Button>
+  );
+}
+
+function DepotSiGere({ gere, remplace }: { gere: boolean; remplace: boolean }) {
+  return gere ? <DepotClasseur remplace={remplace} /> : null;
 }
 
 function venteAvecId(ventes: readonly Vente[], id: number | null): Vente | null {
@@ -132,6 +150,9 @@ function VentesLoaded({
   const [venteAArchiver, setVenteAArchiver] = useState<Vente | null>(null);
   const [teleconseillerOuvert, setTeleconseillerOuvert] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(meQueryOptions);
+  // Sans « ventes.gerer », la page se lit : aucune action d'écriture ne s'affiche.
+  const gerer = peut(user, 'ventes.gerer');
   // Le parcours ouvert depuis la barre ramène à la page d'où il a été ouvert :
   // une adresse `/ventes/nouvelle` restée dans l'historique le rouvrirait au retour.
   const fermerSaisie = useCallback(
@@ -167,6 +188,9 @@ function VentesLoaded({
   }, []);
   const voirDetail = useCallback((vente: Vente) => setVenteDetailId(vente.id), []);
   const archiver = useCallback((vente: Vente) => setVenteAArchiver(vente), []);
+  const ecriture: Ecriture = gerer
+    ? { onAjouter: ajouter, onEdit: modifier, onArchive: archiver }
+    : SANS_ECRITURE;
   return (
     <>
       {vue === 'echeances' ? (
@@ -174,7 +198,7 @@ function VentesLoaded({
           {ventes.some((vente) => vente.modePaiement === 'CREDIT') ? (
             <TableEcheances ventes={ventes} onDetail={voirDetail} />
           ) : (
-            <SansCredit onAjouter={ajouter} />
+            <SansCredit onAjouter={ecriture.onAjouter} />
           )}
         </PageSimple>
       ) : null}
@@ -187,24 +211,19 @@ function VentesLoaded({
       {vue === 'sites' ? <PageSites ventes={ventes} sites={sites} /> : null}
       {vue === 'reglages' ? <PageReglages sites={sites} canaux={canaux} /> : null}
       {PAGES_TABLEAU.has(vue) ? (
-        <PageVentes
-          data={data}
-          sites={sites}
-          onAjouter={ajouter}
-          onEdit={modifier}
-          onDetail={voirDetail}
-          onArchive={archiver}
-        />
+        <PageVentes data={data} sites={sites} {...ecriture} onDetail={voirDetail} />
       ) : null}
 
       <TeleconseillerDetailDialog
         nom={teleconseillerOuvert}
         ventes={ventes}
+        gerer={gerer}
         onFermer={() => setTeleconseillerOuvert(null)}
       />
       <VenteParcours open={saisieOuverte} onOpenChange={fermerSaisie} vente={venteEditee} />
       <VenteDetailDialog
         vente={venteDetail}
+        gerer={gerer}
         open={venteDetail !== null}
         onOpenChange={(open) => {
           if (!open) setVenteDetailId(null);
@@ -265,11 +284,8 @@ const PageVentes = memo(function PageVentes({
 }: {
   data: VentesData;
   sites: readonly SiteVente[];
-  onAjouter: () => void;
-  onEdit: (vente: Vente) => void;
   onDetail: (vente: Vente) => void;
-  onArchive: (vente: Vente) => void;
-}) {
+} & Ecriture) {
   const [recherche, setRecherche] = useState('');
   const telechargement = useFileDownload();
   const { classeur, ventes } = data;
@@ -281,10 +297,8 @@ const PageVentes = memo(function PageVentes({
         description="Enregistrez la première vente en quelques questions, ou importez le classeur Excel existant."
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button size="lg" onClick={onAjouter}>
-              <PlusIcon aria-hidden="true" /> Nouvelle vente
-            </Button>
-            <DepotClasseur remplace={classeur !== null} />
+            <NouvelleVente onAjouter={onAjouter} />
+            <DepotSiGere gere={onAjouter !== undefined} remplace={classeur !== null} />
           </div>
         }
       />
@@ -308,9 +322,7 @@ const PageVentes = memo(function PageVentes({
           />
         </div>
         <SommesDues sites={sites} />
-        <Button size="lg" onClick={onAjouter}>
-          <PlusIcon aria-hidden="true" /> Nouvelle vente
-        </Button>
+        <NouvelleVente onAjouter={onAjouter} />
       </div>
       {data.tronque ? (
         <p className="rounded-md bg-warning-surface p-3 text-warning">
@@ -348,7 +360,7 @@ const PageVentes = memo(function PageVentes({
               <DownloadIcon aria-hidden="true" /> Télécharger le classeur
             </Button>
           )}
-          <DepotClasseur remplace={classeur !== null} />
+          <DepotSiGere gere={onAjouter !== undefined} remplace={classeur !== null} />
         </div>
       </div>
     </div>

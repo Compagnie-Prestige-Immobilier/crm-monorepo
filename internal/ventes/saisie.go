@@ -112,10 +112,8 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 		if err != nil {
 			return err
 		}
-		if preparee.TelephoneE164 != "" {
-			if err := marquerProspectsVendus(ctx, q, acteur, []string{preparee.TelephoneE164}); err != nil {
-				return err
-			}
+		if err := marquerVenduSiTelephone(ctx, q, acteur, preparee.TelephoneE164); err != nil {
+			return err
 		}
 		apres, err := q.VenteParID(ctx, id)
 		if err != nil {
@@ -176,11 +174,7 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 		}); err != nil {
 			return err
 		}
-		apres, err := q.VenteParID(ctx, id)
-		if err != nil {
-			return err
-		}
-		return database.Auditer(ctx, q, acteur, "vente.corriger", "vente", in.ID, venteDTO(&avant, nil), venteDTO(&apres, nil))
+		return correctionTracee(ctx, q, acteur, id, &avant, preparee.TelephoneE164)
 	}); err != nil {
 		return nil, err
 	}
@@ -274,12 +268,57 @@ func (s *service) archiver(ctx context.Context, in *venteIDInput) (*struct{}, er
 		if err := q.ArchiverVente(ctx, db.ArchiverVenteParams{ID: id, ArchiveeParId: &acteur}); err != nil {
 			return err
 		}
+		if err := rendreConvertiesSansVente(ctx, q, acteur, avant.Telephone, s.Cfg.PhoneRegion); err != nil {
+			return err
+		}
 		return database.Auditer(ctx, q, acteur, "vente.archiver", "vente", in.ID, venteDTO(&avant, nil), nil)
 	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
 	return &struct{}{}, nil
+}
+
+// Le numéro corrigé désigne peut-être une autre fiche : elle passe vendue à son tour.
+func correctionTracee(ctx context.Context, q *db.Queries, acteur string, id int64, avant *db.Vente, e164 string) error {
+	if err := marquerVenduSiTelephone(ctx, q, acteur, e164); err != nil {
+		return err
+	}
+	apres, err := q.VenteParID(ctx, id)
+	if err != nil {
+		return err
+	}
+	return database.Auditer(ctx, q, acteur, "vente.corriger", "vente", strconv.FormatInt(id, 10), venteDTO(avant, nil), venteDTO(&apres, nil))
+}
+
+func marquerVenduSiTelephone(ctx context.Context, q *db.Queries, acteur, e164 string) error {
+	if e164 == "" {
+		return nil
+	}
+	return marquerProspectsVendus(ctx, q, acteur, []string{e164})
+}
+
+func rendreConvertiesSansVente(ctx context.Context, q *db.Queries, acteur, telephone, region string) error {
+	// Un numéro illisible ne désigne aucune fiche : l'archivage suit son cours.
+	e164, _ := database.NormaliserTelephone(telephone, region)
+	if e164 == "" {
+		return nil
+	}
+	ids, err := q.RendreConvertiSansVente(ctx, &e164)
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	if err := q.RendreParcoursConverti(ctx, ids); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := database.Auditer(ctx, q, acteur, "prospect.vente_archivee", "prospect", id,
+			map[string]any{champStatut: string(db.ProspectStatutVENDU)},
+			map[string]any{champStatut: string(db.ProspectStatutCONVERTI)}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput, error) {
@@ -290,7 +329,11 @@ func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if _, err := venteDuPanneau(ctx, q, id, true); err != nil {
+		archivee, err := venteDuPanneau(ctx, q, id, true)
+		if err != nil {
+			return err
+		}
+		if err := stockPourRestaurer(ctx, q, &archivee); err != nil {
 			return err
 		}
 		if err := q.RestaurerVente(ctx, id); err != nil {
@@ -298,6 +341,10 @@ func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput
 		}
 		apres, err := q.VenteParID(ctx, id)
 		if err != nil {
+			return err
+		}
+		e164, _ := database.NormaliserTelephone(apres.Telephone, s.Cfg.PhoneRegion)
+		if err := marquerVenduSiTelephone(ctx, q, acteur, e164); err != nil {
 			return err
 		}
 		return database.Auditer(ctx, q, acteur, "vente.restaurer", "vente", in.ID, nil, venteDTO(&apres, nil))
@@ -322,6 +369,15 @@ func (s *service) sortie(ctx context.Context, id int64) (*VenteOutput, error) {
 
 // `avant` est la vente corrigée, nil à la création : une correction garde le
 // site, le canal et l'échéancier qu'elle avait, même retirés ou incomplets depuis.
+func mandataireIncomplet(in *venteInput) bool {
+	nom, prenom := strings.TrimSpace(in.MandataireNom), strings.TrimSpace(in.MandatairePrenom)
+	telephone, cni := strings.TrimSpace(in.MandataireTelephone), strings.TrimSpace(in.MandataireCni)
+	if nom+prenom+telephone+cni == "" {
+		return false
+	}
+	return nom == "" || prenom == "" || telephone == ""
+}
+
 func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, avant *db.Vente) (ventePreparee, error) {
 	contexte, err := contexteVente(ctx, q, in, avant)
 	if err != nil {
@@ -338,6 +394,10 @@ func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, a
 	}
 	if in.Acompte < 0 {
 		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_ACOMPTE_INVALIDE", "L’acompte ne peut pas être négatif.")
+	}
+	if mandataireIncomplet(in) {
+		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_REPRESENTANT_INCOMPLET",
+			"Un client représenté exige le nom, le prénom et le numéro de son représentant.")
 	}
 	echeancier, err := verifierModePaiement(in, avant)
 	if err != nil {
@@ -381,6 +441,20 @@ func (s *service) preparer(ctx context.Context, q *db.Queries, in *venteInput, a
 
 // Le verrou de numérotation sérialise aussi le stock. Une correction qui
 // n'ajoute pas de lot au site passe même si le stock est déjà dépassé.
+// Pendant l'archivage, ses lots ont pu être vendus à d'autres : la restauration revérifie le stock.
+func stockPourRestaurer(ctx context.Context, q *db.Queries, archivee *db.Vente) error {
+	site, err := q.SiteVenteParNom(ctx, archivee.Site)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return verrouillerStock(ctx, q, &ventePreparee{Vente: db.InsererVenteSaisieParams{
+		Site: archivee.Site, NombreLots: archivee.NombreLots,
+	}, TotalLots: site.TotalLots}, nil)
+}
+
 func verrouillerStock(ctx context.Context, q *db.Queries, preparee *ventePreparee, avant *db.Vente) error {
 	if err := q.VerrouNumerotationVentes(ctx); err != nil {
 		return err

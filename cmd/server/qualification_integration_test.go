@@ -839,14 +839,14 @@ func qualificationRappelDansFile(b *banc, portee, prospectID string) *string {
 	return nil
 }
 
-// « RV téléphonique » promet un rappel : la fiche quitte « Reste à appeler »
+// « À rappeler » promet un rappel : la fiche quitte « Reste à appeler »
 // pour la file des rappels, que « Tous » montre même promise pour dans un mois.
 func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
 	quand := time.Now().UTC().AddDate(0, 0, 30)
 	corps := qualificationCorpsTentative(prospect, map[string]any{
-		"reasonCode": "RDV_TELEPHONIQUE",
+		"reasonCode": "CALLBACK",
 		"callbackAt": quand.Format(time.RFC3339Nano),
 	})
 	t.Cleanup(func() {
@@ -854,7 +854,7 @@ func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
 	})
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
-	b.attend(statut, http.StatusOK, "RV téléphonique consigné", body)
+	b.attend(statut, http.StatusOK, "À rappeler consigné", body)
 
 	if motif := qualificationRappelDansFile(b, "week", prospect); motif != nil {
 		t.Fatalf("un rappel promis dans un mois ne tient pas dans la semaine : %q", *motif)
@@ -863,7 +863,7 @@ func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
 	if motif == nil {
 		t.Fatal("« Tous » montre le rappel promis, quelle que soit sa date")
 	}
-	if *motif != "RV téléphonique" {
+	if *motif != "À rappeler" {
 		t.Fatalf("la file nomme la qualification qui a promis le rappel : %q", *motif)
 	}
 	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")

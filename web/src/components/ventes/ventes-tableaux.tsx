@@ -190,8 +190,8 @@ export function TableVentes({
 }: {
   ventes: readonly Vente[];
   onDetail?: (vente: Vente) => void;
-  onEdit?: (vente: Vente) => void;
-  onArchive?: (vente: Vente) => void;
+  onEdit?: ((vente: Vente) => void) | undefined;
+  onArchive?: ((vente: Vente) => void) | undefined;
 }) {
   return (
     <Table containerClassName={TABLE_CONTAINER}>

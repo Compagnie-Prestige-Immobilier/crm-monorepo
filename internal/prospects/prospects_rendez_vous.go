@@ -79,7 +79,8 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 	if err := suiviRendezVousRefus(b.Issue, b.ReporteAt, b.SuiteRencontre, b.Commentaire, b.RecontacterLe); err != nil {
 		return nil, err
 	}
-	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
+	fiche, err := s.prospectLire(ctx, &u, in.ID)
+	if err != nil {
 		return nil, err
 	}
 	var reporteAt *time.Time
@@ -88,11 +89,15 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 		reporteAt = &utc
 	}
 	issue, note := issueEnregistree(b.Issue, b.ReporteAt, b.Commentaire)
-	err := s.prospectTx(ctx, func(q *db.Queries) error {
+	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		avant, err := q.SuivreRendezVous(ctx, db.SuivreRendezVousParams{
 			Issue: issue, ReporteAt: reporteAt, Suite: b.SuiteRencontre, ID: in.ID,
 			Note: note, RecontacterLe: dateFacultative(b.RecontacterLe), Par: &u.ID,
 		})
+		if errors.Is(err, pgx.ErrNoRows) && fiche.Phase2Status == string(db.Phase2StatusAPPOINTMENT) {
+			return socle.Problem(http.StatusConflict, "RENDEZ_VOUS_GESTE_REFUSE",
+				"Un rendez-vous annulé ne se note plus, et un RV téléphonique non joint se reporte.")
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return socle.Problem(http.StatusUnprocessableEntity, "RENDEZ_VOUS_ABSENT", "Cette fiche n'est pas classée en rendez-vous.")
 		}
@@ -220,7 +225,8 @@ func (s *service) closingEnregistrer(ctx context.Context, in *ClosingEnregistrer
 	if err != nil {
 		return nil, err
 	}
-	if fiche.RendezVousIssue == nil || *fiche.RendezVousIssue != prospectIssueHonore {
+	annule := fiche.RendezVousConfirmation != nil && *fiche.RendezVousConfirmation == "ANNULE"
+	if fiche.RendezVousIssue == nil || *fiche.RendezVousIssue != prospectIssueHonore || annule {
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "CLOSING_SANS_PRESENCE", "Le closing se remplit après un rendez-vous où le prospect était présent.")
 	}
 	b := &in.Body

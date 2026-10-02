@@ -15,6 +15,7 @@ import { SearchField } from '@/components/filters/search-field';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
+import { PastilleQualification } from '@/components/prospects/etiquettes-statut';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ListeCartes, NumeroAppel } from '@/components/ui/liste-cartes';
@@ -762,7 +763,12 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
                   </Badge>
                 )}
               </TableCell>
-              <TableCell>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</TableCell>
+              <TableCell>
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  {PHASE2_STATUS_LABELS[prospect.phase2Status]}
+                  <PastilleQualification qualification={prospect.qualificationClosing} />
+                </span>
+              </TableCell>
               <TableCell>
                 <DateRendezVous at={prospect.dateRendezVous} vide={SANS_VALEUR} />
               </TableCell>

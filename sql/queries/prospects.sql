@@ -13,6 +13,7 @@ SELECT
   rv."fullName" AS revue_by_name,
   lc."fullName" AS last_call_by_name,
   sq.label AS statut_qualification,
+  COALESCE(cl."qualification", '')::text AS qualification_closing,
   cp.label AS canal_label,
   pf.label AS profession_label,
   pf."isTeaching" AS profession_is_teaching,
@@ -61,6 +62,7 @@ LEFT JOIN "users" ec ON ec."id" = p."enrollmentCapturedById"
 LEFT JOIN "users" rv ON rv."id" = p."revueById"
 LEFT JOIN "users" lc ON lc."id" = p."lastCallById"
 LEFT JOIN "call_outcome_reasons" sq ON sq."id" = p."lastReasonId"
+LEFT JOIN "rendez_vous_closings" cl ON cl."prospectId" = p."id"
 LEFT JOIN "canaux_provenance" cp ON cp."id" = p."canalProvenanceId"
 LEFT JOIN "professions" pf ON pf."id" = p."professionId"
 LEFT JOIN "income_bands" ib ON ib."id" = p."incomeBandId"
@@ -226,9 +228,7 @@ WHERE p."deletedAt" IS NULL
        OR (sqlc.narg('rendez_vous_issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)
        OR p."rendezVousIssue" = sqlc.narg('rendez_vous_issue')::text)
   AND (sqlc.narg('avec_rdv')::boolean IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" ar
-                  WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)
-          = sqlc.narg('avec_rdv')::boolean)
+       OR (public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") IS NOT NULL) = sqlc.narg('avec_rdv')::boolean)
   -- « Avec commentaire » lit le DERNIER appel, comme la colonne : un ancien
   -- commentaire écrasé par un appel muet ne compte plus.
   AND (sqlc.narg('avec_commentaire')::boolean IS NULL
@@ -240,11 +240,9 @@ WHERE p."deletedAt" IS NULL
                     AND NULLIF(btrim(ac."comment"), '') IS NOT NULL)
           = sqlc.narg('avec_commentaire')::boolean)
   AND (sqlc.narg('rdv_from')::timestamp IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" rf
-                  WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= sqlc.narg('rdv_from')::timestamp))
+       OR public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") >= sqlc.narg('rdv_from')::timestamp)
   AND (sqlc.narg('rdv_to')::timestamp IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" rt
-                  WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= sqlc.narg('rdv_to')::timestamp))
+       OR public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") <= sqlc.narg('rdv_to')::timestamp)
   AND (sqlc.narg('date_from')::timestamp IS NULL OR p."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR p."clientCreatedAt" <= sqlc.narg('date_to')::timestamp)
   AND (
@@ -423,9 +421,7 @@ WHERE p."deletedAt" IS NULL
        OR (sqlc.narg('rendez_vous_issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)
        OR p."rendezVousIssue" = sqlc.narg('rendez_vous_issue')::text)
   AND (sqlc.narg('avec_rdv')::boolean IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" ar
-                  WHERE ar."prospectId" = p."id" AND ar."rendezVousAt" IS NOT NULL)
-          = sqlc.narg('avec_rdv')::boolean)
+       OR (public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") IS NOT NULL) = sqlc.narg('avec_rdv')::boolean)
   -- « Avec commentaire » lit le DERNIER appel, comme la colonne : un ancien
   -- commentaire écrasé par un appel muet ne compte plus.
   AND (sqlc.narg('avec_commentaire')::boolean IS NULL
@@ -437,11 +433,9 @@ WHERE p."deletedAt" IS NULL
                     AND NULLIF(btrim(ac."comment"), '') IS NOT NULL)
           = sqlc.narg('avec_commentaire')::boolean)
   AND (sqlc.narg('rdv_from')::timestamp IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" rf
-                  WHERE rf."prospectId" = p."id" AND rf."rendezVousAt" >= sqlc.narg('rdv_from')::timestamp))
+       OR public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") >= sqlc.narg('rdv_from')::timestamp)
   AND (sqlc.narg('rdv_to')::timestamp IS NULL
-       OR EXISTS (SELECT 1 FROM "call_attempts" rt
-                  WHERE rt."prospectId" = p."id" AND rt."rendezVousAt" <= sqlc.narg('rdv_to')::timestamp))
+       OR public.prospect_date_rendez_vous(p."id", p."phase2Status"::text, p."rendezVousReporteAt") <= sqlc.narg('rdv_to')::timestamp)
   AND (sqlc.narg('date_from')::timestamp IS NULL OR p."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR p."clientCreatedAt" <= sqlc.narg('date_to')::timestamp)
   AND (
@@ -532,6 +526,19 @@ WHERE "id" = $1 AND "statut" <> 'VENDU' AND "deletedAt" IS NULL;
 UPDATE "prospect_journeys" j SET "statut" = 'VENDU', "convertedAt" = COALESCE(j."convertedAt", now())
 FROM "prospects" p
 WHERE j."prospectId" = p."id" AND p."id" = $1 AND j."projet" = p."projet";
+
+-- Une vente archivée rend la fiche convertie, sauf si une autre vente active porte son numéro.
+-- name: RendreConvertiSansVente :many
+UPDATE "prospects" p SET "statut" = 'CONVERTI', "rev" = p."rev" + 1
+WHERE p."phoneE164" = @telephone AND p."statut" = 'VENDU' AND p."deletedAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "ventes" v
+                  WHERE v."archiveeLe" IS NULL AND regexp_replace(v."telephone", '\D', '', 'g') <> ''
+                    AND p."phoneE164" LIKE '%' || regexp_replace(v."telephone", '\D', '', 'g'))
+RETURNING p."id";
+
+-- name: RendreParcoursConverti :exec
+UPDATE "prospect_journeys" SET "statut" = 'CONVERTI'
+WHERE "prospectId" = ANY(@ids::text[]) AND "statut" = 'VENDU';
 
 -- Les clients d'un téléconseiller : ses contacts vendus, avec la vente
 -- rapprochée par téléphone.
@@ -919,6 +926,10 @@ UPDATE "prospects" p SET
   "rev" = p."rev" + 1, "updatedAt" = now()
 FROM "prospects" avant
 WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+  AND NOT (sqlc.arg('issue')::text IN ('HONORE', 'NON_HONORE') AND avant."rendezVousConfirmation" IS NOT DISTINCT FROM 'ANNULE')
+  -- Non joint, un RV téléphonique se reporte : il ne sort que par une annulation.
+  AND NOT (sqlc.arg('issue')::text = 'NON_HONORE' AND EXISTS (
+    SELECT 1 FROM "call_outcome_reasons" r WHERE r."id" = p."lastReasonId" AND r."code" = 'RDV_TELEPHONIQUE'))
 RETURNING avant."rendezVousIssue" AS issue_avant, avant."rendezVousConfirmation" AS confirmation_avant,
   avant."suiteRencontre" AS suite_avant;
 

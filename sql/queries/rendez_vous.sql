@@ -1,4 +1,5 @@
 -- name: RendezVousObtenus :many
+-- Un closing ne clôt le rendez-vous qu'une fois sa qualification posée.
 -- Un rappel annulé garde la date du rendez-vous ; un rappel supplanté ne la donne jamais. Un report la remplace.
 WITH dates AS (
   SELECT p."id", COALESCE(p."rendezVousReporteAt", (
@@ -10,7 +11,7 @@ WITH dates AS (
   WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
 ), rdv AS (
   SELECT d."id", d."quand", public.rendez_vous_etape(d."quand", p."rendezVousConfirmation", p."rendezVousIssue",
-    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = d."id"), @debut_jour::timestamp)::text AS "etape"
+    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = d."id" AND c."qualification" <> ''), @debut_jour::timestamp)::text AS "etape"
   FROM dates d JOIN "prospects" p ON p."id" = d."id"
 )
 SELECT
@@ -43,12 +44,14 @@ SELECT
   COALESCE(to_char(p."rendezVousRecontacterLe", 'YYYY-MM-DD'), '')::text AS "recontacterLe",
   COALESCE(to_char(p."rendezVousRecontacterAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "recontacterAt",
   COALESCE(rp."fullName", '')::text AS "recontacterPar",
+  COALESCE(cl."qualification", '')::text AS "qualification",
   count(*) OVER () AS "total"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 JOIN rdv ON rdv."id" = p."id"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
 LEFT JOIN "users" rp ON rp."id" = p."rendezVousRecontacterPar"
+LEFT JOIN "rendez_vous_closings" cl ON cl."prospectId" = p."id"
 LEFT JOIN LATERAL (
   SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire", a."rvExterneType", a."rvExternePrecision"
   FROM "call_attempts" a
@@ -56,9 +59,7 @@ LEFT JOIN LATERAL (
 ) dernier ON true
 LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
 LEFT JOIN "points_rencontre" pr ON pr."id" = dernier."pointRencontreId"
--- Le comptoir ne reçoit pas les rendez-vous téléphoniques ; la fiche, elle, les montre.
-WHERE (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT NULL)
-  AND (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id')::text)
+WHERE (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id')::text)
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
   AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text
        OR (sqlc.narg('etape')::text = 'A_TRAITER' AND rdv."etape" <> 'HISTORIQUE'))
@@ -86,14 +87,13 @@ SELECT public.rendez_vous_etape(
       ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
     )),
     p."rendezVousConfirmation", p."rendezVousIssue",
-    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id"), @debut_jour::timestamp
+    EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id" AND c."qualification" <> ''), @debut_jour::timestamp
   )::text AS "etape",
   count(*)::bigint AS "nombre"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 WHERE p."deletedAt" IS NULL
   AND p."phase2Status" = 'APPOINTMENT'
-  AND r."code" <> 'RDV_TELEPHONIQUE'
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
 GROUP BY 1;
 

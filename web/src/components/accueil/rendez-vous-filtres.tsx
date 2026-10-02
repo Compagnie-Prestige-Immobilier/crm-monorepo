@@ -18,6 +18,7 @@ const TYPES: readonly { value: string; label: string }[] = [
   { value: 'RV_CPI', label: 'RV CPI' },
   { value: 'RV_SITE', label: 'RV site' },
   { value: 'RV_EXTERNE', label: 'RV externe' },
+  { value: 'RDV_TELEPHONIQUE', label: 'RV téléphonique' },
 ];
 
 export function BarreRendezVous({

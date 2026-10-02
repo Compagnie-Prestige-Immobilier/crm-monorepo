@@ -97,9 +97,8 @@ async function retablirRappel(id: string): Promise<Rappel> {
   );
 }
 
-/** Un rendez-vous fixé ne se reporte ni ne s'annule d'ici ; un rendez-vous téléphonique reste un rappel. */
-export const rendezVousFixe = (callback: Rappel): boolean =>
-  callback.rendezVous && callback.reasonCode !== 'RDV_TELEPHONIQUE';
+/** Un rendez-vous, même téléphonique, ne se reporte ni ne s'annule d'ici : il vit dans l'Accueil. */
+export const rendezVousFixe = (callback: Rappel): boolean => callback.rendezVous;
 
 export function useAnnulationRappel() {
   const queryClient = useQueryClient();

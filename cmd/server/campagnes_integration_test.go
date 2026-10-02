@@ -428,6 +428,10 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	if len(repartition) != 1 {
 		t.Fatalf("le retiré sort de l'équipe : %v", body["repartition"])
 	}
+	hors, _ := body["horsEquipe"].([]any)
+	if len(hors) != 1 || hors[0].(map[string]any)["teleconseillerId"] != b.agentA {
+		t.Fatalf("le retiré reste lisible avec sa fiche traitée : %v", body["horsEquipe"])
+	}
 	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
 		map[string]any{"teleconseillerId": b.agentB})
 	b.attend(statut, http.StatusUnprocessableEntity, "retrait du dernier téléconseiller", body)
@@ -893,6 +897,8 @@ func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	jamaisAppelee := b.prospect(feuille, "CHUES", nil, "NOUVEAU")
 	aRelancer := b.prospect(feuille, "CHUES", &injoignable, "NOUVEAU")
 	b.prospect(feuille, "CHUES", &injoignable, "PERDU")
+	definitif := "INJOIGNABLE_DEFINITIF"
+	b.prospect(feuille, "CHUES", &definitif, "NOUVEAU")
 	b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
 
 	corps := func(projet string, injoignables bool) map[string]any {
@@ -933,8 +939,27 @@ func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	b.attend(statut, http.StatusCreated, "campagne des injoignables", body)
 	relance, _ := body["id"].(string)
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, relance) })
-	if !b.dansLeLot(relance, aRelancer) {
-		t.Fatal("la relance des injoignables reprend la fiche déjà appelée")
+	if !b.dansLeLot(relance, aRelancer) || body["itemCount"] != float64(1) {
+		t.Fatalf("la relance reprend l'injoignable, jamais l'injoignable définitif : %v", body)
+	}
+	b.ficheARappeler(lotID, jamaisAppelee)
+}
+
+// Une fiche dont le rappel attend se lit « À rappeler » dans sa campagne de prospects.
+func (b *bancCampagne) ficheARappeler(lotID, prospectID string) {
+	b.t.Helper()
+	if _, err := b.pool.Exec(b.ctx, `INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","status","updatedAt")
+		VALUES ($1,$2,$3,now() + interval '1 day','PENDING',now())`, uuid.NewString(), prospectID, b.userID); err != nil {
+		b.t.Fatal(err)
+	}
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospectID)
+	})
+	statut, body := b.appelCampagne(http.MethodGet, "/api/v1/lots-export/"+lotID+"/fiches?etat=A_RAPPELER", nil)
+	b.attend(statut, http.StatusOK, "fiches à rappeler", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		b.t.Fatalf("la fiche au rappel en attente se lit à rappeler : %v", body)
 	}
 }
 

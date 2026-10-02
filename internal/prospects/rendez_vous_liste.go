@@ -46,10 +46,11 @@ type RendezVousObtenu struct {
 	RecontacterLe             string  `json:"recontacterLe" doc:"AAAA-MM-JJ, vide si aucune date n'a été choisie."`
 	RecontacterAt             string  `json:"recontacterAt"`
 	RecontacterPar            string  `json:"recontacterPar"`
+	Qualification             string  `json:"qualification" doc:"La qualification posée au closing, vide avant."`
 }
 
 type RendezVousListInput struct {
-	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE."`
+	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE, RDV_TELEPHONIQUE."`
 	Search   string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
 	Etape    string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,A_RECONTACTER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
 	Du       string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
@@ -126,6 +127,7 @@ func rendezVousDe(l *db.RendezVousObtenusRow) RendezVousObtenu {
 		Issue: l.Issue, Confirmation: l.Confirmation, Reporte: l.Reporte, Etape: l.Etape, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
 		PointRencontreCommentaire: l.PointRencontreCommentaire,
 		RecontacterNote:           l.RecontacterNote, RecontacterLe: l.RecontacterLe, RecontacterAt: l.RecontacterAt, RecontacterPar: l.RecontacterPar,
+		Qualification: l.Qualification,
 	}
 }
 

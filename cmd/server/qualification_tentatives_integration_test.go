@@ -66,8 +66,8 @@ func TestRappelAnnuleSeRetablit(t *testing.T) {
 	}
 }
 
-// Un rendez-vous physique part au chargé de clientèle ; un RDV téléphonique reste un rappel du téléconseiller.
-func TestRappelsGardentSeulementLesRendezVousTelephoniques(t *testing.T) {
+// Un rendez-vous, même téléphonique, part au chargé de clientèle : il quitte les rappels du téléconseiller.
+func TestRappelsSansRendezVous(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
 	fiches := map[string]string{}
@@ -91,12 +91,10 @@ func TestRappelsGardentSeulementLesRendezVousTelephoniques(t *testing.T) {
 		id, _ := ligne["prospectId"].(string)
 		lignes[id] = ligne
 	}
-	if _, ok := lignes[fiches["RV_CPI"]]; ok {
-		t.Fatal("un RV CPI ne doit plus figurer dans les rappels du téléconseiller")
-	}
-	telephonique, ok := lignes[fiches["RDV_TELEPHONIQUE"]]
-	if rendezVous, _ := telephonique["rendezVous"].(bool); !ok || !rendezVous || telephonique["reasonCode"] != "RDV_TELEPHONIQUE" {
-		t.Fatalf("le RDV téléphonique reste un rappel marqué rendez-vous : %v", telephonique)
+	for motif, fiche := range fiches {
+		if _, ok := lignes[fiche]; ok {
+			t.Fatalf("un %s ne figure pas dans les rappels du téléconseiller", motif)
+		}
 	}
 }
 

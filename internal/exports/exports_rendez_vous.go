@@ -17,7 +17,7 @@ const (
 )
 
 var entetesRendezVous = []string{
-	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Étape", "Pris le", "Pris par",
+	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Étape", "Qualification du closing", "Pris le", "Pris par",
 	"Site", "Point de rencontre", "Précision du point", "À recontacter : ce qu'a dit la personne", "Recontacter le",
 }
 
@@ -74,14 +74,14 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille("Rendez-vous", entetesRendezVous,
-		[]float64{20, 30, 18, 16, 14, 20, 26, 20, 26, 30, 40, 14}, map[int]int{3: c.texte})
+		[]float64{20, 30, 18, 16, 14, 20, 20, 26, 20, 26, 30, 40, 14}, map[int]int{3: c.texte})
 	if err != nil {
 		return nil, err
 	}
 	for i := range lignes {
 		ligne := &lignes[i]
 		if err := f.ecrire(quandLisible(ligne.Quand, s.Cfg.TimeZone), ligne.Prenom+" "+ligne.Nom,
-			exportCelluleTexte(ligne.PhoneE164), ligne.Type, etapeLisible(ligne),
+			exportCelluleTexte(ligne.PhoneE164), ligne.Type, etapeLisible(ligne), ligne.Qualification,
 			c.horodate(ligne.LastCallAt), ligne.PrisPar, ligne.Site, ligne.PointRencontre,
 			ligne.PointRencontreCommentaire, ligne.RecontacterNote, ligne.RecontacterLe); err != nil {
 			return nil, err
