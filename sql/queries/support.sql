@@ -157,3 +157,9 @@ DELETE FROM "support_categories";
 -- name: SupportCategorieEnregistree :exec
 INSERT INTO "support_categories" ("id", "nom") VALUES ($1, $2)
 ON CONFLICT ("id") DO UPDATE SET "nom" = EXCLUDED."nom", "releveAt" = CURRENT_TIMESTAMP;
+
+-- name: SupportNumerosPilotage :many
+SELECT "numeroGlpi"::int AS numero FROM "support_signalements"
+WHERE "auteurId" = @auteur_id AND "auteurPilotage" AND "numeroGlpi" IS NOT NULL
+ORDER BY "createdAt" DESC
+LIMIT @prendre::bigint;
