@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2Icon } from 'lucide-react';
+import { DownloadIcon, Loader2Icon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
+  exporterTickets,
   libelleEtat,
   lireSignalements,
   reprendreSignalement,
@@ -76,16 +77,50 @@ export function SuiviSignalements({ ouvert }: { ouvert: boolean }) {
   });
 
   const liste = signalements.data ?? [];
-  if (liste.length === 0) return null;
   return (
-    <section className="border-t pt-3">
-      <h3 className="text-[0.8125rem] font-medium">Vos signalements récents</h3>
-      <ul className="mt-1">
-        {liste.slice(0, 5).map((s) => (
-          <Ligne key={s.id} signalement={s} reprendre={() => reprise.mutate(s.id)} />
-        ))}
-      </ul>
+    <section className="flex flex-col gap-2 border-t pt-3">
+      {liste.length === 0 ? null : (
+        <>
+          <h3 className="text-[0.8125rem] font-medium">Vos signalements récents</h3>
+          <ul>
+            {liste.slice(0, 5).map((s) => (
+              <Ligne key={s.id} signalement={s} reprendre={() => reprise.mutate(s.id)} />
+            ))}
+          </ul>
+        </>
+      )}
+      <ExportTickets />
     </section>
+  );
+}
+
+function ExportTickets() {
+  const exporter = useMutation({
+    mutationFn: exporterTickets,
+    onError: (error) => {
+      toastApiError(error, "L'export a échoué. Réessayez.");
+    },
+  });
+  return (
+    <div className="flex flex-wrap gap-2">
+      {(['pdf', 'xlsx'] as const).map((format) => (
+        <Button
+          key={format}
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={exporter.isPending}
+          onClick={() => exporter.mutate(format)}
+        >
+          {exporter.isPending && exporter.variables === format ? (
+            <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <DownloadIcon className="size-4" aria-hidden="true" />
+          )}
+          {format === 'pdf' ? 'Exporter en PDF' : 'Exporter en Excel'}
+        </Button>
+      ))}
+    </div>
   );
 }
 

@@ -64,3 +64,18 @@ export async function lireCategoriesSupport(): Promise<{ value: string; label: s
   const categories = unwrap(await getApiClient().GET('/api/v1/support/categories'));
   return categories.map((c) => ({ value: String(c.id), label: c.nom }));
 }
+
+export async function exporterTickets(format: 'pdf' | 'xlsx'): Promise<void> {
+  const fichier = unwrap(
+    await getApiClient().GET('/api/v1/support/tickets/export', {
+      params: { query: { format } },
+      parseAs: 'blob',
+    }),
+  );
+  const url = URL.createObjectURL(fichier);
+  const ancre = document.createElement('a');
+  ancre.href = url;
+  ancre.download = `tickets-support.${format}`;
+  ancre.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}

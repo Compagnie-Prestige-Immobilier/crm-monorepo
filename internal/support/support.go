@@ -40,6 +40,7 @@ var Garde = map[string]socle.Permission{
 	"POST " + cheminTickets:                       socle.PermissionSupportSignaler,
 	"GET " + cheminTickets:                        socle.PermissionSupportSignaler,
 	"GET " + cheminTicket:                         socle.PermissionSupportSignaler,
+	"GET " + cheminExport:                         socle.PermissionSupportSignaler,
 	"POST " + cheminReprendre:                     socle.PermissionSupportSignaler,
 	"POST " + cheminRattacher:                     socle.PermissionExploitationAdministrer,
 	"GET /api/v1/support/categories":              socle.PermissionSupportSignaler,
@@ -84,6 +85,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "categoriesSupport", Method: http.MethodGet, Path: "/api/v1/support/categories",
 		Summary: "Les catégories GLPI proposées au demandeur.",
 	}, s.categories)
+	monterExport(api, s)
 	monterKairo(api, s)
 }
 
