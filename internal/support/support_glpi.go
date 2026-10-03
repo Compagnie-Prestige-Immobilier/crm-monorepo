@@ -147,6 +147,25 @@ func (g glpi) ticketDeLaReference(ctx context.Context, session, reference string
 	return 0, nil
 }
 
+// Options de recherche GLPI : titre, priorité, catégorie, type, ouverture,
+// description. Le numéro (2) revient toujours.
+var champsExportes = []string{"1", "3", "7", "14", "15", "21"}
+
+func (g glpi) chercherTickets(ctx context.Context, session string, criteres url.Values, prendre int) (total int, lignes []map[string]any, err error) {
+	for i, champ := range champsExportes {
+		criteres.Set(fmt.Sprintf("forcedisplay[%d]", i), champ)
+	}
+	criteres.Set("sort", "2")
+	criteres.Set("order", "DESC")
+	criteres.Set(plageGlpi, fmt.Sprintf("0-%d", prendre-1))
+	var trouve struct {
+		Total int              `json:"totalcount"`
+		Data  []map[string]any `json:"data"`
+	}
+	err = g.appeler(ctx, session, http.MethodGet, "/search/Ticket?"+criteres.Encode(), "", nil, &trouve)
+	return trouve.Total, trouve.Data, err
+}
+
 // Un administrateur signale au nom du pilotage ; les autres sous leur compte, créé au besoin avec
 // l'identifiant du panneau, que la connexion unique à GLPI retrouve ensuite.
 func (g glpi) demandeur(ctx context.Context, session string, d *demande) (int, error) {
