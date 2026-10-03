@@ -480,6 +480,7 @@
   "GET /api/v1/supervision/representants/qualite": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/support/categories": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/support/tickets": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/support/tickets/export": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/support/tickets/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/tableaux-de-bord/amorces": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/tableaux-de-bord/{ecran}/disposition": [
