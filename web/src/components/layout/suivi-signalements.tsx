@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DownloadIcon, Loader2Icon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useFileDownload } from '@/components/exports/download-button';
 import {
-  exporterTickets,
   libelleEtat,
   lireSignalements,
   reprendreSignalement,
@@ -95,12 +95,7 @@ export function SuiviSignalements({ ouvert }: { ouvert: boolean }) {
 }
 
 function ExportTickets() {
-  const exporter = useMutation({
-    mutationFn: exporterTickets,
-    onError: (error) => {
-      toastApiError(error, "L'export a échoué. Réessayez.");
-    },
-  });
+  const { pending, download } = useFileDownload();
   return (
     <div className="flex flex-wrap gap-2">
       {(['pdf', 'xlsx'] as const).map((format) => (
@@ -109,10 +104,16 @@ function ExportTickets() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={exporter.isPending}
-          onClick={() => exporter.mutate(format)}
+          disabled={pending}
+          onClick={() =>
+            void download({
+              url: `/api/v1/support/tickets/export?format=${format}`,
+              fileName: `tickets-support.${format}`,
+              failureMessage: "L'export a échoué. Réessayez.",
+            })
+          }
         >
-          {exporter.isPending && exporter.variables === format ? (
+          {pending ? (
             <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
           ) : (
             <DownloadIcon className="size-4" aria-hidden="true" />
