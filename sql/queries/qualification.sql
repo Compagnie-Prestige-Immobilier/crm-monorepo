@@ -256,6 +256,7 @@ UPDATE "prospects" SET
   "rendezVousConfirmation" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousConfirmation" END,
   "rendezVousReporteAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousReporteAt" END,
   "suiteRencontre" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "suiteRencontre" END,
+  "rendezVousCommentaire" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousCommentaire" END,
   "rendezVousRecontacterNote" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterNote" END,
   "rendezVousRecontacterLe" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterLe" END,
   "rendezVousRecontacterAt" = CASE WHEN CAST(@phase2_status AS text) = 'APPOINTMENT' THEN NULL ELSE "rendezVousRecontacterAt" END,

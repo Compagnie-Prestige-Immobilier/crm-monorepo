@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Slider } from '@/components/ui/slider';
 import { PROSPECT_TYPES, PROSPECT_TYPE_LABELS } from '@/lib/data/grand-public';
 import {
   campagnesPath,
@@ -136,7 +137,7 @@ const TETE: Record<CleRepresentants, string> = {
 const TOUS = 'TOUS';
 const PROSPECTS_VIVANTS = { includeDeleted: false } as const;
 const FICHES_PAR_JOUR_DEFAUT = 50;
-const JOURS_DEFAUT = 1;
+const JOURS_MAX = 10;
 
 type Etape = 1 | 2 | 3;
 const ETAPES: readonly { id: Etape; titre: string }[] = [
@@ -187,22 +188,28 @@ function entierBorne(saisie: string, defaut: number, min: number, max: number): 
 
 const pluriel = (n: number, mot: string) => `${formatNumber(n)} ${mot}${n > 1 ? 's' : ''}`;
 
+function volumeEtDuree(eligible: number | null, capaciteJour: number, volumeSaisi: number | null) {
+  const plafond = Math.max(1, Math.min(eligible ?? 1, capaciteJour * JOURS_MAX));
+  const volume = Math.min(plafond, volumeSaisi ?? plafond);
+  return { plafond, volume, jours: Math.max(1, Math.ceil(volume / Math.max(1, capaciteJour))) };
+}
+
 function texteApercu(
-  apercu: LotExportPreview,
+  eligible: number,
+  volume: number,
   fichesParJour: number,
   jours: number,
   equipeCount: number,
 ): string {
-  const { eligible, places, parTeleconseiller } = apercu;
   if (eligible === 0) return 'Aucune fiche ne correspond aux critères.';
-  const duree = pluriel(jours, 'jour');
-  if (eligible < places) {
-    const parJour = Math.max(1, Math.ceil(parTeleconseiller / jours));
-    return `Seulement ${pluriel(eligible, 'fiche')} pour ${pluriel(equipeCount, 'personne')} : chacun aura ${parJour} par jour sur ${duree}, pas ${fichesParJour}. Décochez des personnes ou baissez le chiffre.`;
-  }
-  const rythme = `chacun aura ${fichesParJour} fiches par jour sur ${duree}`;
-  if (eligible === places) return `${pluriel(eligible, 'fiche')} : ${rythme}.`;
-  return `${pluriel(eligible, 'fiche')} disponibles pour ${formatNumber(places)} places : ${rythme}, ${formatNumber(eligible - places)} attendront la prochaine campagne.`;
+  const parPersonne = Math.ceil(volume / equipeCount);
+  const rythme =
+    parPersonne < fichesParJour
+      ? `environ ${parPersonne} par personne, en un jour`
+      : `${fichesParJour} par personne et par jour pendant ${pluriel(jours, 'jour')}`;
+  const reste = eligible - volume;
+  const suite = reste > 0 ? ` ${pluriel(reste, 'fiche')} resteront pour une autre campagne.` : '';
+  return `${pluriel(volume, 'fiche')} sur ${formatNumber(eligible)} : ${rythme}.${suite}`;
 }
 
 type Critere = { corps: Omit<CreateLotExportInput, 'name' | 'distribution'>; etiquette: string };
@@ -729,6 +736,59 @@ function ListeTeleconseillers({
   );
 }
 
+function ChoixDuVolume({
+  volume,
+  plafond,
+  eligible,
+  jours,
+  setVolumeSaisi,
+}: {
+  volume: number;
+  plafond: number;
+  eligible: number;
+  jours: number;
+  setVolumeSaisi: (v: number | null) => void;
+}) {
+  const libelleId = useId();
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p id={libelleId} className="text-[0.9375rem] font-[600]">
+          Fiches à distribuer
+        </p>
+        <p className="text-[0.875rem] text-muted-foreground tabular-nums">
+          <span className="text-[1.25rem] font-[600] text-foreground">{formatNumber(volume)}</span>{' '}
+          sur {formatNumber(eligible)} · {pluriel(jours, 'jour')}
+        </p>
+      </div>
+      <Slider
+        aria-labelledby={libelleId}
+        min={1}
+        max={plafond}
+        value={volume}
+        disabled={plafond <= 1}
+        onValueChange={(valeur) => setVolumeSaisi(valeur)}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {eligible > plafond
+            ? `${JOURS_MAX} jours au plus : le reste ira dans une autre campagne.`
+            : 'La durée suit le volume choisi.'}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={volume === plafond}
+          onClick={() => setVolumeSaisi(null)}
+        >
+          {eligible > plafond ? `Maximum (${formatNumber(plafond)})` : 'Tout distribuer'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function Step2Equipe({
   teleconseillers,
   chargement,
@@ -738,8 +798,11 @@ function Step2Equipe({
   onChangeDecoches,
   fichesParJourSaisi,
   setFichesParJourSaisi,
-  joursSaisi,
-  setJoursSaisi,
+  volume,
+  plafond,
+  eligible,
+  jours,
+  setVolumeSaisi,
   apercu,
 }: {
   teleconseillers: readonly Teleconseiller[] | undefined;
@@ -750,8 +813,11 @@ function Step2Equipe({
   onChangeDecoches: (decoches: readonly string[]) => void;
   fichesParJourSaisi: string;
   setFichesParJourSaisi: (v: string) => void;
-  joursSaisi: string;
-  setJoursSaisi: (v: string) => void;
+  volume: number;
+  plafond: number;
+  eligible: number | null;
+  jours: number;
+  setVolumeSaisi: (v: number | null) => void;
   apercu: React.ReactNode;
 }) {
   const liste = teleconseillers ?? [];
@@ -759,32 +825,29 @@ function Step2Equipe({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Fiches par téléconseiller et par jour">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              min={1}
-              max={500}
-              value={fichesParJourSaisi}
-              onChange={(e) => setFichesParJourSaisi(e.target.value)}
-            />
-          )}
-        </Field>
-        <Field label="Jours de traitement">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              min={1}
-              max={10}
-              value={joursSaisi}
-              onChange={(e) => setJoursSaisi(e.target.value)}
-            />
-          )}
-        </Field>
-      </div>
+      <Field label="Fiches par téléconseiller et par jour">
+        {(props) => (
+          <Input
+            {...props}
+            className="sm:max-w-40"
+            type="number"
+            min={1}
+            max={500}
+            value={fichesParJourSaisi}
+            onChange={(e) => setFichesParJourSaisi(e.target.value)}
+          />
+        )}
+      </Field>
+
+      {eligible !== null && eligible > 0 && equipe.length > 0 ? (
+        <ChoixDuVolume
+          volume={volume}
+          plafond={plafond}
+          eligible={eligible}
+          jours={jours}
+          setVolumeSaisi={setVolumeSaisi}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
@@ -827,12 +890,14 @@ function Apercu({
   critereStable,
   fichesParJour,
   jours,
+  volume,
 }: {
   equipeCount: number;
   apercu: UseQueryResult<LotExportPreview>;
   critereStable: boolean;
   fichesParJour: number;
   jours: number;
+  volume: number;
 }) {
   if (equipeCount === 0) {
     return (
@@ -856,10 +921,10 @@ function Apercu({
       </p>
     );
   }
-  const insuffisant = apercu.data.eligible > 0 && apercu.data.eligible < apercu.data.places;
+
   return (
-    <p className={cn('text-[0.875rem]', insuffisant ? 'text-warning' : 'text-foreground')}>
-      {texteApercu(apercu.data, fichesParJour, jours, equipeCount)}
+    <p className="text-[0.875rem] text-foreground">
+      {texteApercu(apercu.data.eligible, volume, fichesParJour, jours, equipeCount)}
     </p>
   );
 }
@@ -949,7 +1014,7 @@ function useLotFormState(projet: Projet | null) {
   const [choix, setChoix] = useState<Choix>(() => choixInitial('prospects', projet ?? TOUS));
   const [decoches, setDecoches] = useState<readonly string[] | null>(null);
   const [fichesParJourSaisi, setFichesParJourSaisi] = useState(String(FICHES_PAR_JOUR_DEFAUT));
-  const [joursSaisi, setJoursSaisi] = useState(String(JOURS_DEFAUT));
+  const [volumeSaisi, setVolumeSaisi] = useState<number | null>(null);
   const [nomSaisi, setNomSaisi] = useState<string | null>(null);
 
   return {
@@ -962,8 +1027,8 @@ function useLotFormState(projet: Projet | null) {
     setDecoches,
     fichesParJourSaisi,
     setFichesParJourSaisi,
-    joursSaisi,
-    setJoursSaisi,
+    volumeSaisi,
+    setVolumeSaisi,
     nomSaisi,
     setNomSaisi,
   };
@@ -1022,24 +1087,32 @@ function useLotFormMutationAndQueries(
 
   const { decoches, equipe } = equipeCochee(teleconseillers.data, state.decoches);
   const fichesParJour = entierBorne(state.fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
-  const jours = entierBorne(state.joursSaisi, JOURS_DEFAUT, 1, 10);
-  const distribution = { teleconseillerIds: equipe.map((c) => c.id), fichesParJour, jours };
+  const teleconseillerIds = equipe.map((c) => c.id);
+  const capaciteJour = fichesParJour * equipe.length;
 
   const queryInfo = useLotFormQueries(state.choix);
   const equipeChoisie = equipe.length > 0;
 
-  const cleCritere = JSON.stringify([queryInfo.corps, distribution]);
+  // L'aperçu compte sur la durée maximale : le volume choisi ensuite ne relance pas le comptage.
+  const distributionApercu = { teleconseillerIds, fichesParJour, jours: JOURS_MAX, volume: 50_000 };
+  const cleCritere = JSON.stringify([queryInfo.corps, distributionApercu]);
   const cleDifferee = useDebouncedValue(cleCritere, 250);
   const critereStable = cleDifferee === cleCritere;
 
   const apercu = useQuery({
     queryKey: queryKeys.lotsExportApercu({ cle: cleCritere }),
     queryFn: () =>
-      previewLotExport({ ...queryInfo.corps, name: queryInfo.etiquette, distribution }),
+      previewLotExport({
+        ...queryInfo.corps,
+        name: queryInfo.etiquette,
+        distribution: distributionApercu,
+      }),
     enabled: critereStable && equipeChoisie && queryInfo.sourceChoisie,
   });
 
   const eligible = apercu.isSuccess ? apercu.data.eligible : null;
+  const { plafond, volume, jours } = volumeEtDuree(eligible, capaciteJour, state.volumeSaisi);
+  const distribution = { teleconseillerIds, fichesParJour, jours, volume };
   const titresProposes = [
     `${queryInfo.etiquette}, ${periodeCampagne(maintenant).toLowerCase()}`,
     `${queryInfo.etiquette}, ${formatDateTime(maintenant)}`,
@@ -1066,6 +1139,9 @@ function useLotFormMutationAndQueries(
     equipe,
     fichesParJour,
     jours,
+    volume,
+    plafond,
+    eligible,
     departements: queryInfo.departements,
     iefs: queryInfo.iefs,
     etiquette: queryInfo.etiquette,
@@ -1100,6 +1176,7 @@ function FormulaireDeLot({
       critereStable={data.critereStable}
       fichesParJour={data.fichesParJour}
       jours={data.jours}
+      volume={data.volume}
     />
   );
 
@@ -1139,8 +1216,11 @@ function FormulaireDeLot({
             onChangeDecoches={state.setDecoches}
             fichesParJourSaisi={state.fichesParJourSaisi}
             setFichesParJourSaisi={state.setFichesParJourSaisi}
-            joursSaisi={state.joursSaisi}
-            setJoursSaisi={state.setJoursSaisi}
+            volume={data.volume}
+            plafond={data.plafond}
+            eligible={data.eligible}
+            jours={data.jours}
+            setVolumeSaisi={state.setVolumeSaisi}
             apercu={apercu}
           />
         ) : null}
