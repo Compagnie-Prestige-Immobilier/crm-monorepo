@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { getApiClient } from '@/lib/api/browser';
 import { suivreRendezVous } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime } from '@/lib/format';
@@ -93,6 +94,7 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
   const [issue, setIssue] = useState<Issue>(prospect.rendezVousIssue ?? 'HONORE');
   const [suite, setSuite] = useState<Suite | null>(prospect.suiteRencontre);
   const [report, setReport] = useState('');
+  const [commentaire, setCommentaire] = useState('');
   const envoyee = issueEnvoyee(telephonique, issue);
   const reporteAt = envoyee === 'REPORTE' ? dakarLocalToIso(report) : null;
   const pret = envoyee !== 'REPORTE' || reporteAt !== null;
@@ -103,13 +105,16 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
         issue: envoyee,
         ...(reporteAt === null ? {} : { reporteAt }),
         ...(issue === 'HONORE' && suite !== null ? { suiteRencontre: suite } : {}),
+        ...(envoyee === 'REPORTE' && commentaire.trim() !== ''
+          ? { commentaire: commentaire.trim() }
+          : {}),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       setOuverte(false);
       toast.success('Suivi du rendez-vous enregistré.');
     },
-    onError: (error) => toastApiError(error, 'Le suivi n’a pas pu être enregistré.'),
+    onError: (error) => toastApiError(error, "Le suivi n'a pas pu être enregistré."),
   });
 
   if (!peut(user, 'rendez_vous.suivre') || !suiviOuvert(prospect)) return null;
@@ -181,6 +186,19 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
                 </Tabs>
               </div>
             ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="rendez-vous-commentaire">Commentaire</Label>
+              <Textarea
+                id="rendez-vous-commentaire"
+                placeholder="Ajouter un commentaire..."
+                value={commentaire}
+                onChange={(event) => {
+                  setCommentaire(event.target.value);
+                }}
+                className="resize-none"
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
