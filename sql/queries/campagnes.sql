@@ -452,7 +452,9 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('ief_id')::text IS NULL OR r."iefId" = sqlc.narg('ief_id'))
   AND (sqlc.narg('relation_status')::"RepresentantRelation" IS NULL OR r."relationStatus" = sqlc.narg('relation_status'))
   AND (NOT sqlc.arg('injoignables')::boolean
-       OR (sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL));
+       OR (sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL))
+  AND (sqlc.arg('injoignables')::boolean
+       OR NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."representantId" = r."id"));
 
 -- name: TirerRepresentantsCible :many
 SELECT r."id"
@@ -464,6 +466,8 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('relation_status')::"RepresentantRelation" IS NULL OR r."relationStatus" = sqlc.narg('relation_status'))
   AND (NOT sqlc.arg('injoignables')::boolean
        OR (sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL))
+  AND (sqlc.arg('injoignables')::boolean
+       OR NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."representantId" = r."id"))
 ORDER BY r."id" ASC
 LIMIT sqlc.arg('places');
 

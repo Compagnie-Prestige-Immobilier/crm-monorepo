@@ -203,6 +203,32 @@ func TestCampagneRepartitFichesSansDoublon(t *testing.T) {
 	}
 }
 
+func TestCampagneSuivanteTireLesRepresentantsRestants(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	creer := func(volume int) float64 {
+		statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+			"name": "Campagne par volume", "cible": "REPRESENTANTS",
+			"representants": map[string]any{"departementId": b.departement},
+			"distribution": map[string]any{
+				"teleconseillerIds": []string{b.agentA, b.agentB}, "fichesParJour": 3, "jours": 2, "volume": volume,
+			},
+		})
+		b.attend(statut, http.StatusCreated, "création de la campagne", body)
+		id, _ := body["id"].(string)
+		b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, id) })
+		n, _ := body["itemCount"].(float64)
+		return n
+	}
+	if premiere, seconde := creer(4), creer(12); premiere != 4 || seconde != 6 {
+		t.Fatalf("4 fiches puis les 6 restantes attendues : %v puis %v", premiere, seconde)
+	}
+	lignes := b.compte(`SELECT count(*)::int FROM "lot_export_items" i JOIN "lots_export" l ON l."id" = i."lotId" WHERE l."createdById" = $1`, b.userID)
+	fiches := b.compte(`SELECT count(DISTINCT i."representantId")::int FROM "lot_export_items" i JOIN "lots_export" l ON l."id" = i."lotId" WHERE l."createdById" = $1`, b.userID)
+	if lignes != 10 || fiches != 10 {
+		t.Fatalf("chaque représentant dans une seule campagne : %d lignes pour %d fiches", lignes, fiches)
+	}
+}
+
 func TestCampagneCibleVideEtEquipeInvalide(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{

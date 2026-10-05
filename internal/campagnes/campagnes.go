@@ -94,6 +94,7 @@ type CampagneDistributionSaisie struct {
 	FichesParJour     int                `json:"fichesParJour,omitempty" minimum:"1" maximum:"500" default:"50"`
 	Jours             int                `json:"jours,omitempty" minimum:"1" maximum:"10" default:"1"`
 	Objectifs         []CampagneObjectif `json:"objectifs,omitempty"`
+	Volume            int                `json:"volume,omitempty" minimum:"1" maximum:"50000" default:"50000" doc:"Plafond du nombre total de fiches tirées."`
 }
 
 type CampagneCreationBody struct {
@@ -457,12 +458,12 @@ func lotCapacites(equipe []lotTeleconseiller, fichesParJour int, objectifs map[s
 	return membres
 }
 
-func lotPlacesDe(membres []lotMembreCapacite, jours int) int {
+func lotPlacesDe(membres []lotMembreCapacite, jours, volume int) int {
 	total := 0
 	for _, m := range membres {
 		total += m.fichesParJour
 	}
-	return total * jours
+	return min(total*jours, volume)
 }
 
 func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
@@ -599,7 +600,7 @@ func (s *service) campagneApercu(ctx context.Context, in *CampagneCreationInput)
 		return nil, err
 	}
 	membres := lotCapacites(equipe, in.Body.Distribution.FichesParJour, lotObjectifsDe(in.Body.Distribution.Objectifs))
-	places := lotPlacesDe(membres, in.Body.Distribution.Jours)
+	places := lotPlacesDe(membres, in.Body.Distribution.Jours, in.Body.Distribution.Volume)
 	eligible, err := s.lotCompterCible(ctx, &in.Body)
 	if err != nil {
 		return nil, err
@@ -633,7 +634,7 @@ func (s *service) campagneCreer(ctx context.Context, in *CampagneCreationInput) 
 	}
 	objectifs := lotObjectifsDe(in.Body.Distribution.Objectifs)
 	membres := lotCapacites(equipe, in.Body.Distribution.FichesParJour, objectifs)
-	places := lotPlacesDe(membres, in.Body.Distribution.Jours)
+	places := lotPlacesDe(membres, in.Body.Distribution.Jours, in.Body.Distribution.Volume)
 
 	id, err := s.lotEcrireCampagne(ctx, u.ID, in, equipe, membres, places, objectifs)
 	if err != nil {
@@ -1348,7 +1349,7 @@ func lotReprises(ctx context.Context, q *db.Queries, row *db.LotParIdRow, filtre
 		return nil, err
 	}
 	membres := lotCapacites(equipe, max(1, filtres.Distribution.FichesParJour), filtres.Distribution.Objectifs)
-	parJour := max(1, lotPlacesDe(membres, 1))
+	parJour := max(1, lotPlacesDe(membres, 1, math.MaxInt))
 	jours := max(1, filtres.Distribution.Jours, (len(arendre)+parJour-1)/parJour)
 	reprises := lotRepartir(len(arendre), membres, jours)
 	parRepreneur := map[string][]int32{}
