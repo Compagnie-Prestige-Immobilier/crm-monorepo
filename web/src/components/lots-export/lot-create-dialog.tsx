@@ -188,6 +188,12 @@ function entierBorne(saisie: string, defaut: number, min: number, max: number): 
 
 const pluriel = (n: number, mot: string) => `${formatNumber(n)} ${mot}${n > 1 ? 's' : ''}`;
 
+function volumeEtDuree(eligible: number | null, capaciteJour: number, volumeSaisi: number | null) {
+  const plafond = Math.max(1, Math.min(eligible ?? 1, capaciteJour * JOURS_MAX));
+  const volume = Math.min(plafond, volumeSaisi ?? plafond);
+  return { plafond, volume, jours: Math.max(1, Math.ceil(volume / Math.max(1, capaciteJour))) };
+}
+
 function texteApercu(
   eligible: number,
   volume: number,
@@ -1105,9 +1111,7 @@ function useLotFormMutationAndQueries(
   });
 
   const eligible = apercu.isSuccess ? apercu.data.eligible : null;
-  const plafond = Math.max(1, Math.min(eligible ?? 1, capaciteJour * JOURS_MAX));
-  const volume = Math.min(plafond, state.volumeSaisi ?? plafond);
-  const jours = Math.max(1, Math.ceil(volume / Math.max(1, capaciteJour)));
+  const { plafond, volume, jours } = volumeEtDuree(eligible, capaciteJour, state.volumeSaisi);
   const distribution = { teleconseillerIds, fichesParJour, jours, volume };
   const titresProposes = [
     `${queryInfo.etiquette}, ${periodeCampagne(maintenant).toLowerCase()}`,
