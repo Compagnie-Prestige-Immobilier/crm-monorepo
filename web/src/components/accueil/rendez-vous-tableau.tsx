@@ -110,7 +110,13 @@ function quandDe(fiche: RendezVousObtenu): string {
 
 /** Ce que la personne a dit, et qui l'a noté : l'accueil reprend sans rappeler pour rien. */
 function Recontact({ fiche }: { fiche: RendezVousObtenu }) {
-  if (fiche.etape !== 'A_RECONTACTER') return null;
+  if (fiche.etape !== 'A_RECONTACTER') {
+    return fiche.commentaire === '' ? null : (
+      <p className="mt-1 max-w-md text-[0.8125rem] font-normal whitespace-pre-line text-muted-foreground">
+        « {fiche.commentaire} »
+      </p>
+    );
+  }
   const note = fiche.recontacterAt === '' ? '' : `, le ${formatDateTime(fiche.recontacterAt)}`;
   return (
     <p className="mt-1 max-w-md text-[0.8125rem] font-normal whitespace-pre-line text-muted-foreground">

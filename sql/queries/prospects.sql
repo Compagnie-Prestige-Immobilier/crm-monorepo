@@ -951,6 +951,8 @@ UPDATE "prospects" p SET
   "rendezVousRecontacterLe" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN sqlc.narg('recontacter_le')::date END,
   "rendezVousRecontacterAt" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN now() END,
   "rendezVousRecontacterPar" = CASE WHEN sqlc.arg('issue')::text = 'A_RECONTACTER' THEN sqlc.narg('par')::text END,
+  "rendezVousCommentaire" = CASE WHEN sqlc.arg('issue')::text IN ('HONORE', 'NON_HONORE', 'REPORTE')
+    THEN NULLIF(btrim(sqlc.narg('commentaire')::text), '') ELSE p."rendezVousCommentaire" END,
   "suiteRencontre" = CASE
     WHEN sqlc.arg('issue')::text = 'HONORE' THEN sqlc.narg('suite')::text
     WHEN sqlc.arg('issue')::text IN ('CONFIRME', 'ANNULE', 'A_RECONTACTER') THEN p."suiteRencontre" END,

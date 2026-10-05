@@ -30,19 +30,21 @@ func TestSuiviRendezVousParLaDirection(t *testing.T) {
 	b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
 
 	chemin := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
-	honore := map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD"}
+	honore := map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD", "commentaire": " Venu avec son épouse "}
 	statut, body = qualificationEnvoi(b, http.MethodPost, chemin, honore)
 	b.attend(statut, http.StatusForbidden, "le téléconseiller ne note pas la présence", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "CONFIRME", "reporteAt": quand})
 	direction.attend(statut, http.StatusBadRequest, "nouvelle date sans report", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "NON_HONORE", "suiteRencontre": "CHAUD"})
 	direction.attend(statut, http.StatusBadRequest, "suite sans rencontre", body)
+	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "CONFIRME", "commentaire": "Confirmé"})
+	direction.attend(statut, http.StatusBadRequest, "commentaire hors suivi", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, honore)
 	direction.attend(statut, http.StatusOK, "rendez-vous honoré", body)
 
 	statut, body = qualificationEnvoi(superviseur, http.MethodGet, "/api/v1/prospects/"+fiche, nil)
 	superviseur.attend(statut, http.StatusOK, "fiche lue", body)
-	if body["rendezVousIssue"] != "HONORE" || body["suiteRencontre"] != "CHAUD" {
+	if body["rendezVousIssue"] != "HONORE" || body["suiteRencontre"] != "CHAUD" || body["rendezVousCommentaire"] != "Venu avec son épouse" {
 		t.Fatalf("suivi relu : %v", body)
 	}
 
@@ -56,6 +58,9 @@ func TestSuiviRendezVousParLaDirection(t *testing.T) {
 	}
 	statut, body = qualificationEnvoi(cc, http.MethodPost, chemin, map[string]any{"issue": "NON_HONORE"})
 	cc.attend(statut, http.StatusOK, "le CC note le suivi", body)
+	if body["rendezVousCommentaire"] != nil {
+		t.Fatalf("un suivi sans commentaire efface le précédent : %v", body["rendezVousCommentaire"])
+	}
 }
 
 func prochain(jour time.Weekday) string {

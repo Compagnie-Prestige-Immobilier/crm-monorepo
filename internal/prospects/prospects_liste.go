@@ -125,6 +125,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		HomonymeTelephone: l.HomonymeTelephone, HomonymeAppeleAt: prospectISOPtr(l.HomonymeAppeleAt), HomonymeAppelePar: l.HomonymeAppelePar,
 		Origin: p.Origin, OriginLabel: p.OriginLabel, CampagneMarketing: p.CampagneMarketing, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		RendezVousIssue: p.RendezVousIssue, RendezVousConfirmation: p.RendezVousConfirmation, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
+		RendezVousCommentaire: p.RendezVousCommentaire,
 		// string_agg ne rend rien hors campagne : le vide devient un tiret.
 		Campagne: prospectVide(string(l.CampagneNoms)), RendezVousAt: prospectISOPtr(l.RendezVousAt),
 		DateRendezVous:  prospectDateRendezVous(&p, l.RendezVousRappel, l.RendezVousAt),

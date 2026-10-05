@@ -43,6 +43,7 @@ type RendezVousObtenu struct {
 	PointRencontre            string  `json:"pointRencontre"`
 	PointRencontreCommentaire string  `json:"pointRencontreCommentaire"`
 	RecontacterNote           string  `json:"recontacterNote" doc:"Ce que la personne a dit, sur un rendez-vous à recontacter."`
+	Commentaire               string  `json:"commentaire" doc:"Ce que l'accueil a noté au suivi : présent, absent ou reporté."`
 	RecontacterLe             string  `json:"recontacterLe" doc:"AAAA-MM-JJ, vide si aucune date n'a été choisie."`
 	RecontacterAt             string  `json:"recontacterAt"`
 	RecontacterPar            string  `json:"recontacterPar"`
@@ -126,7 +127,7 @@ func rendezVousDe(l *db.RendezVousObtenusRow) RendezVousObtenu {
 		Quand: prospectVide(l.Quand), PrisLe: rendezVousInstant(l.LastCallAt), PrisPar: l.PrisPar,
 		Issue: l.Issue, Confirmation: l.Confirmation, Reporte: l.Reporte, Etape: l.Etape, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
 		PointRencontreCommentaire: l.PointRencontreCommentaire,
-		RecontacterNote:           l.RecontacterNote, RecontacterLe: l.RecontacterLe, RecontacterAt: l.RecontacterAt, RecontacterPar: l.RecontacterPar,
+		RecontacterNote:           l.RecontacterNote, Commentaire: l.Commentaire, RecontacterLe: l.RecontacterLe, RecontacterAt: l.RecontacterAt, RecontacterPar: l.RecontacterPar,
 		Qualification: l.Qualification,
 	}
 }
