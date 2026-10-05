@@ -69,7 +69,7 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		SELECT '0199f100-0000-7001-8000-'||lpad(g::text,12,'0'),
 		  (ARRAY['Diop','Ndiaye','Fall','Sow','Diallo','Sarr','Ba','Gueye','Faye','Thiam','Kane','Mbaye','Cissé'])[1+(g-1)%13],
 		  (ARRAY['Aminata','Mamadou','Fatou','Ibrahima','Awa','Cheikh','Mariama','Ousmane','Khady','Abdou','Ndèye','Pape'])[1+(g-1)%12],
-		  '+2217'||(ARRAY['7','8','6','0'])[1+(g-1)%4]||((g::bigint*104729+51)%9000000+1000000)::text,b.id,sy.id,'0199f100-0000-7000-8000-'||lpad((1+(g-1)%{REP})::text,12,'0'),
+		  dates.tel,b.id,sy.id,'0199f100-0000-7000-8000-'||lpad((1+(g-1)%{REP})::text,12,'0'),
 		  u.id,jour+ecoule*.4,jour+ecoule*.4,now(),CASE WHEN ((g-1)/{J})%2=0 THEN 'CHUES'::"Projet" ELSE 'GRAND_PUBLIC'::"Projet" END,
 		  CASE WHEN g<={CONV} THEN 'CONVERTI'::"ProspectStatut" ELSE 'CONTACTE'::"ProspectStatut" END,'FONCTIONNAIRE'::"ProspectType",
 		  (SELECT id FROM "professions" WHERE "isTeaching" ORDER BY code LIMIT 1),(SELECT id FROM "income_bands" ORDER BY "position" LIMIT 1),
@@ -78,12 +78,14 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		  CASE WHEN g<={CONV} THEN (ARRAY['PLATFORM','WHATSAPP','VOICE_OR_ELECTRONIC_MESSAGING']::"EnrollmentMethod"[])[1+((g-1)/{J}+(g-1)%{J})%3] END,
 		  CASE WHEN g<={CONV} THEN jour+ecoule*.6 END,CASE WHEN g<={CONV} THEN u.id END,jour+ecoule*.6,u.id,cr.id
 		FROM generate_series(1,{PROS}) g
-		CROSS JOIN LATERAL (SELECT date_trunc('day',now())-make_interval(days=>(g-1)%{J}) AS jour,now()-date_trunc('day',now()) AS ecoule) dates
+		CROSS JOIN LATERAL (SELECT date_trunc('day',now())-make_interval(days=>(g-1)%{J}) AS jour,now()-date_trunc('day',now()) AS ecoule,
+		  '+2217'||(ARRAY['7','8','6','0'])[1+(g-1)%4]||((g::bigint*104729+51)%9000000+1000000)::text AS tel) dates
 		JOIN "users" u ON u.email=CASE WHEN ((g-1)/{J2}+(g-1)%{J})%2=0 THEN 'fixture.awa@cpi.sn' ELSE 'fixture.fatou@cpi.sn' END
 		JOIN "call_outcome_reasons" cr ON cr.code=CASE WHEN g<={CONV} THEN 'INTERESSE' WHEN g<={RAPPEL} THEN 'CALLBACK' WHEN g>{RDVDEBUT} THEN 'RV_CPI' ELSE 'PAS_DE_REPONSE' END
 		JOIN (SELECT id,row_number() OVER (ORDER BY "shortName") AS rang FROM "banques" WHERE "isActive") b ON b.rang=1+((g-1)/{J}+(g-1)%{J})%4
 		JOIN (SELECT id,row_number() OVER (ORDER BY sigle) AS rang FROM "syndicats" WHERE "isActive") sy ON sy.rang=1+(g-1)%3
 		JOIN (SELECT id,row_number() OVER (ORDER BY code) AS rang FROM "canaux_provenance" WHERE "isActive") c ON c.rang=1+((g-1)/{J}+(g-1)%{J})%4
+		WHERE NOT EXISTS (SELECT 1 FROM "prospects" x WHERE x."phoneE164"=dates.tel AND x."deletedAt" IS NULL AND x.id NOT LIKE '0199f100-0000-7001-%')
 		ON CONFLICT (id) DO UPDATE SET "phoneE164"=EXCLUDED."phoneE164",nom=EXCLUDED.nom,prenom=EXCLUDED.prenom,"createdById"=EXCLUDED."createdById","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
 		  "projet"=EXCLUDED."projet","statut"=EXCLUDED."statut","phase2Status"=EXCLUDED."phase2Status","enrollmentMethod"=EXCLUDED."enrollmentMethod",
 		  "enrollmentCapturedAt"=EXCLUDED."enrollmentCapturedAt","enrollmentCapturedById"=EXCLUDED."enrollmentCapturedById",
