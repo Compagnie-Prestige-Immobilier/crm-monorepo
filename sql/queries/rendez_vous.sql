@@ -41,6 +41,7 @@ SELECT
   COALESCE(pr."label", '')::text AS "pointRencontre",
   COALESCE(dernier."pointRencontreCommentaire", '')::text AS "pointRencontreCommentaire",
   COALESCE(p."rendezVousRecontacterNote", '')::text AS "recontacterNote",
+  COALESCE(p."rendezVousCommentaire", '')::text AS "commentaire",
   COALESCE(to_char(p."rendezVousRecontacterLe", 'YYYY-MM-DD'), '')::text AS "recontacterLe",
   COALESCE(to_char(p."rendezVousRecontacterAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "recontacterAt",
   COALESCE(rp."fullName", '')::text AS "recontacterPar",

@@ -29,7 +29,7 @@ type ProspectSuiviRendezVousInput struct {
 		Issue          string     `json:"issue" enum:"CONFIRME,ANNULE,HONORE,NON_HONORE,REPORTE,A_RECONTACTER"`
 		ReporteAt      *time.Time `json:"reporteAt,omitempty" format:"date-time" doc:"Facultatif pour REPORTE : sans elle, le rendez-vous passe à recontacter."`
 		SuiteRencontre *string    `json:"suiteRencontre,omitempty" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
-		Commentaire    *string    `json:"commentaire,omitempty" maxLength:"1000" doc:"Exigé pour A_RECONTACTER, facultatif pour REPORTE."`
+		Commentaire    *string    `json:"commentaire,omitempty" maxLength:"1000" doc:"Exigé pour A_RECONTACTER, facultatif pour HONORE, NON_HONORE et REPORTE, refusé sinon."`
 		RecontacterLe  *string    `json:"recontacterLe,omitempty" format:"date" doc:"Facultatif, pour A_RECONTACTER ou un REPORTE sans heure."`
 	}
 }
@@ -42,13 +42,23 @@ func suiviRendezVousRefus(issue string, reporteAt *time.Time, suite, commentaire
 	if suite != nil && issue != prospectIssueHonore {
 		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_SUITE_SANS_RENCONTRE", "La suite après rencontre se note sur un rendez-vous honoré.")
 	}
-	aRecontacter := issue == prospectIssueARecontacter
-	aDit := commentaire != nil && strings.TrimSpace(*commentaire) != ""
-	if aRecontacter != aDit && !reporte {
-		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_COMMENTAIRE", "Un rendez-vous à recontacter demande ce que la personne a dit ; le commentaire ne vaut que pour lui ou un report.")
+	if err := commentaireRefus(issue, commentaire); err != nil {
+		return err
 	}
+	aRecontacter := issue == prospectIssueARecontacter
 	if recontacterLe != nil && !aRecontacter && (!reporte || reporteAt != nil) {
 		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_DATE_RECONTACT", "La date de recontact ne vaut que pour un rendez-vous à recontacter ou reporté sans heure.")
+	}
+	return nil
+}
+
+func commentaireRefus(issue string, commentaire *string) error {
+	aDit := commentaire != nil && strings.TrimSpace(*commentaire) != ""
+	if issue == prospectIssueARecontacter && !aDit {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_COMMENTAIRE", "Un rendez-vous à recontacter demande ce que la personne a dit.")
+	}
+	if aDit && (issue == "CONFIRME" || issue == "ANNULE") {
+		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_COMMENTAIRE", "Le commentaire se note au suivi : présent, absent, reporté ou à recontacter.")
 	}
 	return nil
 }
@@ -92,7 +102,7 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		avant, err := q.SuivreRendezVous(ctx, db.SuivreRendezVousParams{
 			Issue: issue, ReporteAt: reporteAt, Suite: b.SuiteRencontre, ID: in.ID,
-			Note: note, RecontacterLe: dateFacultative(b.RecontacterLe), Par: &u.ID,
+			Note: note, RecontacterLe: dateFacultative(b.RecontacterLe), Par: &u.ID, Commentaire: b.Commentaire,
 		})
 		if errors.Is(err, pgx.ErrNoRows) && fiche.Phase2Status == string(db.Phase2StatusAPPOINTMENT) {
 			return socle.Problem(http.StatusConflict, "RENDEZ_VOUS_GESTE_REFUSE",

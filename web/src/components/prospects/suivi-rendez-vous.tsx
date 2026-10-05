@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { getApiClient } from '@/lib/api/browser';
 import { suivreRendezVous } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime } from '@/lib/format';
@@ -57,6 +58,15 @@ export function SuiviRendezVousBadges({ prospect }: { prospect: ProspectRow }) {
       {prospect.suiteRencontre === null ? null : (
         <Badge variant="outline">{SUITES[prospect.suiteRencontre]}</Badge>
       )}
+      {prospect.rendezVousCommentaire === null ? null : (
+        <Badge
+          variant="outline"
+          className="max-w-xs truncate"
+          title={prospect.rendezVousCommentaire}
+        >
+          « {prospect.rendezVousCommentaire} »
+        </Badge>
+      )}
     </>
   );
 }
@@ -69,6 +79,8 @@ const ongletsDe = (telephonique: boolean): [string, string][] =>
 // Non joint au téléphone, le rendez-vous se reporte.
 const issueEnvoyee = (telephonique: boolean, issue: Issue): Issue =>
   telephonique && issue === 'NON_HONORE' ? 'REPORTE' : issue;
+
+const commentaireDe = (prospect: ProspectRow): string => prospect.rendezVousCommentaire ?? '';
 
 const suiviOuvert = (prospect: ProspectRow): boolean =>
   prospect.phase2Status === 'APPOINTMENT' && prospect.rendezVousConfirmation !== 'ANNULE';
@@ -93,6 +105,7 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
   const [issue, setIssue] = useState<Issue>(prospect.rendezVousIssue ?? 'HONORE');
   const [suite, setSuite] = useState<Suite | null>(prospect.suiteRencontre);
   const [report, setReport] = useState('');
+  const [commentaire, setCommentaire] = useState(() => commentaireDe(prospect));
   const envoyee = issueEnvoyee(telephonique, issue);
   const reporteAt = envoyee === 'REPORTE' ? dakarLocalToIso(report) : null;
   const pret = envoyee !== 'REPORTE' || reporteAt !== null;
@@ -103,6 +116,7 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
         issue: envoyee,
         ...(reporteAt === null ? {} : { reporteAt }),
         ...(issue === 'HONORE' && suite !== null ? { suiteRencontre: suite } : {}),
+        commentaire: commentaire.trim(),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
@@ -181,6 +195,18 @@ export function SuiviRendezVous({ prospect }: { prospect: ProspectRow }) {
                 </Tabs>
               </div>
             ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="rendez-vous-commentaire">Commentaire</Label>
+              <Textarea
+                id="rendez-vous-commentaire"
+                value={commentaire}
+                maxLength={1000}
+                rows={3}
+                onChange={(event) => {
+                  setCommentaire(event.target.value);
+                }}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button

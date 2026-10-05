@@ -227,6 +227,7 @@ type Prospect struct {
 	RendezVousConfirmation   *string           `json:"rendezVousConfirmation" enum:"CONFIRME,ANNULE,A_RECONTACTER"`
 	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
 	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
+	RendezVousCommentaire    *string           `json:"rendezVousCommentaire" doc:"Ce que l'accueil a noté au suivi du rendez-vous."`
 	Campagne                 *string           `json:"campagne" doc:"Campagnes d'appels qui ont confié la fiche, dernières d'abord."`
 	RendezVousAt             *string           `json:"rendezVousAt" doc:"Dernier rendez-vous posé en appel, tous motifs."`
 	DateRendezVous           *string           `json:"dateRendezVous" doc:"Date du rendez-vous, comme l'écran Rendez-vous : le report, sinon le rappel qui le porte ; à défaut, la date posée avec la méthode."`
