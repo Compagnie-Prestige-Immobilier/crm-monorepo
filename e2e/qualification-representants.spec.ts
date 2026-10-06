@@ -77,6 +77,7 @@ test.describe('parcours 5, qualification des representants', () => {
     await expect(statuts.getByRole('button', { name: SOUS_STATUT })).toHaveCount(0);
     await repondre(page, 'Quel statut de qualification ?', 'Retraité');
     await repondre(page, 'Quelle précision ?', SOUS_STATUT);
+    await repondre(page, 'Souhaite-t-il un rendez-vous ?', 'Non');
 
     // Il a refusé : le script demande quelqu'un d'autre, on n'a personne.
     await page.getByRole('button', { name: 'Personne à proposer' }).click();

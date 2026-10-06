@@ -216,7 +216,7 @@ type Prospect struct {
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
 	RepresentantAppelePar    *string           `json:"representantAppelePar" doc:"Auteur de ce dernier appel au représentant."`
-	Origin                   *string           `json:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	Origin                   *string           `json:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC,PARRAINAGE,REPRESENTANT"`
 	HomonymeTelephone        *string           `json:"homonymeTelephone" doc:"Numéro d'une autre fiche au même nom, déjà appelée."`
 	HomonymeAppeleAt         *string           `json:"homonymeAppeleAt" doc:"Dernier appel de cette fiche homonyme."`
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
@@ -282,7 +282,7 @@ type ProspectListInput struct {
 	AppelePar              string `query:"appelePar" format:"uuid"`
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById" format:"uuid"`
-	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC,PARRAINAGE,REPRESENTANT"`
 	CampagneID             string `query:"campagneId" format:"uuid" doc:"Campagne d'appels qui a confié la fiche."`
 	ProfessionID           string `query:"professionId" format:"uuid"`
 	IncomeBandID           string `query:"incomeBandId" format:"uuid"`

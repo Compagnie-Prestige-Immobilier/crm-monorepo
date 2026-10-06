@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { AUCUN_MOTIF, Palier, type Choix } from '@/components/console/console-paliers';
+import { DateRdv, rdvPossible, useRdvRepresentant } from '@/components/console/rdv-representant';
 import {
   Chrono,
   Kbd,
@@ -294,6 +295,8 @@ type Pas =
   | 'whatsapp'
   | 'statut'
   | 'precision'
+  | 'rdv'
+  | 'rdvDate'
   | 'echeance'
   | 'recommande'
   | 'note';
@@ -308,6 +311,8 @@ const LIBELLES_PAS: Readonly<Record<Pas, string>> = {
   whatsapp: 'WhatsApp',
   statut: 'Statut',
   precision: 'Précision',
+  rdv: 'Rendez-vous',
+  rdvDate: 'Date du RV',
   echeance: 'Rappel',
   recommande: 'Recommandé',
   note: 'Note',
@@ -322,6 +327,7 @@ const QUESTIONS_PAS: Readonly<Partial<Record<Pas, string>>> = {
   representant: 'Accepte-t-il d’être représentant CHUES ?',
   whatsapp: 'A-t-il WhatsApp sur ce numéro ?',
   precision: 'Quelle précision ?',
+  rdv: 'Souhaite-t-il un rendez-vous ?',
 };
 
 const questionDe = (pas: Pas, joignable: boolean): string | null => {
@@ -339,6 +345,7 @@ const CONTINUER: Suite = { libelle: 'Continuer' };
 const SUITE_PAS: Readonly<Partial<Record<Pas, Suite>>> = {
   syndicat: { libelle: 'Continuer', passer: 'Sans syndicat' },
   echeance: CONTINUER,
+  rdvDate: CONTINUER,
   recommande: { libelle: 'Continuer', passer: 'Personne à proposer' },
   note: { libelle: 'Enregistrer l’appel' },
 };
@@ -366,6 +373,7 @@ function parcoursDe(
   ambassadeur: boolean | null,
   avecPrecision: boolean,
   avecEcheance: boolean,
+  rdv: readonly Pas[],
 ): Pas[] {
   const pas: Pas[] = ['reponse'];
   if (resultat === 'JOIGNABLE') {
@@ -374,11 +382,26 @@ function parcoursDe(
   }
   pas.push('statut');
   if (avecPrecision) pas.push('precision');
+  pas.push(...rdv);
   if (avecEcheance) pas.push('echeance');
   if (resultat === 'JOIGNABLE' && ambassadeur === false) pas.push('recommande');
   pas.push('note');
   return pas;
 }
+
+/** La question du rendez-vous suit le statut d'une personne jointe ; sa date, un « oui ». */
+function pasRdvDe(
+  joignable: boolean,
+  statut: StatutQualification | null,
+  code: string | null,
+): Pas[] {
+  if (!rdvPossible(joignable, statut)) return [];
+  return code === null ? ['rdv'] : ['rdv', 'rdvDate'];
+}
+
+/** Le bouton de suite attend la date demandée, rappel ou rendez-vous. */
+const suiteBloquee = (pas: Pas, rappelAt: string | null, rdvAt: string | null): boolean =>
+  (pas === 'echeance' && rappelAt === null) || (pas === 'rdvDate' && rdvAt === null);
 
 const suivantDe = (pas: Pas, parcours: readonly Pas[]): Pas =>
   parcours[parcours.indexOf(pas) + 1] ?? 'note';
@@ -598,6 +621,7 @@ interface Reponses {
   rappelAt: string | null;
   now: number;
   personneProposee: string | null;
+  rdv: string | null;
 }
 
 function ouiNon(valeur: boolean | null, oui: string, non: string): string | null {
@@ -638,6 +662,7 @@ function recapDe(r: Reponses): string[] {
     ouiNon(r.ambassadeur, 'Accepte d’être représentant', 'Refuse d’être représentant'),
     recapWhatsapp(r.memeWhatsapp, r.whatsapp),
     recapStatut(r.statut, r.statuts),
+    r.rdv,
     r.rappelAt === null ? null : `Rappel ${formatCallbackAt(r.rappelAt, r.now)}`,
     r.personneProposee === null ? null : `Propose ${r.personneProposee}`,
   ];
@@ -911,6 +936,7 @@ function Qualification({
   const commentaireRef = useRef<HTMLTextAreaElement>(null);
   const [edit, setEdit] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const rdv = useRdvRepresentant();
 
   const [now] = useState(() => Date.now());
 
@@ -1005,7 +1031,9 @@ function Qualification({
     suggestionCommencee,
     sugPhone,
     sugName,
+    rdvCode: rdv.code,
   });
+  const avecRdv = parcours.includes('rdvDate');
 
   function enregistrer(): void {
     if (send.isPending) return;
@@ -1013,9 +1041,13 @@ function Qualification({
       setPas(manque);
       return;
     }
+    if (avecRdv && !rdv.complet()) {
+      setPas('rdvDate');
+      return;
+    }
     if (resultat === null || statut === null) return;
-    send.mutate(
-      reponseDe({
+    send.mutate({
+      ...reponseDe({
         statut,
         joignable,
         ambassadeur,
@@ -1034,7 +1066,8 @@ function Qualification({
         sugNote,
         commentaire,
       }),
-    );
+      ...rdv.corps(avecRdv),
+    });
   }
 
   function precedent(): void {
@@ -1102,6 +1135,7 @@ function Qualification({
       souhait ?? ambassadeur,
       sousStatutsDe(statuts, id).length > 0,
       choisi !== null && dateDemandee(choisi),
+      pasRdvDe(joignable, choisi, rdv.code),
     );
     setPas(suivantDe('statut', suite));
   }
@@ -1110,7 +1144,13 @@ function Qualification({
     const retenu = statuts.find((ligne) => ligne.id === id) ?? racineRetenue;
     setStatutId(retenu?.id ?? null);
     setRappelAt(rappelInitialDuStatut(retenu, now));
-    const suite = parcoursDe(resultat, ambassadeur, true, retenu !== null && dateDemandee(retenu));
+    const suite = parcoursDe(
+      resultat,
+      ambassadeur,
+      true,
+      retenu !== null && dateDemandee(retenu),
+      pasRdvDe(joignable, retenu, rdv.code),
+    );
     setPas(suivantDe('precision', suite));
   }
 
@@ -1120,6 +1160,7 @@ function Qualification({
       return;
     }
     if (pas === 'echeance' && rappelAt === null) return;
+    if (pas === 'rdvDate' && !rdv.complet()) return;
     setPas(suivantDe(pas, parcours));
   }
 
@@ -1131,6 +1172,22 @@ function Qualification({
       setSugNote('');
     }
     setPas(suivantDe(pas, parcours));
+  }
+
+  // Sans rendez-vous, le parcours reprend après la question ; avec, la date suit.
+  function apresRdv(avecDate: boolean): void {
+    if (avecDate) {
+      setPas('rdvDate');
+      return;
+    }
+    const sans = parcoursDe(
+      resultat,
+      ambassadeur,
+      sousStatuts.length > 0,
+      statut !== null && dateDemandee(statut),
+      ['rdv'],
+    );
+    setPas(suivantDe('rdv', sans));
   }
 
   function choixQuestions(): Choix[] {
@@ -1169,6 +1226,8 @@ function Qualification({
         ]);
       case 'whatsapp':
         return choixOuiNon(memeWhatsapp, choisirMemeWhatsapp);
+      case 'rdv':
+        return rdv.choix(apresRdv);
       default:
         return [];
     }
@@ -1218,6 +1277,7 @@ function Qualification({
     rappelAt,
     now,
     personneProposee,
+    rdv: rdv.recap(now, avecRdv),
   });
 
   useShortcuts(
@@ -1293,6 +1353,18 @@ function Qualification({
         </Question>
       );
     }
+    if (pas === 'rdvDate') {
+      return (
+        <Question titre="Quand a lieu le rendez-vous ?">
+          <DateRdv
+            rdv={rdv}
+            echeance={
+              <ChoixEcheance now={now} value={rdv.at} onChange={rdv.setAt} sansRaccourcis />
+            }
+          />
+        </Question>
+      );
+    }
     if (pas === 'recommande') {
       return (
         <QuestionSuggestion
@@ -1334,7 +1406,7 @@ function Qualification({
       recap={recap}
       pied={{
         suite,
-        suiteDesactivee: pas === 'echeance' && rappelAt === null,
+        suiteDesactivee: suiteBloquee(pas, rappelAt, rdv.at),
         onRetour: precedent,
         onSuite: continuer,
         onPasser: passer,
@@ -1387,6 +1459,7 @@ interface EtatPas {
   suggestionCommencee: boolean;
   sugPhone: string;
   sugName: string;
+  rdvCode: string | null;
 }
 
 /** Tout ce que le pas courant déduit des réponses : le parcours, ce qui manque, la question posée. */
@@ -1401,6 +1474,7 @@ function deriverPas(e: EtatPas) {
     e.ambassadeur,
     sousStatuts.length > 0,
     e.statut !== null && dateDemandee(e.statut),
+    pasRdvDe(e.joignable, e.statut, e.rdvCode),
   );
   const personneProposee =
     e.proposeQuelquUn && e.suggestionCommencee
@@ -1592,15 +1666,18 @@ function ChoixEcheance({
   now,
   value,
   onChange,
+  sansRaccourcis = false,
 }: {
   now: number;
   value: string | null;
   onChange: (at: string | null) => void;
+  /** Un rendez-vous se fixe à une date choisie, sans les créneaux rapides du rappel. */
+  sansRaccourcis?: boolean;
 }) {
   const [jour, setJour] = useState('');
   const [ouvert, setOuvert] = useState(false);
 
-  const slots = useMemo(() => callbackSlots(now), [now]);
+  const slots = useMemo(() => (sansRaccourcis ? [] : callbackSlots(now)), [now, sansRaccourcis]);
   const heures = useMemo(() => (jour === '' ? [] : callbackHalfHours(now, jour)), [now, jour]);
   const surMesure = value !== null && !slots.some((slot) => slot.at === value);
   const minimum = new Date(now).toISOString().slice(0, 10);
