@@ -142,6 +142,7 @@ func rendezVousInstant(quand *time.Time) *string {
 
 var GardeRendezVous = map[string]socle.Permission{
 	"GET " + cheminRendezVous:                socle.PermissionRendezVousVoir,
+	"GET " + cheminRendezVous + "/synthese":  socle.PermissionRendezVousVoir,
 	"GET /api/v1/prospects/{id}/rendez-vous": socle.PermissionProspectsLire,
 }
 
@@ -180,6 +181,10 @@ func MonterRendezVous(api huma.API, d *socle.Deps) {
 		OperationID: "listRendezVous", Method: http.MethodGet, Path: cheminRendezVous,
 		Summary: "Les rendez-vous obtenus au téléphone, pour le comptoir.",
 	}, s.rendezVousLister)
+	huma.Register(api, huma.Operation{
+		OperationID: "syntheseRendezVous", Method: http.MethodGet, Path: cheminRendezVous + "/synthese",
+		Summary: "Les rendez-vous comptés par étape, issue, confirmation, type et site.",
+	}, s.rendezVousSynthese)
 	huma.Register(api, huma.Operation{
 		OperationID: "rendezVousDeLaFiche", Method: http.MethodGet, Path: "/api/v1/prospects/{id}/rendez-vous",
 		Summary: "Le rendez-vous en cours d’une fiche.",

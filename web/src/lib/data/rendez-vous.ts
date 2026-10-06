@@ -5,6 +5,7 @@ import { getApiClient } from '@/lib/api/browser';
 
 export type RendezVousObtenu = components['schemas']['RendezVousObtenu'];
 export type ListeRendezVous = components['schemas']['RendezVousListOutputBody'];
+export type SyntheseRendezVous = components['schemas']['RendezVousSyntheseOutputBody'];
 export type Closing = components['schemas']['Closing'];
 
 export interface FiltresRendezVous {
@@ -64,6 +65,18 @@ export async function enregistrerClosing(id: string, closing: Closing): Promise<
     await getApiClient().PUT('/api/v1/prospects/{id}/closing', {
       params: { path: { id } },
       body: closing,
+    }),
+  );
+}
+
+export async function lireSyntheseRendezVous(
+  type: string,
+  du: string,
+  au: string,
+): Promise<SyntheseRendezVous> {
+  return unwrap(
+    await getApiClient().GET('/api/v1/rendez-vous/synthese', {
+      params: { query: { ...(type === '' ? {} : { type }), du, au } },
     }),
   );
 }
