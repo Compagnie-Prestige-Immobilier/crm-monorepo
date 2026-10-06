@@ -401,6 +401,13 @@
     "OBSERVATEUR"
   ],
   "GET /api/v1/rendez-vous": ["ADMIN", "DIRECTION", "SUPERVISEUR", "CHARGE_CLIENTELE", "ACCUEIL"],
+  "GET /api/v1/rendez-vous/synthese": [
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR",
+    "CHARGE_CLIENTELE",
+    "ACCUEIL"
+  ],
   "GET /api/v1/representants": [
     "ADMIN",
     "COMMERCIAL",

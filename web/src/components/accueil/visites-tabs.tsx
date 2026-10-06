@@ -5,6 +5,7 @@ import {
   ArchiveIcon,
   CalendarCheckIcon,
   CalendarDaysIcon,
+  ChartColumnIcon,
   ChartNoAxesCombinedIcon,
   HeartHandshakeIcon,
   ListChecksIcon,
@@ -35,6 +36,12 @@ const TABS: readonly {
     href: '/accueil/rendez-vous',
     label: 'Rendez-vous',
     icon: CalendarCheckIcon,
+    permission: 'rendez_vous.voir',
+  },
+  {
+    href: '/accueil/tableau-de-bord-rdv',
+    label: 'Tableau de bord RDV',
+    icon: ChartColumnIcon,
     permission: 'rendez_vous.voir',
   },
   {
