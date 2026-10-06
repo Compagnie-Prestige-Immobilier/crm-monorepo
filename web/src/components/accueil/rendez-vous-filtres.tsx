@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { type FiltresRendezVous, lienExportRendezVous } from '@/lib/data/rendez-vous';
 
-const TYPES: readonly { value: string; label: string }[] = [
+export const TYPES: readonly { value: string; label: string }[] = [
   { value: 'tous', label: 'Tous les types' },
   { value: 'RV_CPI', label: 'RV CPI' },
   { value: 'RV_SITE', label: 'RV site' },
