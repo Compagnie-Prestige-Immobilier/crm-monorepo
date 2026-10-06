@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+const (
+	dimensionTotal        = "total"
+	dimensionReporte      = "reporte"
+	dimensionEtape        = "etape"
+	dimensionIssue        = "issue"
+	dimensionConfirmation = "confirmation"
+	dimensionType         = "type"
+	dimensionSite         = "site"
+)
+
 type RendezVousDecompte struct {
 	Code    string `json:"code"`
 	Libelle string `json:"libelle"`
@@ -50,19 +60,19 @@ func (s *service) rendezVousSynthese(ctx context.Context, in *RendezVousSynthese
 	out.Body.ParSite = []RendezVousDecompte{}
 	for _, l := range lignes {
 		switch l.Dimension {
-		case "total":
+		case dimensionTotal:
 			out.Body.Total = l.Nombre
-		case "reporte":
+		case dimensionReporte:
 			out.Body.Reportes = l.Nombre
-		case "etape":
+		case dimensionEtape:
 			out.Body.ParEtape[l.Code] = l.Nombre
-		case "issue":
+		case dimensionIssue:
 			out.Body.ParIssue[l.Code] = l.Nombre
-		case "confirmation":
+		case dimensionConfirmation:
 			out.Body.ParConfirmation[l.Code] = l.Nombre
-		case "type":
+		case dimensionType:
 			out.Body.ParType = append(out.Body.ParType, RendezVousDecompte{Code: l.Code, Libelle: l.Libelle, Nombre: l.Nombre})
-		case "site":
+		case dimensionSite:
 			out.Body.ParSite = append(out.Body.ParSite, RendezVousDecompte{Code: l.Code, Libelle: l.Libelle, Nombre: l.Nombre})
 		}
 	}
