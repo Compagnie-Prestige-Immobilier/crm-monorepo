@@ -978,6 +978,8 @@ export interface RepAnswer {
   readonly statutQualificationId: string;
   /** L'ouverture que cette tentative ferme : c'est elle qui arrête le chronomètre. */
   readonly ouvertureId?: string;
+  /** Le rendez-vous pris pendant l'appel, posé sur la fiche prospect du représentant. */
+  readonly rendezVous?: NonNullable<RepAttemptBody['rendezVous']>;
 }
 
 export function buildRepAttempt(

@@ -35,7 +35,7 @@ type ExportProspectsInput struct {
 	AppelePar              string `query:"appelePar"`
 	LastCallById           string `query:"lastCallById"`
 	EnrollmentCapturedById string `query:"enrollmentCapturedById"`
-	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC,PARRAINAGE,REPRESENTANT"`
 	CampagneId             string `query:"campagneId"`
 	ProfessionId           string `query:"professionId"`
 	IncomeBandId           string `query:"incomeBandId"`
@@ -425,7 +425,7 @@ func exportSuiviRendezVous(issue *string) string {
 
 // L'origine tient en une colonne : le détail du formulaire public suit le code.
 func exportOrigineProspect(l *exportLigneProspect) string {
-	origine := map[string]string{"BANQUE": "Banque", "FORMULAIRE_PUBLIC": "Formulaire public"}[l.Origine]
+	origine := map[string]string{"BANQUE": "Banque", "FORMULAIRE_PUBLIC": "Formulaire public", "REPRESENTANT": "Représentant"}[l.Origine]
 	if origine == "" {
 		origine = l.Origine
 	}

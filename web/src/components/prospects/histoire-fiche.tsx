@@ -55,6 +55,7 @@ function origineDe(prospect: ProspectRow): string {
     prospect.representantName === null ? null : `Apporté par ${prospect.representantName}`,
     prospect.origin === 'BANQUE' ? `Banque ${ouVide(prospect.originLabel)}` : null,
     prospect.origin === 'FORMULAIRE_PUBLIC' ? 'Formulaire public' : null,
+    prospect.origin === 'REPRESENTANT' ? 'Rendez-vous pris au script représentant' : null,
     publicite === '' ? null : publicite,
     campagneAppels === null ? null : `Campagne d’appels ${campagneAppels}`,
   ];
