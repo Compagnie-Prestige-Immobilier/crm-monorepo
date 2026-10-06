@@ -141,3 +141,46 @@ SELECT "fullName" FROM "users"
 WHERE "role" <> 'ADMIN' AND "isActive" AND "deletedAt" IS NULL
 ORDER BY "fullName"
 LIMIT 200;
+
+-- name: RendezVousSynthese :many
+WITH dates AS (
+  SELECT p."id", COALESCE(p."rendezVousReporteAt", (
+    SELECT sc."scheduledAt" FROM "scheduled_callbacks" sc
+    WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
+    ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+  )) AS "quand"
+  FROM "prospects" p
+  WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+), base AS (
+  SELECT r."code" AS "typeCode", r."label" AS "typeLibelle",
+    public.rendez_vous_etape(d."quand", p."rendezVousConfirmation", p."rendezVousIssue",
+      EXISTS (SELECT 1 FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id" AND c."qualification" <> ''), @debut_jour::timestamp)::text AS "etape",
+    COALESCE(p."rendezVousIssue", '')::text AS "issue",
+    COALESCE(p."rendezVousConfirmation", '')::text AS "confirmation",
+    (p."rendezVousReporteAt" IS NOT NULL)::boolean AS "reporte",
+    COALESCE(vs."nom", '')::text AS "site"
+  FROM "prospects" p
+  JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+  JOIN dates d ON d."id" = p."id"
+  LEFT JOIN LATERAL (
+    SELECT a."siteId" FROM "call_attempts" a
+    WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
+  ) dernier ON true
+  LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
+  WHERE (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
+    AND (sqlc.narg('du')::timestamp IS NULL OR d."quand" >= sqlc.narg('du')::timestamp)
+    AND (sqlc.narg('au')::timestamp IS NULL OR d."quand" < sqlc.narg('au')::timestamp)
+)
+SELECT 'total'::text AS "dimension", ''::text AS "code", ''::text AS "libelle", count(*)::bigint AS "nombre" FROM base
+UNION ALL
+SELECT 'reporte', '', '', count(*) FROM base WHERE "reporte"
+UNION ALL
+SELECT 'etape', "etape", '', count(*) FROM base GROUP BY "etape"
+UNION ALL
+SELECT 'issue', "issue", '', count(*) FROM base GROUP BY "issue"
+UNION ALL
+SELECT 'confirmation', "confirmation", '', count(*) FROM base GROUP BY "confirmation"
+UNION ALL
+(SELECT 'type', "typeCode", "typeLibelle", count(*) FROM base GROUP BY "typeCode", "typeLibelle" ORDER BY 4 DESC LIMIT 20)
+UNION ALL
+(SELECT 'site', "site", "site", count(*) FROM base GROUP BY "site" ORDER BY 4 DESC LIMIT 50);
