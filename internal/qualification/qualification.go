@@ -141,27 +141,28 @@ func qualificationTransitionLegale(t map[string][]string, de, vers string) bool 
 }
 
 type QualificationRepAttemptBody struct {
-	ID                    string     `json:"id" format:"uuid"`
-	RepresentantID        string     `json:"representantId" format:"uuid"`
-	ClientCreatedAt       time.Time  `json:"clientCreatedAt" format:"date-time"`
-	StatutQualificationID string     `json:"statutQualificationId" format:"uuid"`
-	OuvertureID           *string    `json:"ouvertureId,omitempty" format:"uuid"`
-	Comment               *string    `json:"comment,omitempty" maxLength:"2000"`
-	RelationStatus        *string    `json:"relationStatus,omitempty" enum:"INCONNU,CONTACTE,AMBASSADEUR,REFUS"`
-	SuggestedPhone        *string    `json:"suggestedPhone,omitempty" minLength:"6" maxLength:"40"`
-	SuggestedName         *string    `json:"suggestedName,omitempty" maxLength:"120"`
-	SuggestedNote         *string    `json:"suggestedNote,omitempty" maxLength:"2000"`
-	WhatsappStatus        *string    `json:"whatsappStatus,omitempty" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
-	WhatsappE164          *string    `json:"whatsappE164,omitempty" minLength:"6" maxLength:"40"`
-	Profession            *string    `json:"profession,omitempty" maxLength:"120"`
-	EtablissementConfirme *bool      `json:"etablissementConfirme,omitempty"`
-	Etablissement         *string    `json:"etablissement,omitempty" maxLength:"200"`
-	NumeroConfirme        *bool      `json:"numeroConfirme,omitempty"`
-	Phone                 *string    `json:"phone,omitempty" minLength:"6" maxLength:"40"`
-	Contacte              *bool      `json:"contacte,omitempty"`
-	ConnaitUES            *bool      `json:"connaitUES,omitempty"`
-	Syndicat              *string    `json:"syndicat,omitempty" maxLength:"200"`
-	CallbackAt            *time.Time `json:"callbackAt,omitempty" format:"date-time"`
+	ID                    string                      `json:"id" format:"uuid"`
+	RepresentantID        string                      `json:"representantId" format:"uuid"`
+	ClientCreatedAt       time.Time                   `json:"clientCreatedAt" format:"date-time"`
+	StatutQualificationID string                      `json:"statutQualificationId" format:"uuid"`
+	OuvertureID           *string                     `json:"ouvertureId,omitempty" format:"uuid"`
+	Comment               *string                     `json:"comment,omitempty" maxLength:"2000"`
+	RelationStatus        *string                     `json:"relationStatus,omitempty" enum:"INCONNU,CONTACTE,AMBASSADEUR,REFUS"`
+	SuggestedPhone        *string                     `json:"suggestedPhone,omitempty" minLength:"6" maxLength:"40"`
+	SuggestedName         *string                     `json:"suggestedName,omitempty" maxLength:"120"`
+	SuggestedNote         *string                     `json:"suggestedNote,omitempty" maxLength:"2000"`
+	WhatsappStatus        *string                     `json:"whatsappStatus,omitempty" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
+	WhatsappE164          *string                     `json:"whatsappE164,omitempty" minLength:"6" maxLength:"40"`
+	Profession            *string                     `json:"profession,omitempty" maxLength:"120"`
+	EtablissementConfirme *bool                       `json:"etablissementConfirme,omitempty"`
+	Etablissement         *string                     `json:"etablissement,omitempty" maxLength:"200"`
+	NumeroConfirme        *bool                       `json:"numeroConfirme,omitempty"`
+	Phone                 *string                     `json:"phone,omitempty" minLength:"6" maxLength:"40"`
+	Contacte              *bool                       `json:"contacte,omitempty"`
+	ConnaitUES            *bool                       `json:"connaitUES,omitempty"`
+	Syndicat              *string                     `json:"syndicat,omitempty" maxLength:"200"`
+	CallbackAt            *time.Time                  `json:"callbackAt,omitempty" format:"date-time"`
+	RendezVous            *QualificationRepRendezVous `json:"rendezVous,omitempty" doc:"Le rendez-vous pris pendant l'appel : il s'inscrit sur la fiche prospect du représentant."`
 }
 
 type QualificationRepAttemptInput struct{ Body QualificationRepAttemptBody }
@@ -311,6 +312,7 @@ type qualificationAppelRep struct {
 	statut     *db.StatutQualificationParIdRow
 	relation   *string
 	suggestion *qualificationSuggestionRecue
+	rdv        *qualificationRdvRep
 }
 
 func (s *service) qualificationStatutActif(ctx context.Context, id string) (db.StatutQualificationParIdRow, error) {
@@ -442,7 +444,11 @@ func (s *service) qualificationPreparerAppelRep(ctx context.Context, u *socle.Ut
 	}
 	appel.u, appel.b = u, b
 	appel.relation = qualificationRelationAPoser(b, appel.statut, string(appel.rep.RelationStatus))
-	return nil
+	if b.RendezVous == nil {
+		return nil
+	}
+	appel.rdv, err = s.qualificationPreparerRdvRep(ctx, u, appel)
+	return err
 }
 
 func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRepAttemptInput) (*QualificationRepAttemptOutput, error) {
@@ -529,6 +535,9 @@ func (s *service) qualificationAppliquerRepAppel(ctx context.Context, q *db.Quer
 		return false, err
 	}
 	if err := s.qualificationFermerOuverture(ctx, q, a); err != nil {
+		return false, err
+	}
+	if err := s.qualificationAppliquerRdvRep(ctx, q, a); err != nil {
 		return false, err
 	}
 	return true, qualificationBasculerRelation(ctx, q, a.b.RepresentantID, string(a.rep.RelationStatus), a.relation, a.u.ID)

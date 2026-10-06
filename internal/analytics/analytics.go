@@ -117,7 +117,7 @@ type FiltreDesAnalyses struct {
 	AppelePar              string `query:"appelePar"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById"`
 	LotID                  string `query:"lotId" doc:"Fiches confiées par cette campagne d'appels."`
-	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC"`
+	Origin                 string `query:"origin" enum:"BANQUE,FORMULAIRE_PUBLIC,PARRAINAGE,REPRESENTANT"`
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
 	ActFrom                string `query:"actFrom" doc:"Fiches appelées à partir de cette date ou de cet instant : borne la date de l'appel, là où dateFrom borne la saisie de la fiche."`

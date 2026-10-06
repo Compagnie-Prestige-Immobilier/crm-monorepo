@@ -129,6 +129,8 @@ export const PROSPECT_ORIGINS = [
 export const PROSPECT_ORIGIN_LABELS: Record<ProspectOrigin, string> = {
   BANQUE: 'Banque',
   FORMULAIRE_PUBLIC: 'Formulaire public',
+  PARRAINAGE: 'Contact recommandé',
+  REPRESENTANT: 'Représentant',
 };
 
 export type RendezVousIssue = NonNullable<Schemas['Prospect']['rendezVousIssue']>;
