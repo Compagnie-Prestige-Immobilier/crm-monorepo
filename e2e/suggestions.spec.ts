@@ -80,6 +80,7 @@ async function declinerEnProposant(
 
   // Le refus pose le statut : on le garde et on passe a la personne recommandee.
   await page.getByRole('button', { name: 'Continuer' }).click();
+  await repondre(page, 'Souhaite-t-il un rendez-vous ?', 'Non');
   await page.getByLabel('Son numéro').fill(nationalDe(propose.phoneE164));
   await page.getByLabel('Son nom et prénom').fill(propose.nom);
   await page.getByLabel('Sa remarque').fill(propose.remarque);
