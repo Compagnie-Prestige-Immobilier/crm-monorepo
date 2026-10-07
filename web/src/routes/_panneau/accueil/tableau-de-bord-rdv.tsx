@@ -3,10 +3,12 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { TYPES } from '@/components/accueil/rendez-vous-filtres';
+import { plageDuPreset } from '@/components/accueil/tableau-de-bord/periode';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { AnneauChart, BarresHorizontalesChart } from '@/components/dashboard/visites-charts';
 import { QueryErrorState } from '@/components/query-error-state';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,9 +20,16 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { lireSyntheseRendezVous, type SyntheseRendezVous } from '@/lib/data/rendez-vous';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatRateOrNone } from '@/lib/format';
 import { type Contexte, RefusPermission } from '@/lib/guard';
 import { type NamedCount, peut } from '@/lib/types';
+
+type Affichage = 'nombre' | 'taux';
+
+const PERIODES_RAPIDES: readonly { preset: 'aujourdhui' | 'cette-semaine'; label: string }[] = [
+  { preset: 'aujourdhui', label: 'Aujourd’hui' },
+  { preset: 'cette-semaine', label: 'Cette semaine' },
+];
 
 export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord-rdv')({
   beforeLoad: ({ context }: Contexte) => {
@@ -40,12 +49,6 @@ const ETAPES: readonly { code: string; label: string }[] = [
   { code: 'HISTORIQUE', label: 'Historique' },
 ];
 
-const ISSUES: Record<string, string> = {
-  HONORE: 'Honoré',
-  NON_HONORE: 'Non honoré',
-  '': 'Sans issue',
-};
-
 const CONFIRMATIONS: Record<string, string> = {
   CONFIRME: 'Confirmé',
   ANNULE: 'Annulé',
@@ -59,12 +62,26 @@ function comptes(parCode: Record<string, number>, libelles: Record<string, strin
     .filter((compte) => compte.value > 0);
 }
 
-function Tuile({ label, valeur }: { label: string; valeur: number }) {
+function Tuile({
+  label,
+  valeur,
+  total,
+  affichage,
+}: {
+  label: string;
+  valeur: number;
+  total: number;
+  affichage: Affichage;
+}) {
+  const texte =
+    affichage === 'taux'
+      ? formatRateOrNone(total === 0 ? null : Math.round((valeur / total) * 1000) / 10)
+      : formatNumber(valeur);
   return (
     <Card>
       <CardContent className="flex flex-col gap-1 py-4">
         <span className="text-[0.8125rem] text-muted-foreground">{label}</span>
-        <span className="text-2xl font-[700] tabular-nums">{formatNumber(valeur)}</span>
+        <span className="text-2xl font-[700] tabular-nums">{texte}</span>
       </CardContent>
     </Card>
   );
@@ -92,7 +109,15 @@ function Repartition({
   );
 }
 
-function Synthese({ synthese }: { synthese: SyntheseRendezVous }) {
+function Synthese({
+  synthese,
+  type,
+  affichage,
+}: {
+  synthese: SyntheseRendezVous;
+  type: string;
+  affichage: Affichage;
+}) {
   const parType = synthese.parType.map((ligne) => ({
     id: ligne.code,
     label: ligne.libelle,
@@ -106,27 +131,45 @@ function Synthese({ synthese }: { synthese: SyntheseRendezVous }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Tuile label="Total" valeur={synthese.total} />
+        <Tuile label="Total" valeur={synthese.total} total={synthese.total} affichage="nombre" />
         {ETAPES.map((etape) => (
-          <Tuile key={etape.code} label={etape.label} valeur={synthese.parEtape[etape.code] ?? 0} />
+          <Tuile
+            key={etape.code}
+            label={etape.label}
+            valeur={synthese.parEtape[etape.code] ?? 0}
+            total={synthese.total}
+            affichage={affichage}
+          />
         ))}
-        <Tuile label="Reportés" valeur={synthese.reportes} />
+        <Tuile
+          label="Reportés"
+          valeur={synthese.reportes}
+          total={synthese.total}
+          affichage={affichage}
+        />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Repartition titre="Issue" items={comptes(synthese.parIssue, ISSUES)} anneau />
         <Repartition
           titre="Confirmation"
           items={comptes(synthese.parConfirmation, CONFIRMATIONS)}
           anneau
         />
         <Repartition titre="Type de rendez-vous" items={parType} />
-        <Repartition titre="Site" items={parSite} />
+        {type === 'RV_SITE' ? <Repartition titre="Site" items={parSite} /> : null}
       </div>
     </div>
   );
 }
 
-function Contenu({ requete }: { requete: UseQueryResult<SyntheseRendezVous> }) {
+function Contenu({
+  requete,
+  type,
+  affichage,
+}: {
+  requete: UseQueryResult<SyntheseRendezVous>;
+  type: string;
+  affichage: Affichage;
+}) {
   if (requete.isError) {
     return (
       <QueryErrorState
@@ -138,13 +181,14 @@ function Contenu({ requete }: { requete: UseQueryResult<SyntheseRendezVous> }) {
     );
   }
   if (requete.data === undefined) return <Skeleton className="h-80 w-full rounded-lg" />;
-  return <Synthese synthese={requete.data} />;
+  return <Synthese synthese={requete.data} type={type} affichage={affichage} />;
 }
 
 function TableauDeBordRendezVousPage() {
   const [type, setType] = useState('');
   const [du, setDu] = useState('');
   const [au, setAu] = useState('');
+  const [affichage, setAffichage] = useState<Affichage>('nombre');
   const requete = useQuery({
     queryKey: ['accueil', 'rendez-vous', 'synthese', type, du, au],
     queryFn: () => lireSyntheseRendezVous(type, du, au),
@@ -153,6 +197,30 @@ function TableauDeBordRendezVousPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end gap-3">
         <h1 className="mr-auto text-xl font-[700]">Tableau de bord des rendez-vous</h1>
+        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+          <Button
+            type="button"
+            variant={affichage === 'nombre' ? 'default' : 'ghost'}
+            size="sm"
+            aria-pressed={affichage === 'nombre'}
+            onClick={() => {
+              setAffichage('nombre');
+            }}
+          >
+            Nombre
+          </Button>
+          <Button
+            type="button"
+            variant={affichage === 'taux' ? 'default' : 'ghost'}
+            size="sm"
+            aria-pressed={affichage === 'taux'}
+            onClick={() => {
+              setAffichage('taux');
+            }}
+          >
+            Taux
+          </Button>
+        </div>
         <Select
           items={TYPES}
           value={type === '' ? 'tous' : type}
@@ -171,6 +239,21 @@ function TableauDeBordRendezVousPage() {
             ))}
           </SelectContent>
         </Select>
+        {PERIODES_RAPIDES.map((periode) => (
+          <Button
+            key={periode.preset}
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const plage = plageDuPreset(periode.preset, new Date());
+              setDu(plage.du);
+              setAu(plage.au);
+            }}
+          >
+            {periode.label}
+          </Button>
+        ))}
         <Input
           type="date"
           value={du}
@@ -190,7 +273,7 @@ function TableauDeBordRendezVousPage() {
           }}
         />
       </div>
-      <Contenu requete={requete} />
+      <Contenu requete={requete} type={type} affichage={affichage} />
     </div>
   );
 }
