@@ -59,10 +59,19 @@ function filtresMemorises(): FiltresTableauDeBordRdv {
     const preset = PERIODES_RAPIDES.some((periode) => periode.preset === valeur.preset)
       ? (valeur.preset as PeriodePreset)
       : null;
+
+    let du = typeof valeur.du === 'string' ? valeur.du : '';
+    let au = typeof valeur.au === 'string' ? valeur.au : '';
+    if (preset !== null) {
+      const plage = plageDuPreset(preset, new Date());
+      du = plage.du;
+      au = plage.au;
+    }
+
     return {
       type: typeof valeur.type === 'string' ? valeur.type : '',
-      du: typeof valeur.du === 'string' ? valeur.du : '',
-      au: typeof valeur.au === 'string' ? valeur.au : '',
+      du,
+      au,
       preset,
       affichage: valeur.affichage === 'taux' ? 'taux' : 'nombre',
     };
