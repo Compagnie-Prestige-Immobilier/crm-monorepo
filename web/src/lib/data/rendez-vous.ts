@@ -1,6 +1,7 @@
 import { unwrap } from '@crm/api-client/query';
 
 import { type components } from '@/api/compat/serveur';
+import type { paths } from '@/api/schema';
 import { getApiClient } from '@/lib/api/browser';
 
 export type RendezVousObtenu = components['schemas']['RendezVousObtenu'];
@@ -77,6 +78,42 @@ export async function lireSyntheseRendezVous(
   return unwrap(
     await getApiClient().GET('/api/v1/rendez-vous/synthese', {
       params: { query: { ...(type === '' ? {} : { type }), du, au } },
+    }),
+  );
+}
+
+export type EtapeRendezVous = NonNullable<
+  NonNullable<paths['/api/v1/rendez-vous']['get']['parameters']['query']>['etape']
+>;
+
+export interface FiltresSynthese {
+  etape: EtapeRendezVous;
+  reporte: boolean;
+  type: string;
+  du: string;
+  au: string;
+}
+
+export const RENDEZ_VOUS_PAR_PAGE_SYNTHESE = 20;
+
+export async function lireRendezVousDeLaSynthese(
+  filtres: FiltresSynthese,
+  page: number,
+): Promise<ListeRendezVous> {
+  return unwrap(
+    await getApiClient().GET('/api/v1/rendez-vous', {
+      params: {
+        query: {
+          ...(filtres.etape === '' ? {} : { etape: filtres.etape }),
+          ...(filtres.type === '' ? {} : { type: filtres.type }),
+          ...(filtres.du === '' ? {} : { du: filtres.du }),
+          ...(filtres.au === '' ? {} : { au: filtres.au }),
+          reporte: filtres.reporte,
+          recontacterCompris: true,
+          page,
+          pageSize: RENDEZ_VOUS_PAR_PAGE_SYNTHESE,
+        },
+      },
     }),
   );
 }

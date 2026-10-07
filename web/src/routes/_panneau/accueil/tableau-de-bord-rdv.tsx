@@ -3,11 +3,15 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { TYPES } from '@/components/accueil/rendez-vous-filtres';
+import { DetailSynthese } from '@/components/accueil/rendez-vous-synthese-detail';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
-import { AnneauChart, BarresHorizontalesChart } from '@/components/dashboard/visites-charts';
+import {
+  AnneauChart,
+  BarresHorizontalesChart,
+  TuileWidget,
+} from '@/components/dashboard/visites-charts';
 import { QueryErrorState } from '@/components/query-error-state';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -17,8 +21,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { lireSyntheseRendezVous, type SyntheseRendezVous } from '@/lib/data/rendez-vous';
-import { formatNumber } from '@/lib/format';
+import {
+  type EtapeRendezVous,
+  type FiltresSynthese,
+  lireSyntheseRendezVous,
+  type SyntheseRendezVous,
+} from '@/lib/data/rendez-vous';
 import { type Contexte, RefusPermission } from '@/lib/guard';
 import { type NamedCount, peut } from '@/lib/types';
 
@@ -31,13 +39,47 @@ export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord-rdv')({
   component: TableauDeBordRendezVousPage,
 });
 
-const ETAPES: readonly { code: string; label: string }[] = [
-  { code: 'A_CONFIRMER', label: 'À confirmer' },
-  { code: 'A_RECONTACTER', label: 'À recontacter' },
-  { code: 'CONFIRMES', label: 'Confirmés' },
-  { code: 'EN_RETARD', label: 'En retard' },
-  { code: 'A_CLOSER', label: 'Présents, closing à compléter' },
-  { code: 'HISTORIQUE', label: 'Historique' },
+interface Carte {
+  label: string;
+  description: string;
+  etape: EtapeRendezVous;
+  reporte?: boolean;
+}
+
+const CARTES: readonly Carte[] = [
+  { label: 'Total', description: 'Tous les rendez-vous de la période.', etape: '' },
+  {
+    label: 'À confirmer',
+    description: 'Rendez-vous à venir que personne n’a encore confirmés.',
+    etape: 'A_CONFIRMER',
+  },
+  {
+    label: 'À recontacter',
+    description: 'La personne demande à être rappelée avant de fixer la date.',
+    etape: 'A_RECONTACTER',
+  },
+  { label: 'Confirmés', description: 'Rendez-vous à venir confirmés.', etape: 'CONFIRMES' },
+  {
+    label: 'En retard',
+    description: 'Date passée, sans présence, absence ni annulation enregistrée.',
+    etape: 'EN_RETARD',
+  },
+  {
+    label: 'Présents, closing à compléter',
+    description: 'La personne est venue ; le closing n’est pas encore qualifié.',
+    etape: 'A_CLOSER',
+  },
+  {
+    label: 'Historique',
+    description: 'Rendez-vous clos : closing qualifié, absence ou annulation.',
+    etape: 'HISTORIQUE',
+  },
+  {
+    label: 'Reportés',
+    description: 'Rendez-vous dont la date a été déplacée au moins une fois.',
+    etape: '',
+    reporte: true,
+  },
 ];
 
 const ISSUES: Record<string, string> = {
@@ -59,14 +101,37 @@ function comptes(parCode: Record<string, number>, libelles: Record<string, strin
     .filter((compte) => compte.value > 0);
 }
 
-function Tuile({ label, valeur }: { label: string; valeur: number }) {
+function valeurDe(carte: Carte, synthese: SyntheseRendezVous): number {
+  if (carte.reporte === true) return synthese.reportes;
+  if (carte.etape === '') return synthese.total;
+  return synthese.parEtape[carte.etape] ?? 0;
+}
+
+function Tuile({
+  carte,
+  valeur,
+  onOuvrir,
+}: {
+  carte: Carte;
+  valeur: number;
+  onOuvrir: () => void;
+}) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 py-4">
-        <span className="text-[0.8125rem] text-muted-foreground">{label}</span>
-        <span className="text-2xl font-[700] tabular-nums">{formatNumber(valeur)}</span>
-      </CardContent>
-    </Card>
+    <ChartCard
+      title={carte.label}
+      info={carte.description}
+      hauteur="compacte"
+      className="transition-colors hover:border-primary/40"
+    >
+      <button
+        type="button"
+        aria-label={`Voir les rendez-vous : ${carte.label}`}
+        className="h-full w-full cursor-pointer rounded-md text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        onClick={onOuvrir}
+      >
+        <TuileWidget valeur={valeur} libelle={carte.label} />
+      </button>
+    </ChartCard>
   );
 }
 
@@ -92,7 +157,13 @@ function Repartition({
   );
 }
 
-function Synthese({ synthese }: { synthese: SyntheseRendezVous }) {
+function Synthese({
+  synthese,
+  onOuvrir,
+}: {
+  synthese: SyntheseRendezVous;
+  onOuvrir: (carte: Carte) => void;
+}) {
   const parType = synthese.parType.map((ligne) => ({
     id: ligne.code,
     label: ligne.libelle,
@@ -105,12 +176,17 @@ function Synthese({ synthese }: { synthese: SyntheseRendezVous }) {
   }));
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Tuile label="Total" valeur={synthese.total} />
-        {ETAPES.map((etape) => (
-          <Tuile key={etape.code} label={etape.label} valeur={synthese.parEtape[etape.code] ?? 0} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {CARTES.map((carte) => (
+          <Tuile
+            key={carte.label}
+            carte={carte}
+            valeur={valeurDe(carte, synthese)}
+            onOuvrir={() => {
+              onOuvrir(carte);
+            }}
+          />
         ))}
-        <Tuile label="Reportés" valeur={synthese.reportes} />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Repartition titre="Issue" items={comptes(synthese.parIssue, ISSUES)} anneau />
@@ -126,7 +202,13 @@ function Synthese({ synthese }: { synthese: SyntheseRendezVous }) {
   );
 }
 
-function Contenu({ requete }: { requete: UseQueryResult<SyntheseRendezVous> }) {
+function Contenu({
+  requete,
+  onOuvrir,
+}: {
+  requete: UseQueryResult<SyntheseRendezVous>;
+  onOuvrir: (carte: Carte) => void;
+}) {
   if (requete.isError) {
     return (
       <QueryErrorState
@@ -138,13 +220,18 @@ function Contenu({ requete }: { requete: UseQueryResult<SyntheseRendezVous> }) {
     );
   }
   if (requete.data === undefined) return <Skeleton className="h-80 w-full rounded-lg" />;
-  return <Synthese synthese={requete.data} />;
+  return <Synthese synthese={requete.data} onOuvrir={onOuvrir} />;
 }
 
 function TableauDeBordRendezVousPage() {
   const [type, setType] = useState('');
   const [du, setDu] = useState('');
   const [au, setAu] = useState('');
+  const [ouverte, setOuverte] = useState<Carte | null>(null);
+  const filtresDetail: FiltresSynthese | null =
+    ouverte === null
+      ? null
+      : { etape: ouverte.etape, reporte: ouverte.reporte === true, type, du, au };
   const requete = useQuery({
     queryKey: ['accueil', 'rendez-vous', 'synthese', type, du, au],
     queryFn: () => lireSyntheseRendezVous(type, du, au),
@@ -190,7 +277,14 @@ function TableauDeBordRendezVousPage() {
           }}
         />
       </div>
-      <Contenu requete={requete} />
+      <Contenu requete={requete} onOuvrir={setOuverte} />
+      <DetailSynthese
+        titre={ouverte?.label ?? ''}
+        filtres={filtresDetail}
+        onClose={() => {
+          setOuverte(null);
+        }}
+      />
     </div>
   );
 }
