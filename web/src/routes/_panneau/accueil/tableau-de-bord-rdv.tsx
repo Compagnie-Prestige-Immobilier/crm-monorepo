@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { TYPES } from '@/components/accueil/rendez-vous-filtres';
-import { plageDuPreset } from '@/components/accueil/tableau-de-bord/periode';
+import { plageDuPreset, type PeriodePreset } from '@/components/accueil/tableau-de-bord/periode';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { AnneauChart, BarresHorizontalesChart } from '@/components/dashboard/visites-charts';
@@ -26,10 +26,50 @@ import { type NamedCount, peut } from '@/lib/types';
 
 type Affichage = 'nombre' | 'taux';
 
-const PERIODES_RAPIDES: readonly { preset: 'aujourdhui' | 'cette-semaine'; label: string }[] = [
+const PERIODES_RAPIDES: readonly { preset: PeriodePreset; label: string }[] = [
   { preset: 'aujourdhui', label: 'Aujourd’hui' },
   { preset: 'cette-semaine', label: 'Cette semaine' },
+  { preset: 'ce-mois', label: 'Ce mois-ci' },
 ];
+
+interface FiltresTableauDeBordRdv {
+  type: string;
+  du: string;
+  au: string;
+  preset: PeriodePreset | null;
+  affichage: Affichage;
+}
+
+const CLE_FILTRES = 'accueil.tableau-de-bord-rdv.filtres';
+
+const FILTRES_PAR_DEFAUT: FiltresTableauDeBordRdv = {
+  type: '',
+  du: '',
+  au: '',
+  preset: null,
+  affichage: 'nombre',
+};
+
+/** Les filtres restent posés d'une rubrique à l'autre : plus besoin de recliquer « Aujourd'hui ». */
+function filtresMemorises(): FiltresTableauDeBordRdv {
+  try {
+    const brut = localStorage.getItem(CLE_FILTRES);
+    if (brut === null) return FILTRES_PAR_DEFAUT;
+    const valeur = JSON.parse(brut) as Partial<FiltresTableauDeBordRdv>;
+    const preset = PERIODES_RAPIDES.some((periode) => periode.preset === valeur.preset)
+      ? (valeur.preset as PeriodePreset)
+      : null;
+    return {
+      type: typeof valeur.type === 'string' ? valeur.type : '',
+      du: typeof valeur.du === 'string' ? valeur.du : '',
+      au: typeof valeur.au === 'string' ? valeur.au : '',
+      preset,
+      affichage: valeur.affichage === 'taux' ? 'taux' : 'nombre',
+    };
+  } catch {
+    return FILTRES_PAR_DEFAUT;
+  }
+}
 
 export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord-rdv')({
   beforeLoad: ({ context }: Contexte) => {
@@ -185,10 +225,21 @@ function Contenu({
 }
 
 function TableauDeBordRendezVousPage() {
-  const [type, setType] = useState('');
-  const [du, setDu] = useState('');
-  const [au, setAu] = useState('');
-  const [affichage, setAffichage] = useState<Affichage>('nombre');
+  const [filtres, setFiltresState] = useState<FiltresTableauDeBordRdv>(filtresMemorises);
+  const { type, du, au, preset, affichage } = filtres;
+
+  function changer(patch: Partial<FiltresTableauDeBordRdv>): void {
+    setFiltresState((precedent) => {
+      const suivant = { ...precedent, ...patch };
+      try {
+        localStorage.setItem(CLE_FILTRES, JSON.stringify(suivant));
+      } catch {
+        // Sans stockage, les filtres ne survivent pas au changement de rubrique : acceptable.
+      }
+      return suivant;
+    });
+  }
+
   const requete = useQuery({
     queryKey: ['accueil', 'rendez-vous', 'synthese', type, du, au],
     queryFn: () => lireSyntheseRendezVous(type, du, au),
@@ -204,7 +255,7 @@ function TableauDeBordRendezVousPage() {
             size="sm"
             aria-pressed={affichage === 'nombre'}
             onClick={() => {
-              setAffichage('nombre');
+              changer({ affichage: 'nombre' });
             }}
           >
             Nombre
@@ -215,7 +266,7 @@ function TableauDeBordRendezVousPage() {
             size="sm"
             aria-pressed={affichage === 'taux'}
             onClick={() => {
-              setAffichage('taux');
+              changer({ affichage: 'taux' });
             }}
           >
             Taux
@@ -225,7 +276,7 @@ function TableauDeBordRendezVousPage() {
           items={TYPES}
           value={type === '' ? 'tous' : type}
           onValueChange={(valeur) => {
-            setType(valeur === 'tous' || valeur === null ? '' : valeur);
+            changer({ type: valeur === 'tous' || valeur === null ? '' : valeur });
           }}
         >
           <SelectTrigger aria-label="Type de rendez-vous" className="w-44">
@@ -243,12 +294,12 @@ function TableauDeBordRendezVousPage() {
           <Button
             key={periode.preset}
             type="button"
-            variant="outline"
+            variant={preset === periode.preset ? 'default' : 'outline'}
             size="sm"
+            aria-pressed={preset === periode.preset}
             onClick={() => {
               const plage = plageDuPreset(periode.preset, new Date());
-              setDu(plage.du);
-              setAu(plage.au);
+              changer({ preset: periode.preset, du: plage.du, au: plage.au });
             }}
           >
             {periode.label}
@@ -260,7 +311,7 @@ function TableauDeBordRendezVousPage() {
           aria-label="Du"
           className="w-40"
           onChange={(event) => {
-            setDu(event.target.value);
+            changer({ du: event.target.value, preset: null });
           }}
         />
         <Input
@@ -269,7 +320,7 @@ function TableauDeBordRendezVousPage() {
           aria-label="Au"
           className="w-40"
           onChange={(event) => {
-            setAu(event.target.value);
+            changer({ au: event.target.value, preset: null });
           }}
         />
       </div>
