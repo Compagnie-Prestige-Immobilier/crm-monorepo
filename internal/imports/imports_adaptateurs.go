@@ -1072,11 +1072,11 @@ func telephoneFacultatifImport(brut, region string, numero int, colonne, code, f
 	if brut == "" {
 		return nil, nil
 	}
-	e164, err := database.NormaliserTelephone(brut, region)
-	if err != nil {
+	telephone, lisible := telephoneImport(brut, region)
+	if !lisible {
 		return nil, refusImport(numero, colonne, code, fmt.Sprintf(format, brut))
 	}
-	return &e164, nil
+	return &telephone, nil
 }
 
 // « Non » dit ce que la personne n'est PAS : il ne choisit pas entre secteur

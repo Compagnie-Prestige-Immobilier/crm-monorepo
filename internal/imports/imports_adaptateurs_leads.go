@@ -2,8 +2,10 @@ package imports
 
 import (
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -254,4 +256,35 @@ func (r reponsesFormulaireImport) audit() map[string]*string {
 		"projet": r.projet, "zone": r.zone, "budget": r.budget,
 		"modalitePaiement": r.modalite, "echeance": r.echeance, "roleDecision": r.role,
 	}
+}
+
+// Les leads Meta arrivent en « p:+225… » et les numéros étrangers souvent sans
+// leur « + » : un numéro que la numérotation ne reconnaît pas reste celui que
+// le classeur donne, plutôt que de perdre le lead.
+var (
+	prefixeMetaImport = regexp.MustCompile(`(?i)^p\s*:`)
+	numeroBrutImport  = regexp.MustCompile(`^\+?[\d\s.\-()/]+$`)
+	chiffresMinImport = 8
+)
+
+func telephoneImport(brut, region string) (string, bool) {
+	brut = strings.TrimSpace(prefixeMetaImport.ReplaceAllString(strings.TrimSpace(brut), ""))
+	if brut == "" {
+		return "", false
+	}
+	if e164, err := database.NormaliserTelephone(brut, region); err == nil {
+		return e164, true
+	}
+	if !strings.HasPrefix(brut, "+") && !strings.HasPrefix(brut, "0") {
+		if e164, err := database.NormaliserTelephone("+"+brut, region); err == nil {
+			return e164, true
+		}
+	}
+	chiffres := 0
+	for _, r := range brut {
+		if r >= '0' && r <= '9' {
+			chiffres++
+		}
+	}
+	return brut, numeroBrutImport.MatchString(brut) && chiffres >= chiffresMinImport
 }
