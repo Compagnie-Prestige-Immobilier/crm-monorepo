@@ -3,7 +3,6 @@ package imports
 import (
 	"context"
 	"cpi-go/db"
-	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"log/slog"
 	"net/http"
@@ -112,8 +111,8 @@ func (s *service) rattraperUnClasseur(ctx context.Context, jobID, chemin string)
 // Un numéro illisible n'est pas une erreur : la ligne n'a pas donné de fiche,
 // il n'y a donc rien à rattraper pour elle.
 func telephoneLisibleImport(brut, region string) string {
-	numero, err := database.NormaliserTelephone(strings.TrimSpace(brut), region)
-	if err != nil {
+	numero, lisible := telephoneImport(brut, region)
+	if !lisible {
 		return ""
 	}
 	return numero
