@@ -15,7 +15,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from 'lucide-react';
 import { useState } from 'react';
 import {
   Calendar,
@@ -35,11 +35,12 @@ import { FichePopup } from '@/components/accueil/fiche-popup';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CLE_RENDEZ_VOUS,
+  lienExportRendezVousEntre,
   lireRendezVousEntre,
   type RendezVousObtenu,
 } from '@/lib/data/rendez-vous';
@@ -192,7 +193,7 @@ function Rendu({ event }: EventProps<Evenement>) {
   );
 }
 
-export function RendezVousAgenda() {
+export function RendezVousAgenda({ peutExporter }: { peutExporter: boolean }) {
   const [date, setDate] = useState(() => new Date());
   const [vue, setVue] = useState<View>(() => (window.innerWidth < 640 ? 'day' : 'week'));
   const [closingDe, setClosingDe] = useState<RendezVousObtenu | null>(null);
@@ -217,13 +218,32 @@ export function RendezVousAgenda() {
             Plus de 200 rendez-vous cette semaine : seuls les 200 premiers sont affichés.
           </p>
         ) : null}
-        <ul aria-label="Légende" className="flex flex-wrap gap-2">
-          {LEGENDE.map((item) => (
-            <li key={item.texte}>
-              <Badge variant={item.ton}>{item.texte}</Badge>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-wrap items-center gap-2">
+          <ul aria-label="Légende" className="flex flex-wrap gap-2">
+            {LEGENDE.map((item) => (
+              <li key={item.texte}>
+                <Badge variant={item.ton}>{item.texte}</Badge>
+              </li>
+            ))}
+          </ul>
+          {peutExporter ? (
+            <a
+              href={
+                vue === 'day'
+                  ? lienExportRendezVousEntre(jour(date), jour(date))
+                  : lienExportRendezVousEntre(du, au)
+              }
+              className={buttonVariants({
+                variant: 'outline',
+                size: 'sm',
+                className: 'ml-auto gap-1.5',
+              })}
+            >
+              <DownloadIcon className="size-3.5" aria-hidden="true" />
+              {vue === 'day' ? 'Exporter le jour' : 'Exporter la semaine'}
+            </a>
+          ) : null}
+        </div>
         <Calendar<Evenement>
           localizer={localisateur}
           culture="fr"
