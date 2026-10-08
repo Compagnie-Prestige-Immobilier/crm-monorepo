@@ -15,6 +15,7 @@ import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { MethodeFiche } from '@/components/prospects/methode-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
+import { ReponsesFormulaire } from '@/components/prospects/reponses-formulaire';
 import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
 import { SuiviRendezVous, SuiviRendezVousBadges } from '@/components/prospects/suivi-rendez-vous';
 import {
@@ -179,6 +180,7 @@ export function ProspectDetailView({
         <div className="flex min-w-0 flex-col gap-6">
           <FicheProspect prospect={prospect} />
           <ChampsAjoutes prospect={prospect} />
+          <ReponsesFormulaire prospect={prospect} />
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
 import { chiffresDe } from '@/components/prospects/prospect-detail-view';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
+import { ReponsesFormulaire } from '@/components/prospects/reponses-formulaire';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { HistoireDeLaFiche } from '@/components/prospects/histoire-fiche';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
@@ -564,6 +565,7 @@ export function GrandPublicProspectDetail({
           </Card>
 
           <ChampsAjoutes prospect={prospect} />
+          <ReponsesFormulaire prospect={prospect} />
         </div>
       </div>
 

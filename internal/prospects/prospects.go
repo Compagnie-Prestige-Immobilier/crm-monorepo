@@ -222,6 +222,7 @@ type Prospect struct {
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
 	OriginLabel              *string           `json:"originLabel"`
 	CampagneMarketing        *string           `json:"campagneMarketing" doc:"Campagne publicitaire nommée par la colonne Canal du classeur des leads."`
+	ReponsesFormulaire       FormulaireMeta    `json:"reponsesFormulaire" doc:"Réponses au formulaire Meta, reprises telles quelles du classeur des leads."`
 	ARevoirAt                *string           `json:"aRevoirAt"`
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
 	RendezVousConfirmation   *string           `json:"rendezVousConfirmation" enum:"CONFIRME,ANNULE,A_RECONTACTER"`
@@ -1342,4 +1343,14 @@ func Monter(api huma.API, d *socle.Deps) {
 	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)
 	prospectMonterRendezVous(api, s)
+}
+
+// Les questions du formulaire Meta, sans interprétation : une case vide reste nulle.
+type FormulaireMeta struct {
+	Projet           *string `json:"projet" doc:"Quel est votre projet ?"`
+	Zone             *string `json:"zone" doc:"Dans quelle zone recherchez-vous ?"`
+	Budget           *string `json:"budget" doc:"Budget / salaire."`
+	ModalitePaiement *string `json:"modalitePaiement" doc:"Quelle modalité de paiement vous convient le mieux ?"`
+	Echeance         *string `json:"echeance" doc:"Quand souhaitez-vous concrétiser votre projet ?"`
+	RoleDecision     *string `json:"roleDecision" doc:"Quel est votre rôle dans la décision d'achat ?"`
 }
