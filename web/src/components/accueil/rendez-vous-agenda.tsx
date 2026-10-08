@@ -228,7 +228,11 @@ export function RendezVousAgenda({ peutExporter }: { peutExporter: boolean }) {
           </ul>
           {peutExporter ? (
             <a
-              href={lienExportRendezVousEntre(du, au)}
+              href={
+                vue === 'day'
+                  ? lienExportRendezVousEntre(jour(date), jour(date))
+                  : lienExportRendezVousEntre(du, au)
+              }
               className={buttonVariants({
                 variant: 'outline',
                 size: 'sm',
@@ -236,7 +240,7 @@ export function RendezVousAgenda({ peutExporter }: { peutExporter: boolean }) {
               })}
             >
               <DownloadIcon className="size-3.5" aria-hidden="true" />
-              Exporter la semaine
+              {vue === 'day' ? 'Exporter le jour' : 'Exporter la semaine'}
             </a>
           ) : null}
         </div>
