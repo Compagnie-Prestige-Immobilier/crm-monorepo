@@ -49,6 +49,11 @@ export function lienExportRendezVous(filtres: FiltresRendezVous): string {
   return `/api/v1/export/rendez-vous.xlsx?${new URLSearchParams(query(filtres)).toString()}`;
 }
 
+/** Même export, borné à la période affichée dans l'agenda. */
+export function lienExportRendezVousEntre(du: string, au: string): string {
+  return `/api/v1/export/rendez-vous.xlsx?${new URLSearchParams({ du, au }).toString()}`;
+}
+
 export async function lireClosing(id: string): Promise<{
   closing: Closing;
   sites: string[];
