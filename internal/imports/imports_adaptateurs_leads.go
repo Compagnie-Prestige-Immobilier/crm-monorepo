@@ -213,3 +213,45 @@ func dateSansJourFeuilleImport(date dateLueImport, maintenant time.Time, numero 
 	return maintenant, refusImport(numero, enteteCreeLeImport, codeDateCorrigeeImport,
 		fmt.Sprintf("« %s » est à venir ou illisible : la fiche prend l’heure du relevé.", date.brut))
 }
+
+// Les questions ajoutées au formulaire Meta en octobre 2026. Les réponses sont
+// saisies librement par le prospect, souvent dans la mauvaise case : elles
+// passent telles quelles sur la fiche, sans jamais décider de rien.
+const (
+	enteteFormulaireProjetImport   = "Quel est votre projet ?"
+	enteteFormulaireZoneImport     = "Dans quelle zone recherchez-vous ?"
+	enteteFormulaireBudgetImport   = "Budget / salaire"
+	enteteFormulaireModaliteImport = "Quelle modalité de paiement vous convient le mieux ?"
+	enteteFormulaireEcheanceImport = "Quand souhaitez-vous concrétiser votre projet ?"
+	enteteFormulaireRoleImport     = "Quel est votre rôle dans la décision d’achat ?"
+)
+
+type reponsesFormulaireImport struct {
+	projet, zone, budget, modalite, echeance, role *string
+}
+
+func reponsesFormulaireGrandPublicImport(cellules map[string]string) reponsesFormulaireImport {
+	reponse := func(entete string) *string { return couperImport(cellules[entete], remarqueImportMax) }
+	return reponsesFormulaireImport{
+		projet: reponse(enteteFormulaireProjetImport), zone: reponse(enteteFormulaireZoneImport),
+		budget: reponse(enteteFormulaireBudgetImport), modalite: reponse(enteteFormulaireModaliteImport),
+		echeance: reponse(enteteFormulaireEcheanceImport), role: reponse(enteteFormulaireRoleImport),
+	}
+}
+
+func (r reponsesFormulaireImport) inserer(p *db.InsertImportProspectGrandPublicParams) {
+	p.FormulaireProjet, p.FormulaireZone, p.FormulaireBudget = r.projet, r.zone, r.budget
+	p.FormulaireModalitePaiement, p.FormulaireEcheance, p.FormulaireRoleDecision = r.modalite, r.echeance, r.role
+}
+
+func (r reponsesFormulaireImport) mettreAJour(p *db.ImportMettreAJourProspectGrandPublicParams) {
+	p.FormulaireProjet, p.FormulaireZone, p.FormulaireBudget = r.projet, r.zone, r.budget
+	p.FormulaireModalitePaiement, p.FormulaireEcheance, p.FormulaireRoleDecision = r.modalite, r.echeance, r.role
+}
+
+func (r reponsesFormulaireImport) audit() map[string]*string {
+	return map[string]*string{
+		"projet": r.projet, "zone": r.zone, "budget": r.budget,
+		"modalitePaiement": r.modalite, "echeance": r.echeance, "roleDecision": r.role,
+	}
+}

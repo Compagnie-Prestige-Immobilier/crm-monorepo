@@ -677,14 +677,20 @@ var colonnesGrandPublicImport = []colonneImport{
 	{entete: enteteEtapeImport, alias: []string{"Statut"}},
 	{entete: enteteProvenanceImport, alias: []string{"Source"}},
 	{entete: enteteReponseProspectImport, alias: []string{"Réponse", "Remarque", "Commentaire"}},
+	{entete: enteteFormulaireProjetImport},
+	{entete: enteteFormulaireZoneImport},
+	{entete: enteteFormulaireBudgetImport, alias: []string{"Budget", "Salaire"}},
+	{entete: enteteFormulaireModaliteImport},
+	{entete: enteteFormulaireEcheanceImport},
+	{entete: enteteFormulaireRoleImport},
 }
 
 func enteteGrandPublicImport(rang int) string { return colonnesGrandPublicImport[rang].entete }
 
-// Les six dernières colonnes n'existent pas dans le modèle : elles n'ont pas
+// Les douze dernières colonnes n'existent pas dans le modèle : elles n'ont pas
 // d'exemple à reconnaître.
 func exemplesGrandPublicImport() []string {
-	return append(exports.ExemplesGrandPublic(), "", "", "", "", "", "")
+	return append(exports.ExemplesGrandPublic(), make([]string, 12)...)
 }
 
 var (
@@ -731,6 +737,7 @@ type ligneGrandPublicImport struct {
 	modeEpargne                                            *db.ModeEpargne
 	paysID, villeResidence, whatsapp, relaisNom, relaisTel *string
 	feuille, remarque, campagne                            *string
+	formulaire                                             reponsesFormulaireImport
 	// Le Canal cite une plateforme d'enrôlement : la personne n'existe que
 	// là-bas, sa ligne se compte sans jamais entrer dans les fiches.
 	plateforme bool
@@ -943,8 +950,9 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 		profession: couperImport(cellules[enteteGrandPublicImport(3)], 120),
 		syndicatID: syndicatID, banqueID: banqueID,
 		typeProspect: typeProspect, dureeSystemeMois: duree,
-		feuille:  couperImport(cellules[feuilleImport], 200),
-		remarque: couperImport(cellules[enteteGrandPublicImport(24)], remarqueImportMax),
+		feuille:    couperImport(cellules[feuilleImport], 200),
+		remarque:   couperImport(cellules[enteteGrandPublicImport(24)], remarqueImportMax),
+		formulaire: reponsesFormulaireGrandPublicImport(cellules),
 	}
 	provenanceEtDateGrandPublicImport(&ligne, cellules, etat)
 	if refus := completerSituationGrandPublicImport(&ligne, cellules, numero, etat); refus != nil {
@@ -1347,6 +1355,7 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			ClientCreatedAt: ligne.creeLe, ImportJobID: &c.jobID, ImportFeuille: ligne.feuille,
 			RemarqueImport: ligne.remarque, CampagneMarketing: ligne.campagne,
 		})
+		ligne.formulaire.inserer(&fiches[len(fiches)-1])
 	}
 	if err := executerLotImport(q.InsertImportProspectGrandPublic(ctx, fiches).Exec); err != nil {
 		return 0, nil, err
@@ -1414,10 +1423,12 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 	if err := executerLotImport(q.InsertImportProspectJourney(ctx, parcours).Exec); err != nil {
 		return false, err
 	}
-	rangs, err := q.ImportMettreAJourProspectGrandPublic(ctx, db.ImportMettreAJourProspectGrandPublicParams{
+	maj := db.ImportMettreAJourProspectGrandPublicParams{
 		ID: connue.id, CanalProvenanceID: ligne.canalID, RemarqueImport: ligne.remarque,
 		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email, CampagneMarketing: ligne.campagne,
-	})
+	}
+	ligne.formulaire.mettreAJour(&maj)
+	rangs, err := q.ImportMettreAJourProspectGrandPublic(ctx, maj)
 	if err != nil || rangs == 0 {
 		return false, err
 	}
@@ -1425,6 +1436,7 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 		map[string]any{
 			"canalProvenanceId": ligne.canalID, "remarqueImport": ligne.remarque,
 			"onglet": ligne.feuille, "campagneMarketing": ligne.campagne,
+			"reponsesFormulaire": ligne.formulaire.audit(),
 		}); err != nil {
 		return false, err
 	}
