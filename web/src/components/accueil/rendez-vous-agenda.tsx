@@ -32,11 +32,19 @@ import {
   tonDuCreneau,
 } from '@/components/accueil/rendez-vous-agenda-creneau';
 import { FichePopup } from '@/components/accueil/fiche-popup';
+import { TYPES } from '@/components/accueil/rendez-vous-filtres';
 import { etatDe } from '@/components/accueil/rendez-vous-tableau';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CLE_RENDEZ_VOUS,
@@ -70,6 +78,44 @@ const LEGENDE: readonly { texte: string; ton: 'warning' | 'info' | 'success' | '
   { texte: 'Présent', ton: 'success' },
   { texte: 'Annulé ou absent', ton: 'destructive' },
 ];
+
+const STATUTS: readonly { value: string; label: string }[] = [
+  { value: 'tous', label: 'Tous les statuts' },
+  ...LEGENDE.map((item) => ({ value: item.ton, label: item.texte })),
+];
+
+function Choix({
+  choix,
+  valeur,
+  libelle,
+  changer,
+}: {
+  choix: readonly { value: string; label: string }[];
+  valeur: string;
+  libelle: string;
+  changer: (valeur: string) => void;
+}) {
+  return (
+    <Select
+      items={choix}
+      value={valeur}
+      onValueChange={(choisi) => {
+        changer(choisi ?? 'tous');
+      }}
+    >
+      <SelectTrigger aria-label={libelle} className="w-44">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {choix.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 interface Evenement {
   title: string;
@@ -197,13 +243,18 @@ export function RendezVousAgenda() {
   const [vue, setVue] = useState<View>(() => (window.innerWidth < 640 ? 'day' : 'week'));
   const [closingDe, setClosingDe] = useState<RendezVousObtenu | null>(null);
   const [ficheDe, setFicheDe] = useState<string | null>(null);
+  const [type, setType] = useState('tous');
+  const [statut, setStatut] = useState('tous');
   const du = jour(startOfWeek(date, { weekStartsOn: 1 }));
   const au = jour(endOfWeek(date, { weekStartsOn: 1 }));
   const semaine = useQuery({
-    queryKey: [...CLE_RENDEZ_VOUS, 'agenda', du, au],
-    queryFn: () => lireRendezVousEntre(du, au),
+    queryKey: [...CLE_RENDEZ_VOUS, 'agenda', du, au, type],
+    queryFn: () => lireRendezVousEntre(du, au, type === 'tous' ? '' : type),
   });
-  const evenements = evenementsDe(semaine.data?.items ?? [], vue === 'week');
+  const recus = semaine.data?.items ?? [];
+  const visibles =
+    statut === 'tous' ? recus : recus.filter((fiche) => etatDe(fiche).ton === statut);
+  const evenements = evenementsDe(visibles, vue === 'week');
   const { min, max } = heures(evenements);
 
   return (
@@ -212,18 +263,22 @@ export function RendezVousAgenda() {
         {semaine.isError ? (
           <QueryErrorState error={semaine.error} onRetry={() => void semaine.refetch()} />
         ) : null}
-        {(semaine.data?.total ?? 0) > evenements.length ? (
+        {(semaine.data?.total ?? 0) > recus.length ? (
           <p className="text-sm text-warning">
             Plus de 200 rendez-vous cette semaine : seuls les 200 premiers sont affichés.
           </p>
         ) : null}
-        <ul aria-label="Légende" className="flex flex-wrap gap-2">
-          {LEGENDE.map((item) => (
-            <li key={item.texte}>
-              <Badge variant={item.ton}>{item.texte}</Badge>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-wrap items-center gap-3">
+          <Choix choix={STATUTS} valeur={statut} libelle="Statut" changer={setStatut} />
+          <Choix choix={TYPES} valeur={type} libelle="Type de rendez-vous" changer={setType} />
+          <ul aria-label="Légende" className="ml-auto flex flex-wrap gap-2">
+            {LEGENDE.map((item) => (
+              <li key={item.texte}>
+                <Badge variant={item.ton}>{item.texte}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
         <Calendar<Evenement>
           localizer={localisateur}
           culture="fr"

@@ -37,10 +37,14 @@ export async function lireRendezVous(filtres: FiltresRendezVous): Promise<ListeR
 }
 
 /** Une semaine d'agenda tient sous la borne de l'API ; `total` dit si elle déborde. */
-export async function lireRendezVousEntre(du: string, au: string): Promise<ListeRendezVous> {
+export async function lireRendezVousEntre(
+  du: string,
+  au: string,
+  type: string,
+): Promise<ListeRendezVous> {
   return unwrap(
     await getApiClient().GET('/api/v1/rendez-vous', {
-      params: { query: { du, au, page: 1, pageSize: 200 } },
+      params: { query: { ...(type === '' ? {} : { type }), du, au, page: 1, pageSize: 200 } },
     }),
   );
 }
