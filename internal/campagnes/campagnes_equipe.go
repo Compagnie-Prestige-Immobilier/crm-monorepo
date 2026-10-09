@@ -122,3 +122,21 @@ func monterCampagnesEquipe(api huma.API, s *service) {
 		Path: "/api/v1/lots-export/{id}/equipe",
 	}, s.campagneAjouterTeleconseiller)
 }
+
+// Au retrait, seuls les membres encore téléconseillers reprennent des fiches :
+// un compte dont le rôle a changé ne bloque pas la sortie d'un autre.
+func lotEquipeRestante(ctx context.Context, q *db.Queries, ids []string) ([]lotTeleconseiller, error) {
+	rows, err := q.Teleconseillers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
+			"Une campagne garde au moins un téléconseiller.")
+	}
+	equipe := make([]lotTeleconseiller, 0, len(rows))
+	for _, row := range rows {
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
+	}
+	return equipe, nil
+}
