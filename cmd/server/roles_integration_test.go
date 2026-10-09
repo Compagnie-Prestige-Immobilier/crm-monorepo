@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Gel repris le 30 septembre 2026 : l'observateur n'ouvre que le panneau, et les
-// permissions accordées à un compte s'administrent comme celles des rôles.
+// Gel repris le 9 octobre 2026 : le relevé des leads à la demande ne revient
+// qu'à l'administrateur, comme le dépôt d'un classeur.
 func TestMatriceRolesInchangee(t *testing.T) {
 	var attendu map[string][]socle.Role
-	contenu, err := os.ReadFile("testdata/matrice-roles-2026-09-30.json")
+	contenu, err := os.ReadFile("testdata/matrice-roles-2026-10-09.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -111,6 +111,13 @@ export async function rattraperFeuillesImport(
   return unwrap(await client.POST('/api/v1/imports/rattraper-feuilles', {}));
 }
 
+/** Relève tout de suite le classeur des leads SharePoint, même inchangé. */
+export async function releverLeadsMaintenant(
+  client: ApiClient = getApiClient(),
+): Promise<ImportJob> {
+  return unwrap(await client.POST('/api/v1/imports/releve-leads', {}));
+}
+
 // Le contrat engendré représente un fichier multipart par `string`; FormData
 // conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
 export async function createImportJob(

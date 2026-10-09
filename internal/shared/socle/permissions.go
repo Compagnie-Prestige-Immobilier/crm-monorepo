@@ -37,6 +37,7 @@ const (
 	PermissionCampagnesAdministrer     Permission = "campagnes.administrer"
 	PermissionAnalyticsSuperviser      Permission = "analytics.superviser"
 	PermissionImportsAdministrer       Permission = "imports.administrer"
+	PermissionImportsRelever           Permission = "imports.relever"
 	PermissionReferentielsSuperviser   Permission = "referentiels.superviser"
 	PermissionProspectsSuperviser      Permission = "prospects.superviser"
 	PermissionProspectsLire            Permission = "prospects.lire"
@@ -109,6 +110,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionCampagnesAdministrer:     {domaineCampagnes, "Supprimer une campagne", AdminSeul},
 	PermissionAnalyticsSuperviser:      {domaineChiffres, "Consulter les tableaux de bord de supervision", Encadrement},
 	PermissionImportsAdministrer:       {"Imports", "Importer des fichiers", AdminSeul},
+	PermissionImportsRelever:           {"Imports", "Relever tout de suite le classeur des leads SharePoint", AdminSeul},
 	PermissionReferentielsSuperviser:   {"Référentiels", "Modifier les référentiels métier", Encadrement},
 	PermissionProspectsSuperviser:      {domaineFiches, "Régler segments et paramètres CHUES, requalifier une fiche", Encadrement},
 	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},

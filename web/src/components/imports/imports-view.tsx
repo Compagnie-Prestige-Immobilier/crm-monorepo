@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FeuillesDuClasseur } from '@/components/imports/feuilles-du-classeur';
 import { RattraperFeuilles } from '@/components/imports/rattraper-feuilles';
+import { ReleveLeads } from '@/components/imports/releve-leads';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -476,8 +477,11 @@ function DepotClasseur({ kind }: { kind: UploadableImportKind }) {
         />
       )}
 
-      {/* RATTRAPAGE PONCTUEL, à retirer avec `rattraper-feuilles.tsx`. */}
-      <RattraperFeuilles />
+      <div className="flex flex-wrap gap-2">
+        <ReleveLeads />
+        {/* RATTRAPAGE PONCTUEL, à retirer avec `rattraper-feuilles.tsx`. */}
+        <RattraperFeuilles />
+      </div>
 
       {/* L'historique se consulte APRÈS coup, et rarement : replié, il laisse
           l'écran à son seul geste, déposer un classeur. */}
