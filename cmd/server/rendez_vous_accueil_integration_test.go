@@ -392,12 +392,14 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	}
 	corps["localite"], corps["superficie"], corps["prochaineAction"], corps["dateRelance"] = "Site test", "300 m²", "Signature du contrat", "2026-10-15"
 	corps["qualification"], corps["qualificationCommentaire"] = "Partenariat", "Coopérative d'enseignants"
+	corps["compteRendu"] = "Veut deux parcelles côte à côte"
 	corps["qualificationExterne"] = []string{"Négociation", "Visite du notaire"}
 	corps["dateVisite"], corps["heureVisite"] = "2026-10-02", "09:30"
 	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
 	cc.attend(statut, http.StatusUnprocessableEntity, "closing avant la venue", body)
 
-	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi, map[string]any{"issue": "HONORE"})
+	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi,
+		map[string]any{"issue": "HONORE", "suiteRencontre": "TRES_CHAUD", "commentaire": "Venu avec son épouse"})
 	accueil.attend(statut, http.StatusOK, "le comptoir note la venue", body)
 	attendreEtape(cc, fiche, "A_CLOSER")
 	statut, body = qualificationEnvoi(accueil, http.MethodPut, closing, corps)
@@ -441,6 +443,57 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	if contientFiche(body, fiche) {
 		t.Fatal("un rendez-vous closé quitte « À traiter »")
 	}
+
+	suiviDansLExport(accueil, fiche)
+}
+
+// L'export de l'agenda porte le suivi et le closing du rendez-vous mené par TestRendezVousDuReportAuClosing.
+func suiviDansLExport(b *banc, fiche string) {
+	b.t.Helper()
+	ligne := ligneExportRendezVous(b, fiche)
+	if ligne["Rendez-vous le"] == "" {
+		b.t.Fatalf("export de l'agenda sans date de rendez-vous : %v", ligne)
+	}
+	for colonne, attendu := range map[string]string{
+		"Étape": "Closing fait", "Reporté au": ligne["Rendez-vous le"],
+		"Suite rencontre": "Très chaud", "Commentaire du suivi": "Venu avec son épouse",
+		"Prochaine action": "Signature du contrat", "Date de relance": "15/10/2026",
+		"Compte-rendu du closing": "Veut deux parcelles côte à côte",
+	} {
+		if ligne[colonne] != attendu {
+			b.t.Fatalf("export de l'agenda, %s : %q au lieu de %q", colonne, ligne[colonne], attendu)
+		}
+	}
+}
+
+// La ligne d'une fiche dans le classeur des rendez-vous, colonne par colonne.
+func ligneExportRendezVous(b *banc, fiche string) map[string]string {
+	b.t.Helper()
+	var telephone string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "phoneE164" FROM "prospects" WHERE "id" = $1`, fiche).Scan(&telephone); err != nil {
+		b.t.Fatal(err)
+	}
+	statut, _, f := b.classeur("/api/v1/export/rendez-vous.xlsx")
+	if statut != http.StatusOK {
+		b.t.Fatalf("classeur des rendez-vous : %d", statut)
+	}
+	lignes, err := f.GetRows("Rendez-vous")
+	if err != nil || len(lignes) == 0 {
+		b.t.Fatalf("feuille des rendez-vous illisible : %v", err)
+	}
+	for _, l := range lignes[1:] {
+		if len(l) > 2 && l[2] == telephone {
+			ligne := map[string]string{}
+			for i, entete := range lignes[0] {
+				if i < len(l) {
+					ligne[entete] = l[i]
+				}
+			}
+			return ligne
+		}
+	}
+	b.t.Fatalf("le rendez-vous %s manque au classeur", fiche)
+	return nil
 }
 
 // Date et heure d'un report sont facultatives : sans heure, il attend dans

@@ -46,6 +46,10 @@ SELECT
   COALESCE(to_char(p."rendezVousRecontacterAt", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "recontacterAt",
   COALESCE(rp."fullName", '')::text AS "recontacterPar",
   COALESCE(cl."qualification", '')::text AS "qualification",
+  COALESCE(p."suiteRencontre", '')::text AS "suiteRencontre",
+  COALESCE(cl."prochaineAction", '')::text AS "prochaineAction",
+  COALESCE(to_char(cl."dateRelance", 'YYYY-MM-DD'), '')::text AS "dateRelance",
+  COALESCE(cl."compteRendu", '')::text AS "compteRendu",
   count(*) OVER () AS "total"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"

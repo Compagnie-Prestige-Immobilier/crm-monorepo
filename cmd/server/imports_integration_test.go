@@ -635,6 +635,30 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	if travaux := b.travauxDuClasseur(nomClasseurLeads); travaux != 1 {
 		t.Fatalf("un classeur inchangé ne se rejoue pas : %d travaux", travaux)
 	}
+	b.releveALaDemande(nomClasseurLeads)
+}
+
+// Le bouton relit le classeur inchangé, sous le nom de qui l'a pressé, et le
+// journal le garde ; un rôle sans la permission est refusé.
+func (b *banc) releveALaDemande(nomClasseur string) {
+	b.t.Helper()
+	statut, body := b.appel(http.MethodPost, "/api/v1/imports/releve-leads", nil, true)
+	b.attend(statut, http.StatusOK, "relevé à la demande", body)
+	if body["status"] != "succeeded" || body["mode"] != "APPLY" || body["requestedById"] != b.userID {
+		b.t.Fatalf("relevé à la demande : %v", body)
+	}
+	if travaux := b.travauxDuClasseur(nomClasseur); travaux != 2 {
+		b.t.Fatalf("le relevé à la demande relit un classeur inchangé : %d travaux", travaux)
+	}
+	var traces int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "audit_logs"
+		WHERE "action" = 'imports.releve_leads' AND "entityId" = $1 AND "userId" = $2`, body["id"], b.userID).Scan(&traces); err != nil || traces != 1 {
+		b.t.Fatalf("le relevé à la demande laisse une trace au journal : %d, %v", traces, err)
+	}
+	superviseur := nouveauBanc(b.t, "SUPERVISEUR")
+	superviseur.connecterImport()
+	statut, body = superviseur.appel(http.MethodPost, "/api/v1/imports/releve-leads", nil, true)
+	superviseur.attend(statut, http.StatusForbidden, "relevé sans la permission", body)
 }
 
 // Seuls les relevés du marketing sont des leads : un classeur CHUES déposé à la

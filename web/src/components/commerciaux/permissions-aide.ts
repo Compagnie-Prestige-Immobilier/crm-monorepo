@@ -55,6 +55,8 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'fiches.voir_segment': 'Voir le segment d’une fiche et l’historique de ses changements.',
   'formulaires.administrer': 'Régler les champs du formulaire de conversion.',
   'imports.administrer': 'Importer des fichiers de prospects ou de représentants.',
+  'imports.relever':
+    'Lancer tout de suite le relevé du classeur des leads SharePoint, même s’il n’a pas changé.',
   'notifications.administrer': 'Envoyer des notifications et régler leur envoi.',
   'panneau.acceder': 'Se connecter au panneau. Sans elle, le compte ne peut rien ouvrir.',
   'parametres.administrer': 'Régler les objectifs et les tableaux de bord par défaut.',

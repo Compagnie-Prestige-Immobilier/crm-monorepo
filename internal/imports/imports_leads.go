@@ -36,47 +36,80 @@ const (
 	libelleChampDate         = "Date"
 )
 
-var releveLeadsEnCours atomic.Bool
+var (
+	releveLeadsEnCours atomic.Bool
+	errReleveSansLien  = errors.New("relevé des leads : IMPORT_LEADS_URL absent")
+	errReleveEnCours   = errors.New("relevé des leads : un relevé tourne déjà")
+)
 
 func (s *service) releverLeads(ctx context.Context) error {
-	lien := strings.TrimSpace(socle.Env("IMPORT_LEADS_URL", ""))
-	if lien == "" || !releveLeadsEnCours.CompareAndSwap(false, true) {
+	_, err := s.releverLeadsPour(ctx, "", false)
+	if errors.Is(err, errReleveSansLien) || errors.Is(err, errReleveEnCours) {
 		return nil
+	}
+	return err
+}
+
+// Un relevé forcé relit le classeur même inchangé : après une correction de la
+// lecture, les lignes refusées entrent sans attendre que le marketing y touche.
+// Sans travail créé, l'identifiant rendu est vide.
+func (s *service) releverLeadsPour(ctx context.Context, demandeur string, force bool) (string, error) {
+	lien := strings.TrimSpace(socle.Env("IMPORT_LEADS_URL", ""))
+	if lien == "" {
+		return "", errReleveSansLien
+	}
+	if !releveLeadsEnCours.CompareAndSwap(false, true) {
+		return "", errReleveEnCours
 	}
 	defer releveLeadsEnCours.Store(false)
 
 	classeur, nom, err := telechargerLeads(ctx, lien, reglagesImports().maxOctets)
 	if err != nil {
-		return fmt.Errorf("relevé des leads : %w", err)
+		return "", fmt.Errorf("relevé des leads : %w", err)
 	}
 	somme := sha256.Sum256(classeur)
 	empreinte := hex.EncodeToString(somme[:])
-	deja, err := s.Q.AppSettingParCle(ctx, cleEmpreinteLeads)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
+	if !force {
+		if connu, err := s.empreinteConnue(ctx, empreinte); err != nil || connu {
+			return "", err
+		}
 	}
-	if err == nil && deja.Value == empreinte {
-		return nil
-	}
-	demandeur, err := s.Q.ImportDemandeurSysteme(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return errors.New("relevé des leads : aucun administrateur actif pour porter l’import")
-	}
+	demandeur, err = s.porteurDuReleve(ctx, demandeur)
 	if err != nil {
-		return err
+		return "", err
 	}
 	job, err := s.creerTravailImport(ctx, db.ImportKindPROSPECTSGRANDPUBLIC, demandeur, nom, bytes.NewReader(classeur))
 	if err != nil {
-		return fmt.Errorf("relevé des leads : %w", err)
+		return "", fmt.Errorf("relevé des leads : %w", err)
 	}
 	// L'empreinte se retient avant l'issue : un classeur refusé se lit dans
 	// l'écran Imports, il ne se rejoue pas tous les quarts d'heure.
 	if err := s.Q.UpsertAppSetting(ctx, db.UpsertAppSettingParams{
 		Key: cleEmpreinteLeads, Value: empreinte, UpdatedById: &demandeur,
 	}); err != nil {
-		return err
+		return "", err
 	}
-	return s.simulerPuisAppliquerLeads(ctx, job.ID, nom)
+	return job.ID, s.simulerPuisAppliquerLeads(ctx, job.ID, nom)
+}
+
+func (s *service) empreinteConnue(ctx context.Context, empreinte string) (bool, error) {
+	deja, err := s.Q.AppSettingParCle(ctx, cleEmpreinteLeads)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil && deja.Value == empreinte, err
+}
+
+// Le relevé horaire est porté par un administrateur actif ; le bouton, par qui l'a pressé.
+func (s *service) porteurDuReleve(ctx context.Context, demandeur string) (string, error) {
+	if demandeur != "" {
+		return demandeur, nil
+	}
+	demandeur, err := s.Q.ImportDemandeurSysteme(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", errors.New("relevé des leads : aucun administrateur actif pour porter l’import")
+	}
+	return demandeur, err
 }
 
 func (s *service) simulerPuisAppliquerLeads(ctx context.Context, jobID, nom string) error {
