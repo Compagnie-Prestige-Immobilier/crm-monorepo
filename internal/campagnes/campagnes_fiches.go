@@ -112,6 +112,7 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traite
 			TeleconseillerName: lotSiVide(lotValeurTexte(ligne.AssigneeName), "Non attribuée"),
 			Etat:               lotEtatDe(traitees[ligne.Position], ligne.ARappeler),
 			StatutLabel:        lotPointeurTexte(ligne.LastReasonLabel),
+			Remontee:           ligne.RemonteeLe != nil,
 		})
 	}
 	return fiches, nil

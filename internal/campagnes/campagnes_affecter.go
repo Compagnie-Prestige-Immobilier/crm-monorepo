@@ -181,13 +181,7 @@ func (s *service) campagneMembreLeMoinsCharge(ctx context.Context, row *db.LotPa
 	for _, charge := range charges {
 		fichesDe[lotValeurTexte(charge.AssigneeId)] = charge.Fiches
 	}
-	choisi := equipe[0].id
-	for _, membre := range equipe[1:] {
-		if fichesDe[membre.id] < fichesDe[choisi] {
-			choisi = membre.id
-		}
-	}
-	return choisi, nil
+	return lotMoinsCharge(equipe, fichesDe), nil
 }
 
 func (s *service) campagneAjouterFiche(ctx context.Context, row *db.LotParIdRow, fiche db.LotsActifsDeLaFicheParams, membre string) error {

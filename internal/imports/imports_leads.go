@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/campagnes"
 	"cpi-go/internal/notifications"
 	"cpi-go/internal/shared/socle"
 	"crypto/sha256"
@@ -62,6 +63,7 @@ func (s *service) releverLeadsPour(ctx context.Context, demandeur string, force 
 		return "", errReleveEnCours
 	}
 	defer releveLeadsEnCours.Store(false)
+	defer func() { s.rangerRemontees(ctx, demandeur) }()
 
 	classeur, nom, err := telechargerLeads(ctx, lien, reglagesImports().maxOctets)
 	if err != nil {
@@ -90,6 +92,23 @@ func (s *service) releverLeadsPour(ctx context.Context, demandeur string, force 
 		return "", err
 	}
 	return job.ID, s.simulerPuisAppliquerLeads(ctx, job.ID, nom)
+}
+
+// Le rangement suit chaque relevé, même d'un classeur inchangé : une fiche
+// laissée de côté (campagne en pause, équipe vide) entre dès qu'elle le peut.
+// Le relevé est fait : un rangement manqué se journalise sans le faire échouer.
+func (s *service) rangerRemontees(ctx context.Context, demandeur string) {
+	porteur, err := s.porteurDuReleve(ctx, demandeur)
+	if err == nil {
+		var rangees int
+		rangees, err = campagnes.RangerFichesRemontees(ctx, s.Deps, porteur)
+		if rangees > 0 {
+			slog.Info("relevé des leads : fiches remontées rangées dans leur campagne", "fiches", rangees)
+		}
+	}
+	if err != nil {
+		slog.Warn("relevé des leads : fiches remontées non rangées", "err", err)
+	}
 }
 
 func (s *service) empreinteConnue(ctx context.Context, empreinte string) (bool, error) {
