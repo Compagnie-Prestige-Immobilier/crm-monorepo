@@ -51,13 +51,15 @@ type RendezVousObtenu struct {
 }
 
 type RendezVousListInput struct {
-	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE, RDV_TELEPHONIQUE."`
-	Search   string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
-	Etape    string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,A_RECONTACTER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
-	Du       string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
-	Au       string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
-	Page     int32  `query:"page" minimum:"1" maximum:"10000"`
-	PageSize int32  `query:"pageSize" minimum:"1" maximum:"200"`
+	Type               string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE, RDV_TELEPHONIQUE."`
+	Search             string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
+	Etape              string `query:"etape" enum:",A_TRAITER,A_CONFIRMER,A_RECONTACTER,CONFIRMES,A_CLOSER,EN_RETARD,HISTORIQUE" doc:"A_TRAITER regroupe toutes les étapes hors historique."`
+	Du                 string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
+	Au                 string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
+	Reporte            bool   `query:"reporte" doc:"Seulement les rendez-vous reportés."`
+	RecontacterCompris bool   `query:"recontacterCompris" doc:"Garde les rendez-vous à recontacter dans la période, comme la synthèse."`
+	Page               int32  `query:"page" minimum:"1" maximum:"10000"`
+	PageSize           int32  `query:"pageSize" minimum:"1" maximum:"200"`
 }
 
 type RendezVousListOutput struct {
@@ -84,14 +86,16 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 		return nil, err
 	}
 	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{
-		TypeCode:  prospectVide(strings.TrimSpace(in.Type)),
-		Recherche: prospectVide(strings.TrimSpace(in.Search)),
-		Etape:     prospectVide(in.Etape),
-		DebutJour: socle.DebutDuJour(s.Cfg.TimeZone),
-		Du:        du,
-		Au:        au,
-		Prendre:   taille,
-		Sauter:    (page - 1) * taille,
+		TypeCode:           prospectVide(strings.TrimSpace(in.Type)),
+		Recherche:          prospectVide(strings.TrimSpace(in.Search)),
+		Etape:              prospectVide(in.Etape),
+		DebutJour:          socle.DebutDuJour(s.Cfg.TimeZone),
+		Du:                 du,
+		Au:                 au,
+		Reporte:            &in.Reporte,
+		RecontacterCompris: &in.RecontacterCompris,
+		Prendre:            taille,
+		Sauter:             (page - 1) * taille,
 	})
 	if err != nil {
 		return nil, err
