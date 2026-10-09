@@ -3,11 +3,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { TYPES } from '@/components/accueil/rendez-vous-filtres';
-<<<<<<< HEAD
 import { DetailSynthese } from '@/components/accueil/rendez-vous-synthese-detail';
-=======
 import { plageDuPreset, type PeriodePreset } from '@/components/accueil/tableau-de-bord/periode';
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import {
@@ -16,11 +13,7 @@ import {
   TuileWidget,
 } from '@/components/dashboard/visites-charts';
 import { QueryErrorState } from '@/components/query-error-state';
-<<<<<<< HEAD
-=======
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -30,17 +23,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-<<<<<<< HEAD
 import {
   type EtapeRendezVous,
   type FiltresSynthese,
   lireSyntheseRendezVous,
   type SyntheseRendezVous,
 } from '@/lib/data/rendez-vous';
-=======
-import { lireSyntheseRendezVous, type SyntheseRendezVous } from '@/lib/data/rendez-vous';
-import { formatNumber, formatRateOrNone } from '@/lib/format';
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
+import { formatRateOrNone } from '@/lib/format';
 import { type Contexte, RefusPermission } from '@/lib/guard';
 import { type NamedCount, peut } from '@/lib/types';
 
@@ -156,7 +145,6 @@ function comptes(parCode: Record<string, number>, libelles: Record<string, strin
     .filter((compte) => compte.value > 0);
 }
 
-<<<<<<< HEAD
 function valeurDe(carte: Carte, synthese: SyntheseRendezVous): number {
   if (carte.reporte === true) return synthese.reportes;
   if (carte.etape === '') return synthese.total;
@@ -166,12 +154,20 @@ function valeurDe(carte: Carte, synthese: SyntheseRendezVous): number {
 function Tuile({
   carte,
   valeur,
+  total,
+  affichage,
   onOuvrir,
 }: {
   carte: Carte;
   valeur: number;
+  total: number;
+  affichage: Affichage;
   onOuvrir: () => void;
 }) {
+  const taux =
+    affichage === 'taux'
+      ? formatRateOrNone(total === 0 ? null : Math.round((valeur / total) * 1000) / 10)
+      : undefined;
   return (
     <ChartCard
       title={carte.label}
@@ -185,33 +181,9 @@ function Tuile({
         className="h-full w-full cursor-pointer rounded-md text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         onClick={onOuvrir}
       >
-        <TuileWidget valeur={valeur} libelle={carte.label} />
+        <TuileWidget valeur={valeur} affichage={taux} libelle={carte.label} />
       </button>
     </ChartCard>
-=======
-function Tuile({
-  label,
-  valeur,
-  total,
-  affichage,
-}: {
-  label: string;
-  valeur: number;
-  total: number;
-  affichage: Affichage;
-}) {
-  const texte =
-    affichage === 'taux'
-      ? formatRateOrNone(total === 0 ? null : Math.round((valeur / total) * 1000) / 10)
-      : formatNumber(valeur);
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 py-4">
-        <span className="text-[0.8125rem] text-muted-foreground">{label}</span>
-        <span className="text-2xl font-[700] tabular-nums">{texte}</span>
-      </CardContent>
-    </Card>
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
   );
 }
 
@@ -239,19 +211,14 @@ function Repartition({
 
 function Synthese({
   synthese,
-<<<<<<< HEAD
-  onOuvrir,
-}: {
-  synthese: SyntheseRendezVous;
-  onOuvrir: (carte: Carte) => void;
-=======
   type,
   affichage,
+  onOuvrir,
 }: {
   synthese: SyntheseRendezVous;
   type: string;
   affichage: Affichage;
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
+  onOuvrir: (carte: Carte) => void;
 }) {
   const parType = synthese.parType.map((ligne) => ({
     id: ligne.code,
@@ -265,37 +232,19 @@ function Synthese({
   }));
   return (
     <div className="flex flex-col gap-6">
-<<<<<<< HEAD
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {CARTES.map((carte) => (
           <Tuile
             key={carte.label}
             carte={carte}
             valeur={valeurDe(carte, synthese)}
+            total={synthese.total}
+            affichage={carte === CARTES[0] ? 'nombre' : affichage}
             onOuvrir={() => {
               onOuvrir(carte);
             }}
           />
         ))}
-=======
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Tuile label="Total" valeur={synthese.total} total={synthese.total} affichage="nombre" />
-        {ETAPES.map((etape) => (
-          <Tuile
-            key={etape.code}
-            label={etape.label}
-            valeur={synthese.parEtape[etape.code] ?? 0}
-            total={synthese.total}
-            affichage={affichage}
-          />
-        ))}
-        <Tuile
-          label="Reportés"
-          valeur={synthese.reportes}
-          total={synthese.total}
-          affichage={affichage}
-        />
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Repartition
@@ -312,19 +261,14 @@ function Synthese({
 
 function Contenu({
   requete,
-<<<<<<< HEAD
-  onOuvrir,
-}: {
-  requete: UseQueryResult<SyntheseRendezVous>;
-  onOuvrir: (carte: Carte) => void;
-=======
   type,
   affichage,
+  onOuvrir,
 }: {
   requete: UseQueryResult<SyntheseRendezVous>;
   type: string;
   affichage: Affichage;
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
+  onOuvrir: (carte: Carte) => void;
 }) {
   if (requete.isError) {
     return (
@@ -337,21 +281,7 @@ function Contenu({
     );
   }
   if (requete.data === undefined) return <Skeleton className="h-80 w-full rounded-lg" />;
-<<<<<<< HEAD
-  return <Synthese synthese={requete.data} onOuvrir={onOuvrir} />;
-}
-
-function TableauDeBordRendezVousPage() {
-  const [type, setType] = useState('');
-  const [du, setDu] = useState('');
-  const [au, setAu] = useState('');
-  const [ouverte, setOuverte] = useState<Carte | null>(null);
-  const filtresDetail: FiltresSynthese | null =
-    ouverte === null
-      ? null
-      : { etape: ouverte.etape, reporte: ouverte.reporte === true, type, du, au };
-=======
-  return <Synthese synthese={requete.data} type={type} affichage={affichage} />;
+  return <Synthese synthese={requete.data} type={type} affichage={affichage} onOuvrir={onOuvrir} />;
 }
 
 function TableauDeBordRendezVousPage() {
@@ -370,7 +300,11 @@ function TableauDeBordRendezVousPage() {
     });
   }
 
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
+  const [ouverte, setOuverte] = useState<Carte | null>(null);
+  const filtresDetail: FiltresSynthese | null =
+    ouverte === null
+      ? null
+      : { etape: ouverte.etape, reporte: ouverte.reporte === true, type, du, au };
   const requete = useQuery({
     queryKey: ['accueil', 'rendez-vous', 'synthese', type, du, au],
     queryFn: () => lireSyntheseRendezVous(type, du, au),
@@ -455,8 +389,7 @@ function TableauDeBordRendezVousPage() {
           }}
         />
       </div>
-<<<<<<< HEAD
-      <Contenu requete={requete} onOuvrir={setOuverte} />
+      <Contenu requete={requete} type={type} affichage={affichage} onOuvrir={setOuverte} />
       <DetailSynthese
         titre={ouverte?.label ?? ''}
         filtres={filtresDetail}
@@ -464,9 +397,6 @@ function TableauDeBordRendezVousPage() {
           setOuverte(null);
         }}
       />
-=======
-      <Contenu requete={requete} type={type} affichage={affichage} />
->>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
     </div>
   );
 }
