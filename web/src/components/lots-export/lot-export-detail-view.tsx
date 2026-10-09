@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
+import { BadgeRemontees } from '@/components/lots-export/badge-remontees';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -80,6 +81,7 @@ function LotSummary({
   createdAt,
   createdByName,
   pausedAt,
+  remontees,
 }: {
   id: string;
   peutRegler: boolean;
@@ -91,6 +93,7 @@ function LotSummary({
   createdAt: string;
   createdByName: string;
   pausedAt: string | null;
+  remontees: { remontees: number; derniereRemontee: string };
 }) {
   return (
     <div className="max-w-2xl">
@@ -104,6 +107,7 @@ function LotSummary({
         {pausedAt === null ? null : (
           <Badge variant="warning">En pause depuis le {formatDate(pausedAt)}</Badge>
         )}
+        <BadgeRemontees {...remontees} />
         {peutRegler ? <BoutonPause id={id} enPause={pausedAt !== null} /> : null}
       </div>
       <p className="mt-1 text-[0.9375rem] text-muted-foreground">
@@ -512,6 +516,7 @@ export function LotExportDetailView({
           createdAt={createdAt}
           createdByName={createdByName}
           pausedAt={lot.data.pausedAt}
+          remontees={lot.data}
         />
         <LotDownloads id={id} name={name} telechargement={telechargement} />
       </div>

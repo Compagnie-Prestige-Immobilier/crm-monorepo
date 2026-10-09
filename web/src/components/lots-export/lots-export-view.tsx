@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { LotCreateDialog } from '@/components/lots-export/lot-create-dialog';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
+import { BadgeRemontees } from '@/components/lots-export/badge-remontees';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -389,6 +390,7 @@ function LotsContent({
                 ) : (
                   <Badge variant="warning">En pause</Badge>
                 )}
+                <BadgeRemontees remontees={lot.remontees} derniereRemontee={lot.derniereRemontee} />
               </h2>
               <div className="flex items-center gap-2">
                 <p className="text-[0.8125rem] text-muted-foreground">

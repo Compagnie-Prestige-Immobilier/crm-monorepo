@@ -4,7 +4,10 @@ SELECT l."id", l."name", l."cible", l."projet", l."filters",
        (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id"
          AND NOT (li."assigneeId" IS NULL AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
                     WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
-       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
+       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName",
+       (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL)::int AS "remontees",
+       COALESCE((SELECT to_char(max(li."remonteeLe"), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+                 FROM "lot_export_items" li WHERE li."lotId" = l."id"), '')::text AS "derniereRemontee"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
 WHERE l."id" = $1;
@@ -30,7 +33,10 @@ SELECT l."id", l."name", l."cible", l."projet", l."filters",
        (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id"
          AND NOT (li."assigneeId" IS NULL AND EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
                     WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
-       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
+       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName",
+       (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL)::int AS "remontees",
+       COALESCE((SELECT to_char(max(li."remonteeLe"), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+                 FROM "lot_export_items" li WHERE li."lotId" = l."id"), '')::text AS "derniereRemontee"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
 WHERE (sqlc.narg('search')::text IS NULL OR concat_ws(' ', l."name", u."fullName",
@@ -78,6 +84,8 @@ WITH fiches AS (
          p."projet" = 'CHUES' AS chues
   FROM "import_jobs" j
   JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
+  -- Une fiche remontée est déjà dans la campagne de son onglet : elle n'a plus rien à lancer.
+  WHERE NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id" AND li."remonteeLe" IS NOT NULL)
 )
 SELECT MAX("jobId")::text AS "id",
        MAX("fileName")::text AS "fileName",
@@ -344,7 +352,7 @@ WHERE i."lotId" = $1
         ELSE 'NON_TRAITEE' END);
 
 -- name: LotFichesProspects :many
-SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
+SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", i."remonteeLe",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
        COALESCE((SELECT cr."label" FROM "call_outcome_reasons" cr WHERE cr."id" = p."lastReasonId"), '')::text AS "lastReasonLabel",
        EXISTS (SELECT 1 FROM "scheduled_callbacks" sc JOIN "prospects" pr ON pr."id" = sc."prospectId"
@@ -363,7 +371,8 @@ WHERE i."lotId" = $1
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
         ELSE 'NON_TRAITEE' END)
-ORDER BY i."position"
+-- Les fiches remontées après le lancement passent devant : elles n'ont pas encore été vues.
+ORDER BY i."remonteeLe" IS NULL, i."position"
 LIMIT sqlc.arg('page_size')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 
 -- name: LotFichesProspectsCount :one
@@ -602,3 +611,43 @@ SELECT i."assigneeId", COUNT(*)::int AS fiches
 FROM "lot_export_items" i
 WHERE i."lotId" = $1 AND i."assigneeId" IS NOT NULL
 GROUP BY i."assigneeId";
+
+-- Une ligne complétée dans le classeur après le lancement de la campagne de son
+-- onglet rejoint cette campagne, la plus récente tirée de l'onglet, aux mêmes
+-- conditions que le tirage : même projet, même type, ni appelée, ni distribuée,
+-- ni perdue, ni inscrite. Une campagne en pause ne reçoit rien : la fiche reste
+-- sur sa ligne « relevé du … » du sélecteur.
+-- name: FichesRemonteesARanger :many
+SELECT c."prospectId"::text AS "prospectId", c."lotId"::text AS "lotId"
+FROM (
+  SELECT DISTINCT ON (p."id") p."id" AS "prospectId", l."id" AS "lotId", l."pausedAt"
+  FROM "lots_export" l
+  JOIN "import_jobs" ja ON ja."id" = l."filters"->>'importJobId'
+  JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+  JOIN "prospects" p ON p."importJobId" = jb."id" AND p."importFeuille" = l."filters"->>'importFeuille'
+  WHERE l."cible" = 'PROSPECTS'
+    AND NOT COALESCE((l."filters"->>'injoignables')::boolean, false)
+    AND COALESCE(l."filters"->>'segment', '') = ''
+    AND (l."projet" IS NULL OR p."projet" = l."projet")
+    AND (l."filters"->>'type' IS NULL OR p."type"::text = l."filters"->>'type')
+  ORDER BY p."id", l."createdAt" DESC, l."id" DESC
+) c
+JOIN "prospects" p ON p."id" = c."prospectId"
+JOIN "import_jobs" j ON j."id" = p."importJobId"
+JOIN "lots_export" l ON l."id" = c."lotId"
+WHERE c."pausedAt" IS NULL
+  AND j."createdAt" > l."createdAt"
+  AND p."deletedAt" IS NULL
+  AND p."statut" <> 'PERDU'
+  AND p."lastCallAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
+ORDER BY l."createdAt", c."lotId", p."id";
+
+-- Rien n'entre si la fiche a rejoint une campagne entre la lecture et l'écriture.
+-- name: RangerFicheRemontee :one
+INSERT INTO "lot_export_items" ("lotId", "prospectId", "position", "assigneeId", "day", "remonteeLe")
+SELECT @lot_id::text, @prospect_id::text, COALESCE(MAX(i."position"), 0) + 1, @assignee_id::text, 1, now()
+FROM "lot_export_items" i WHERE i."lotId" = @lot_id::text
+HAVING NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = @prospect_id::text)
+RETURNING "position";

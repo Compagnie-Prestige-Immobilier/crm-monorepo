@@ -501,6 +501,11 @@ function LigneFiche({
             {fiche.fullName}
           </Link>
         )}
+        {fiche.remontee ? (
+          <Badge variant="info" className="ml-2">
+            Remontée en retard
+          </Badge>
+        ) : null}
       </th>
       <TableCell className="tabular-nums">{formatPhone(fiche.phoneE164)}</TableCell>
       <TableCell>{fiche.teleconseillerName}</TableCell>

@@ -42,6 +42,7 @@ const (
 	lotDureeRepartition    = 120 * time.Second
 	lotCleNom              = "name"
 	lotCleVers             = "vers"
+	lotCleFiches           = "fiches"
 	lotCleTeleconseillerID = "teleconseillerId"
 )
 
@@ -106,18 +107,20 @@ type CampagneCreationBody struct {
 }
 
 type CampagneResume struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Cible          string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
-	Projet         *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-	ScopeLabel     string  `json:"scopeLabel"`
-	ItemCount      int     `json:"itemCount"`
-	CreatedByID    string  `json:"createdById"`
-	CreatedByName  string  `json:"createdByName"`
-	CreatedAt      string  `json:"createdAt"`
-	PausedAt       *string `json:"pausedAt"`
-	CallsSince     int     `json:"callsSince"`
-	FichesAppelees int     `json:"fichesAppelees"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Cible            string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
+	Projet           *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	ScopeLabel       string  `json:"scopeLabel"`
+	ItemCount        int     `json:"itemCount"`
+	CreatedByID      string  `json:"createdById"`
+	CreatedByName    string  `json:"createdByName"`
+	CreatedAt        string  `json:"createdAt"`
+	PausedAt         *string `json:"pausedAt"`
+	CallsSince       int     `json:"callsSince"`
+	FichesAppelees   int     `json:"fichesAppelees"`
+	Remontees        int     `json:"remontees" doc:"Fiches complétées dans le classeur après le lancement, entrées au relevé suivant."`
+	DerniereRemontee string  `json:"derniereRemontee" doc:"Jour du dernier ajout, vide tant qu'aucune fiche n'est remontée."`
 }
 
 type CampagneTentative struct {
@@ -196,6 +199,7 @@ type CampagneFiche struct {
 	TeleconseillerName string  `json:"teleconseillerName"`
 	Etat               string  `json:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME,HORS_PROJET"`
 	StatutLabel        *string `json:"statutLabel"`
+	Remontee           bool    `json:"remontee" doc:"Entrée après le lancement, à un relevé tardif du classeur."`
 }
 
 type lotDistribution struct {
@@ -369,24 +373,6 @@ func (s *service) lotEquipe(ctx context.Context, ids []string) ([]lotTeleconseil
 	equipe := make([]lotTeleconseiller, 0, len(ids))
 	for _, id := range ids {
 		row := parID[id]
-		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
-	}
-	return equipe, nil
-}
-
-// Au retrait, seuls les membres encore téléconseillers reprennent des fiches :
-// un compte dont le rôle a changé ne bloque pas la sortie d'un autre.
-func lotEquipeRestante(ctx context.Context, q *db.Queries, ids []string) ([]lotTeleconseiller, error) {
-	rows, err := q.Teleconseillers(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
-			"Une campagne garde au moins un téléconseiller.")
-	}
-	equipe := make([]lotTeleconseiller, 0, len(rows))
-	for _, row := range rows {
 		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
 	}
 	return equipe, nil
@@ -716,7 +702,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	if err := database.Auditer(ctx, q, createurID, "lot_export.create", "lot_export", lotID.String(), nil,
 		map[string]any{
 			lotCleNom: strings.TrimSpace(in.Body.Name), "cible": in.Body.Cible,
-			"projet": lotProjetTexte(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
+			"projet": lotProjetTexte(projetDuLot(&in.Body)), lotCleFiches: len(lotAffectations),
 			"teleconseillerIds": lotIdsDe(equipe),
 		}); err != nil {
 		return "", err
@@ -862,6 +848,7 @@ func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneR
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
 		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches,
+		Remontees: int(row.Remontees), DerniereRemontee: row.DerniereRemontee,
 	}, nil
 }
 
@@ -1415,7 +1402,7 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 		}
 		fiches += len(deplacees)
 	}
-	details["fiches"] = fiches
+	details[lotCleFiches] = fiches
 	if err := database.Auditer(ctx, q, auteur, action, "lot_export", row.ID, nil, details); err != nil {
 		return err
 	}
@@ -1432,7 +1419,7 @@ func (s *service) campagneSupprimer(ctx context.Context, in *CampagneIDInput) (*
 	auteur := socle.UtilisateurCourant(ctx).ID
 	avant := map[string]any{
 		lotCleNom: row.Name, "cible": string(row.Cible), "projet": lotProjetTexte(row.Projet),
-		"fiches": row.ItemCount, "createdById": row.CreatedById,
+		lotCleFiches: row.ItemCount, "createdById": row.CreatedById,
 		"teleconseillerIds": lotLireFiltres(row.Filters).Distribution.TeleconseillerIds,
 	}
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
