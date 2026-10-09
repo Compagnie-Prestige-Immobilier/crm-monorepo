@@ -2,7 +2,7 @@ module cpi-go
 
 go 1.26.2
 
-toolchain go1.26.8
+toolchain go1.26.9
 
 require (
 	github.com/danielgtaylor/huma/v2 v2.39.1
@@ -13,7 +13,7 @@ require (
 	github.com/nyaruka/phonenumbers v1.8.1
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/xuri/excelize/v2 v2.11.1-0.20260930021559-01a9ff32fb3c
+	github.com/xuri/excelize/v2 v2.11.1-0.20261003002531-6258dcebc4e2
 	golang.org/x/crypto v0.57.0
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.16.0
