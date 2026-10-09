@@ -3,7 +3,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { TYPES } from '@/components/accueil/rendez-vous-filtres';
+<<<<<<< HEAD
 import { DetailSynthese } from '@/components/accueil/rendez-vous-synthese-detail';
+=======
+import { plageDuPreset, type PeriodePreset } from '@/components/accueil/tableau-de-bord/periode';
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import {
@@ -12,6 +16,11 @@ import {
   TuileWidget,
 } from '@/components/dashboard/visites-charts';
 import { QueryErrorState } from '@/components/query-error-state';
+<<<<<<< HEAD
+=======
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -21,14 +30,66 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+<<<<<<< HEAD
 import {
   type EtapeRendezVous,
   type FiltresSynthese,
   lireSyntheseRendezVous,
   type SyntheseRendezVous,
 } from '@/lib/data/rendez-vous';
+=======
+import { lireSyntheseRendezVous, type SyntheseRendezVous } from '@/lib/data/rendez-vous';
+import { formatNumber, formatRateOrNone } from '@/lib/format';
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 import { type Contexte, RefusPermission } from '@/lib/guard';
 import { type NamedCount, peut } from '@/lib/types';
+
+type Affichage = 'nombre' | 'taux';
+
+const PERIODES_RAPIDES: readonly { preset: PeriodePreset; label: string }[] = [
+  { preset: 'aujourdhui', label: 'Aujourd’hui' },
+  { preset: 'cette-semaine', label: 'Cette semaine' },
+  { preset: 'ce-mois', label: 'Ce mois-ci' },
+];
+
+interface FiltresTableauDeBordRdv {
+  type: string;
+  du: string;
+  au: string;
+  preset: PeriodePreset | null;
+  affichage: Affichage;
+}
+
+const CLE_FILTRES = 'accueil.tableau-de-bord-rdv.filtres';
+
+const FILTRES_PAR_DEFAUT: FiltresTableauDeBordRdv = {
+  type: '',
+  du: '',
+  au: '',
+  preset: null,
+  affichage: 'nombre',
+};
+
+/** Les filtres restent posés d'une rubrique à l'autre : plus besoin de recliquer « Aujourd'hui ». */
+function filtresMemorises(): FiltresTableauDeBordRdv {
+  try {
+    const brut = localStorage.getItem(CLE_FILTRES);
+    if (brut === null) return FILTRES_PAR_DEFAUT;
+    const valeur = JSON.parse(brut) as Partial<FiltresTableauDeBordRdv>;
+    const preset = PERIODES_RAPIDES.some((periode) => periode.preset === valeur.preset)
+      ? (valeur.preset as PeriodePreset)
+      : null;
+    return {
+      type: typeof valeur.type === 'string' ? valeur.type : '',
+      du: typeof valeur.du === 'string' ? valeur.du : '',
+      au: typeof valeur.au === 'string' ? valeur.au : '',
+      preset,
+      affichage: valeur.affichage === 'taux' ? 'taux' : 'nombre',
+    };
+  } catch {
+    return FILTRES_PAR_DEFAUT;
+  }
+}
 
 export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord-rdv')({
   beforeLoad: ({ context }: Contexte) => {
@@ -82,12 +143,6 @@ const CARTES: readonly Carte[] = [
   },
 ];
 
-const ISSUES: Record<string, string> = {
-  HONORE: 'Honoré',
-  NON_HONORE: 'Non honoré',
-  '': 'Sans issue',
-};
-
 const CONFIRMATIONS: Record<string, string> = {
   CONFIRME: 'Confirmé',
   ANNULE: 'Annulé',
@@ -101,6 +156,7 @@ function comptes(parCode: Record<string, number>, libelles: Record<string, strin
     .filter((compte) => compte.value > 0);
 }
 
+<<<<<<< HEAD
 function valeurDe(carte: Carte, synthese: SyntheseRendezVous): number {
   if (carte.reporte === true) return synthese.reportes;
   if (carte.etape === '') return synthese.total;
@@ -132,6 +188,30 @@ function Tuile({
         <TuileWidget valeur={valeur} libelle={carte.label} />
       </button>
     </ChartCard>
+=======
+function Tuile({
+  label,
+  valeur,
+  total,
+  affichage,
+}: {
+  label: string;
+  valeur: number;
+  total: number;
+  affichage: Affichage;
+}) {
+  const texte =
+    affichage === 'taux'
+      ? formatRateOrNone(total === 0 ? null : Math.round((valeur / total) * 1000) / 10)
+      : formatNumber(valeur);
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-1 py-4">
+        <span className="text-[0.8125rem] text-muted-foreground">{label}</span>
+        <span className="text-2xl font-[700] tabular-nums">{texte}</span>
+      </CardContent>
+    </Card>
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
   );
 }
 
@@ -159,10 +239,19 @@ function Repartition({
 
 function Synthese({
   synthese,
+<<<<<<< HEAD
   onOuvrir,
 }: {
   synthese: SyntheseRendezVous;
   onOuvrir: (carte: Carte) => void;
+=======
+  type,
+  affichage,
+}: {
+  synthese: SyntheseRendezVous;
+  type: string;
+  affichage: Affichage;
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 }) {
   const parType = synthese.parType.map((ligne) => ({
     id: ligne.code,
@@ -176,6 +265,7 @@ function Synthese({
   }));
   return (
     <div className="flex flex-col gap-6">
+<<<<<<< HEAD
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {CARTES.map((carte) => (
           <Tuile
@@ -187,16 +277,34 @@ function Synthese({
             }}
           />
         ))}
+=======
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <Tuile label="Total" valeur={synthese.total} total={synthese.total} affichage="nombre" />
+        {ETAPES.map((etape) => (
+          <Tuile
+            key={etape.code}
+            label={etape.label}
+            valeur={synthese.parEtape[etape.code] ?? 0}
+            total={synthese.total}
+            affichage={affichage}
+          />
+        ))}
+        <Tuile
+          label="Reportés"
+          valeur={synthese.reportes}
+          total={synthese.total}
+          affichage={affichage}
+        />
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Repartition titre="Issue" items={comptes(synthese.parIssue, ISSUES)} anneau />
         <Repartition
           titre="Confirmation"
           items={comptes(synthese.parConfirmation, CONFIRMATIONS)}
           anneau
         />
         <Repartition titre="Type de rendez-vous" items={parType} />
-        <Repartition titre="Site" items={parSite} />
+        {type === 'RV_SITE' ? <Repartition titre="Site" items={parSite} /> : null}
       </div>
     </div>
   );
@@ -204,10 +312,19 @@ function Synthese({
 
 function Contenu({
   requete,
+<<<<<<< HEAD
   onOuvrir,
 }: {
   requete: UseQueryResult<SyntheseRendezVous>;
   onOuvrir: (carte: Carte) => void;
+=======
+  type,
+  affichage,
+}: {
+  requete: UseQueryResult<SyntheseRendezVous>;
+  type: string;
+  affichage: Affichage;
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
 }) {
   if (requete.isError) {
     return (
@@ -220,6 +337,7 @@ function Contenu({
     );
   }
   if (requete.data === undefined) return <Skeleton className="h-80 w-full rounded-lg" />;
+<<<<<<< HEAD
   return <Synthese synthese={requete.data} onOuvrir={onOuvrir} />;
 }
 
@@ -232,6 +350,27 @@ function TableauDeBordRendezVousPage() {
     ouverte === null
       ? null
       : { etape: ouverte.etape, reporte: ouverte.reporte === true, type, du, au };
+=======
+  return <Synthese synthese={requete.data} type={type} affichage={affichage} />;
+}
+
+function TableauDeBordRendezVousPage() {
+  const [filtres, setFiltresState] = useState<FiltresTableauDeBordRdv>(filtresMemorises);
+  const { type, du, au, preset, affichage } = filtres;
+
+  function changer(patch: Partial<FiltresTableauDeBordRdv>): void {
+    setFiltresState((precedent) => {
+      const suivant = { ...precedent, ...patch };
+      try {
+        localStorage.setItem(CLE_FILTRES, JSON.stringify(suivant));
+      } catch {
+        // Sans stockage, les filtres ne survivent pas au changement de rubrique : acceptable.
+      }
+      return suivant;
+    });
+  }
+
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
   const requete = useQuery({
     queryKey: ['accueil', 'rendez-vous', 'synthese', type, du, au],
     queryFn: () => lireSyntheseRendezVous(type, du, au),
@@ -240,11 +379,35 @@ function TableauDeBordRendezVousPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end gap-3">
         <h1 className="mr-auto text-xl font-[700]">Tableau de bord des rendez-vous</h1>
+        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+          <Button
+            type="button"
+            variant={affichage === 'nombre' ? 'default' : 'ghost'}
+            size="sm"
+            aria-pressed={affichage === 'nombre'}
+            onClick={() => {
+              changer({ affichage: 'nombre' });
+            }}
+          >
+            Nombre
+          </Button>
+          <Button
+            type="button"
+            variant={affichage === 'taux' ? 'default' : 'ghost'}
+            size="sm"
+            aria-pressed={affichage === 'taux'}
+            onClick={() => {
+              changer({ affichage: 'taux' });
+            }}
+          >
+            Taux
+          </Button>
+        </div>
         <Select
           items={TYPES}
           value={type === '' ? 'tous' : type}
           onValueChange={(valeur) => {
-            setType(valeur === 'tous' || valeur === null ? '' : valeur);
+            changer({ type: valeur === 'tous' || valeur === null ? '' : valeur });
           }}
         >
           <SelectTrigger aria-label="Type de rendez-vous" className="w-44">
@@ -258,13 +421,28 @@ function TableauDeBordRendezVousPage() {
             ))}
           </SelectContent>
         </Select>
+        {PERIODES_RAPIDES.map((periode) => (
+          <Button
+            key={periode.preset}
+            type="button"
+            variant={preset === periode.preset ? 'default' : 'outline'}
+            size="sm"
+            aria-pressed={preset === periode.preset}
+            onClick={() => {
+              const plage = plageDuPreset(periode.preset, new Date());
+              changer({ preset: periode.preset, du: plage.du, au: plage.au });
+            }}
+          >
+            {periode.label}
+          </Button>
+        ))}
         <Input
           type="date"
           value={du}
           aria-label="Du"
           className="w-40"
           onChange={(event) => {
-            setDu(event.target.value);
+            changer({ du: event.target.value, preset: null });
           }}
         />
         <Input
@@ -273,10 +451,11 @@ function TableauDeBordRendezVousPage() {
           aria-label="Au"
           className="w-40"
           onChange={(event) => {
-            setAu(event.target.value);
+            changer({ au: event.target.value, preset: null });
           }}
         />
       </div>
+<<<<<<< HEAD
       <Contenu requete={requete} onOuvrir={setOuverte} />
       <DetailSynthese
         titre={ouverte?.label ?? ''}
@@ -285,6 +464,9 @@ function TableauDeBordRendezVousPage() {
           setOuverte(null);
         }}
       />
+=======
+      <Contenu requete={requete} type={type} affichage={affichage} />
+>>>>>>> de5e213f88bc4c8a5e9b5cbeb4f1ad2cf2af17d4
     </div>
   );
 }

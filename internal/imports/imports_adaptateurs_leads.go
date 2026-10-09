@@ -2,8 +2,10 @@ package imports
 
 import (
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -212,4 +214,77 @@ func dateSansJourFeuilleImport(date dateLueImport, maintenant time.Time, numero 
 	}
 	return maintenant, refusImport(numero, enteteCreeLeImport, codeDateCorrigeeImport,
 		fmt.Sprintf("« %s » est à venir ou illisible : la fiche prend l’heure du relevé.", date.brut))
+}
+
+// Les questions ajoutées au formulaire Meta en octobre 2026. Les réponses sont
+// saisies librement par le prospect, souvent dans la mauvaise case : elles
+// passent telles quelles sur la fiche, sans jamais décider de rien.
+const (
+	enteteFormulaireProjetImport   = "Quel est votre projet ?"
+	enteteFormulaireZoneImport     = "Dans quelle zone recherchez-vous ?"
+	enteteFormulaireBudgetImport   = "Budget / salaire"
+	enteteFormulaireModaliteImport = "Quelle modalité de paiement vous convient le mieux ?"
+	enteteFormulaireEcheanceImport = "Quand souhaitez-vous concrétiser votre projet ?"
+	enteteFormulaireRoleImport     = "Quel est votre rôle dans la décision d’achat ?"
+)
+
+type reponsesFormulaireImport struct {
+	projet, zone, budget, modalite, echeance, role *string
+}
+
+func reponsesFormulaireGrandPublicImport(cellules map[string]string) reponsesFormulaireImport {
+	reponse := func(entete string) *string { return couperImport(cellules[entete], remarqueImportMax) }
+	return reponsesFormulaireImport{
+		projet: reponse(enteteFormulaireProjetImport), zone: reponse(enteteFormulaireZoneImport),
+		budget: reponse(enteteFormulaireBudgetImport), modalite: reponse(enteteFormulaireModaliteImport),
+		echeance: reponse(enteteFormulaireEcheanceImport), role: reponse(enteteFormulaireRoleImport),
+	}
+}
+
+func (r reponsesFormulaireImport) inserer(p *db.InsertImportProspectGrandPublicParams) {
+	p.FormulaireProjet, p.FormulaireZone, p.FormulaireBudget = r.projet, r.zone, r.budget
+	p.FormulaireModalitePaiement, p.FormulaireEcheance, p.FormulaireRoleDecision = r.modalite, r.echeance, r.role
+}
+
+func (r reponsesFormulaireImport) mettreAJour(p *db.ImportMettreAJourProspectGrandPublicParams) {
+	p.FormulaireProjet, p.FormulaireZone, p.FormulaireBudget = r.projet, r.zone, r.budget
+	p.FormulaireModalitePaiement, p.FormulaireEcheance, p.FormulaireRoleDecision = r.modalite, r.echeance, r.role
+}
+
+func (r reponsesFormulaireImport) audit() map[string]*string {
+	return map[string]*string{
+		"projet": r.projet, "zone": r.zone, "budget": r.budget,
+		"modalitePaiement": r.modalite, "echeance": r.echeance, "roleDecision": r.role,
+	}
+}
+
+// Les leads Meta arrivent en « p:+225… » et les numéros étrangers souvent sans
+// leur « + » : un numéro que la numérotation ne reconnaît pas reste celui que
+// le classeur donne, plutôt que de perdre le lead.
+var (
+	prefixeMetaImport = regexp.MustCompile(`(?i)^p\s*:`)
+	numeroBrutImport  = regexp.MustCompile(`^\+?[\d\s.\-()/]+$`)
+	chiffresMinImport = 8
+)
+
+func telephoneImport(brut, region string) (string, bool) {
+	brut = strings.TrimSpace(prefixeMetaImport.ReplaceAllString(strings.TrimSpace(brut), ""))
+	if brut == "" {
+		return "", false
+	}
+	if e164, err := database.NormaliserTelephone(brut, region); err == nil {
+		return e164, true
+	}
+	if !strings.HasPrefix(brut, "+") && !strings.HasPrefix(brut, "0") {
+		if e164, err := database.NormaliserTelephone("+"+brut, region); err == nil {
+			return e164, true
+		}
+	}
+	chiffres := 0
+	for _, r := range brut {
+		if r >= '0' && r <= '9' {
+			chiffres++
+		}
+	}
+	return brut, numeroBrutImport.MatchString(brut) && chiffres >= chiffresMinImport
 }
