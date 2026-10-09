@@ -2,7 +2,7 @@ module cpi-go
 
 go 1.26.2
 
-toolchain go1.26.8
+toolchain go1.26.9
 
 require (
 	github.com/danielgtaylor/huma/v2 v2.39.1
