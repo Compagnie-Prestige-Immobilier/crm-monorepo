@@ -68,8 +68,10 @@ WHERE (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
   AND (sqlc.narg('etape')::text IS NULL OR rdv."etape" = sqlc.narg('etape')::text
        OR (sqlc.narg('etape')::text = 'A_TRAITER' AND rdv."etape" <> 'HISTORIQUE'))
-  -- L'agenda ne garde pas le créneau d'un rendez-vous à recontacter.
-  AND (sqlc.narg('du')::timestamp IS NULL OR (rdv."quand" >= sqlc.narg('du')::timestamp AND rdv."etape" <> 'A_RECONTACTER'))
+  AND (sqlc.narg('reporte')::boolean IS NOT TRUE OR p."rendezVousReporteAt" IS NOT NULL)
+  -- L'agenda ne garde pas le créneau d'un rendez-vous à recontacter ; la synthèse le compte.
+  AND (sqlc.narg('du')::timestamp IS NULL OR (rdv."quand" >= sqlc.narg('du')::timestamp
+       AND (rdv."etape" <> 'A_RECONTACTER' OR sqlc.narg('recontacter_compris')::boolean IS TRUE)))
   AND (sqlc.narg('au')::timestamp IS NULL OR rdv."quand" < sqlc.narg('au')::timestamp)
   AND (sqlc.narg('recherche')::text IS NULL
        OR public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom"))

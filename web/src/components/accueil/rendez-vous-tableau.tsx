@@ -20,7 +20,7 @@ import { dakarNow } from '@/lib/data/visites';
 import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { peut } from '@/lib/types';
 
-function NomFiche({ fiche }: { fiche: RendezVousObtenu }) {
+export function NomFiche({ fiche }: { fiche: RendezVousObtenu }) {
   const { data: user } = useQuery(meQueryOptions);
   const [ouverte, setOuverte] = useState(false);
   const nom = `${fiche.prenom} ${fiche.nom}`;
@@ -99,7 +99,7 @@ function sectionDe(fiche: RendezVousObtenu, aujourdhui: string, demain: string):
   return jour === demain ? 'Demain' : 'Plus tard';
 }
 
-function quandDe(fiche: RendezVousObtenu): string {
+export function quandDe(fiche: RendezVousObtenu): string {
   if (fiche.etape === 'A_RECONTACTER') {
     return fiche.recontacterLe === ''
       ? 'Date à fixer'
@@ -127,10 +127,10 @@ function Recontact({ fiche }: { fiche: RendezVousObtenu }) {
   );
 }
 
-const lieuDe = (fiche: RendezVousObtenu): string =>
+export const lieuDe = (fiche: RendezVousObtenu): string =>
   fiche.site === '' ? fiche.type : `${fiche.type} · ${fiche.site}`;
 
-function Telephone({ fiche }: { fiche: RendezVousObtenu }) {
+export function Telephone({ fiche }: { fiche: RendezVousObtenu }) {
   if (fiche.phoneE164 === null) return null;
   return (
     <a href={`tel:${fiche.phoneE164}`} className="font-mono whitespace-nowrap text-primary">
