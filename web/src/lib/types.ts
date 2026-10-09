@@ -229,6 +229,7 @@ export const PERMISSIONS = [
   'fiches.voir_segment',
   'formulaires.administrer',
   'imports.administrer',
+  'imports.relever',
   'notifications.administrer',
   'panneau.acceder',
   'parametres.administrer',

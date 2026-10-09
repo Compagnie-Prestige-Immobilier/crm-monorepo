@@ -10,8 +10,10 @@ matrice est repris à `cmd/server/testdata/matrice-roles-2026-09-18.json`, 225
 routes. Ce qui suit décrit la construction du RBAC et garde le vocabulaire de
 l'époque : les mentions de `CCP` y sont historiques.
 
-Le 30 septembre 2026, le propriétaire a tranché deux points (D11, D12) et le
-gel est repris à `cmd/server/testdata/matrice-roles-2026-09-30.json`.
+Le 30 septembre 2026, le propriétaire a tranché deux points (D11, D12). Le 9
+octobre 2026, `imports.relever` (relever le classeur des leads à la demande)
+s'ajoute, réservée à l'administrateur par défaut, et le gel est repris à
+`cmd/server/testdata/matrice-roles-2026-10-09.json`.
 
 | #   | Décision                                                                                                                                                                                                                                                | Raison                                                                                                             |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

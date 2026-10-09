@@ -59,6 +59,7 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/imports/{id}/apply":             socle.PermissionImportsAdministrer,
 	"POST /api/v1/representants/import":           socle.PermissionImportsAdministrer,
 	cheminRattrapageFeuilles:                      socle.PermissionImportsAdministrer,
+	cheminReleveLeads:                             socle.PermissionImportsRelever,
 }
 
 type reglagesImport struct {
@@ -1073,5 +1074,6 @@ func Monter(api huma.API, d *socle.Deps) {
 		Summary: "Applique une simulation terminée : le même fichier est réécrit en base.",
 	}, s.appliquerImport)
 	rattrapageMonterRoute(api, s)
+	releveManuelMonterRoute(api, s)
 	representantsMonterRoutes(api, s)
 }

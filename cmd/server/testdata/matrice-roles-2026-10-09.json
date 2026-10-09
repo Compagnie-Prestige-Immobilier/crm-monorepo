@@ -660,6 +660,7 @@
   "POST /api/v1/imports/prospects": ["ADMIN"],
   "POST /api/v1/imports/prospects-grand-public": ["ADMIN"],
   "POST /api/v1/imports/rattraper-feuilles": ["ADMIN"],
+  "POST /api/v1/imports/releve-leads": ["ADMIN"],
   "POST /api/v1/imports/representants": ["ADMIN"],
   "POST /api/v1/imports/visites": ["ADMIN"],
   "POST /api/v1/imports/{id}/apply": ["ADMIN"],
