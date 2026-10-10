@@ -107,20 +107,21 @@ type CampagneCreationBody struct {
 }
 
 type CampagneResume struct {
-	ID               string  `json:"id"`
-	Name             string  `json:"name"`
-	Cible            string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
-	Projet           *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-	ScopeLabel       string  `json:"scopeLabel"`
-	ItemCount        int     `json:"itemCount"`
-	CreatedByID      string  `json:"createdById"`
-	CreatedByName    string  `json:"createdByName"`
-	CreatedAt        string  `json:"createdAt"`
-	PausedAt         *string `json:"pausedAt"`
-	CallsSince       int     `json:"callsSince"`
-	FichesAppelees   int     `json:"fichesAppelees"`
-	Remontees        int     `json:"remontees" doc:"Fiches complétées dans le classeur après le lancement, entrées au relevé suivant."`
-	DerniereRemontee string  `json:"derniereRemontee" doc:"Jour du dernier ajout, vide tant qu'aucune fiche n'est remontée."`
+	ID                string  `json:"id"`
+	Name              string  `json:"name"`
+	Cible             string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
+	Projet            *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	ScopeLabel        string  `json:"scopeLabel"`
+	ItemCount         int     `json:"itemCount"`
+	CreatedByID       string  `json:"createdById"`
+	CreatedByName     string  `json:"createdByName"`
+	CreatedAt         string  `json:"createdAt"`
+	PausedAt          *string `json:"pausedAt"`
+	CallsSince        int     `json:"callsSince"`
+	FichesAppelees    int     `json:"fichesAppelees"`
+	Remontees         int     `json:"remontees" doc:"Fiches complétées dans le classeur après le lancement, entrées au relevé suivant."`
+	RemonteesATraiter int     `json:"remonteesATraiter" doc:"Fiches remontées pas encore appelées : la campagne passe en tête de la liste."`
+	DerniereRemontee  string  `json:"derniereRemontee" doc:"Jour du dernier ajout, vide tant qu'aucune fiche n'est remontée."`
 }
 
 type CampagneTentative struct {
@@ -848,7 +849,7 @@ func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneR
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
 		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches,
-		Remontees: int(row.Remontees), DerniereRemontee: row.DerniereRemontee,
+		Remontees: int(row.Remontees), RemonteesATraiter: int(row.RemonteesATraiter), DerniereRemontee: row.DerniereRemontee,
 	}, nil
 }
 

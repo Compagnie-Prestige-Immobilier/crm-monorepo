@@ -114,3 +114,62 @@ func (b *bancCampagne) enPauseRienNEntre(deps *socle.Deps, lotID, prospectID str
 		b.t.Fatal(err)
 	}
 }
+
+// Une campagne qui a reçu des fiches remontées encore jamais appelées passe en
+// tête de la liste, même plus ancienne ; appelées, elle reprend sa place.
+func TestCampagneAvecRemonteesEnTete(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	jeton := uuid.NewString()
+	feuille := "Leads 02 oct 2026 " + jeton
+	classeur := "Suivi Campagne & Leads " + jeton + ".xlsx"
+	premier := b.travailDImport(classeur)
+	b.dansLeTravail(premier, b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU"))
+	ancienne := b.campagneDeLOnglet("Ancienne "+jeton, feuille, premier)
+	autre := "Leads 03 oct 2026 " + jeton
+	b.prospect(autre, "GRAND_PUBLIC", nil, "NOUVEAU")
+	recente := b.campagneDeLOnglet("Récente "+jeton, autre, "")
+
+	remontee := b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
+	b.dansLeTravail(b.travailDImport(classeur), remontee)
+	b.ranger(serviceDesImports(b.banc))
+	b.enTete(jeton, ancienne, ancienne, 1, "la campagne aux remontées à appeler passe devant la plus récente")
+
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "lastCallAt" = now() WHERE "id" = $1`, remontee); err != nil {
+		t.Fatal(err)
+	}
+	b.enTete(jeton, recente, ancienne, 0, "appelée, la campagne reprend l'ordre chronologique")
+}
+
+func (b *bancCampagne) campagneDeLOnglet(nom, feuille, travail string) string {
+	b.t.Helper()
+	prospects := map[string]any{"importFeuille": feuille, "projet": "GRAND_PUBLIC"}
+	if travail != "" {
+		prospects["importJobId"] = travail
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+		"name": nom, "cible": "PROSPECTS", "prospects": prospects,
+		"distribution": map[string]any{"teleconseillerIds": []string{b.agentA}, "fichesParJour": 5, "jours": 1},
+	})
+	b.attend(statut, http.StatusCreated, "campagne "+nom, body)
+	id, _ := body["id"].(string)
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, id) })
+	return id
+}
+
+func (b *bancCampagne) enTete(jeton, premiereAttendue, ancienne string, aTraiter float64, etape string) {
+	b.t.Helper()
+	statut, body := b.appelCampagne(http.MethodGet, "/api/v1/lots-export?search="+jeton, nil)
+	b.attend(statut, http.StatusOK, etape, body)
+	items, _ := body["items"].([]any)
+	if len(items) != 2 {
+		b.t.Fatalf("%s : deux campagnes attendues, %v", etape, items)
+	}
+	restantes := map[any]any{}
+	for _, item := range items {
+		campagne, _ := item.(map[string]any)
+		restantes[campagne["id"]] = campagne["remonteesATraiter"]
+	}
+	if premiere, _ := items[0].(map[string]any); premiere["id"] != premiereAttendue || restantes[ancienne] != aTraiter {
+		b.t.Fatalf("%s : %v", etape, items)
+	}
+}
