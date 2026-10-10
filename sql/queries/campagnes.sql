@@ -6,6 +6,9 @@ SELECT l."id", l."name", l."cible", l."projet", l."filters",
                     WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
        l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName",
        (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL)::int AS "remontees",
+       (SELECT count(*) FROM "lot_export_items" li JOIN "prospects" p ON p."id" = li."prospectId"
+         WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL AND p."deletedAt" IS NULL AND p."statut" <> 'PERDU'
+           AND (p."lastCallAt" IS NULL OR p."lastCallAt" < li."remonteeLe"))::int AS "remonteesATraiter",
        COALESCE((SELECT to_char(max(li."remonteeLe"), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
                  FROM "lot_export_items" li WHERE li."lotId" = l."id"), '')::text AS "derniereRemontee"
 FROM "lots_export" l
@@ -35,6 +38,9 @@ SELECT l."id", l."name", l."cible", l."projet", l."filters",
                     WHERE ip."prospectId" = li."prospectId" AND ip."disparueLe" IS NULL)))::int AS "itemCount",
        l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName",
        (SELECT count(*) FROM "lot_export_items" li WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL)::int AS "remontees",
+       (SELECT count(*) FROM "lot_export_items" li JOIN "prospects" p ON p."id" = li."prospectId"
+         WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL AND p."deletedAt" IS NULL AND p."statut" <> 'PERDU'
+           AND (p."lastCallAt" IS NULL OR p."lastCallAt" < li."remonteeLe"))::int AS "remonteesATraiter",
        COALESCE((SELECT to_char(max(li."remonteeLe"), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
                  FROM "lot_export_items" li WHERE li."lotId" = l."id"), '')::text AS "derniereRemontee"
 FROM "lots_export" l
@@ -49,7 +55,12 @@ WHERE (sqlc.narg('search')::text IS NULL OR concat_ws(' ', l."name", u."fullName
   AND (sqlc.narg('created_by')::text IS NULL OR l."createdById" = sqlc.narg('created_by'))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR l."createdAt" >= sqlc.narg('date_from'))
   AND (sqlc.narg('date_to')::timestamp IS NULL OR l."createdAt" <= sqlc.narg('date_to'))
-ORDER BY l."createdAt" DESC, l."id" DESC
+-- Une campagne qui a reçu des fiches remontées encore jamais appelées passe en
+-- tête, pour que le superviseur la voie d'office ; appelées, elle reprend sa place.
+ORDER BY EXISTS (SELECT 1 FROM "lot_export_items" li JOIN "prospects" p ON p."id" = li."prospectId"
+                 WHERE li."lotId" = l."id" AND li."remonteeLe" IS NOT NULL AND p."deletedAt" IS NULL AND p."statut" <> 'PERDU'
+                   AND (p."lastCallAt" IS NULL OR p."lastCallAt" < li."remonteeLe")) DESC,
+         l."createdAt" DESC, l."id" DESC
 LIMIT $1 OFFSET $2;
 
 -- name: InsertLot :exec

@@ -93,7 +93,7 @@ function LotSummary({
   createdAt: string;
   createdByName: string;
   pausedAt: string | null;
-  remontees: { remontees: number; derniereRemontee: string };
+  remontees: { remontees: number; remonteesATraiter: number; derniereRemontee: string };
 }) {
   return (
     <div className="max-w-2xl">

@@ -390,7 +390,7 @@ function LotsContent({
                 ) : (
                   <Badge variant="warning">En pause</Badge>
                 )}
-                <BadgeRemontees remontees={lot.remontees} derniereRemontee={lot.derniereRemontee} />
+                <BadgeRemontees {...lot} />
               </h2>
               <div className="flex items-center gap-2">
                 <p className="text-[0.8125rem] text-muted-foreground">
