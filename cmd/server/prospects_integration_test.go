@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -899,6 +901,65 @@ func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
 	}
 	if auteur != b.userID || montant != 150000 {
 		t.Fatalf("l’auteur et le montant de la conversion signée ne doivent pas être écrasés : %s, %d", auteur, montant)
+	}
+}
+
+// Deux ventes visent la même fiche convertie au même instant : une seule l'obtient,
+// l'autre voit son UPDATE affecter 0 ligne et ne doit pas enchaîner sur le parcours ni l'audit.
+func TestProspectVendreDoubleConcurrent(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	id := creerProspect(b, "Diouf", numeroSenegalais(16))["id"].(string)
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "statut" = 'CONVERTI' WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	chemin := "/api/v1/prospects/" + id + "/vendre"
+	statuts := make([]int, 2)
+	var depart, fin sync.WaitGroup
+	depart.Add(1)
+	for i := range statuts {
+		fin.Add(1)
+		go func(i int) {
+			defer fin.Done()
+			req, err := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+chemin, http.NoBody)
+			if err != nil {
+				return
+			}
+			req.Header.Set("Origin", b.ts.URL)
+			depart.Wait()
+			if resp, err := b.client.Do(req); err == nil {
+				statuts[i] = resp.StatusCode
+				_ = resp.Body.Close()
+			}
+		}(i)
+	}
+	depart.Done()
+	fin.Wait()
+	slices.Sort(statuts)
+	if statuts[0] != http.StatusUnprocessableEntity || statuts[1] != http.StatusOK {
+		t.Fatalf("une seule vente doit aboutir : %v", statuts)
+	}
+
+	var statutProspect, statutParcours string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT p."statut"::text, j."statut"::text FROM "prospects" p
+		 JOIN "prospect_journeys" j ON j."prospectId" = p."id" AND j."projet" = 'CHUES'
+		 WHERE p."id" = $1`, id).Scan(&statutProspect, &statutParcours); err != nil {
+		t.Fatal(err)
+	}
+	if statutProspect != "VENDU" || statutParcours != "VENDU" {
+		t.Fatalf("la fiche et son parcours doivent rester cohérents : %s / %s", statutProspect, statutParcours)
+	}
+
+	var audits int
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT count(*) FROM "audit_logs" WHERE "action" = 'prospect.vendre' AND "entityId" = $1`, id).Scan(&audits); err != nil {
+		t.Fatal(err)
+	}
+	if audits != 1 {
+		t.Fatalf("un seul geste de vente doit être audité : %d", audits)
 	}
 }
 

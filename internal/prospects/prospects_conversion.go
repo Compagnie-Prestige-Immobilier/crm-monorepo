@@ -215,8 +215,13 @@ func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (
 			"Seule une fiche convertie peut être marquée vendue.")
 	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
-		if _, err := q.MarquerProspectVendu(ctx, in.ID); err != nil {
+		lignes, err := q.MarquerProspectVendu(ctx, in.ID)
+		if err != nil {
 			return err
+		}
+		if lignes == 0 {
+			return socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_NOT_CONVERTI",
+				"Seule une fiche convertie peut être marquée vendue.")
 		}
 		if err := q.MarquerParcoursVendu(ctx, in.ID); err != nil {
 			return err
