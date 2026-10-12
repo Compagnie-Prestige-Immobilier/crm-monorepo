@@ -36,3 +36,43 @@ func TestImportLeadsGardeLesNumerosHorsNumerotation(t *testing.T) {
 		b.ficheLeadTest(telephone)
 	}
 }
+
+// Un numéro hors numérotation reste écrit tel quel, mais compacté : deux
+// relevés du même lead aux séparateurs différents doivent se reconnaître
+// comme un seul numéro plutôt que créer une fiche en double.
+func TestImportLeadsNumeroHorsNumerotationSeDedoublonneMalgreLesSeparateurs(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	base := time.Now().UnixNano() % 1_000_000
+	telephone := fmt.Sprintf("123%07d", base)
+	nomClasseur := fmt.Sprintf("Suivi Campagne & Leads Oct 2026 telephones doublon %d.xlsx", base)
+	b.nettoyerLeadsTest([]string{telephone}, nomClasseur)
+
+	entete := []string{"Date", "Nom complet", "Téléphone", "Canal"}
+	brutEspaces := telephone[:3] + " " + telephone[3:6] + " " + telephone[6:]
+	brutPoints := telephone[:3] + "." + telephone[3:6] + "." + telephone[6:]
+	lignes := [][]any{
+		{"02/10/2026", "Lead Doublon", brutEspaces, canalMetaChuesTest},
+		{"02/10/2026", "Lead Doublon", brutPoints, canalMetaChuesTest},
+	}
+
+	travail := b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{{nom: "Leads 01 oct 2026", lignes: lignes}}), nomClasseur)
+	b.ficheLeadTest(telephone)
+	if n := importCompterParTelephone(b, telephone); n != 1 {
+		t.Fatalf("les deux lignes doivent se reconnaître comme le même numéro : %d fiche(s)", n)
+	}
+	b.attendRapportTest(travail, "total=2 created=1 updated=0 skipped=1 errors=0 warnings=1",
+		map[string]float64{"PROSPECT_GP_IMPORT_LIGNE_REMPLACEE": 1})
+}
+
+func importCompterParTelephone(b *banc, telephone string) int {
+	b.t.Helper()
+	var n int
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT count(*)::int FROM "prospects" WHERE "phoneE164" = $1 AND "deletedAt" IS NULL`, telephone).Scan(&n); err != nil {
+		b.t.Fatal(err)
+	}
+	return n
+}

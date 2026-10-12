@@ -262,9 +262,10 @@ func (r reponsesFormulaireImport) audit() map[string]*string {
 // leur « + » : un numéro que la numérotation ne reconnaît pas reste celui que
 // le classeur donne, plutôt que de perdre le lead.
 var (
-	prefixeMetaImport = regexp.MustCompile(`(?i)^p\s*:`)
-	numeroBrutImport  = regexp.MustCompile(`^\+?[\d\s.\-()/]+$`)
-	chiffresMinImport = 8
+	prefixeMetaImport     = regexp.MustCompile(`(?i)^p\s*:`)
+	numeroBrutImport      = regexp.MustCompile(`^\+?[\d\s.\-()/]+$`)
+	separateursBrutImport = regexp.MustCompile(`[\s.\-()/]`)
+	chiffresMinImport     = 8
 )
 
 func telephoneImport(brut, region string) (string, bool) {
@@ -286,5 +287,11 @@ func telephoneImport(brut, region string) (string, bool) {
 			chiffres++
 		}
 	}
-	return brut, numeroBrutImport.MatchString(brut) && chiffres >= chiffresMinImport
+	if !numeroBrutImport.MatchString(brut) || chiffres < chiffresMinImport {
+		return brut, false
+	}
+	// Même numéro brut, deux relevés aux séparateurs différents : sans ce
+	// compactage la déduplication exacte sur phoneE164 les traiterait comme
+	// deux leads distincts.
+	return separateursBrutImport.ReplaceAllString(brut, ""), true
 }
