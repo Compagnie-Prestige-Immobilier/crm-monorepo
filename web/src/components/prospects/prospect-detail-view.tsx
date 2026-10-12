@@ -1,8 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLinkIcon, PhoneCallIcon } from 'lucide-react';
+import { ExternalLinkIcon, PencilIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
@@ -14,6 +15,7 @@ import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { MethodeFiche } from '@/components/prospects/methode-fiche';
+import { ProspectEditDialog } from '@/components/prospects/prospect-edit-dialog';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import { ReponsesFormulaire } from '@/components/prospects/reponses-formulaire';
 import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
@@ -40,6 +42,7 @@ import {
   SEGMENT_LABELS,
   peutRevoirUneDemande,
   peutTenirUneFiche,
+  readsOnly,
   type ProspectRow,
   type SessionUser,
 } from '@/lib/types';
@@ -93,6 +96,7 @@ export function ProspectDetailView({
     queryFn: () => fetchProspect(prospectId),
   });
   const resume = useResumeFiche();
+  const [editing, setEditing] = useState<ProspectRow | null>(null);
 
   if (fiche.isPending) {
     return (
@@ -151,6 +155,7 @@ export function ProspectDetailView({
               </Link>
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
+            <ModifierFiche prospect={prospect} user={user} onEdit={setEditing} />
             <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
             <AffecterFiche
               cible="prospect"
@@ -173,6 +178,13 @@ export function ProspectDetailView({
       ) : null}
 
       <CarteRendezVous prospect={prospect} />
+
+      <ProspectEditDialog
+        prospect={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <HistoireDeLaFiche prospect={prospect} />
@@ -269,6 +281,31 @@ function ChampsAjoutes({ prospect }: { prospect: ProspectRow }) {
         </dl>
       </CardContent>
     </Card>
+  );
+}
+
+/** Corriger le nom, le prénom ou les coordonnées : fermée au lecteur seul. */
+function ModifierFiche({
+  prospect,
+  user,
+  onEdit,
+}: {
+  prospect: ProspectRow;
+  user: SessionUser | null | undefined;
+  onEdit: (prospect: ProspectRow) => void;
+}) {
+  if (readsOnly(user)) return null;
+
+  return (
+    <Button
+      variant="outline"
+      onClick={() => {
+        onEdit(prospect);
+      }}
+    >
+      <PencilIcon aria-hidden="true" />
+      Modifier
+    </Button>
   );
 }
 
