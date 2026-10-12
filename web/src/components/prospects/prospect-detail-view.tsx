@@ -151,7 +151,11 @@ export function ProspectDetailView({
               </Link>
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
-            <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
+            <RequalifierFiche
+              prospect={prospect}
+              projet={prospect.projet}
+              statut={prospect.statut}
+            />
             <AffecterFiche
               cible="prospect"
               id={prospect.id}

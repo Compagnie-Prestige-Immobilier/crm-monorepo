@@ -267,6 +267,21 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
       page.getByRole('heading', { name: `Ousmane Dossier ${cle}`, level: 2 }),
     ).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
+
+    // La remise à traiter vise le parcours de la fiche : sur une fiche Grand
+    // Public, un projet figé à CHUES chercherait un parcours absent et la
+    // fenêtre resterait ouverte sur une erreur.
+    await page.getByRole('button', { name: 'Requalifier', exact: true }).click();
+    const requalifier = page.getByRole('dialog', { name: `Requalifier Ousmane Dossier ${cle}` });
+    await requalifier.getByRole('button', { name: 'Remettre à traiter (remise à zéro)' }).click();
+    await expect(requalifier).toBeHidden();
+
+    const remise = await ligne<{ statut: string; phase2Status: string }>(
+      `SELECT statut, "phase2Status" FROM prospect_journeys
+        WHERE "prospectId" = $1 AND projet = 'GRAND_PUBLIC'`,
+      [prospectGrandPublic],
+    );
+    expect(remise).toEqual({ statut: 'NOUVEAU', phase2Status: 'PENDING' });
   });
 });
 
