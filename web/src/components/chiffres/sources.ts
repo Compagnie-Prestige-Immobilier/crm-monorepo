@@ -20,7 +20,7 @@ import type {
   ChiffresTotaux,
   CouvertureCampagne,
 } from '@/lib/data/chiffres';
-import type { ComptageOuvertures } from '@/lib/data/ouvertures';
+import type { ComptageOuvertures, OuvertureEnCours } from '@/lib/data/ouvertures';
 import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Permission, Projet } from '@/lib/types';
@@ -40,6 +40,7 @@ export type Jeu =
   | 'creneaux'
   | 'representants'
   | 'ouvertures'
+  | 'ouverturesEnCours'
   | 'enrolement';
 
 /** La permission de la route qui rend chaque jeu : une carte sans elle n'est pas proposée. */
@@ -55,6 +56,7 @@ const PERMISSION_DU_JEU: Record<Jeu, Permission> = {
   creneaux: 'analytics.superviser',
   representants: 'analytics.superviser',
   ouvertures: 'analytics.lire',
+  ouverturesEnCours: 'analytics.lire',
   enrolement: 'enrolement.administrer',
 };
 
@@ -70,6 +72,7 @@ export interface Jeux {
   creneaux?: ChiffresCreneaux;
   representants?: ChiffresRepresentants;
   ouvertures?: ComptageOuvertures[];
+  ouverturesEnCours?: OuvertureEnCours[];
   enrolement?: ChiffresEnrolement;
 }
 
@@ -579,6 +582,26 @@ const SOURCES_CHIFFRES = {
         `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} ouvertures`,
         'Aucune ouverture sur la période',
       );
+    },
+  },
+  'fiches-a-qualifier': {
+    label: 'Fiches ouvertes à qualifier',
+    forme: 'classement',
+    jeu: 'ouverturesEnCours',
+    description:
+      'Fiches encore ouvertes sur la période, jamais qualifiées, avec qui les a ouvertes. Nombre d’heures depuis l’ouverture ; les plus anciennes en tête.',
+    groupe: 'Fiches',
+    extraire: ({ ouverturesEnCours }) => {
+      if (ouverturesEnCours === undefined) return null;
+      const maintenant = Date.now();
+      return {
+        forme: 'classement',
+        donnee: ouverturesEnCours.map((ouverture) => ({
+          id: ouverture.id,
+          label: `${ouverture.ficheNom} · ${ouverture.openedByName}`,
+          value: Math.floor((maintenant - Date.parse(ouverture.openedAt)) / 3_600_000),
+        })),
+      };
     },
   },
   'taux-de-reiteration': {

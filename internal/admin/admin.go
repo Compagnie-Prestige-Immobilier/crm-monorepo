@@ -53,6 +53,7 @@ const (
 	taillePleine           = "pleine"
 	presetEssentiel        = "essentiel"
 	sourceFichesOuvertes   = "fiches-ouvertes"
+	sourceFichesAQualifier = "fiches-a-qualifier"
 	sourceTauxExploitation = "taux-d-exploitation"
 	marqueCourbe           = "courbe"
 	champWidgets           = "body.widgets"
@@ -1004,7 +1005,7 @@ func supprimerTablePurge(ctx context.Context, tx pgx.Tx, etape etapePurge, acteu
 var (
 	sourcesVisites       = strings.Split("total-visites,moyenne-journaliere,jour-le-plus-charge,par-entreprise,par-objet,par-direction,par-destinataire,par-jour,par-mois,par-heure,par-jour-semaine,par-heure-jour-semaine,par-agent,par-entreprise-objet,par-destinataire-direction,par-objet-mois,visiteurs-recurrents,avec-telephone,qualite-de-saisie", ",")
 	sourcesQualification = strings.Split("taux-de-contact,taux-de-joignabilite-representants,taux-d-acceptation,taux-de-rappel,repartition-statuts-qualification,joints-non-joints,statuts-par-famille,joignabilite-par-creneau,taux-d-exploitation,representants-par-departement,representants-par-ief,representants-jamais-appeles,representants-injoignables", ",")
-	sourcesProspects     = strings.Split("taux-de-joignabilite,taux-de-rendez-vous,prospects-notes,adhesions,reste-a-appeler,fiches-ouvertes,taux-de-qualification,taux-de-reiteration,duree-moyenne-sur-la-fiche,duree-moyenne-de-communication,appels-par-jour,par-teleconseiller,rendez-vous-par-teleconseiller,couverture-derniere-campagne,hors-attribution-derniere-campagne,encaisse,de-l-appel-a-l-encaissement,methodes-d-adhesion,par-banque,delais-medians,rendement-par-departement", ",")
+	sourcesProspects     = strings.Split("taux-de-joignabilite,taux-de-rendez-vous,prospects-notes,adhesions,reste-a-appeler,fiches-ouvertes,fiches-a-qualifier,taux-de-qualification,taux-de-reiteration,duree-moyenne-sur-la-fiche,duree-moyenne-de-communication,appels-par-jour,par-teleconseiller,rendez-vous-par-teleconseiller,couverture-derniere-campagne,hors-attribution-derniere-campagne,encaisse,de-l-appel-a-l-encaissement,methodes-d-adhesion,par-banque,delais-medians,rendement-par-departement", ",")
 	sourcesEnrolement    = strings.Split("enrolement-inscriptions,enrolement-taux-rapprochement,enrolement-taux-conversion,enrolement-par-jour,enrolement-par-etape,enrolement-par-teleconseiller", ",")
 
 	sourcesParEcran = map[string][]string{
@@ -1076,6 +1077,7 @@ var reglesParSource = map[string]regleMarque{
 	"taux-de-joignabilite": regleChiffre, "taux-de-rendez-vous": regleChiffre, "prospects-notes": regleChiffre,
 	"adhesions": regleChiffre, "reste-a-appeler": regleChiffre,
 	sourceFichesOuvertes: regleMatrice, "taux-de-qualification": regleChiffre,
+	sourceFichesAQualifier:       {marqueTableau, strings.Split("tableau,barres-horizontales", ",")},
 	"taux-de-reiteration":        regleChiffre,
 	"duree-moyenne-sur-la-fiche": regleChiffre, "duree-moyenne-de-communication": regleChiffre,
 	"appels-par-jour":                    regleTemporelle,
@@ -1130,6 +1132,7 @@ var dispositionsUsine = map[string][]DispositionWidget{
 			{Source: "par-teleconseiller", Marque: marqueTableau},
 			{Source: "rendez-vous-par-teleconseiller", Marque: marqueTableau},
 			{Source: sourceFichesOuvertes, Taille: taillePleine},
+			{Source: sourceFichesAQualifier, Taille: taillePleine},
 		},
 		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "prospects-notes"),
 		widgetsDe("taux-de-joignabilite-representants", "taux-d-acceptation"),
@@ -1140,7 +1143,10 @@ var dispositionsUsine = map[string][]DispositionWidget{
 	),
 	ecranGrandPublic: slices.Concat(
 		widgetsDe("taux-de-joignabilite", "taux-de-qualification", "prospects-notes", "adhesions"),
-		[]DispositionWidget{{Source: sourceFichesOuvertes, Taille: taillePleine}},
+		[]DispositionWidget{
+			{Source: sourceFichesOuvertes, Taille: taillePleine},
+			{Source: sourceFichesAQualifier, Taille: taillePleine},
+		},
 		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "par-banque", "enrolement-par-jour", "enrolement-par-etape"),
 	),
 	// Ce qu'un PMO lit d'abord : l'argent et les objectifs, puis la chaîne de

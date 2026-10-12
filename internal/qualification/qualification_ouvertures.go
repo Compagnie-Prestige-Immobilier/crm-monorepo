@@ -625,6 +625,60 @@ func qualificationPeriodeComptage(du, au string, zone *time.Location) (depuis, j
 	return depuis, jusqua, nil
 }
 
+type QualificationOuvertureEnCoursDTO struct {
+	ID           string `json:"id" format:"uuid"`
+	OpenedByID   string `json:"openedById" format:"uuid"`
+	OpenedByName string `json:"openedByName"`
+	FicheNom     string `json:"ficheNom"`
+	OpenedAt     string `json:"openedAt" format:"date-time"`
+}
+
+type QualificationOuverturesEnCoursOutput struct {
+	Body struct {
+		Items   []QualificationOuvertureEnCoursDTO `json:"items"`
+		Tronque bool                               `json:"tronque" doc:"Plus de 200 lignes : seules les plus anciennes sont rendues."`
+	}
+}
+
+const ouverturesEnCoursLignesMax = 200
+
+// Les fiches encore ouvertes de la période : celles que le taux de
+// qualification laisse de côté, avec qui les a ouvertes.
+func (s *service) qualificationOuverturesEnCours(ctx context.Context, in *QualificationComptageInput) (*QualificationOuverturesEnCoursOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	p := db.ListerOuverturesEnCoursParams{}
+	borne := in.OpenedByID
+	if !qualificationVoitTout(&u) {
+		borne = u.ID
+	}
+	if borne != "" {
+		p.OpenedByID = &borne
+	}
+	if in.LotID != "" {
+		p.LotID = &in.LotID
+	}
+	var err error
+	if p.Depuis, p.Jusqua, err = qualificationPeriodeComptage(in.From, in.To, s.Cfg.TimeZone); err != nil {
+		return nil, err
+	}
+	rows, err := s.Q.ListerOuverturesEnCours(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := &QualificationOuverturesEnCoursOutput{}
+	out.Body.Tronque = len(rows) > ouverturesEnCoursLignesMax
+	rows = rows[:min(len(rows), ouverturesEnCoursLignesMax)]
+	out.Body.Items = make([]QualificationOuvertureEnCoursDTO, 0, len(rows))
+	for i := range rows {
+		r := &rows[i]
+		out.Body.Items = append(out.Body.Items, QualificationOuvertureEnCoursDTO{
+			ID: r.ID, OpenedByID: r.OpenedById, OpenedByName: r.OpenedByName,
+			FicheNom: r.FicheNom, OpenedAt: qualificationISO(r.OpenedAt),
+		})
+	}
+	return out, nil
+}
+
 func qualificationBorneDebut(iso string, zone *time.Location) (*time.Time, error) {
 	if !strings.Contains(iso, "T") {
 		return qualificationBorneJour(iso, false, zone)

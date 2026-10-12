@@ -67,7 +67,7 @@ import {
   type Projet,
 } from '@/lib/data/chiffres';
 import { fetchLotsExport } from '@/lib/data/lots-export';
-import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
+import { fetchComptageOuvertures, fetchOuverturesEnCours } from '@/lib/data/ouvertures';
 import {
   resetDisposition,
   type DashboardEcran,
@@ -95,6 +95,13 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   representants: fetchChiffresRepresentants,
   ouvertures: (perimetre) =>
     fetchComptageOuvertures({
+      from: perimetre.heureDebut === null ? perimetre.plage.from : premierInstant(perimetre),
+      to: perimetre.plage.to,
+      ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
+      ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
+    }),
+  ouverturesEnCours: (perimetre) =>
+    fetchOuverturesEnCours({
       from: perimetre.heureDebut === null ? perimetre.plage.from : premierInstant(perimetre),
       to: perimetre.plage.to,
       ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),

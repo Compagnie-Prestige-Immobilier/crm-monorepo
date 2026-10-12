@@ -281,3 +281,34 @@ func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
 		}
 	}
 }
+
+func TestQualificationOuverturesEnCoursNeGardeQueLesNonQualifiees(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	ouverte, qualifiee := qualificationProspect(b), qualificationProspect(b)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
+	qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
+	                      VALUES ($1,$2,$3,now() - interval '2 hours',NULL,NULL,now())`,
+		uuid.NewString(), b.userID, ouverte)
+	qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
+	                      VALUES ($1,$2,$3,now() - interval '1 hour',now(),$4,now())`,
+		uuid.NewString(), b.userID, qualifiee, uuid.NewString())
+
+	jour := time.Now().UTC()
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/en-cours", nil)
+	b.attend(statut, http.StatusBadRequest, "ouvertures en cours sans période", body)
+	statut, body = qualificationEnvoi(b, http.MethodGet,
+		"/api/v1/ouvertures/en-cours?from="+jour.AddDate(0, 0, -1).Format(time.DateOnly)+"&to="+jour.Format(time.DateOnly), nil)
+	b.attend(statut, http.StatusOK, "ouvertures en cours", body)
+	items := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %v, attendu une seule fiche encore ouverte", items)
+	}
+	ligne := items[0].(map[string]any)
+	if ligne["ficheNom"] != "Awa Diop" {
+		t.Fatalf("ficheNom = %v, attendu « Awa Diop »", ligne["ficheNom"])
+	}
+	if ligne["openedByName"] != "Test Intégration" {
+		t.Fatalf("openedByName = %v, attendu « Test Intégration »", ligne["openedByName"])
+	}
+}
