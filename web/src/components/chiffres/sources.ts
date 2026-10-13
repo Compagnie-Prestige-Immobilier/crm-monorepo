@@ -177,7 +177,9 @@ function tableauEquipe(activite: ChiffresActivite): DonneesSource {
 }
 
 /** EB-13 : le compte se lit par téléconseiller ET par jour, jamais cumulé. */
-function matriceOuvertures(lignes: readonly ComptageOuvertures[]): DonneesSource {
+function matriceOuvertures(toutes: readonly ComptageOuvertures[]): DonneesSource {
+  // Un jour d'appels consignés sans aucune ouverture n'ajoute ni ligne ni colonne vide.
+  const lignes = toutes.filter((ligne) => ligne.ouvertures > 0);
   const jours = [...new Set(lignes.map((ligne) => ligne.jour))].sort();
   const noms = new Map(lignes.map((ligne) => [ligne.openedById, ligne.openedByName]));
   const comptes = new Map(
@@ -225,7 +227,7 @@ function matriceCreneaux(creneaux: ChiffresCreneaux): DonneesSource {
 
 const sommeOuvertures = (
   lignes: readonly ComptageOuvertures[],
-  cle: 'ouvertures' | 'qualifiees' | 'liberees' | 'ouverturesDejaQualifiees' | 'requalifiees',
+  cle: 'ouvertures' | 'qualifiees' | 'liberees' | 'requalifiees' | 'appelsConsignes',
 ): number => lignes.reduce((total, ligne) => total + ligne[cle], 0);
 
 /** DMT d'équipe pondérée par les fiches qualifiées de chaque ligne, jamais une moyenne de moyennes. */
@@ -565,19 +567,16 @@ const SOURCES_CHIFFRES = {
     forme: 'scalaire',
     jeu: 'ouvertures',
     description:
-      'Fiches qualifiées pour la première fois ÷ ouvertures de fiches jamais qualifiées. Une requalification compte dans le taux de réitération.',
+      'Qualifications de la période ÷ appels consignés. Les requalifications comptent, comme dans le taux de réitération.',
     groupe: 'Fiches',
     extraire: ({ ouvertures }) => {
       if (ouvertures === undefined) return null;
-      const ouvertes =
-        sommeOuvertures(ouvertures, 'ouvertures') -
-        sommeOuvertures(ouvertures, 'ouverturesDejaQualifiees');
-      const qualifiees =
-        sommeOuvertures(ouvertures, 'qualifiees') - sommeOuvertures(ouvertures, 'requalifiees');
+      const qualifiees = sommeOuvertures(ouvertures, 'qualifiees');
+      const appels = sommeOuvertures(ouvertures, 'appelsConsignes');
       return scalaireTaux(
-        part(qualifiees, ouvertes),
-        `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} ouvertures`,
-        'Aucune ouverture sur la période',
+        part(qualifiees, appels),
+        `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(appels)} appels consignés`,
+        'Aucun appel consigné sur la période',
       );
     },
   },

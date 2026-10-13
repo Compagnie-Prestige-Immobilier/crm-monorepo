@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const qualificationOrigineRepresentant = "REPRESENTANT"
@@ -100,6 +101,25 @@ func (s *service) qualificationAppliquerRdvRep(ctx context.Context, q *db.Querie
 	}
 	_, _, err := s.qualificationAppliquerTentative(ctx, q, a.u, &rdv.corps, &rdv.tentative)
 	return err
+}
+
+// Le 23505 avorte la transaction : le gagnant de la course a déjà sa fiche
+// committée, on s'y rattache plutôt que d'échouer toute la tentative.
+func (s *service) qualificationRdvRepConcurrent(ctx context.Context, u *socle.Utilisateur, a *qualificationAppelRep, cause error) error {
+	rdv := a.rdv
+	if rdv == nil || !rdv.creer {
+		return cause
+	}
+	var pg *pgconn.PgError
+	if !errors.As(cause, &pg) || pg.Code != "23505" || pg.ConstraintName != "prospects_phone_e164_active_key" {
+		return cause
+	}
+	existant, err := s.Q.ProspectRattachable(ctx, db.ProspectRattachableParams{Projet: db.ProjetCHUES, PhoneE164: &rdv.phone})
+	if err != nil {
+		return cause
+	}
+	rdv.corps.ProspectID, rdv.creer = existant.ID, false
+	return s.qualificationProspectAttribue(ctx, u, existant.ID)
 }
 
 func qualificationCreerFicheRep(ctx context.Context, q *db.Queries, a *qualificationAppelRep) error {

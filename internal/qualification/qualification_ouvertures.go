@@ -560,9 +560,11 @@ type QualificationComptageJourDTO struct {
 	Qualifiees           int32  `json:"qualifiees"`
 	Liberees             int32  `json:"liberees"`
 	DureeMoyenneSecondes *int32 `json:"dureeMoyenneSecondes"`
-	// Une fiche déjà qualifiée qu'on qualifie de nouveau : comptée ici, pas dans le taux de qualification.
+	// Une fiche déjà qualifiée qu'on ouvre de nouveau ; qualifiée, elle compte dans le taux de réitération.
 	OuverturesDejaQualifiees int32 `json:"ouverturesDejaQualifiees"`
 	Requalifiees             int32 `json:"requalifiees"`
+	// Chaque « Consigner un appel » du téléconseiller ce jour-là, fiche ouverte ou non.
+	AppelsConsignes int32 `json:"appelsConsignes"`
 }
 
 type QualificationComptageOutput struct {
@@ -642,6 +644,7 @@ func qualificationComptageDTO(r *db.ComptageOuverturesRow) QualificationComptage
 		OpenedByID: r.OpenedById, OpenedByName: r.OpenedByName, Jour: r.Jour,
 		Ouvertures: r.Ouvertures, Qualifiees: r.Qualifiees, Liberees: r.Liberees,
 		OuverturesDejaQualifiees: r.OuverturesDejaQualifiees, Requalifiees: r.Requalifiees,
+		AppelsConsignes: r.AppelsConsignes,
 	}
 	// Une ouverture fermée sans aucune saisie sort du dénominateur au lieu d'y
 	// entrer avec une durée de zéro.

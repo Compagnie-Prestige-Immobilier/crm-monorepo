@@ -248,7 +248,10 @@ func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)
 	requalifiee, premiere := qualificationProspect(b), qualificationProspect(b)
-	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "performedById" = $1`, b.userID)
+	})
 	ouvrir := func(prospect string, ilYA time.Duration, tentative any) {
 		qualificationExec(b, `INSERT INTO "ouvertures_fiche" ("id","openedById","prospectId","openedAt","closedAt","closingAttemptId","updatedAt")
 		                      VALUES ($1,$2,$3,now() - $4::interval,now() - $4::interval + interval '1 minute',$5,now())`,
@@ -258,6 +261,11 @@ func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
 	ouvrir(requalifiee, 2*time.Hour, uuid.NewString())
 	ouvrir(requalifiee, time.Hour, nil)
 	ouvrir(premiere, time.Hour, uuid.NewString())
+	// Le dénominateur du taux de qualification : chaque appel consigné de la période, ouverture ou non.
+	maintenant := time.Now().UTC()
+	analyticsAppelMotif(b, premiere, "DEMANDE_INFORMATION", maintenant.Add(-time.Hour).Format(time.RFC3339))
+	analyticsAppelMotif(b, requalifiee, "DEMANDE_INFORMATION", maintenant.Add(-2*time.Hour).Format(time.RFC3339))
+	analyticsAppelMotif(b, requalifiee, "DEMANDE_INFORMATION", maintenant.AddDate(0, 0, -10).Format(time.RFC3339))
 
 	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/comptage", nil)
 	b.attend(statut, http.StatusBadRequest, "comptage sans période", body)
@@ -274,7 +282,7 @@ func TestQualificationComptageSepareLesRequalifications(t *testing.T) {
 			}
 		}
 	}
-	attendus := map[string]float64{"ouvertures": 4, "qualifiees": 3, "ouverturesDejaQualifiees": 2, "requalifiees": 1}
+	attendus := map[string]float64{"ouvertures": 4, "qualifiees": 3, "ouverturesDejaQualifiees": 2, "requalifiees": 1, "appelsConsignes": 2}
 	for cle, attendu := range attendus {
 		if totaux[cle] != attendu {
 			t.Fatalf("%s = %v, attendu %v (%v)", cle, totaux[cle], attendu, totaux)

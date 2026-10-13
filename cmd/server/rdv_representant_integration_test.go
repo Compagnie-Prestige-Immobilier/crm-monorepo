@@ -4,6 +4,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,5 +63,61 @@ func TestRendezVousPrisAuScriptRepresentant(t *testing.T) {
 	b.attend(statut, http.StatusOK, "second rendez-vous", body)
 	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = $1`, telephone); n != 1 {
 		t.Fatalf("le second rendez-vous reprend la même fiche : %d", n)
+	}
+}
+
+// Deux rendez-vous sur un numéro de représentant jamais vu, verrouillés au
+// même point : le second doit rattacher sa fiche plutôt qu'échouer.
+func TestRendezVousRepresentantConcurrentsPartagentLaFiche(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	rep := qualificationRepresentant(b)
+	var telephone string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "phoneE164" FROM "representants" WHERE "id" = $1`, rep).Scan(&telephone); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		fiches := `SELECT "id" FROM "prospects" WHERE "phoneE164" = $1`
+		for _, table := range []string{"call_attempts", "scheduled_callbacks", "prospect_journeys"} {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "`+table+`" WHERE "prospectId" IN (`+fiches+`)`, telephone)
+		}
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" IN (`+fiches+`)`, telephone)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, telephone)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "rep_call_attempts" WHERE "representantId" = $1`, rep)
+	})
+	demain := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	rendezVous := map[string]any{"reasonCode": "RV_CPI", "rendezVousAt": demain}
+
+	tx, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(b.ctx) }()
+	if _, err := tx.Exec(b.ctx, `SELECT 1 FROM "representants" WHERE "id" = $1 FOR NO KEY UPDATE`, rep); err != nil {
+		t.Fatal(err)
+	}
+
+	statuts := make([]int, 2)
+	var attente sync.WaitGroup
+	attente.Go(func() {
+		statuts[0], _ = rdvRepresentantAppel(b, rep, "ACCEPTE", rendezVous)
+	})
+	attendreAttentesVerrou(b, 1)
+	attente.Go(func() {
+		statuts[1], _ = rdvRepresentantAppel(b, rep, "ACCEPTE", rendezVous)
+	})
+	attendreAttentesVerrou(b, 2)
+	if err := tx.Commit(b.ctx); err != nil {
+		t.Fatal(err)
+	}
+	attente.Wait()
+
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusOK {
+		t.Fatalf("les deux rendez-vous concurrents doivent aboutir : %v", statuts)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = $1`, telephone); n != 1 {
+		t.Fatalf("une seule fiche doit être créée malgré la course : %d", n)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "rep_call_attempts" WHERE "representantId" = $1`, rep); n != 2 {
+		t.Fatalf("les deux tentatives doivent être consignées : %d", n)
 	}
 }
