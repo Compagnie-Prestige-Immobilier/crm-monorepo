@@ -9,6 +9,7 @@ import { formatNumber } from '@/lib/format';
 
 export type OuvertureFiche = components['schemas']['QualificationOuvertureFicheDTO'];
 export type ComptageOuvertures = components['schemas']['QualificationComptageJourDTO'];
+export type OuvertureEnCours = components['schemas']['QualificationOuvertureEnCoursDTO'];
 type OuvrirFicheInput = Omit<
   components['schemas']['QualificationOuvrirFicheInputBody'],
   'id' | 'openedAt'
@@ -57,6 +58,20 @@ export async function fetchComptageOuvertures(
     toast.warning(
       `Comptage des ouvertures limité aux ${formatNumber(page.items.length)} lignes les plus récentes. Choisissez une période plus courte.`,
       { id: 'plafond-ouvertures' },
+    );
+  }
+  return page.items;
+}
+
+export async function fetchOuverturesEnCours(
+  query: { from?: string; to?: string; openedById?: string; lotId?: string } = {},
+  client: ApiClient = getApiClient(),
+): Promise<OuvertureEnCours[]> {
+  const page = unwrap(await client.GET('/api/v1/ouvertures/en-cours', { params: { query } }));
+  if (estTronque(page)) {
+    toast.warning(
+      `Fiches ouvertes à qualifier limitées aux ${formatNumber(page.items.length)} plus anciennes. Choisissez une période plus courte.`,
+      { id: 'plafond-ouvertures-en-cours' },
     );
   }
   return page.items;

@@ -44,6 +44,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/ouvertures/courante":                      socle.PermissionFichesTenir,
 	"PUT /api/v1/ouvertures/{id}/brouillon":                socle.PermissionFichesTenir,
 	"GET /api/v1/ouvertures/comptage":                      socle.PermissionAnalyticsLire,
+	"GET /api/v1/ouvertures/en-cours":                      socle.PermissionAnalyticsLire,
 	"GET /api/v1/suggestions":                              socle.PermissionFichesTenir,
 	"PATCH /api/v1/suggestions/{id}":                       socle.PermissionFichesTenir,
 	"POST /api/v1/sync/push":                               socle.PermissionFichesTenir,
@@ -68,6 +69,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("ouvertureCourante", http.MethodGet, "/api/v1/ouvertures/courante"), s.qualificationOuvertureCourante)
 	huma.Register(api, qualificationRoute("enregistrerBrouillonOuverture", http.MethodPut, "/api/v1/ouvertures/{id}/brouillon"), s.qualificationEnregistrerBrouillon)
 	huma.Register(api, qualificationRoute("compterOuvertures", http.MethodGet, "/api/v1/ouvertures/comptage"), s.qualificationComptage)
+	huma.Register(api, qualificationRoute("listerOuverturesEnCours", http.MethodGet, "/api/v1/ouvertures/en-cours"), s.qualificationOuverturesEnCours)
 	qualificationMonterRequalification(api, s)
 	huma.Register(api, qualificationRoute("listSuggestions", http.MethodGet, "/api/v1/suggestions"), s.qualificationListerSuggestions)
 	huma.Register(api, qualificationRoute("updateSuggestionStatus", http.MethodPatch, "/api/v1/suggestions/{id}"), s.qualificationBasculerSuggestion)

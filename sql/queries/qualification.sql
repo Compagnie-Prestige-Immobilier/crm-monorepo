@@ -455,6 +455,28 @@ JOIN "users" u ON u."id" = COALESCE(o."userId", a."userId")
 ORDER BY 3 DESC, 2 ASC, 1
 LIMIT 3001;
 
+-- Les plus anciennes d'abord : ce sont elles que le superviseur doit faire corriger en premier.
+-- name: ListerOuverturesEnCours :many
+SELECT o."id", o."openedById", u."fullName" AS "openedByName",
+       COALESCE(r."fullName", btrim(p."prenom" || ' ' || p."nom"), '') AS "ficheNom",
+       o."openedAt"
+FROM "ouvertures_fiche" o
+JOIN "users" u ON u."id" = o."openedById"
+LEFT JOIN "representants" r ON r."id" = o."representantId"
+LEFT JOIN "prospects" p ON p."id" = o."prospectId"
+WHERE o."closedAt" IS NULL
+  AND (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
+       OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
+  AND (CAST(sqlc.narg('lot_id') AS text) IS NULL
+       OR EXISTS (
+         SELECT 1 FROM "lot_export_items" li
+         WHERE li."lotId" = CAST(sqlc.narg('lot_id') AS text)
+           AND (li."prospectId" = o."prospectId" OR li."representantId" = o."representantId")))
+  AND o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
+  AND o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
+ORDER BY o."openedAt" ASC
+LIMIT 201;
+
 -- name: ListerSuggestions :many
 SELECT s."id", s."sourceRepresentantId", s."suggestedName", s."suggestedPhoneE164",
        s."note", s."status", s."suggestedById", u."fullName" AS "suggestedByName",
