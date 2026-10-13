@@ -476,13 +476,20 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 		return nil, err
 	}
 	applique := false
-	err = qualificationTx(ctx, s, func(q *db.Queries) error {
-		var e error
-		applique, e = s.qualificationAppliquerRepAppel(ctx, q, &appel)
-		return e
-	})
-	if err != nil {
-		return nil, err
+	appliquerRep := func() error {
+		return qualificationTx(ctx, s, func(q *db.Queries) error {
+			var e error
+			applique, e = s.qualificationAppliquerRepAppel(ctx, q, &appel)
+			return e
+		})
+	}
+	if err := appliquerRep(); err != nil {
+		if err := s.qualificationRdvRepConcurrent(ctx, &u, &appel, err); err != nil {
+			return nil, err
+		}
+		if err := appliquerRep(); err != nil {
+			return nil, err
+		}
 	}
 	if !applique {
 		return qualificationRepResultat("duplicate", b.ID), nil
