@@ -386,8 +386,10 @@ UPDATE "ouvertures_fiche" SET
 WHERE "id" = @id AND "openedById" = @opened_by_id AND "closedAt" IS NULL;
 
 -- name: ComptageOuvertures :many
-SELECT o."openedById", u."fullName" AS "openedByName",
-       to_char(date_trunc('day', o."openedAt"), 'YYYY-MM-DD') AS jour,
+-- Les appels consignés se comptent à part : un appel sans ouverture de fiche
+-- (mobile, ancienne console) entre au dénominateur du taux de qualification.
+WITH ouvertures AS (
+SELECT o."openedById" AS "userId", date_trunc('day', o."openedAt") AS jour,
        COUNT(*)::int AS ouvertures,
        COUNT(*) FILTER (WHERE o."closingAttemptId" IS NOT NULL)::int AS qualifiees,
        COUNT(*) FILTER (WHERE o."releasedById" IS NOT NULL)::int AS liberees,
@@ -398,7 +400,6 @@ SELECT o."openedById", u."fullName" AS "openedByName",
        COUNT(*) FILTER (WHERE deja."qualifiee")::int AS "ouverturesDejaQualifiees",
        COUNT(*) FILTER (WHERE deja."qualifiee" AND o."closingAttemptId" IS NOT NULL)::int AS requalifiees
 FROM "ouvertures_fiche" o
-JOIN "users" u ON u."id" = o."openedById"
 CROSS JOIN LATERAL (
   SELECT EXISTS (
            SELECT 1 FROM "ouvertures_fiche" p
@@ -418,7 +419,39 @@ WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
            AND (li."prospectId" = o."prospectId" OR li."representantId" = o."representantId")))
   AND o."openedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
   AND o."openedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
-GROUP BY 1, 2, 3
+GROUP BY 1, 2
+), appels AS (
+SELECT a."performedById" AS "userId", date_trunc('day', a."clientCreatedAt") AS jour,
+       COUNT(*)::int AS appels
+FROM (
+  SELECT "performedById", "clientCreatedAt", "prospectId", NULL::text AS "representantId" FROM "call_attempts"
+  UNION ALL
+  SELECT "performedById", "clientCreatedAt", NULL::text, "representantId" FROM "rep_call_attempts"
+) a
+WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
+       OR a."performedById" = CAST(sqlc.narg('opened_by_id') AS text))
+  AND (CAST(sqlc.narg('lot_id') AS text) IS NULL
+       OR EXISTS (
+         SELECT 1 FROM "lot_export_items" li
+         WHERE li."lotId" = CAST(sqlc.narg('lot_id') AS text)
+           AND (li."prospectId" = a."prospectId" OR li."representantId" = a."representantId")))
+  AND a."clientCreatedAt" >= CAST(sqlc.narg('depuis') AS timestamp)
+  AND a."clientCreatedAt" <= CAST(sqlc.narg('jusqua') AS timestamp)
+GROUP BY 1, 2
+)
+SELECT u."id" AS "openedById", u."fullName" AS "openedByName",
+       to_char(COALESCE(o.jour, a.jour), 'YYYY-MM-DD') AS jour,
+       COALESCE(o.ouvertures, 0)::int AS ouvertures,
+       COALESCE(o.qualifiees, 0)::int AS qualifiees,
+       COALESCE(o.liberees, 0)::int AS liberees,
+       COALESCE(o.mesurees, 0)::int AS mesurees,
+       COALESCE(o."dureeMoyenneSecondes", 0)::int AS "dureeMoyenneSecondes",
+       COALESCE(o."ouverturesDejaQualifiees", 0)::int AS "ouverturesDejaQualifiees",
+       COALESCE(o.requalifiees, 0)::int AS requalifiees,
+       COALESCE(a.appels, 0)::int AS "appelsConsignes"
+FROM ouvertures o
+FULL JOIN appels a ON a."userId" = o."userId" AND a.jour = o.jour
+JOIN "users" u ON u."id" = COALESCE(o."userId", a."userId")
 ORDER BY 3 DESC, 2 ASC, 1
 LIMIT 3001;
 
