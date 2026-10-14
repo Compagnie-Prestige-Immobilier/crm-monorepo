@@ -1,20 +1,40 @@
 package imports
 
+import "strings"
+
 // Un onglet par jour, relu en entier à chaque relevé : sans ce compte par onglet,
 // « j'ai donné 900 leads » ne se vérifie pas.
 type StatsFeuilleImportDTO struct {
-	Feuille        string `json:"feuille"`
-	Lignes         int    `json:"lignes"`
-	Inedits        int    `json:"inedits"`
-	ReLivres       int    `json:"reLivres"`
-	Doublons       int    `json:"doublons"`
-	Inexploitables int    `json:"inexploitables"`
+	Feuille  string `json:"feuille"`
+	Lignes   int    `json:"lignes"`
+	Inedits  int    `json:"inedits"`
+	ReLivres int    `json:"reLivres"`
+	Doublons int    `json:"doublons"`
+	// Part des doublons dont la fiche existait avant ce classeur : un classeur
+	// par mois ne voit pas les précédents, la base si.
+	DejaEnBase       int                        `json:"dejaEnBase"`
+	FichesDejaEnBase []FicheDejaEnBaseImportDTO `json:"fichesDejaEnBase,omitempty"`
+	Inexploitables   int                        `json:"inexploitables"`
+}
+
+// De quoi répondre au marketing nom par nom : la ligne livrée et la fiche
+// qu'elle a retrouvée.
+type FicheDejaEnBaseImportDTO struct {
+	Ligne      int    `json:"ligne"`
+	Nom        string `json:"nom"`
+	Telephone  string `json:"telephone"`
+	ProspectID string `json:"prospectId"`
+	// Vides pour une fiche née hors d'un classeur : formulaire, saisie, banque.
+	Fichier string `json:"fichier"`
+	Onglet  string `json:"onglet"`
 }
 
 // L'ordre des onglets du classeur, que celui d'une map perdrait.
 type statsFeuillesImport struct {
 	ordre []string
 	par   map[string]*StatsFeuilleImportDTO
+	// Le classeur relu : ses propres fiches ne sont pas des doublons.
+	fichier string
 }
 
 func statsFeuillesReprises(deja []StatsFeuilleImportDTO) *statsFeuillesImport {
@@ -53,10 +73,8 @@ func (s *statsFeuillesImport) liste() []StatsFeuilleImportDTO {
 	return liste
 }
 
-// Compté sur le classeur seul, jamais sur la base : relu toutes les heures, un
-// jour livré ne doit pas changer de bilan au relevé suivant.
 func compterFeuillesGrandPublicImport(stats *statsFeuillesImport, lues, uniques []any,
-	premiere map[string]string,
+	premiere map[string]string, deja map[string]connuImport,
 ) {
 	if stats == nil {
 		return
@@ -65,21 +83,8 @@ func compterFeuillesGrandPublicImport(stats *statsFeuillesImport, lues, uniques 
 	for _, valeur := range uniques {
 		ligne := valeur.(ligneGrandPublicImport)
 		retenues[identiteLigneGrandPublicImport(&ligne)] = true
-		compteur := stats.pour(feuilleLigneGrandPublicImport(&ligne))
-		if compteur == nil {
-			continue
-		}
-		telephone := telephoneConnuImport(ligne.telephone)
-		switch {
-		case ligne.vide:
-			compteur.Inexploitables++
-		case telephone != "" && premiere[telephone] != "":
-			compteur.ReLivres++
-		default:
-			compteur.Inedits++
-			if telephone != "" {
-				premiere[telephone] = feuilleLigneGrandPublicImport(&ligne)
-			}
+		if compteur := stats.pour(feuilleLigneGrandPublicImport(&ligne)); compteur != nil {
+			stats.compterLigne(compteur, &ligne, premiere, deja)
 		}
 	}
 	for _, valeur := range lues {
@@ -108,4 +113,50 @@ type ligneDuClasseurImport struct {
 
 func identiteLigneGrandPublicImport(ligne *ligneGrandPublicImport) ligneDuClasseurImport {
 	return ligneDuClasseurImport{feuille: feuilleLigneGrandPublicImport(ligne), numero: ligne.numero}
+}
+
+func nomConnuImport(prenom, nom string) string {
+	return strings.TrimSpace(prenom + " " + nom)
+}
+
+func texteImport(valeur *string) string {
+	if valeur == nil {
+		return ""
+	}
+	return *valeur
+}
+
+func (s *statsFeuillesImport) compterLigne(compteur *StatsFeuilleImportDTO, ligne *ligneGrandPublicImport,
+	premiere map[string]string, deja map[string]connuImport,
+) {
+	telephone := telephoneConnuImport(ligne.telephone)
+	anterieure := s.anterieure(deja[telephone])
+	switch {
+	case ligne.vide:
+		compteur.Inexploitables++
+	case telephone != "" && anterieure != nil:
+		compteur.Doublons++
+		compteur.DejaEnBase++
+		compteur.FichesDejaEnBase = append(compteur.FichesDejaEnBase, FicheDejaEnBaseImportDTO{
+			Ligne: ligne.numero, Nom: anterieure.nom, Telephone: telephone, ProspectID: deja[telephone].id,
+			Fichier: anterieure.fichier, Onglet: anterieure.onglet,
+		})
+	case telephone != "" && premiere[telephone] != "":
+		compteur.ReLivres++
+	default:
+		compteur.Inedits++
+		if telephone != "" {
+			premiere[telephone] = feuilleLigneGrandPublicImport(ligne)
+		}
+	}
+}
+
+// Une fiche née d'un autre classeur, ou hors de tout classeur, avant cette
+// lecture. Celles que ce classeur a créées n'en sont pas : relu toutes les
+// heures, un jour livré ne doit pas changer de bilan au relevé suivant.
+func (s *statsFeuillesImport) anterieure(connue connuImport) *origineConnueImport {
+	if connue.origine == nil || (connue.origine.fichier != "" && connue.origine.fichier == s.fichier) {
+		return nil
+	}
+	return connue.origine
 }

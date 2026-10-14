@@ -1,9 +1,10 @@
 'use client';
 
+import { Link } from '@tanstack/react-router';
 import { CalendarRangeIcon } from 'lucide-react';
 
 import type { ImportJob, ImportJobReport } from '@/lib/data/imports';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatPhone } from '@/lib/format';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -15,16 +16,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+interface FicheDejaEnBase {
+  ligne: number;
+  nom: string;
+  telephone: string;
+  prospectId: string;
+  fichier: string;
+  onglet: string;
+}
+
 export interface Feuille {
   feuille: string;
   lignes: number;
   inedits: number;
   reLivres: number;
   doublons: number;
+  dejaEnBase?: number;
+  fichesDejaEnBase?: FicheDejaEnBase[];
   inexploitables: number;
 }
 
-export type CleFeuille = keyof Omit<Feuille, 'feuille'>;
+export type CleFeuille = 'lignes' | 'inedits' | 'reLivres' | 'doublons' | 'inexploitables';
 
 type ImportJobReportAvecFeuilles = ImportJobReport & {
   feuilles?: Feuille[];
@@ -37,6 +49,11 @@ const COLONNES: { cle: CleFeuille; titre: string }[] = [
   { cle: 'doublons', titre: 'En double' },
   { cle: 'inexploitables', titre: 'Inexploitables' },
 ];
+
+function origine(fiche: FicheDejaEnBase): string {
+  if (!fiche.fichier) return 'Hors classeur (formulaire, saisie, banque…)';
+  return fiche.onglet ? `${fiche.fichier} · ${fiche.onglet}` : fiche.fichier;
+}
 
 function total(feuilles: Feuille[], cle: CleFeuille): number {
   return feuilles.reduce((somme, feuille) => somme + (feuille[cle] ?? 0), 0);
@@ -52,6 +69,7 @@ export function FeuillesDuClasseur({ job }: { job: ImportJob }) {
   if (feuilles.length < 2) return null;
   const lignes = total(feuilles, 'lignes');
   const inedits = total(feuilles, 'inedits');
+  const dejaEnBase = feuilles.reduce((somme, feuille) => somme + (feuille.dejaEnBase ?? 0), 0);
 
   return (
     <Card>
@@ -62,7 +80,8 @@ export function FeuillesDuClasseur({ job }: { job: ImportJob }) {
         </CardTitle>
         <CardDescription>
           {formatNumber(lignes)} lignes livrées, {formatNumber(inedits)} numéros inédits. Un numéro
-          re-livré a déjà été donné un jour précédent : il ne fait pas une fiche de plus.
+          re-livré a déjà été donné un jour précédent : il ne fait pas une fiche de plus. Un numéro
+          déjà en base avant ce classeur compte en double.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -85,6 +104,11 @@ export function FeuillesDuClasseur({ job }: { job: ImportJob }) {
                   {COLONNES.map((colonne) => (
                     <TableCell key={colonne.cle} className="text-right tabular-nums">
                       {formatNumber(feuille[colonne.cle])}
+                      {colonne.cle === 'doublons' && feuille.dejaEnBase ? (
+                        <span className="text-muted-foreground block text-xs">
+                          dont {formatNumber(feuille.dejaEnBase)} déjà en base
+                        </span>
+                      ) : null}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -102,7 +126,56 @@ export function FeuillesDuClasseur({ job }: { job: ImportJob }) {
             </TableFooter>
           </Table>
         </div>
+        {dejaEnBase > 0 ? <DejaEnBase feuilles={feuilles} total={dejaEnBase} /> : null}
       </CardContent>
     </Card>
+  );
+}
+
+/** Nom par nom, pour répondre au marketing quand ses comptes et les nôtres divergent. */
+function DejaEnBase({ feuilles, total }: { feuilles: Feuille[]; total: number }) {
+  return (
+    <div className="border-t">
+      <p className="px-4 pt-4 text-sm font-[600]">
+        {formatNumber(total)} {total > 1 ? 'numéros étaient' : 'numéro était'} déjà en base avant ce
+        classeur
+      </p>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Onglet</TableHead>
+              <TableHead className="text-right">Ligne</TableHead>
+              <TableHead>Fiche</TableHead>
+              <TableHead>Téléphone</TableHead>
+              <TableHead>Arrivée d’abord par</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {feuilles.flatMap((feuille) =>
+              (feuille.fichesDejaEnBase ?? []).map((fiche) => (
+                <TableRow key={`${feuille.feuille}-${fiche.ligne}`}>
+                  <TableCell>{feuille.feuille}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fiche.ligne}</TableCell>
+                  <TableCell>
+                    <Link
+                      to="/teleconseil/prospects/$id"
+                      params={{ id: fiche.prospectId }}
+                      className="font-[600] underline underline-offset-4"
+                    >
+                      {fiche.nom || 'Sans nom'}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatPhone(fiche.telephone)}
+                  </TableCell>
+                  <TableCell>{origine(fiche)}</TableCell>
+                </TableRow>
+              )),
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }

@@ -517,6 +517,7 @@ func (s *service) consommerImport(ctx context.Context, job *db.ImportJob, jeton 
 		saut:   int(job.ProcessedRows), tranche: reglagesImports().tranche,
 	}
 	course.contexte.feuilles = course.totaux.feuilles
+	course.contexte.feuilles.fichier = job.FileName
 	if course.etat, err = a.preparer(ctx, s.Q, course.contexte); err != nil {
 		return err
 	}
