@@ -146,12 +146,15 @@ SELECT "id", "phoneE164" FROM "representants" WHERE "deletedAt" IS NULL;
 SELECT "phoneE164" FROM "representants"
 WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
+-- Le classeur d'origine dit si la fiche est née de ce classeur ou l'a précédé.
 -- name: ImportProspectsConnus :many
-SELECT "id", "phoneE164", "representantId", "projet",
+SELECT p."id", p."phoneE164", p."representantId", p."projet", p."prenom", p."nom", p."importFeuille",
+       ij."fileName" AS "fichierImport",
        EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
        EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
 FROM "prospects" p
-WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
+LEFT JOIN "import_jobs" ij ON ij."id" = p."importJobId"
+WHERE p."phoneE164" = ANY(@phones::text[]) AND p."deletedAt" IS NULL;
 
 -- name: ImportTelephonesInscritsPlateforme :many
 SELECT DISTINCT "phoneE164"::text FROM "inscriptions_plateforme"

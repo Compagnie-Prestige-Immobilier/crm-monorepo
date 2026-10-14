@@ -767,7 +767,12 @@ type etatGrandPublicImport struct {
 type connuImport struct {
 	id     string
 	projet db.Projet
+	// D'où vient la fiche : le bilan par onglet sépare celles nées de ce
+	// classeur de celles qui l'ont précédé.
+	origine *origineConnueImport
 }
+
+type origineConnueImport struct{ nom, onglet, fichier string }
 
 // `sure` : une règle ou un libellé exact a parlé ; sinon le canal est deviné et le projet reste à vérifier.
 type provenanceImport struct {
@@ -1140,7 +1145,7 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		return bilanTrancheImport{}, err
 	}
 	tri := trierGrandPublicImport(uniques, deja, dejaEmail, inscrits, etat)
-	compterFeuillesGrandPublicImport(c.feuilles, lignes, uniques, etat.premiereFeuille)
+	compterFeuillesGrandPublicImport(c.feuilles, lignes, uniques, etat.premiereFeuille, deja)
 	bilan := bilanTrancheImport{
 		ignorees: ignoreesDoublons + tri.ignorees, avertissements: append(erreursDoublons, tri.avertissements...),
 	}
@@ -1249,7 +1254,12 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 			return nil, nil, err
 		}
 		for _, ligne := range connus {
-			telephones[telephoneConnuImport(ligne.PhoneE164)] = connuImport{id: ligne.ID, projet: ligne.Projet}
+			telephones[telephoneConnuImport(ligne.PhoneE164)] = connuImport{
+				id: ligne.ID, projet: ligne.Projet, origine: &origineConnueImport{
+					nom: nomConnuImport(ligne.Prenom, ligne.Nom), onglet: texteImport(ligne.ImportFeuille),
+					fichier: texteImport(ligne.FichierImport),
+				},
+			}
 		}
 	}
 	for _, lot := range lotsImport(clesEmail) {

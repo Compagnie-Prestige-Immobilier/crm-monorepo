@@ -265,8 +265,8 @@ func TestRapportDImportCompteChaqueOnglet(t *testing.T) {
 	}
 
 	attendus := map[string]string{
-		"Leads 13 sept 2026": "lignes=3 inedits=1 reLivres=0 doublons=1 inexploitables=1",
-		"Leads 14 sept 2026": "lignes=2 inedits=1 reLivres=1 doublons=0 inexploitables=0",
+		"Leads 13 sept 2026": "lignes=3 inedits=1 reLivres=0 doublons=1 inexploitables=1 dejaEnBase=0",
+		"Leads 14 sept 2026": "lignes=2 inedits=1 reLivres=1 doublons=0 inexploitables=0 dejaEnBase=0",
 	}
 	vus := feuillesDuRapportTest(b, nomClasseur)
 	for feuille, attendu := range attendus {
@@ -277,6 +277,81 @@ func TestRapportDImportCompteChaqueOnglet(t *testing.T) {
 	if len(vus) != len(attendus) {
 		b.t.Fatalf("un onglet par jour attendu, vu %v", vus)
 	}
+}
+
+// Un classeur par mois : un numéro livré en septembre puis relivré en octobre
+// est un doublon, pas un inédit, et le reste au relevé suivant.
+func TestRapportDImportCompteLesFichesDejaEnBase(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+
+	base := time.Now().UnixNano() % 10_000_000
+	revenu := fmt.Sprintf("+22178%07d", base)
+	nouveau := fmt.Sprintf("+22178%07d", (base+1)%10_000_000)
+	septembre := fmt.Sprintf("Leads sept %d.xlsx", base)
+	octobre := fmt.Sprintf("Leads oct %d.xlsx", base)
+	nettoyerClasseurTest(b, septembre, []string{revenu, nouveau})
+	nettoyerClasseurTest(b, octobre, nil)
+
+	b.releverClasseurTest(septembre, []ongletLignesTest{
+		{nom: "Leads 19 sept 2026", lignes: []ligneLeadTest{{nom: "Esprit Revenu", telephone: revenu}}},
+	})
+	onglets := []ongletLignesTest{
+		{nom: "Leads 01 oct 2026", lignes: []ligneLeadTest{{nom: "Awa Nouvelle", telephone: nouveau}}},
+		{nom: "Leads 10 oct 2026", lignes: []ligneLeadTest{
+			{nom: "Esprit Revenu", telephone: revenu},
+			{nom: "Awa Nouvelle", telephone: nouveau},
+		}},
+	}
+	attendus := map[string]string{
+		"Leads 01 oct 2026": "lignes=1 inedits=1 reLivres=0 doublons=0 inexploitables=0 dejaEnBase=0",
+		"Leads 10 oct 2026": "lignes=2 inedits=0 reLivres=1 doublons=1 inexploitables=0 dejaEnBase=1",
+	}
+	for _, releve := range []string{"premier relevé", "relevé suivant"} {
+		b.releverClasseurTest(octobre, onglets)
+		vus := feuillesDuRapportTest(b, octobre)
+		for feuille, attendu := range attendus {
+			if vus[feuille] != attendu {
+				b.t.Fatalf("%s, onglet %q : %q, attendu %q", releve, feuille, vus[feuille], attendu)
+			}
+		}
+	}
+	fiche := ficheDejaEnBaseTest(b, octobre, "Leads 10 oct 2026")
+	if fiche["telephone"] != revenu || fiche["fichier"] != septembre || fiche["onglet"] != "Leads 19 sept 2026" {
+		b.t.Fatalf("la fiche retrouvée doit dire d'où elle vient : %v", fiche)
+	}
+}
+
+// Le relevé ne relit pas un classeur inchangé : l'empreinte s'oublie d'abord.
+func (b *banc) releverClasseurTest(nomClasseur string, onglets []ongletLignesTest) {
+	b.t.Helper()
+	b.t.Setenv("IMPORT_LEADS_URL", b.lienDesLeads(classeurLeadsLignes(b.t, onglets), nomClasseur))
+	_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`)
+	if err := imports.ReleverLeads(b.ctx, serviceDesImports(b)); err != nil {
+		b.t.Fatal(err)
+	}
+}
+
+func ficheDejaEnBaseTest(b *banc, nomClasseur, onglet string) map[string]any {
+	b.t.Helper()
+	var travail string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "id" FROM "import_jobs" WHERE "fileName" = $1 ORDER BY "createdAt" DESC LIMIT 1`, nomClasseur).Scan(&travail); err != nil {
+		b.t.Fatal(err)
+	}
+	rapport, _ := b.rapportImportTest(travail)
+	feuilles, _ := rapport["feuilles"].([]any)
+	for _, brut := range feuilles {
+		ligne := mapDe(brut)
+		fiches, _ := ligne["fichesDejaEnBase"].([]any)
+		if ligne["feuille"] == onglet && len(fiches) == 1 {
+			return mapDe(fiches[0])
+		}
+	}
+	b.t.Fatalf("l'onglet %q doit nommer une fiche déjà en base : %v", onglet, feuilles)
+	return nil
 }
 
 func nettoyerClasseurTest(b *banc, nomClasseur string, telephones []string) {
@@ -317,6 +392,7 @@ func feuillesDuRapportTest(b *banc, nomClasseur string) map[string]string {
 		vus[nom] = fmt.Sprintf("lignes=%d inedits=%d reLivres=%d doublons=%d inexploitables=%d",
 			entierDuRapport(ligne, "lignes"), entierDuRapport(ligne, "inedits"), entierDuRapport(ligne, "reLivres"),
 			entierDuRapport(ligne, "doublons"), entierDuRapport(ligne, "inexploitables"))
+		vus[nom] += fmt.Sprintf(" dejaEnBase=%d", entierDuRapport(ligne, "dejaEnBase"))
 	}
 	return vus
 }
