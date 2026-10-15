@@ -369,10 +369,10 @@ func prospectRechercheTelephone(recherche, region string) *string {
 
 func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (db.ListProspectsParams, error) {
 	p := prospectPorteeDe(u)
-	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
-	// compose que les numéros qui lui reviennent.
+	// `mesFiches` borne aussi l'encadrement et le suivi des rendez-vous : sur
+	// l'écran d'appel, chacun ne compose que les numéros qui lui reviennent.
 	if in.MesFiches {
-		p.tout, p.converti, p.rendezVous = false, false, false
+		p.tout, p.converti, p.rendezVous, p.suivi = false, false, false, false
 	}
 	arg := db.ListProspectsParams{
 		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous, ScopeSuivi: p.suivi,

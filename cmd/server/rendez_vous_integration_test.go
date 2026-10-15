@@ -354,5 +354,25 @@ func TestChargeDeClienteleVoitTousLesInteresses(t *testing.T) {
 		}
 		code, body := qualificationEnvoi(cc, http.MethodGet, "/api/v1/prospects/"+fiche, nil)
 		cc.attend(code, http.StatusOK, "fiche "+statut+" d'un autre téléconseiller", body)
+		liste := "/api/v1/prospects?pageSize=200&phase2Status=" + statut
+		if !rvListeContient(cc, liste, fiche) {
+			t.Fatalf("la liste du suivi omet la fiche %s d'un autre téléconseiller", statut)
+		}
+		// L'écran d'appel ne compose que ses propres numéros, même avec le closing.
+		if rvListeContient(cc, liste+"&mesFiches=true", fiche) {
+			t.Fatalf("mesFiches montre la fiche %s d'un autre téléconseiller", statut)
+		}
 	}
+}
+
+func rvListeContient(b *banc, chemin, fiche string) bool {
+	code, body := qualificationEnvoi(b, http.MethodGet, chemin, nil)
+	b.attend(code, http.StatusOK, chemin, body)
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		if ligne, _ := item.(map[string]any); ligne["id"] == fiche {
+			return true
+		}
+	}
+	return false
 }
