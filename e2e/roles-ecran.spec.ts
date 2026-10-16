@@ -186,6 +186,7 @@ const BARRES = [
       'Tableau de pilotage',
       'Tableau de bord',
       'Campagnes d’appels',
+      'Portefeuilles orphelins',
       'Intéressés, hésitants et RDV',
       'Ventes',
       'Banque & Finance',
@@ -202,6 +203,7 @@ const BARRES = [
     liens: [
       'Tableau de bord',
       'Campagnes d’appels',
+      'Portefeuilles orphelins',
       'Intéressés, hésitants et RDV',
       'Banque & Finance',
       'Fiche représentant',
