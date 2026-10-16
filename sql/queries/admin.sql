@@ -84,6 +84,20 @@ WHERE "userId" = $1 AND "revokedAt" IS NULL;
 SELECT (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = $1 AND p."deletedAt" IS NULL)::int AS prospects,
        (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = $1 AND r."deletedAt" IS NULL)::int AS representants;
 
+-- Comptes désactivés ou supprimés qui détiennent encore des fiches.
+-- name: PortefeuillesOrphelins :many
+SELECT u."id", u."fullName", u."role"::text AS "role", u."updatedAt", (u."deletedAt" IS NOT NULL)::boolean AS "supprime",
+       (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = u."id" AND p."deletedAt" IS NULL)::int AS prospects,
+       (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id" AND r."deletedAt" IS NULL)::int AS representants
+FROM "users" u
+WHERE (NOT u."isActive" OR u."deletedAt" IS NOT NULL)
+  AND (EXISTS (SELECT 1 FROM "prospects" p WHERE p."createdById" = u."id" AND p."deletedAt" IS NULL)
+       OR EXISTS (SELECT 1 FROM "representants" r WHERE r."createdById" = u."id" AND r."deletedAt" IS NULL))
+ORDER BY u."updatedAt" DESC, u."id";
+
+-- name: CompteActif :one
+SELECT ("isActive" AND "deletedAt" IS NULL)::boolean FROM "users" WHERE "id" = $1;
+
 -- name: HandoverTarget :one
 SELECT "id", "role", "fullName" FROM "users"
 WHERE "id" = $1 AND "isActive" AND "deletedAt" IS NULL;

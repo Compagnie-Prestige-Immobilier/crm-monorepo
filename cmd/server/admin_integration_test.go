@@ -270,6 +270,79 @@ func TestAdminRepriseDePortefeuilleExigeeEtTracee(t *testing.T) {
 	}
 }
 
+// Désactivé sans repreneur, le portefeuille reste au compte parti ; l'encadrement
+// est averti et le reprend, jamais sur un compte encore actif.
+func TestAdminPortefeuilleOrphelinReprisParLEncadrement(t *testing.T) {
+	b := adminConnecte(t)
+	sortantID, _ := adminCompte(b, "COMMERCIAL")
+	repreneurID, _ := adminCompte(b, "COMMERCIAL")
+	actifID, _ := adminCompte(b, "COMMERCIAL")
+	_, superviseurEmail := adminCompte(b, "SUPERVISEUR")
+	_, teleconseillerEmail := adminCompte(b, "COMMERCIAL")
+	prospectID := adminProspect(b, sortantID, "CHUES", adminTelephone())
+	adminProspect(b, actifID, "CHUES", adminTelephone())
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "notifications" WHERE "createdById" = $1 AND "route" = '/teleconseil/orphelines'`, b.userID)
+	})
+
+	statut, body := adminAppel(b, http.MethodPut, "/api/v1/users/"+sortantID+"/active", map[string]any{"isActive": false})
+	b.attend(statut, http.StatusOK, "désactivation sans repreneur", body)
+	if n := adminCompterAudit(b, "portfolio.orphaned", sortantID); n != 1 {
+		t.Fatalf("%d traces portfolio.orphaned", n)
+	}
+	var avis int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM "notifications"
+		WHERE "createdById" = $1 AND "route" = '/teleconseil/orphelines' AND "audienceRole" = 'SUPERVISEUR'`, b.userID).Scan(&avis); err != nil {
+		t.Fatal(err)
+	}
+	if avis != 1 {
+		t.Fatalf("%d avis aux superviseurs", avis)
+	}
+
+	teleconseiller := adminSession(b, teleconseillerEmail)
+	statut, body = adminAppel(teleconseiller, http.MethodGet, "/api/v1/portefeuilles-orphelins", nil)
+	teleconseiller.attend(statut, http.StatusForbidden, "liste réservée à l’encadrement", body)
+
+	superviseur := adminSession(b, superviseurEmail)
+	statut, body = adminAppel(superviseur, http.MethodGet, "/api/v1/portefeuilles-orphelins", nil)
+	superviseur.attend(statut, http.StatusOK, "liste des orphelins", body)
+	items, _ := body["items"].([]any)
+	trouve := false
+	for _, item := range items {
+		ligne, _ := item.(map[string]any)
+		if ligne["id"] == actifID {
+			t.Fatal("un compte actif est listé orphelin")
+		}
+		if ligne["id"] == sortantID {
+			trouve = true
+			if ligne["prospects"] != float64(1) {
+				t.Fatalf("prospects : %v", ligne["prospects"])
+			}
+		}
+	}
+	if !trouve {
+		t.Fatal("le compte désactivé n’est pas listé")
+	}
+
+	statut, body = adminAppel(superviseur, http.MethodPost, "/api/v1/portefeuilles-orphelins/"+actifID+"/reprise",
+		map[string]any{"handoverToId": repreneurID})
+	superviseur.attend(statut, http.StatusConflict, "reprise d’un compte actif", body)
+
+	statut, body = adminAppel(superviseur, http.MethodPost, "/api/v1/portefeuilles-orphelins/"+sortantID+"/reprise",
+		map[string]any{"handoverToId": repreneurID})
+	superviseur.attend(statut, http.StatusNoContent, "reprise par le superviseur", body)
+	var proprietaire string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "createdById" FROM "prospects" WHERE "id" = $1`, prospectID).Scan(&proprietaire); err != nil {
+		t.Fatal(err)
+	}
+	if proprietaire != repreneurID {
+		t.Fatalf("la fiche est restée sur %s", proprietaire)
+	}
+	if n := adminCompterAudit(b, "portfolio.handover", sortantID); n != 1 {
+		t.Fatalf("%d traces portfolio.handover", n)
+	}
+}
+
 func TestAdminReinitialisationDuMotDePasse(t *testing.T) {
 	b := adminConnecte(t)
 	cibleID, cibleEmail := adminCompte(b, "ACCUEIL")

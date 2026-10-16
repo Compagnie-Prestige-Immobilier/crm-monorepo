@@ -37,6 +37,7 @@ import {
   UserPlusIcon,
   UsersIcon,
   UsersRoundIcon,
+  UserXIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -268,6 +269,13 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Fiches exportées et distribution',
         acces: 'campagnes.superviser',
+      },
+      {
+        href: '/teleconseil/orphelines',
+        label: 'Portefeuilles orphelins',
+        icon: UserXIcon,
+        description: 'Fiches des comptes désactivés, à réaffecter',
+        acces: 'prospects.reaffecter_tout',
       },
       {
         href: '/teleconseil/interesses',

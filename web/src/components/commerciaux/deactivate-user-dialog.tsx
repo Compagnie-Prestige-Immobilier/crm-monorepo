@@ -15,6 +15,11 @@ import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
 import { useRecalage } from '@/lib/use-recalage';
 
+function representantsLabel(n: number): string {
+  if (n === 0) return '';
+  return `, ainsi que ${formatNumber(n)} ${n === 1 ? 'représentant' : 'représentants'}`;
+}
+
 export function DeactivateUserDialog({
   user,
   repreneurs,
@@ -30,16 +35,14 @@ export function DeactivateUserDialog({
   onConfirm: (handoverToId?: string) => void;
 }) {
   const [repreneur, setRepreneur] = useState<string | null>(null);
-  const [erreur, setErreur] = useState<string | undefined>(undefined);
 
   useRecalage([user?.id], () => {
     setRepreneur(null);
-    setErreur(undefined);
   });
 
-  // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
-  // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.
-  const reprisRequise = user !== null && user.prospectCount > 0;
+  // Sans repreneur, le portefeuille reste au compte parti : l'encadrement est
+  // averti et le reprend depuis « Portefeuilles orphelins ».
+  const portefeuille = user !== null && user.prospectCount + user.representantCount > 0;
 
   const candidats = repreneurs.filter((row) => row.id !== user?.id && row.isActive);
 
@@ -49,11 +52,6 @@ export function DeactivateUserDialog({
       onOpenChange={onOpenChange}
       pending={pending}
       onConfirm={() => {
-        if (reprisRequise && repreneur === null) {
-          setErreur('Désignez le téléconseiller qui reprend le portefeuille.');
-          return;
-        }
-        setErreur(undefined);
         onConfirm(repreneur ?? undefined);
       }}
       confirmLabel="Désactiver le compte"
@@ -67,15 +65,13 @@ export function DeactivateUserDialog({
               {formatNumber(user.prospectCount)}
             </span>{' '}
             {user.prospectCount === 1 ? 'prospect est rattaché' : 'prospects sont rattachés'} à ce
-            compte.
+            compte{representantsLabel(user.representantCount)}.
           </p>
 
-          {reprisRequise ? (
+          {portefeuille ? (
             <Field
-              label="Qui reprend le portefeuille"
-              required
-              description="Ses prospects, ses représentants et ses appels à passer lui sont transférés."
-              error={erreur}
+              label="Qui reprend le portefeuille (facultatif)"
+              description="Ses prospects et ses représentants lui sont transférés. Sans repreneur, ils attendent dans « Portefeuilles orphelins » et les superviseurs sont avertis."
             >
               {(props) => (
                 <Select
@@ -83,7 +79,6 @@ export function DeactivateUserDialog({
                   value={repreneur}
                   onValueChange={(value) => {
                     setRepreneur(typeof value === 'string' ? value : null);
-                    setErreur(undefined);
                   }}
                 >
                   <SelectTrigger {...props}>
