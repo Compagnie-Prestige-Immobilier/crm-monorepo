@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Gel repris le 9 octobre 2026 : le relevé des leads à la demande ne revient
-// qu'à l'administrateur, comme le dépôt d'un classeur.
+// Gel repris le 16 octobre 2026 : la remise à zéro d'un closing ne revient
+// qu'à l'administrateur.
 func TestMatriceRolesInchangee(t *testing.T) {
 	var attendu map[string][]socle.Role
-	contenu, err := os.ReadFile("testdata/matrice-roles-2026-10-09.json")
+	contenu, err := os.ReadFile("testdata/matrice-roles-2026-10-16.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -27,6 +27,7 @@
     "SUPERVISEUR",
     "DIRECTION"
   ],
+  "DELETE /api/v1/prospects/{id}/closing": ["ADMIN"],
   "DELETE /api/v1/representants/{id}": [
     "ADMIN",
     "COMMERCIAL",

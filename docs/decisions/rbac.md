@@ -12,8 +12,10 @@ l'époque : les mentions de `CCP` y sont historiques.
 
 Le 30 septembre 2026, le propriétaire a tranché deux points (D11, D12). Le 9
 octobre 2026, `imports.relever` (relever le classeur des leads à la demande)
-s'ajoute, réservée à l'administrateur par défaut, et le gel est repris à
-`cmd/server/testdata/matrice-roles-2026-10-09.json`.
+s'ajoute, réservée à l'administrateur par défaut. Le 16 octobre 2026,
+`rendez_vous.reinitialiser_closing` (remettre à zéro un closing saisi sur le
+mauvais rendez-vous) s'ajoute de même, et le gel est repris à
+`cmd/server/testdata/matrice-roles-2026-10-16.json`.
 
 | #   | Décision                                                                                                                                                                                                                                                | Raison                                                                                                             |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
