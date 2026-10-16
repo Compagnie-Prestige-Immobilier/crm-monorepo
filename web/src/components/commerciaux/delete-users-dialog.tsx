@@ -62,7 +62,9 @@ export function DeleteUsersDialog({
   });
 
   const prospects = users.reduce((total, row) => total + row.prospectCount, 0);
-  const reprisRequise = prospects > 0;
+  const representants = users.reduce((total, row) => total + row.representantCount, 0);
+  // Les représentants comptent aussi : le serveur exige la reprise dès qu'il en reste un.
+  const reprisRequise = prospects + representants > 0;
 
   // Un repreneur pris dans la sélection serait supprimé juste après, et le
   // portefeuille transféré gèlerait avec lui.

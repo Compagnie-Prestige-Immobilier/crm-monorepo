@@ -15,6 +15,11 @@ import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
 import { useRecalage } from '@/lib/use-recalage';
 
+function representantsLabel(n: number): string {
+  if (n === 0) return '';
+  return `, ainsi que ${formatNumber(n)} ${n === 1 ? 'représentant' : 'représentants'}`;
+}
+
 export function DeactivateUserDialog({
   user,
   repreneurs,
@@ -39,7 +44,8 @@ export function DeactivateUserDialog({
 
   // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
   // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.
-  const reprisRequise = user !== null && user.prospectCount > 0;
+  // Les représentants comptent aussi : le serveur exige la reprise dès qu'il en reste un.
+  const reprisRequise = user !== null && user.prospectCount + user.representantCount > 0;
 
   const candidats = repreneurs.filter((row) => row.id !== user?.id && row.isActive);
 
@@ -67,7 +73,7 @@ export function DeactivateUserDialog({
               {formatNumber(user.prospectCount)}
             </span>{' '}
             {user.prospectCount === 1 ? 'prospect est rattaché' : 'prospects sont rattachés'} à ce
-            compte.
+            compte{representantsLabel(user.representantCount)}.
           </p>
 
           {reprisRequise ? (
