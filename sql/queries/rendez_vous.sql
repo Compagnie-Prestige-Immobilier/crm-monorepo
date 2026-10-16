@@ -142,6 +142,20 @@ ON CONFLICT ("prospectId") DO UPDATE SET
   "auteurId" = EXCLUDED."auteurId", "updatedAt" = CURRENT_TIMESTAMP
 RETURNING *;
 
+-- name: EffacerClosing :one
+DELETE FROM "rendez_vous_closings" WHERE "prospectId" = @prospect_id
+RETURNING *;
+
+-- name: OublierPresenceRendezVous :one
+-- Le rendez-vous redevient à venir : sa confirmation et sa date restent.
+UPDATE "prospects" p SET
+  "rendezVousIssue" = NULL, "suiteRencontre" = NULL, "rendezVousCommentaire" = NULL,
+  "rev" = p."rev" + 1, "updatedAt" = now()
+FROM "prospects" avant
+WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant,
+  avant."rendezVousCommentaire" AS commentaire_avant;
+
 -- name: ChargesDeClientele :many
 SELECT "fullName" FROM "users"
 WHERE "role" <> 'ADMIN' AND "isActive" AND "deletedAt" IS NULL

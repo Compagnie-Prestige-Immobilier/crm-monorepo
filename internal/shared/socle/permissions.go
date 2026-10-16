@@ -76,6 +76,7 @@ const (
 	PermissionRendezVousVoir           Permission = "rendez_vous.voir"
 	PermissionRendezVousExporter       Permission = "rendez_vous.exporter"
 	PermissionRendezVousCloser         Permission = "rendez_vous.closer"
+	PermissionRendezVousReinitialiser  Permission = "rendez_vous.reinitialiser_closing"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
 	PermissionAnalyticsLire            Permission = "analytics.lire"
@@ -148,6 +149,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionRendezVousSuivre:         {domaineRendezVous, "Confirmer, reporter ou annuler un rendez-vous et noter la présence", []Role{Admin, Direction, Superviseur, ChargeClientele, Accueil}},
 	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Superviseur, ChargeClientele, Accueil}},
 	PermissionRendezVousCloser:         {domaineRendezVous, "Remplir le formulaire de closing après un rendez-vous", []Role{Admin, Direction, Superviseur, ChargeClientele}},
+	PermissionRendezVousReinitialiser:  {domaineRendezVous, "Remettre à zéro le closing et la présence d'un rendez-vous", AdminSeul},
 	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Superviseur, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", Encadrement},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", Encadrement},

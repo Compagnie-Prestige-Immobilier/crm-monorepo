@@ -39,6 +39,7 @@ func TestSuiviRendezVousParLaDirection(t *testing.T) {
 	direction.attend(statut, http.StatusBadRequest, "suite sans rencontre", body)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, map[string]any{"issue": "CONFIRME", "commentaire": "Confirmé"})
 	direction.attend(statut, http.StatusBadRequest, "commentaire hors suivi", body)
+	rendezVousDuJour(direction, fiche)
 	statut, body = qualificationEnvoi(direction, http.MethodPost, chemin, honore)
 	direction.attend(statut, http.StatusOK, "rendez-vous honoré", body)
 

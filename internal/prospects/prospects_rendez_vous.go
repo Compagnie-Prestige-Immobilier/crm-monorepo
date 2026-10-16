@@ -20,6 +20,7 @@ const (
 	prospectIssueARecontacter = "A_RECONTACTER"
 	prospectIssueHonore       = "HONORE"
 	cheminClosing             = "/api/v1/prospects/{id}/closing"
+	champSuiteRencontre       = "suiteRencontre"
 )
 
 // CONFIRME, ANNULE et A_RECONTACTER répondent à la confirmation ; HONORE et NON_HONORE à la présence ; REPORTE aux deux.
@@ -48,6 +49,19 @@ func suiviRendezVousRefus(issue string, reporteAt *time.Time, suite, commentaire
 	aRecontacter := issue == prospectIssueARecontacter
 	if recontacterLe != nil && !aRecontacter && (!reporte || reporteAt != nil) {
 		return socle.Problem(http.StatusBadRequest, "RENDEZ_VOUS_DATE_RECONTACT", "La date de recontact ne vaut que pour un rendez-vous à recontacter ou reporté sans heure.")
+	}
+	return nil
+}
+
+// Deux homonymes se confondent à l'Agenda : la présence d'un rendez-vous qui
+// n'a pas encore eu lieu ne se note pas, ni le closing qui en découle.
+func presenceAvantLeJour(issue string, date *string, zone *time.Location) error {
+	if (issue != prospectIssueHonore && issue != "NON_HONORE") || date == nil {
+		return nil
+	}
+	if quand, err := time.Parse(time.RFC3339, *date); err == nil && !quand.Before(socle.DebutDuJour(zone).AddDate(0, 0, 1)) {
+		return socle.Problem(http.StatusUnprocessableEntity, "RENDEZ_VOUS_A_VENIR",
+			"Ce rendez-vous est prévu le "+quand.In(zone).Format("02/01/2006")+" : la présence se note ce jour-là. Vérifiez que c'est le bon prospect.")
 	}
 	return nil
 }
@@ -93,6 +107,9 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 	if err != nil {
 		return nil, err
 	}
+	if err := presenceAvantLeJour(b.Issue, fiche.DateRendezVous, s.Cfg.TimeZone); err != nil {
+		return nil, err
+	}
 	var reporteAt *time.Time
 	if b.ReporteAt != nil {
 		utc := b.ReporteAt.UTC()
@@ -115,9 +132,9 @@ func (s *service) prospectSuivreRendezVous(ctx context.Context, in *ProspectSuiv
 			return err
 		}
 		return database.Auditer(ctx, q, u.ID, "prospect.suivi_rendez_vous", prospectEntite, in.ID,
-			map[string]any{"issue": avant.IssueAvant, "confirmation": avant.ConfirmationAvant, "suiteRencontre": avant.SuiteAvant},
+			map[string]any{"issue": avant.IssueAvant, "confirmation": avant.ConfirmationAvant, champSuiteRencontre: avant.SuiteAvant},
 			map[string]any{
-				"issue": b.Issue, "suiteRencontre": b.SuiteRencontre, "reporteAt": reporteAt,
+				"issue": b.Issue, champSuiteRencontre: b.SuiteRencontre, "reporteAt": reporteAt,
 				"commentaire": b.Commentaire, "recontacterLe": b.RecontacterLe,
 			})
 	})
@@ -276,6 +293,47 @@ func (s *service) closingEnregistrer(ctx context.Context, in *ClosingEnregistrer
 	return s.closingLire(ctx, &ClosingInput{ID: in.ID})
 }
 
+// Un closing saisi sur le mauvais rendez-vous s'efface avec la présence qui
+// l'avait permis ; le journal garde le formulaire entier.
+func (s *service) closingReinitialiser(ctx context.Context, in *ClosingInput) (*ProspectOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
+		return nil, err
+	}
+	err := s.prospectTx(ctx, func(q *db.Queries) error {
+		avant, err := q.OublierPresenceRendezVous(ctx, in.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return socle.Problem(http.StatusUnprocessableEntity, "RENDEZ_VOUS_ABSENT", "Cette fiche n'est pas classée en rendez-vous.")
+		}
+		if err != nil {
+			return err
+		}
+		var formulaire *Closing
+		ligne, err := q.EffacerClosing(ctx, in.ID)
+		switch {
+		case err == nil:
+			c := closingDe(&ligne)
+			formulaire = &c
+		case !errors.Is(err, pgx.ErrNoRows):
+			return err
+		}
+		if formulaire == nil && avant.IssueAvant == nil {
+			return socle.Problem(http.StatusConflict, "CLOSING_DEJA_VIDE", "Ce rendez-vous n'a ni présence notée ni closing : rien à remettre à zéro.")
+		}
+		return database.Auditer(ctx, q, u.ID, "prospect.closing_reinitialise", prospectEntite, in.ID,
+			map[string]any{dimensionIssue: avant.IssueAvant, champSuiteRencontre: avant.SuiteAvant, "commentaire": avant.CommentaireAvant, "closing": formulaire},
+			nil)
+	})
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.prospectLire(ctx, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ProspectOutput{Body: *item}, nil
+}
+
 func closingDe(l *db.RendezVousClosing) Closing {
 	return Closing{
 		Localite: l.Localite, Superficie: l.Superficie, NatureJuridique: l.NatureJuridique, EtatSite: l.EtatSite,
@@ -311,4 +369,8 @@ func prospectMonterRendezVous(api huma.API, s *service) {
 		OperationID: "enregistrerClosing", Method: http.MethodPut, Path: cheminClosing,
 		Summary: "Enregistre ou corrige le formulaire de closing.",
 	}, s.closingEnregistrer)
+	huma.Register(api, huma.Operation{
+		OperationID: "reinitialiserClosing", Method: http.MethodDelete, Path: cheminClosing,
+		Summary: "Remet à zéro le closing et la présence d’un rendez-vous ; le journal garde ce qui est effacé.",
+	}, s.closingReinitialiser)
 }
