@@ -74,6 +74,8 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'referentiels.superviser': 'Modifier les listes de référence : motifs, statuts, départements.',
   'rendez_vous.suivre': 'Confirmer, reporter ou annuler un rendez-vous et noter la présence.',
   'rendez_vous.closer': 'Remplir le formulaire de closing après un rendez-vous honoré.',
+  'rendez_vous.reinitialiser_closing':
+    'Effacer un closing saisi sur le mauvais rendez-vous : la présence notée retombe, le journal garde le formulaire.',
   'rendez_vous.exporter':
     'Emporter les rendez-vous affichés dans un classeur Excel, filtres compris.',
   'rendez_vous.voir':

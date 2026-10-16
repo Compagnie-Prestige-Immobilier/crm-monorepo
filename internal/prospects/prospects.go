@@ -1306,6 +1306,7 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
 	"GET " + cheminClosing:                                            socle.PermissionRendezVousCloser,
 	"PUT " + cheminClosing:                                            socle.PermissionRendezVousCloser,
+	"DELETE " + cheminClosing:                                         socle.PermissionRendezVousReinitialiser,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
 	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,

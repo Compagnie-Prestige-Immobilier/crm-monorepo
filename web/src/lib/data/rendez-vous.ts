@@ -75,6 +75,13 @@ export async function enregistrerClosing(id: string, closing: Closing): Promise<
   );
 }
 
+/** Efface le closing et la présence notée ; le journal garde ce qui est effacé. */
+export async function reinitialiserClosing(id: string): Promise<void> {
+  unwrap(
+    await getApiClient().DELETE('/api/v1/prospects/{id}/closing', { params: { path: { id } } }),
+  );
+}
+
 export async function lireSyntheseRendezVous(
   type: string,
   du: string,

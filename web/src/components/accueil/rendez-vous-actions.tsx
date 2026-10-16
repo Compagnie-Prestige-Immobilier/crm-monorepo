@@ -58,6 +58,14 @@ const libelleDe = (bouton: Bouton, fiche: RendezVousObtenu): string =>
   (fiche.typeCode === 'RDV_TELEPHONIQUE' ? AU_TELEPHONE[bouton] : undefined) ??
   BOUTONS[bouton].label;
 
+/** La présence se note le jour du rendez-vous, pas avant : deux homonymes se confondent. */
+function aVenir(fiche: RendezVousObtenu): boolean {
+  if (fiche.quand === null) return false;
+  const demain = new Date();
+  demain.setUTCHours(24, 0, 0, 0); // Dakar vit à UTC+0 toute l'année.
+  return new Date(fiche.quand) >= demain;
+}
+
 /** Le geste attendu reste visible ; le reste passe dans le menu « … ». */
 function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[] } {
   if (fiche.etape === 'A_CONFIRMER')
@@ -70,6 +78,8 @@ function gestesDe(fiche: RendezVousObtenu): { visibles: Bouton[]; menu: Bouton[]
       menu: ['HONORE', 'NON_HONORE', 'REPORTER', 'RECONTACTER', 'ANNULER'],
     };
   }
+  if (fiche.etape === 'CONFIRMES' && aVenir(fiche))
+    return { visibles: [], menu: ['REPORTER', 'ANNULER'] };
   if (fiche.etape === 'CONFIRMES' || fiche.etape === 'EN_RETARD') {
     return { visibles: ['HONORE', 'NON_HONORE'], menu: ['REPORTER', 'ANNULER'] };
   }

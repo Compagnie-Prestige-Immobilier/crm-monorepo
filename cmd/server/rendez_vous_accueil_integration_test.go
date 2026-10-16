@@ -62,6 +62,19 @@ func rendezVousPoses(t *testing.T) (teleconseiller *banc, fiches map[string]stri
 
 const listeRendezVous = "/api/v1/rendez-vous?pageSize=200"
 
+// La présence ne se note qu'au jour du rendez-vous : le banc l'y amène.
+func rendezVousDuJour(b *banc, fiche string) {
+	b.t.Helper()
+	for _, requete := range []string{
+		`UPDATE "scheduled_callbacks" SET "scheduledAt" = now() AT TIME ZONE 'UTC' WHERE "prospectId" = $1 AND "status" <> 'SUPERSEDED'`,
+		`UPDATE "prospects" SET "rendezVousReporteAt" = now() AT TIME ZONE 'UTC' WHERE "id" = $1 AND "rendezVousReporteAt" IS NOT NULL`,
+	} {
+		if _, err := b.pool.Exec(b.ctx, requete, fiche); err != nil {
+			b.t.Fatal(err)
+		}
+	}
+}
+
 // Le comptoir trie les rendez-vous par type : il reçoit ceux qui viennent à
 // l'agence, pas ceux qui se tiennent ailleurs.
 func TestRendezVousFiltresParType(t *testing.T) {
@@ -121,8 +134,9 @@ func TestRendezVousTelephoniqueAuComptoir(t *testing.T) {
 
 // La venue notée au comptoir sépare les filtres, et le classeur les emporte.
 func TestRendezVousVenuesEtClasseur(t *testing.T) {
-	teleconseiller, fiches, quandRV := rendezVousPoses(t)
+	teleconseiller, fiches, _ := rendezVousPoses(t)
 	accueil := qualificationConnecte(t, "ACCUEIL")
+	rendezVousDuJour(accueil, fiches["RV_CPI"])
 
 	statut, body := qualificationEnvoi(accueil, http.MethodPost,
 		"/api/v1/prospects/"+fiches["RV_CPI"]+"/suivi-rendez-vous", map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD"})
@@ -140,8 +154,8 @@ func TestRendezVousVenuesEtClasseur(t *testing.T) {
 		t.Fatal("le filtre « à confirmer » garde une fiche déjà confirmée")
 	}
 
-	// Le jour du rendez-vous le contient, celui d'après non.
-	jour := quandRV
+	// Le jour du rendez-vous, aujourd'hui depuis la venue, le contient ; celui d'après non.
+	jour := time.Now().UTC()
 	statut, body = qualificationEnvoi(accueil, http.MethodGet,
 		listeRendezVous+"&du="+jour.Format("2006-01-02")+"&au="+jour.Format("2006-01-02"), nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous du jour", body)
@@ -247,6 +261,7 @@ func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
 		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": premier}))
 	teleconseiller.attend(statut, http.StatusOK, "premier RV CPI consigné", body)
 
+	rendezVousDuJour(accueil, fiche)
 	statut, body = qualificationEnvoi(accueil, http.MethodPost, "/api/v1/prospects/"+fiche+"/suivi-rendez-vous",
 		map[string]any{"issue": "NON_HONORE"})
 	accueil.attend(statut, http.StatusOK, "rendez-vous non honoré", body)
@@ -398,8 +413,14 @@ func TestRendezVousDuReportAuClosing(t *testing.T) {
 	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
 	cc.attend(statut, http.StatusUnprocessableEntity, "closing avant la venue", body)
 
-	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi,
-		map[string]any{"issue": "HONORE", "suiteRencontre": "TRES_CHAUD", "commentaire": "Venu avec son épouse"})
+	venue := map[string]any{"issue": "HONORE", "suiteRencontre": "TRES_CHAUD", "commentaire": "Venu avec son épouse"}
+	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi, venue)
+	accueil.attend(statut, http.StatusUnprocessableEntity, "venue notée avant le jour du rendez-vous", body)
+	if body["code"] != "RENDEZ_VOUS_A_VENIR" {
+		t.Fatalf("un rendez-vous à venir ne se note pas honoré : %v", body)
+	}
+	rendezVousDuJour(accueil, fiche)
+	statut, body = qualificationEnvoi(accueil, http.MethodPost, suivi, venue)
 	accueil.attend(statut, http.StatusOK, "le comptoir note la venue", body)
 	attendreEtape(cc, fiche, "A_CLOSER")
 	statut, body = qualificationEnvoi(accueil, http.MethodPut, closing, corps)
@@ -595,6 +616,7 @@ func TestRendezVousReposeRepartDeZero(t *testing.T) {
 	suivi := "/api/v1/prospects/" + fiche + "/suivi-rendez-vous"
 	closing := "/api/v1/prospects/" + fiche + "/closing"
 
+	rendezVousDuJour(cc, fiche)
 	statut, body := qualificationEnvoi(cc, http.MethodPost, suivi, map[string]any{"issue": "HONORE"})
 	cc.attend(statut, http.StatusOK, "présent", body)
 	corps := closingVide()
@@ -627,6 +649,54 @@ func TestRendezVousReposeRepartDeZero(t *testing.T) {
 	}
 }
 
+// Un closing saisi sur le mauvais homonyme se remet à zéro par l'administrateur
+// seul : la présence retombe, le journal garde le formulaire effacé.
+func TestClosingRemisAZeroParLAdministrateur(t *testing.T) {
+	_, fiches, _ := rendezVousPoses(t)
+	fiche := fiches["RV_CPI"]
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	admin := qualificationConnecte(t, "ADMIN")
+	t.Cleanup(func() {
+		_, _ = cc.pool.Exec(cc.ctx, `DELETE FROM "rendez_vous_closings" WHERE "prospectId" = $1`, fiche)
+	})
+	closing := "/api/v1/prospects/" + fiche + "/closing"
+	rendezVousDuJour(cc, fiche)
+	statut, body := qualificationEnvoi(cc, http.MethodPost, "/api/v1/prospects/"+fiche+"/suivi-rendez-vous",
+		map[string]any{"issue": "HONORE", "suiteRencontre": "CHAUD", "commentaire": "Venu seul"})
+	cc.attend(statut, http.StatusOK, "présent", body)
+	corps := closingVide()
+	corps["qualification"], corps["compteRendu"] = "Va acheter", "Saisi sur le mauvais homonyme"
+	statut, body = qualificationEnvoi(cc, http.MethodPut, closing, corps)
+	cc.attend(statut, http.StatusOK, "closing qualifié", body)
+	attendreEtape(cc, fiche, "HISTORIQUE")
+
+	statut, body = qualificationEnvoi(cc, http.MethodDelete, closing, nil)
+	cc.attend(statut, http.StatusForbidden, "le chargé de clientèle ne remet pas à zéro", body)
+	statut, body = qualificationEnvoi(admin, http.MethodDelete, closing, nil)
+	admin.attend(statut, http.StatusOK, "remise à zéro", body)
+	if body["rendezVousIssue"] != nil || body["suiteRencontre"] != nil || body["rendezVousCommentaire"] != nil {
+		t.Fatalf("la présence retombe avec le closing : %v", body)
+	}
+	if lue := etapeDuRendezVous(cc, fiche); lue["qualification"] != "" {
+		t.Fatalf("le rendez-vous perd la qualification effacée : %v", lue)
+	}
+	if rdv := etapeDuRendezVous(cc, fiche); rdv["etape"] == "HISTORIQUE" || rdv["etape"] == "A_CLOSER" {
+		t.Fatalf("le rendez-vous remis à zéro attend de nouveau la venue : %v", rdv)
+	}
+	statut, body = qualificationEnvoi(cc, http.MethodGet, closing, nil)
+	cc.attend(statut, http.StatusOK, "closing relu", body)
+	if relu, _ := body["closing"].(map[string]any); relu["compteRendu"] != "" {
+		t.Fatalf("le formulaire est vide après la remise à zéro : %v", relu)
+	}
+	var garde string
+	if err := cc.pool.QueryRow(cc.ctx, `SELECT "before"->'closing'->>'compteRendu' FROM "audit_logs"
+		WHERE "action" = 'prospect.closing_reinitialise' AND "entityId" = $1`, fiche).Scan(&garde); err != nil || garde != "Saisi sur le mauvais homonyme" {
+		t.Fatalf("le journal garde le formulaire effacé : %q, %v", garde, err)
+	}
+	statut, body = qualificationEnvoi(admin, http.MethodDelete, closing, nil)
+	admin.attend(statut, http.StatusConflict, "rien à remettre à zéro", body)
+}
+
 // Un rendez-vous annulé ne se note plus ; un RV téléphonique non joint se reporte.
 func TestRendezVousGestesRefuses(t *testing.T) {
 	teleconseiller, fiches, _ := rendezVousPoses(t)
@@ -634,6 +704,7 @@ func TestRendezVousGestesRefuses(t *testing.T) {
 	annule := "/api/v1/prospects/" + fiches["RV_CPI"] + "/suivi-rendez-vous"
 	statut, body := qualificationEnvoi(cc, http.MethodPost, annule, map[string]any{"issue": "ANNULE"})
 	cc.attend(statut, http.StatusOK, "annulation", body)
+	rendezVousDuJour(cc, fiches["RV_CPI"])
 	statut, body = qualificationEnvoi(cc, http.MethodPost, annule, map[string]any{"issue": "HONORE"})
 	cc.attend(statut, http.StatusConflict, "présence sur un rendez-vous annulé", body)
 
@@ -649,6 +720,7 @@ func TestRendezVousGestesRefuses(t *testing.T) {
 			"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
 		}))
 	teleconseiller.attend(statut, http.StatusOK, "RV téléphonique consigné", body)
+	rendezVousDuJour(cc, telephonique)
 	statut, body = qualificationEnvoi(cc, http.MethodPost, "/api/v1/prospects/"+telephonique+"/suivi-rendez-vous",
 		map[string]any{"issue": "NON_HONORE"})
 	cc.attend(statut, http.StatusConflict, "RV téléphonique noté non joint sans report", body)

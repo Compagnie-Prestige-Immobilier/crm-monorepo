@@ -6,11 +6,18 @@ import { toast } from 'sonner';
 
 import { ChoixOuAutre, Tuiles } from '@/components/accueil/choix-ou-autre';
 import { etapesDe, type Question } from '@/components/accueil/closing-questions';
+import { RemiseAZeroClosing, repereRendezVous } from '@/components/accueil/closing-remise-a-zero';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -270,7 +277,11 @@ export function ClosingDialog({
           <DialogTitle>
             Closing de {rendezVous.prenom} {rendezVous.nom}
           </DialogTitle>
+          <DialogDescription className="tabular-nums">
+            {repereRendezVous(rendezVous)}
+          </DialogDescription>
         </DialogHeader>
+        <RemiseAZeroClosing rendezVous={rendezVous} onFait={onClose} />
         {lecture.isError ? (
           <QueryErrorState error={lecture.error} onRetry={() => void lecture.refetch()} />
         ) : null}

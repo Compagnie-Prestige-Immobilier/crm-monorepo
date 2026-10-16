@@ -248,6 +248,7 @@ export const PERMISSIONS = [
   'rendez_vous.exporter',
   'rendez_vous.voir',
   'rendez_vous.closer',
+  'rendez_vous.reinitialiser_closing',
   'roles.administrer',
   'support.plateforme',
   'support.signaler',

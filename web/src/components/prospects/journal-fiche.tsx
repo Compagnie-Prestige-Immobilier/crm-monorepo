@@ -43,6 +43,11 @@ const ACTIONS: Record<string, { titre: string; categorie: 'fiche' | 'statut'; va
     'prospect.affectation': { titre: 'Suivi confié', categorie: 'fiche', variant: 'info' },
     'prospect.vendre': { titre: 'Vendue', categorie: 'statut', variant: 'success' },
     'prospect.suivi_rendez_vous': { titre: 'Suivi du rendez-vous', categorie: 'statut' },
+    'prospect.closing_reinitialise': {
+      titre: 'Closing remis à zéro',
+      categorie: 'statut',
+      variant: 'warning',
+    },
   };
 
 const LIBELLES: Record<string, string> = {

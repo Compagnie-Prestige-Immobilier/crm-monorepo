@@ -47,6 +47,18 @@ async function poserRendezVous(nom: string, ip: string): Promise<string> {
   return id;
 }
 
+/** La présence ne se note qu'au jour du rendez-vous : le prospect arrive aujourd'hui. */
+async function amenerAuJour(id: string): Promise<void> {
+  await ecrire(
+    `UPDATE "scheduled_callbacks" SET "scheduledAt" = now() AT TIME ZONE 'UTC' WHERE "prospectId" = $1 AND "status" <> 'SUPERSEDED'`,
+    [id],
+  );
+  await ecrire(
+    `UPDATE "prospects" SET "rendezVousReporteAt" = now() AT TIME ZONE 'UTC' WHERE "id" = $1 AND "rendezVousReporteAt" IS NOT NULL`,
+    [id],
+  );
+}
+
 test.describe('rendez-vous au comptoir', () => {
   test.use({ storageState: compteDe('ACCUEIL').etat });
 
@@ -101,6 +113,10 @@ test.describe('rendez-vous au comptoir', () => {
       .getByRole('button', { name: 'Enregistrer' })
       .click();
     await expect(ligne.getByText('Confirmé', { exact: true })).toBeVisible();
+    // Prévu demain, il n'offre pas encore « Présent » ; le jour venu, si.
+    await expect(ligne.getByRole('button', { name: `Présent : Awa ${nom}` })).toHaveCount(0);
+    await amenerAuJour(convoque);
+    await page.reload();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
     await expect(ligne.getByText('Présent, closing à compléter')).toBeVisible();
     await expect(ligne.getByRole('button', { name: 'Compléter le closing' })).toHaveCount(0);
@@ -206,6 +222,9 @@ test.describe('closing par le chargé de clientèle', () => {
     // Présent : le closing s'ouvre de lui-même, en trois étapes, rien d'obligatoire.
     await ligne.getByRole('button', { name: `Confirmer : Awa ${nom}` }).click();
     await confirmation.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(ligne.getByText('Confirmé', { exact: true })).toBeVisible();
+    await amenerAuJour(convoque);
+    await page.reload();
     await ligne.getByRole('button', { name: `Présent : Awa ${nom}` }).click();
     const closing = page.getByRole('dialog', { name: `Closing de Awa ${nom}` });
     await closing.getByRole('combobox', { name: 'Superficie du lot' }).click();
