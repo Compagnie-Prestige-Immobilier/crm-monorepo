@@ -64,6 +64,7 @@ func gardesDomaines() []map[string]socle.Permission {
 		imports.Garde,
 		admin.Garde,
 		admin.GardeRoles,
+		admin.GardeOrphelins,
 		analytics.Garde,
 		prospects.Garde,
 		prospects.GardeFormulairePublic,

@@ -321,6 +321,7 @@
     "SUPERVISEUR",
     "DIRECTION"
   ],
+  "GET /api/v1/portefeuilles-orphelins": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/prospects": ["COMMERCIAL", "CHARGE_CLIENTELE", "ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/prospects/clients": [
     "COMMERCIAL",
@@ -701,6 +702,7 @@
   "POST /api/v1/phase2/callbacks/{id}/cancel": ["ADMIN", "COMMERCIAL", "CHARGE_CLIENTELE"],
   "POST /api/v1/phase2/callbacks/{id}/retablir": ["ADMIN", "COMMERCIAL", "CHARGE_CLIENTELE"],
   "POST /api/v1/phase2/callbacks/{id}/snooze": ["ADMIN", "COMMERCIAL", "CHARGE_CLIENTELE"],
+  "POST /api/v1/portefeuilles-orphelins/{id}/reprise": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "POST /api/v1/presence/beat": [
     "ADMIN",
     "COMMERCIAL",

@@ -111,6 +111,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	monterDump(api, s)
 	monterEnrolement(api, s)
 	monterExploitation(api, s)
+	monterOrphelins(api, s)
 }
 
 func (s *service) txAdmin(ctx context.Context, geste func(pgx.Tx, *db.Queries) error) error {
@@ -549,7 +550,16 @@ func (s *service) activerCompte(ctx context.Context, in *ActiverCompteInput) (*C
 	if err := s.compteDansSesDroits(ctx, in.ID, nil); err != nil {
 		return nil, err
 	}
-	if !in.Body.IsActive {
+	// Sans repreneur, le portefeuille reste au compte : l'encadrement le reprend
+	// depuis « Portefeuilles orphelins ».
+	orphelin := !in.Body.IsActive && in.Body.HandoverToID == nil
+	var compteurs db.CountPortfolioRow
+	if orphelin {
+		var err error
+		if compteurs, err = s.Q.CountPortfolio(ctx, in.ID); err != nil {
+			return nil, err
+		}
+	} else if !in.Body.IsActive {
 		if err := s.reprisePortefeuille(ctx, in.ID, in.Body.HandoverToID, acteur.ID); err != nil {
 			return nil, err
 		}
@@ -558,12 +568,15 @@ func (s *service) activerCompte(ctx context.Context, in *ActiverCompteInput) (*C
 	if err != nil {
 		return nil, err
 	}
+	if orphelin {
+		s.signalerOrphelin(ctx, &modifie, compteurs, acteur.ID)
+	}
 	return &CompteOutput{Body: modifie}, nil
 }
 
 // Sans reprise, le portefeuille du compte qui part gèle : plus aucun
-// téléconseiller actif ne lit ses fiches et ses tâches de campagne les
-// bloquent hors de tout tirage.
+// téléconseiller actif ne lit ses fiches. La suppression l'exige donc ; la
+// désactivation le laisse orphelin (voir `signalerOrphelin`).
 func (s *service) reprisePortefeuille(ctx context.Context, id string, repreneurID *string, acteurID string) error {
 	compteurs, err := s.Q.CountPortfolio(ctx, id)
 	if err != nil {
