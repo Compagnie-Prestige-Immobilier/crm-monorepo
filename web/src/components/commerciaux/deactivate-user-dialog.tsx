@@ -35,17 +35,14 @@ export function DeactivateUserDialog({
   onConfirm: (handoverToId?: string) => void;
 }) {
   const [repreneur, setRepreneur] = useState<string | null>(null);
-  const [erreur, setErreur] = useState<string | undefined>(undefined);
 
   useRecalage([user?.id], () => {
     setRepreneur(null);
-    setErreur(undefined);
   });
 
-  // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
-  // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.
-  // Les représentants comptent aussi : le serveur exige la reprise dès qu'il en reste un.
-  const reprisRequise = user !== null && user.prospectCount + user.representantCount > 0;
+  // Sans repreneur, le portefeuille reste au compte parti : l'encadrement est
+  // averti et le reprend depuis « Portefeuilles orphelins ».
+  const portefeuille = user !== null && user.prospectCount + user.representantCount > 0;
 
   const candidats = repreneurs.filter((row) => row.id !== user?.id && row.isActive);
 
@@ -55,11 +52,6 @@ export function DeactivateUserDialog({
       onOpenChange={onOpenChange}
       pending={pending}
       onConfirm={() => {
-        if (reprisRequise && repreneur === null) {
-          setErreur('Désignez le téléconseiller qui reprend le portefeuille.');
-          return;
-        }
-        setErreur(undefined);
         onConfirm(repreneur ?? undefined);
       }}
       confirmLabel="Désactiver le compte"
@@ -76,12 +68,10 @@ export function DeactivateUserDialog({
             compte{representantsLabel(user.representantCount)}.
           </p>
 
-          {reprisRequise ? (
+          {portefeuille ? (
             <Field
-              label="Qui reprend le portefeuille"
-              required
-              description="Ses prospects, ses représentants et ses appels à passer lui sont transférés."
-              error={erreur}
+              label="Qui reprend le portefeuille (facultatif)"
+              description="Ses prospects et ses représentants lui sont transférés. Sans repreneur, ils attendent dans « Portefeuilles orphelins » et les superviseurs sont avertis."
             >
               {(props) => (
                 <Select
@@ -89,7 +79,6 @@ export function DeactivateUserDialog({
                   value={repreneur}
                   onValueChange={(value) => {
                     setRepreneur(typeof value === 'string' ? value : null);
-                    setErreur(undefined);
                   }}
                 >
                   <SelectTrigger {...props}>
