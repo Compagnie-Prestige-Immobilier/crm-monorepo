@@ -261,6 +261,7 @@ func TestNouveauRendezVousEffaceLIssuePrecedente(t *testing.T) {
 		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": premier}))
 	teleconseiller.attend(statut, http.StatusOK, "premier RV CPI consigné", body)
 
+	rendezVousDuJour(accueil, fiche)
 	statut, body = qualificationEnvoi(accueil, http.MethodPost, "/api/v1/prospects/"+fiche+"/suivi-rendez-vous",
 		map[string]any{"issue": "NON_HONORE"})
 	accueil.attend(statut, http.StatusOK, "rendez-vous non honoré", body)
