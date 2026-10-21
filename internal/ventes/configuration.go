@@ -384,3 +384,19 @@ func verifierModePartage(mode string, valeur int64) error {
 	}
 	return nil
 }
+
+type ZonesOutput struct {
+	Body struct {
+		Zones []string `json:"zones"`
+	}
+}
+
+func (s *service) zones(ctx context.Context, _ *struct{}) (*ZonesOutput, error) {
+	zones, err := s.Q.ZonesBant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &ZonesOutput{}
+	out.Body.Zones = append([]string{}, zones...)
+	return out, nil
+}

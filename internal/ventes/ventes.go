@@ -42,6 +42,7 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/ventes/classeur":           gestionnaires,
 	"GET /api/v1/ventes/classeur/fichier":    lecteurs,
 	"GET /api/v1/ventes/configuration":       lecteurs,
+	"GET /api/v1/ventes/zones":               socle.PermissionFichesTenir,
 	"GET " + cheminEcheancesEnRetard:         lecteurs,
 	"POST /api/v1/ventes/sites":              gestionnaires,
 	"PATCH /api/v1/ventes/sites/{id}":        gestionnaires,
@@ -96,6 +97,10 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "listVentesConfiguration", Method: http.MethodGet, Path: "/api/v1/ventes/configuration",
 		Summary: "Les sites et canaux proposés à la saisie.",
 	}, s.configuration)
+	huma.Register(api, huma.Operation{
+		OperationID: "listZonesBant", Method: http.MethodGet, Path: "/api/v1/ventes/zones",
+		Summary: "Les sites actifs, proposés comme zone dans le BANT.",
+	}, s.zones)
 	monterConfiguration(api, s)
 	monterEcheances(api, s)
 }

@@ -222,6 +222,7 @@ type Prospect struct {
 	HomonymeAppelePar        *string           `json:"homonymeAppelePar" doc:"Auteur de ce dernier appel à la fiche homonyme."`
 	OriginLabel              *string           `json:"originLabel"`
 	CampagneMarketing        *string           `json:"campagneMarketing" doc:"Campagne publicitaire nommée par la colonne Canal du classeur des leads."`
+	Bant                     ProspectBant      `json:"bant"`
 	ReponsesFormulaire       FormulaireMeta    `json:"reponsesFormulaire" doc:"Réponses au formulaire Meta, reprises telles quelles du classeur des leads."`
 	ARevoirAt                *string           `json:"aRevoirAt"`
 	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
@@ -1303,6 +1304,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects/clients":                                   prospectLecture,
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
 	"PUT /api/v1/prospects/{id}/methode":                              socle.PermissionProspectsSuperviser,
+	"PUT " + prospectCheminBant:                                       socle.PermissionFichesTenir,
 	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
 	"GET " + cheminClosing:                                            socle.PermissionRendezVousCloser,
 	"PUT " + cheminClosing:                                            socle.PermissionRendezVousCloser,
@@ -1339,6 +1341,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "marquerProspectRevue", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/revue"}, s.prospectRevue)
 	prospectMonterRequalifications(api, s)
 	prospectMonterPipeline(api, s)
+	prospectMonterBant(api, s)
 	prospectMonterClients(api, s)
 	prospectMonterSegment(api, s)
 	prospectMonterJournal(api, s)

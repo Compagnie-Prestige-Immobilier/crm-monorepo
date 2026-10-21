@@ -196,3 +196,6 @@ GROUP BY "site";
 INSERT INTO "professions" ("id", "code", "label", "position", "updatedAt")
 VALUES (@id, @code, @label, (SELECT COALESCE(MAX("position"), 0) + 1 FROM "professions"), now())
 ON CONFLICT DO NOTHING;
+
+-- name: ZonesBant :many
+SELECT "nom" FROM "ventes_sites" WHERE "actif" ORDER BY "ordre", "nom" LIMIT 200;

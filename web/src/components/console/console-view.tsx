@@ -51,6 +51,7 @@ import {
   type ConversionErrors,
 } from '@/lib/data/console';
 import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import { bantDe, enregistrerBant, PanneauBant, type Bant } from '@/components/console/panneau-bant';
 import { AUCUN_MOTIF, Palier, type Choix } from '@/components/console/console-paliers';
 import { EtapesProgression } from '@/components/grand-public/etapes';
 import {
@@ -617,11 +618,12 @@ function resumeDernierAppel(prospect: ProspectRow): string {
 }
 
 /** Les pas de la consignation, un seul à l'écran ; le parcours suit les choix. */
-type Pas = 'reponse' | 'formulaire' | 'statut' | 'precision' | 'echeance' | 'note';
+type Pas = 'reponse' | 'formulaire' | 'bant' | 'statut' | 'precision' | 'echeance' | 'note';
 
 const LIBELLES_PAS: Readonly<Record<Pas, string>> = {
   reponse: 'Réponse',
   formulaire: 'Formulaire',
+  bant: 'BANT',
   statut: 'Statut',
   precision: 'Précision',
   echeance: 'Échéance',
@@ -635,7 +637,7 @@ function parcoursDe(
   sansNote: boolean,
 ): Pas[] {
   const pas: Pas[] = ['reponse'];
-  if (groupe === 'joignable') pas.push('formulaire');
+  if (groupe === 'joignable') pas.push('formulaire', 'bant');
   pas.push('statut');
   if (avecPrecision) pas.push('precision');
   if (rappelDemande) pas.push('echeance');
@@ -840,6 +842,8 @@ function ConsignationPasAPas({
   // Le formulaire rempli survit à un passage par « Injoignable ».
   const [dossierMisDeCote, setDossierMisDeCote] = useState<ConversionDraft | null>(null);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
+  const [bant, setBant] = useState<Bant>(() => bantDe(prospect));
+  const [bantModifie, setBantModifie] = useState(false);
   const [callbackAt, setCallbackAt] = useState<string | null>(null);
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
@@ -880,6 +884,7 @@ function ConsignationPasAPas({
           departChrono ?? new Date().toISOString(),
         );
       }
+      if (bantModifie) await enregistrerBant(prospect.id, bant);
       return pushCallAttempt({ ...newAttemptInput(prospect.id, draft), attemptId });
     },
     onSuccess: () => {
@@ -1063,7 +1068,8 @@ function ConsignationPasAPas({
 
   const entree: Readonly<Record<Pas, () => void>> = {
     reponse: () => {},
-    formulaire: () => setPas('statut'),
+    formulaire: () => setPas('bant'),
+    bant: () => setPas('statut'),
     statut: sansNote ? enregistrer : () => {},
     precision: () => {},
     echeance: validerEcheance,
@@ -1072,6 +1078,7 @@ function ConsignationPasAPas({
   const chiffres: Readonly<Record<Pas, Record<string, () => void>>> = {
     reponse: raccourcisDe(groupes),
     formulaire: {},
+    bant: {},
     statut: raccourcisDe(statuts),
     precision: raccourcisDe(precisionsChoix),
     echeance: slotShortcuts,
@@ -1144,6 +1151,11 @@ function ConsignationPasAPas({
           conversion={conversion}
           conversionErrors={conversionErrors}
           formulaire={formulaire}
+          bant={bant}
+          onBant={(patch) => {
+            setBant((avant) => ({ ...avant, ...patch }));
+            setBantModifie(true);
+          }}
           groupes={groupes}
           statuts={statuts}
           precisions={precisionsChoix}
@@ -1249,6 +1261,8 @@ function CorpsPas({
   conversion,
   conversionErrors,
   formulaire,
+  bant,
+  onBant,
   groupes,
   statuts,
   precisions,
@@ -1279,6 +1293,8 @@ function CorpsPas({
   conversion: ConversionDraft | null;
   conversionErrors: ConversionErrors;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
+  bant: Bant;
+  onBant: (patch: Partial<Bant>) => void;
   groupes: readonly Choix[];
   statuts: readonly Choix[];
   precisions: readonly Choix[];
@@ -1339,6 +1355,8 @@ function CorpsPas({
           onChange={onConversion}
         />
       );
+    case 'bant':
+      return <PanneauBant bant={bant} disabled={disabled} onChange={onBant} />;
     case 'statut':
       return (
         <PasStatut
@@ -1394,6 +1412,7 @@ function CorpsPas({
 
 const SUITE_PAS: Readonly<Partial<Record<Pas, string>>> = {
   formulaire: 'Continuer',
+  bant: 'Continuer',
   echeance: 'Continuer',
   note: 'Enregistrer l’appel',
 };

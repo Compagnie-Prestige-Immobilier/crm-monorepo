@@ -977,3 +977,12 @@ SELECT DISTINCT "telephone" FROM "ventes"
 WHERE "archiveeLe" IS NULL AND "telephone" <> ''
 ORDER BY "telephone"
 LIMIT @limite::bigint;
+
+-- name: ModifierBantProspect :exec
+UPDATE "prospects" SET
+  "bantProjet" = sqlc.narg('projet'), "bantZone" = sqlc.narg('zone'), "bantDocument" = sqlc.narg('document'),
+  "bantBudget" = sqlc.narg('budget'), "bantSuivi" = sqlc.narg('suivi'),
+  "bantCalendrier" = sqlc.narg('calendrier'), "bantBesoin" = sqlc.narg('besoin'),
+  "bantAutorite" = sqlc.narg('autorite'), "bantCapacite" = sqlc.narg('capacite'),
+  "rev" = "rev" + 1, "updatedAt" = now()
+WHERE "id" = @prospect_id;

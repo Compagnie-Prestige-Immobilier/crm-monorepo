@@ -1452,3 +1452,31 @@ func TestPipelineDesContactsJusquALaVente(t *testing.T) {
 		t.Fatalf("client sans vente rapprochée : %v", items[0])
 	}
 }
+
+// Le BANT d'une fiche se note sur 100 côté serveur, sa zone vient des sites de vente actifs.
+func TestQualificationBantCalculeLeScoreEtRefuseUneZoneInconnue(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	site := "BANT " + qualificationNumero()
+	qualificationExec(b, `INSERT INTO "ventes_sites" ("nom") VALUES ($1)`, site)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes_sites" WHERE "nom" = $1`, site) })
+
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/ventes/zones", nil)
+	b.attend(statut, http.StatusOK, "zones", body)
+	if zones, _ := body["zones"].([]any); !slices.Contains(zones, any(site)) {
+		t.Fatalf("le site actif est proposé comme zone : %v", zones)
+	}
+	chemin := "/api/v1/prospects/" + fiche + "/bant"
+	statut, body = qualificationEnvoi(b, http.MethodPut, chemin, map[string]any{"zone": "Nulle part"})
+	b.attend(statut, http.StatusUnprocessableEntity, "zone inconnue", body)
+
+	statut, body = qualificationEnvoi(b, http.MethodPut, chemin, map[string]any{
+		"projet": "TERRAIN", "zone": site, "budget": "M5_15",
+		"calendrier": 5, "besoin": 4, "autorite": 3, "capacite": 2,
+	})
+	b.attend(statut, http.StatusOK, "BANT", body)
+	bant, _ := body["bant"].(map[string]any)
+	if score, _ := bant["score"].(float64); score != 67 {
+		t.Fatalf("5×4 + 4×5 + 3×5 + 2×6 = 67 : %v", bant)
+	}
+}

@@ -339,7 +339,8 @@ SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
    ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1),
   p."remarqueImport", COALESCE(p."rendezVousIssue", NULLIF(p."rendezVousConfirmation", 'CONFIRME')), p."rendezVousReporteAt", p."suiteRencontre",
   (SELECT count(*)::int FROM "call_attempts" ca WHERE ca."prospectId" = p."id"),
-  COALESCE((SELECT c."qualification" FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id"), '')::text`
+  COALESCE((SELECT c."qualification" FROM "rendez_vous_closings" c WHERE c."prospectId" = p."id"), '')::text,
+  p."bantScore"::int`
 
 type exportLigneProspect struct {
 	ID                string
@@ -404,6 +405,7 @@ type exportLigneProspect struct {
 	SuiteRencontre    *string
 	NbAppels          int32
 	Qualification     string
+	ScoreBant         *int32
 }
 
 // Le suivi ne vit que sur un rendez-vous : hors RDV la colonne reste vide,
@@ -465,7 +467,7 @@ var ExportEntetesProspects = []string{
 	"Méthode obtenue par", "Date d’obtention",
 	"Campagne", "RDV posé", "Note du classeur", "Suivi du RDV", "Reporté au", "Suite rencontre", "Qualification du closing",
 	"Nb appels", "Email", ExportEnteteEtablissement, "Revenu", "Paiement", "Type de bien",
-	"Origine", "À revoir", "Revue le", "Revue par",
+	"Origine", "À revoir", "Revue le", "Revue par", "Score BANT",
 }
 
 type exportChampLibre struct {
@@ -523,6 +525,7 @@ func exportValeursProspect(c *exportClasseur, l *exportLigneProspect, libres []e
 		l.NbAppels, l.Email, l.Etablissement, l.Revenu,
 		exportLibelle(exportLibellesPaiement, l.Paiement), exportLibelle(exportLibellesTypeBien, l.TypeBien),
 		exportOrigineProspect(l), c.horodate(l.ARevoirDepuis), c.horodate(l.RevuLe), l.RevuPar,
+		exportCelluleNombre(l.ScoreBant),
 	}
 	if len(libres) == 0 {
 		return valeurs
