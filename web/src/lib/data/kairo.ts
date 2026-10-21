@@ -61,9 +61,9 @@ export function compteGroupe(comptes: Record<string, number>, filtre: FiltreTick
   return statuts.reduce((acc, statut) => acc + (comptes[statut] ?? 0), 0);
 }
 
-/** Kairo écrit ses dates en UTC, au format SQLite `AAAA-MM-JJ HH:MM:SS`. */
+/** Kairo écrit ses dates en UTC, au format SQLite ou ISO 8601. */
 export function isoKairo(sqlite: string): string {
-  return `${sqlite.replace(' ', 'T')}Z`;
+  return sqlite.includes('T') ? sqlite : `${sqlite.replace(' ', 'T')}Z`;
 }
 
 export function ilYA(iso: string): string {
