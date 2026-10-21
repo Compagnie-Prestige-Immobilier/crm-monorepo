@@ -162,6 +162,13 @@ func instancierBase(ctx context.Context, cfg *socle.Config, pool *pgxpool.Pool, 
 	if err != nil {
 		return nil, err
 	}
+	if cfg.Base != socle.BasePublique {
+		if crees, err := seedComptesFixtures(ctx, i.deps.Q); err != nil {
+			slog.Error("comptes de démonstration non complétés", "base", cfg.Base, "err", err)
+		} else if crees > 0 {
+			slog.Info("comptes de démonstration complétés", "base", cfg.Base, "créés", crees)
+		}
+	}
 	return i, i.deps.Attributions.Charger(ctx, i.deps.Q)
 }
 

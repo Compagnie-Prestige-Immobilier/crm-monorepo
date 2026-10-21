@@ -343,27 +343,9 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstrat
 		slog.Info("seed fixtures", "statut", "aucune sur la base principale", "désactivés", desactives)
 		return nil
 	}
-	password, err := motDePasseFixtures()
+	crees, err := seedComptesFixtures(ctx, q)
 	if err != nil {
 		return err
-	}
-	condensat, err := database.HacherMotDePasse(password)
-	if err != nil {
-		return err
-	}
-	var crees int64
-	for _, f := range seedFixtureUsers {
-		id, err := seedNouvelID()
-		if err != nil {
-			return err
-		}
-		lignes, err := q.SeedInsertFixtureUser(ctx, db.SeedInsertFixtureUserParams{
-			ID: id, Email: f.email, Username: f.username, FullName: f.fullName, PasswordHash: condensat, Role: f.role,
-		})
-		if err != nil {
-			return err
-		}
-		crees += lignes
 	}
 	// Ils ne se créent que s'ils sont absents : sans cette reprise, un compte
 	// fermé une fois par un semis de base principale le resterait pour toujours,
@@ -453,4 +435,32 @@ WHERE p."id" = '00000000-0000-7000-0000-000000000101'
 	AND (SELECT "id" FROM "bank_case_stages" WHERE "code" = 'A_TRAITER') IS NOT NULL
 ON CONFLICT ("referenceKey") WHERE "deletedAt" IS NULL DO NOTHING`)
 	return err
+}
+
+// Un profil ajouté au code doit exister sur une base de démonstration déjà semée,
+// sans attendre qu'on la rafraîchisse et qu'elle perde ce qu'on y a saisi.
+func seedComptesFixtures(ctx context.Context, q *db.Queries) (int64, error) {
+	password, err := motDePasseFixtures()
+	if err != nil {
+		return 0, err
+	}
+	condensat, err := database.HacherMotDePasse(password)
+	if err != nil {
+		return 0, err
+	}
+	var crees int64
+	for _, f := range seedFixtureUsers {
+		id, err := seedNouvelID()
+		if err != nil {
+			return 0, err
+		}
+		lignes, err := q.SeedInsertFixtureUser(ctx, db.SeedInsertFixtureUserParams{
+			ID: id, Email: f.email, Username: f.username, FullName: f.fullName, PasswordHash: condensat, Role: f.role,
+		})
+		if err != nil {
+			return 0, err
+		}
+		crees += lignes
+	}
+	return crees, nil
 }
