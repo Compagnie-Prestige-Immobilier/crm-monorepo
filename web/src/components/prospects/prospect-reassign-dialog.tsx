@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { RepresentantCombobox } from '@/components/filters/representant-combobox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -103,10 +104,9 @@ export function ProspectReassignDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <FilterCombobox
+          <RepresentantCombobox
             label="Représentant"
             placeholder="Choisir un représentant"
-            options={reference?.representants ?? []}
             value={representantId}
             onChange={setRepresentantId}
           />

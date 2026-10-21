@@ -9,6 +9,7 @@ import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { useRepresentantLabel } from '@/components/filters/representant-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -81,7 +82,8 @@ export function FiltersBar({
   }, [setFilters]);
 
   const activeCount = countActiveFilters(filters);
-  const chips = buildAdvancedChips(filters, reference, PROSPECT_ADVANCED_KEYS);
+  const representantLabel = useRepresentantLabel(filters.representantId);
+  const chips = buildAdvancedChips(filters, reference, PROSPECT_ADVANCED_KEYS, representantLabel);
 
   if (isError) {
     return (

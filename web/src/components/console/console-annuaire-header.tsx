@@ -7,6 +7,7 @@ import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { type AdvancedChip } from '@/components/filters/advanced-chips';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { RepresentantCombobox } from '@/components/filters/representant-combobox';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -215,15 +216,12 @@ function FiltresConsole({
 >) {
   return (
     <>
-      {reference && reference.representants.length > 0 ? (
-        <FilterCombobox
-          label="Représentant"
-          placeholder="Tous les représentants"
-          options={reference.representants}
-          value={representantId}
-          onChange={onRepresentantChange}
-        />
-      ) : null}
+      <RepresentantCombobox
+        label="Représentant"
+        placeholder="Tous les représentants"
+        value={representantId}
+        onChange={onRepresentantChange}
+      />
       <FilterCombobox
         label="Département"
         placeholder="Tous les départements"

@@ -21,6 +21,10 @@ import { useFileDownload } from '@/components/exports/download-button';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import {
+  RepresentantCombobox,
+  useRepresentantLabel,
+} from '@/components/filters/representant-combobox';
+import {
   FilterableTableHead,
   type FiltreColonne,
 } from '@/components/filters/filterable-table-head';
@@ -244,6 +248,7 @@ export function GrandPublicProspectsView({
   }, [setFilters]);
 
   const activeCount = countGrandPublicFilters(filters);
+  const representantLabel = useRepresentantLabel(filters.representantId);
   const advancedChips = buildAdvancedChips(
     {
       ...EMPTY_FILTERS,
@@ -257,6 +262,7 @@ export function GrandPublicProspectsView({
     },
     reference.data,
     GRAND_PUBLIC_ADVANCED_KEYS,
+    representantLabel,
   );
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -421,17 +427,14 @@ function FiltresAvances({
 }) {
   return (
     <>
-      {reference && reference.representants.length > 0 ? (
-        <FilterCombobox
-          label="Représentant"
-          placeholder="Tous les représentants"
-          options={reference.representants}
-          value={filters.representantId}
-          onChange={(value) => {
-            setFilters({ representantId: value });
-          }}
-        />
-      ) : null}
+      <RepresentantCombobox
+        label="Représentant"
+        placeholder="Tous les représentants"
+        value={filters.representantId}
+        onChange={(value) => {
+          setFilters({ representantId: value });
+        }}
+      />
       <FilterCombobox
         label="Département"
         placeholder="Tous les départements"

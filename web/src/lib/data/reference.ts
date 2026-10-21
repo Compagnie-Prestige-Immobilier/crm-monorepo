@@ -3,7 +3,7 @@ import { ApiError, unwrap } from '@crm/api-client/query';
 import { toast } from 'sonner';
 
 import { getApiClient } from '@/lib/api/browser';
-import { formatNumber, formatPhone } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { peut, type SessionUser } from '@/lib/types';
 import type {
   Banque,
@@ -64,59 +64,6 @@ function comptesFacultatifs(result: {
   }
 }
 
-function listeFacultative<TItem>(
-  result: { data?: { items: TItem[] }; error?: unknown; response: Response },
-  map: (item: TItem) => FilterOption,
-): FilterOption[] {
-  try {
-    return unwrap(result).items.map(map);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 403) return [];
-    throw error;
-  }
-}
-
-const REPRESENTANTS_PAR_PAGE = 200;
-const REPRESENTANTS_PAGES_MAX = 25;
-const PLAFOND_REPRESENTANTS = REPRESENTANTS_PAR_PAGE * REPRESENTANTS_PAGES_MAX;
-
-const optionRepresentant = (representant: {
-  id: string;
-  fullName: string;
-  phoneE164: string;
-  departementName: string | null;
-}): FilterOption => ({
-  value: representant.id,
-  label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
-  hint: representant.departementName ?? undefined,
-});
-
-/**
- * Le serveur sert 200 représentants par page et la base en porte plus de 3 000 :
- * toutes les pages se lisent, sinon la liste déroulante cacherait les autres sans le dire.
- */
-async function representantsComplets(client: ApiClient): Promise<FilterOption[]> {
-  const premiere = await client.GET('/api/v1/representants', {
-    params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: 1 } },
-  });
-  const options = listeFacultative(premiere, optionRepresentant);
-  const pageCount = Math.min(premiere.data?.meta.pageCount ?? 1, REPRESENTANTS_PAGES_MAX);
-  if ((premiere.data?.meta.pageCount ?? 1) > REPRESENTANTS_PAGES_MAX) {
-    toast.warning(
-      `Seuls les ${formatNumber(PLAFOND_REPRESENTANTS)} premiers représentants sont proposés dans les listes. Signalez-le à l’administrateur.`,
-      { id: 'plafond-representants' },
-    );
-  }
-  const suites = await Promise.all(
-    Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
-      client.GET('/api/v1/representants', {
-        params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: index + 2 } },
-      }),
-    ),
-  );
-  return options.concat(...suites.map((suite) => listeFacultative(suite, optionRepresentant)));
-}
-
 /** Sans la session, tout est demandé : un refus 403 rend alors une liste vide. */
 export async function fetchReferenceData(
   session?: Pick<SessionUser, 'permissions'>,
@@ -124,7 +71,7 @@ export async function fetchReferenceData(
 ): Promise<ReferenceData> {
   const lit = (permission: Parameters<typeof peut>[1]): boolean =>
     session === undefined || peut(session, permission);
-  const [bundle, iefs, users, representants] = await Promise.all([
+  const [bundle, iefs, users] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/referentiels/{kind}', {
       params: { path: { kind: 'iefs' }, query: { activeOnly: false } },
@@ -132,7 +79,6 @@ export async function fetchReferenceData(
     lit('comptes.lister')
       ? client.GET('/api/v1/users', { params: { query: { pageSize: 200 } } })
       : null,
-    lit('representants.lire') ? representantsComplets(client) : [],
   ]);
 
   const referentiels = unwrap(bundle);
@@ -151,7 +97,6 @@ export async function fetchReferenceData(
     pays: referentiels.pays,
     commerciaux: comptes.filter((compte) => compte.role === 'COMMERCIAL').map(optionCompte),
     utilisateurs: comptes.map(optionCompte),
-    representants,
   };
 }
 

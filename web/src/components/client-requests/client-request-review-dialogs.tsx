@@ -5,7 +5,7 @@ import { CheckIcon, LoaderIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
-import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { RepresentantCombobox } from '@/components/filters/representant-combobox';
 import { QueryErrorInline } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +34,7 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { FilterOption, Syndicat } from '@/lib/types';
+import type { Syndicat } from '@/lib/types';
 import { useRecalage } from '@/lib/use-recalage';
 
 export function ClientRequestReviewDialogs({
@@ -60,7 +60,6 @@ export function ClientRequestReviewDialogs({
 
 function ApproveDialogFields({
   referenceError,
-  representants,
   syndicats,
   representant,
   syndicat,
@@ -70,7 +69,6 @@ function ApproveDialogFields({
   onRetryReference,
 }: {
   referenceError: unknown;
-  representants: FilterOption[];
   syndicats: Syndicat[];
   representant: string | null;
   syndicat: string | null;
@@ -93,11 +91,10 @@ function ApproveDialogFields({
     <div className="flex flex-col gap-4">
       {/* `required` : le champ bloque l'envoi au même titre que ses deux
         voisins, il doit donc porter la même marque. */}
-      <FilterCombobox
+      <RepresentantCombobox
         label="Représentant de rattachement"
         placeholder="Choisir un représentant"
         value={representant}
-        options={representants}
         onChange={onRepresentantChange}
         required
       />
@@ -204,7 +201,6 @@ function ApproveDialog({
   });
 
   const canSubmit = representant !== null && syndicat !== null && !approve.isPending;
-  const representants = reference?.representants ?? [];
   const syndicats = reference?.syndicats ?? [];
 
   return (
@@ -227,7 +223,6 @@ function ApproveDialog({
 
         <ApproveDialogFields
           referenceError={referenceError}
-          representants={representants}
           syndicats={syndicats}
           representant={representant}
           syndicat={syndicat}

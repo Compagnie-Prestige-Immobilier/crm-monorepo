@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { RepresentantCombobox } from '@/components/filters/representant-combobox';
 import { Field } from '@/components/forms/field';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { classifySegment } from '@/components/prospects/segment';
@@ -88,7 +89,6 @@ function choixReferentiels(
       value: item.id,
       label: referentielLabel(item.sigle, item.isActive),
     })),
-    representantItems: reference?.representants ?? [],
     nextSegment: segmentSuivant(banque, syndicat),
   };
 }
@@ -243,6 +243,38 @@ function SegmentBasculePanel({
   );
 }
 
+function ChampRepresentant({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error: string | undefined;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <RepresentantCombobox
+        label="Représentant"
+        placeholder="Choisir un représentant"
+        required
+        value={value === '' ? null : value}
+        onChange={(choisi) => {
+          applyIfSelected(choisi, onChange);
+        }}
+      />
+      <p className="text-[0.75rem] text-muted-foreground">
+        Change aussi le département rattaché au prospect.
+      </p>
+      {error === undefined ? null : (
+        <p role="alert" className="text-[0.75rem] text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ProspectEditDialog({
   prospect,
   onOpenChange,
@@ -327,7 +359,7 @@ export function ProspectEditDialog({
     name: ['banqueId', 'syndicatId', 'representantId', 'statut'],
   });
 
-  const { banqueItems, syndicatItems, representantItems, nextSegment } = choixReferentiels(
+  const { banqueItems, syndicatItems, nextSegment } = choixReferentiels(
     reference,
     banqueId,
     syndicatId,
@@ -484,35 +516,13 @@ export function ProspectEditDialog({
             <ProspectSegmentHistoryOrNull prospect={prospect} />
           </div>
 
-          <Field
-            label="Représentant"
-            required
+          <ChampRepresentant
+            value={representantId}
             error={formState.errors.representantId?.message}
-            description="Change aussi le département rattaché au prospect."
-          >
-            {(props) => (
-              <Select
-                items={representantItems}
-                value={representantId}
-                onValueChange={(value) => {
-                  applyIfSelected(value, (representantValue) => {
-                    setValue('representantId', representantValue, { shouldDirty: true });
-                  });
-                }}
-              >
-                <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-                  <SelectValue placeholder="Choisir un représentant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {representantItems.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </Field>
+            onChange={(representantValue) => {
+              setValue('representantId', representantValue, { shouldDirty: true });
+            }}
+          />
 
           <DialogFooter className="sm:col-span-2">
             <Button

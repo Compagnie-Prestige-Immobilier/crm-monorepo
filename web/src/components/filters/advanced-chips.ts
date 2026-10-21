@@ -36,13 +36,15 @@ function optionLabel(options: readonly { value: string; label: string }[], id: s
   return options.find((option) => option.value === id)?.label ?? UNKNOWN_VALUE;
 }
 
-type ChipValue = (filters: ProspectFilters, reference: ReferenceData | undefined) => string | null;
+type ChipValue = (
+  filters: ProspectFilters,
+  reference: ReferenceData | undefined,
+  representantLabel: string | null,
+) => string | null;
 
 const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
-  representantId: (filters, reference) =>
-    filters.representantId === null
-      ? null
-      : optionLabel(reference?.representants ?? [], filters.representantId),
+  representantId: (filters, _reference, representantLabel) =>
+    filters.representantId === null ? null : (representantLabel ?? UNKNOWN_VALUE),
 
   departementId: (filters, reference) => {
     if (filters.departementId === null) return null;
@@ -95,11 +97,12 @@ export function buildAdvancedChips(
   filters: ProspectFilters,
   reference: ReferenceData | undefined,
   keys: readonly AdvancedFilterKey[],
+  representantLabel: string | null,
 ): AdvancedChip[] {
   const chips: AdvancedChip[] = [];
 
   for (const key of keys) {
-    const value = CHIP_VALUES[key](filters, reference);
+    const value = CHIP_VALUES[key](filters, reference, representantLabel);
     if (value === null) continue;
     chips.push({ key, field: ADVANCED_FILTER_LABELS[key], value });
   }
