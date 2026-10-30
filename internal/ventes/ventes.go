@@ -44,6 +44,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/ventes/configuration":       lecteurs,
 	"GET /api/v1/ventes/zones":               socle.PermissionFichesTenir,
 	"GET " + cheminEcheancesEnRetard:         lecteurs,
+	"PUT " + cheminDelaiGrace:                gestionnaires,
 	"POST /api/v1/ventes/sites":              gestionnaires,
 	"PATCH /api/v1/ventes/sites/{id}":        gestionnaires,
 	"POST /api/v1/ventes/sites/{id}/active":  gestionnaires,

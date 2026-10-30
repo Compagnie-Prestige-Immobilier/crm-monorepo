@@ -44,9 +44,18 @@ type CanalVenteDTO struct {
 
 type VentesConfigurationOutput struct {
 	Body struct {
-		Sites  []SiteVenteDTO  `json:"sites"`
-		Canaux []CanalVenteDTO `json:"canaux"`
+		Sites      []SiteVenteDTO  `json:"sites"`
+		Canaux     []CanalVenteDTO `json:"canaux"`
+		DelaiGrace DelaiGrace      `json:"delaiGrace"`
 	}
+}
+
+type delaiGraceInput struct {
+	Body DelaiGrace
+}
+
+type DelaiGraceOutput struct {
+	Body DelaiGrace
 }
 
 type siteVenteInput struct {
@@ -90,6 +99,7 @@ func monterConfiguration(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{OperationID: "setVenteSiteActive", Method: http.MethodPost, Path: "/api/v1/ventes/sites/{id}/active", Summary: "Active ou retire un site de la saisie."}, s.activerSite)
 	huma.Register(api, huma.Operation{OperationID: "createVenteCanal", Method: http.MethodPost, Path: "/api/v1/ventes/canaux", Summary: "Ajoute un canal de vente."}, s.creerCanal)
 	huma.Register(api, huma.Operation{OperationID: "updateVenteCanal", Method: http.MethodPatch, Path: "/api/v1/ventes/canaux/{id}", Summary: "Modifie un canal de vente."}, s.modifierCanal)
+	huma.Register(api, huma.Operation{OperationID: "updateVentesDelaiGrace", Method: http.MethodPut, Path: cheminDelaiGrace, Summary: "Règle le délai entre l’acompte et la première échéance."}, s.modifierDelaiGrace)
 	huma.Register(api, huma.Operation{OperationID: "setVenteCanalActive", Method: http.MethodPost, Path: "/api/v1/ventes/canaux/{id}/active", Summary: "Active ou retire un canal de la saisie."}, s.activerCanal)
 }
 
@@ -111,6 +121,9 @@ func (s *service) configuration(ctx context.Context, _ *struct{}) (*VentesConfig
 		return nil, err
 	}
 	out := &VentesConfigurationOutput{}
+	if out.Body.DelaiGrace, err = LireDelaiGrace(ctx, s.Q); err != nil {
+		return nil, err
+	}
 	for i := range sites {
 		dto, err := siteDTO(&sites[i], vendus[sites[i].Nom])
 		if err != nil {
@@ -279,6 +292,27 @@ func (s *service) activerCanal(ctx context.Context, in *canalVenteIDInput) (*Can
 }
 
 // Un réglage de vente ne s'écrit pas sans sa trace : les parts de chaque vente en dépendent.
+func (s *service) modifierDelaiGrace(ctx context.Context, in *delaiGraceInput) (*DelaiGraceOutput, error) {
+	valeur, err := json.Marshal(in.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = s.tracer(ctx, "ventes.delai_grace", "reglage", func(q *db.Queries) (string, any, any, error) {
+		avant, err := LireDelaiGrace(ctx, q)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		acteur := socle.UtilisateurCourant(ctx).ID
+		_, err = q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleDelaiGrace, Value: string(valeur), UpdatedById: &acteur})
+		return cleDelaiGrace, avant, in.Body, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.Live.Emettre("ventes")
+	return &DelaiGraceOutput{Body: in.Body}, nil
+}
+
 func (s *service) tracer(ctx context.Context, action, entite string, ecrire func(q *db.Queries) (id string, avant, apres any, err error)) error {
 	acteur := socle.UtilisateurCourant(ctx).ID
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/database"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -12,9 +14,13 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5"
 )
 
-const cheminEcheancesEnRetard = "/api/v1/ventes/echeances-en-retard"
+const (
+	cheminEcheancesEnRetard = "/api/v1/ventes/echeances-en-retard"
+	cheminDelaiGrace        = "/api/v1/ventes/delai-grace"
+)
 
 // DatesEcheances : la première échéance tombe à la date choisie, les suivantes
 // au jour de versement, tous les `periodiciteMois` mois.
@@ -26,6 +32,58 @@ func DatesEcheances(premier time.Time, periodiciteMois, jourVersement, nombre in
 		dates = append(dates, time.Date(premier.Year(), time.Month(mois), int(jourVersement), 0, 0, 0, 0, time.UTC))
 	}
 	return dates
+}
+
+const cleDelaiGrace = "ventes.delaiGrace"
+
+// Le délai court de la souscription, jour du premier acompte, à la première échéance.
+type DelaiGrace struct {
+	Unite  string `json:"unite" enum:"MOIS,SEMAINE,JOUR"`
+	Nombre int32  `json:"nombre" minimum:"0" maximum:"365"`
+}
+
+var delaiGraceDefaut = DelaiGrace{Unite: "MOIS", Nombre: 1}
+
+func LireDelaiGrace(ctx context.Context, q *db.Queries) (DelaiGrace, error) {
+	ligne, err := q.GetSetting(ctx, cleDelaiGrace)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return delaiGraceDefaut, nil
+	}
+	if err != nil {
+		return DelaiGrace{}, err
+	}
+	var delai DelaiGrace
+	err = json.Unmarshal([]byte(ligne.Value), &delai)
+	return delai, err
+}
+
+func (d DelaiGrace) fin(souscription time.Time) time.Time {
+	switch d.Unite {
+	case "MOIS":
+		return souscription.AddDate(0, int(d.Nombre), 0)
+	case "SEMAINE":
+		return souscription.AddDate(0, 0, 7*int(d.Nombre))
+	default:
+		return souscription.AddDate(0, 0, int(d.Nombre))
+	}
+}
+
+// Une première échéance tombée pendant le délai glisse au premier jour de
+// versement qui le suit ; l'échéancier enregistré, lui, ne change pas.
+func EcheancesDeLaVente(v *db.EcheancesVentesACreditRow, delai DelaiGrace) []time.Time {
+	nombre := int32(1)
+	if v.NombreEcheances != nil {
+		nombre = max(*v.NombreEcheances, 1)
+	}
+	jour := *v.JourVersement
+	premier := v.PremierVersement.Time
+	if fin := delai.fin(v.DateSouscription.Time); v.DateSouscription.Valid && premier.Before(fin) {
+		premier = time.Date(fin.Year(), fin.Month(), int(jour), 0, 0, 0, 0, time.UTC)
+		if premier.Before(fin) {
+			premier = time.Date(fin.Year(), fin.Month()+1, int(jour), 0, 0, 0, 0, time.UTC)
+		}
+	}
+	return DatesEcheances(premier, v.PeriodiciteMois, jour, nombre)
 }
 
 type EcheanceEnRetardDTO struct {
@@ -72,13 +130,17 @@ func EcheancesEnRetard(ctx context.Context, q *db.Queries, maintenant time.Time,
 	if err != nil {
 		return nil, false, err
 	}
+	delai, err := LireDelaiGrace(ctx, q)
+	if err != nil {
+		return nil, false, err
+	}
 	tronque = len(ventes) > plafondVentes
 	ventes = ventes[:min(len(ventes), plafondVentes)]
 	local := maintenant.In(zone)
 	aujourdhui := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
 	lignes = []EcheanceEnRetardDTO{}
 	for i := range ventes {
-		if ligne, enRetard := retardVente(&ventes[i], aujourdhui); enRetard {
+		if ligne, enRetard := retardVente(&ventes[i], delai, aujourdhui); enRetard {
 			lignes = append(lignes, ligne)
 		}
 	}
@@ -109,17 +171,13 @@ func (s *service) echeancesEnRetard(ctx context.Context, in *EcheancesEnRetardIn
 
 // Une échéance vaut le reste à payer après acompte divisé par leur nombre,
 // arrondi au franc supérieur ; elle est en retard le lendemain de sa date.
-func retardVente(v *db.EcheancesVentesACreditRow, aujourdhui time.Time) (EcheanceEnRetardDTO, bool) {
-	nombre := int32(1)
-	if v.NombreEcheances != nil {
-		nombre = max(*v.NombreEcheances, 1)
-	}
+func retardVente(v *db.EcheancesVentesACreditRow, delai DelaiGrace, aujourdhui time.Time) (EcheanceEnRetardDTO, bool) {
 	reste := v.PrixTotal - v.Acompte
 	if reste <= 0 {
 		return EcheanceEnRetardDTO{}, false
 	}
-	montant := (reste + int64(nombre) - 1) / int64(nombre)
-	dates := DatesEcheances(v.PremierVersement.Time, v.PeriodiciteMois, *v.JourVersement, nombre)
+	dates := EcheancesDeLaVente(v, delai)
+	montant := (reste + int64(len(dates)) - 1) / int64(len(dates))
 	echues := 0
 	for echues < len(dates) && dates[echues].Before(aujourdhui) {
 		echues++
