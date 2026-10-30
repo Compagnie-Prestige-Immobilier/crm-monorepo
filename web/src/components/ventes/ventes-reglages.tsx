@@ -98,6 +98,7 @@ export function PageReglages({
   });
   return (
     <div className="flex flex-col gap-8">
+      <DelaiAvantEcheance />
       <Section
         titre="Les sites"
         aide="Le prix et les parts sont proposés à chaque nouvelle vente sur ce site."
@@ -136,7 +137,6 @@ export function PageReglages({
         ))}
       </Section>
       <Canaux canaux={canaux} onChange={() => void rafraichir()} />
-      <DelaiAvantEcheance />
       {edition === null ? null : (
         <SiteDialog
           site={edition === 'nouveau' ? null : edition}
