@@ -505,6 +505,13 @@
   "GET /api/v1/ventes/classeur/fichier": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/configuration": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/echeances-en-retard": ["ADMIN", "DIRECTION"],
+  "GET /api/v1/ventes/zones": [
+    "ADMIN",
+    "COMMERCIAL",
+    "CHARGE_CLIENTELE",
+    "SUPERVISEUR",
+    "DIRECTION"
+  ],
   "GET /api/v1/visites": ["ADMIN", "DIRECTION", "SUPERVISEUR", "ACCUEIL", "CHARGE_CLIENTELE"],
   "GET /api/v1/visites/import/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
   "GET /api/v1/visites/import/{id}/revue": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
@@ -826,6 +833,13 @@
   "PUT /api/v1/courriels/reglages": ["ADMIN"],
   "PUT /api/v1/enrolement/{projet}/reglages": ["ADMIN"],
   "PUT /api/v1/ouvertures/{id}/brouillon": [
+    "ADMIN",
+    "COMMERCIAL",
+    "CHARGE_CLIENTELE",
+    "SUPERVISEUR",
+    "DIRECTION"
+  ],
+  "PUT /api/v1/prospects/{id}/bant": [
     "ADMIN",
     "COMMERCIAL",
     "CHARGE_CLIENTELE",
