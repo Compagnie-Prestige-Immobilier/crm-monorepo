@@ -970,6 +970,33 @@ func TestEcheancesEnRetard(t *testing.T) {
 	superviseur.attend(statut, http.StatusForbidden, "sans ventes.lire", body)
 }
 
+// Souscrite le 1er octobre 2025, la vente prévoyait sa première échéance le 10 : le mois de délai la porte au 10 novembre.
+func TestDelaiGraceDecaleLaPremiereEcheance(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	client := "CLIENT GRACE " + strings.ToUpper(b.userID[:8])
+	b.exec(`DELETE FROM "app_settings" WHERE "key" = 'ventes.delaiGrace'`)
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "ventes" WHERE "client" = $1`, client)
+		b.exec(`DELETE FROM "app_settings" WHERE "key" = 'ventes.delaiGrace'`)
+	})
+	vente := venteACredit(b, client, 400000, 100000, 3, 1, 10, "2025-10-10")
+
+	exigerRetard(t, echeancesEnRetard(t, b)[vente], map[string]any{
+		"montantDu": float64(300000), "premiereImpayee": "2025-11-10", "derniereEcheance": "2026-01-10",
+	})
+	statut, body := appelJSON(b, http.MethodPut, "/api/v1/ventes/delai-grace", map[string]any{"unite": "SEMAINE", "nombre": 1}, nil)
+	b.attend(statut, http.StatusOK, "délai d'une semaine", body)
+	exigerRetard(t, echeancesEnRetard(t, b)[vente], map[string]any{
+		"premiereImpayee": "2025-10-10", "derniereEcheance": "2025-12-10",
+	})
+	statut, body = appelJSON(b, http.MethodGet, "/api/v1/ventes/configuration", nil, nil)
+	b.attend(statut, http.StatusOK, "configuration", body)
+	if delai := body["delaiGrace"].(map[string]any); delai["unite"] != "SEMAINE" || delai["nombre"] != float64(1) {
+		t.Fatalf("la configuration rend le délai enregistré : %v", delai)
+	}
+}
+
 func exigerRetard(t *testing.T, ligne, attendu map[string]any) {
 	t.Helper()
 	for cle, valeur := range attendu {

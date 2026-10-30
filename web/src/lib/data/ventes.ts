@@ -17,6 +17,7 @@ export type CanalVenteInput = components['schemas']['CanalVenteModifyInputBody']
 export type CanalVenteCreationInput = components['schemas']['CanalVenteInputBody'];
 export type EcheancesEnRetard = components['schemas']['EcheancesEnRetardOutputBody'];
 export type EcheanceEnRetard = components['schemas']['EcheanceEnRetardDTO'];
+export type DelaiGrace = components['schemas']['DelaiGrace'];
 export interface VentesData {
   classeur: ClasseurVentes | null;
   ventes: Vente[];
@@ -27,6 +28,7 @@ export interface VentesData {
 export interface VentesConfiguration {
   sites: SiteVente[];
   canaux: CanalVente[];
+  delaiGrace: DelaiGrace;
 }
 
 export const CLASSEUR_VENTES_URL = '/api/v1/ventes/classeur/fichier';
@@ -139,6 +141,13 @@ export async function createCanalVente(
   client: ApiClient = getApiClient(),
 ): Promise<CanalVente> {
   return unwrap(await client.POST('/api/v1/ventes/canaux', { body: input }));
+}
+
+export async function updateDelaiGrace(
+  delai: DelaiGrace,
+  client: ApiClient = getApiClient(),
+): Promise<DelaiGrace> {
+  return unwrap(await client.PUT('/api/v1/ventes/delai-grace', { body: delai }));
 }
 
 export async function setCanalVenteActive(

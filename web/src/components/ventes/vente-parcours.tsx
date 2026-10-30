@@ -33,6 +33,7 @@ import {
   lotsRestants,
   mandataireDe,
   stockEpuise,
+  type DelaiGrace,
   type SiteVente,
   type Vente,
   type VenteInput,
@@ -1007,11 +1008,22 @@ const PARTS_ACOMPTE: [string, number][] = [
   ['Tout', 1],
 ];
 
-/** Prochaine date, après aujourd'hui, qui tombe ce jour du mois. */
-function prochaineDate(jour: number): string {
-  const maintenant = new Date();
-  const mois = maintenant.getMonth() + (maintenant.getDate() < jour ? 0 : 1);
-  const date = new Date(maintenant.getFullYear(), mois, jour);
+function finDelai(dateSouscription: string, delai: DelaiGrace): Date {
+  const fin = new Date(`${dateSouscription}T00:00:00`);
+  if (delai.unite === 'MOIS') fin.setMonth(fin.getMonth() + delai.nombre);
+  else fin.setDate(fin.getDate() + delai.nombre * (delai.unite === 'SEMAINE' ? 7 : 1));
+  return fin;
+}
+
+/** Prochaine date, après aujourd'hui et après le délai de la vente, qui tombe ce jour du mois. */
+function prochaineDate(jour: number, dateSouscription: string, delai?: DelaiGrace): string {
+  const demain = new Date();
+  demain.setHours(0, 0, 0, 0);
+  demain.setDate(demain.getDate() + 1);
+  const fin = delai ? finDelai(dateSouscription || aujourdhui(), delai) : demain;
+  const depart = fin > demain ? fin : demain;
+  let date = new Date(depart.getFullYear(), depart.getMonth(), jour);
+  if (date < depart) date = new Date(depart.getFullYear(), depart.getMonth() + 1, jour);
   const deux = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${deux(date.getMonth() + 1)}-${deux(date.getDate())}`;
 }
@@ -1049,6 +1061,10 @@ function Choix<T extends number | boolean>({
 
 function Echeancier({ draft, reste, changer }: EcranProps & { reste: number }) {
   const nombre = draft.nombreEcheances ?? 0;
+  const configuration = useQuery({
+    queryKey: queryKeys.ventesConfiguration,
+    queryFn: () => fetchVentesConfiguration(),
+  });
   return (
     <div className="flex flex-col gap-4">
       <Choix
@@ -1086,7 +1102,9 @@ function Echeancier({ draft, reste, changer }: EcranProps & { reste: number }) {
         onChoisir={(jourVersement) =>
           changer({
             jourVersement,
-            premierVersement: draft.premierVersement || prochaineDate(jourVersement),
+            premierVersement:
+              draft.premierVersement ||
+              prochaineDate(jourVersement, draft.dateSouscription, configuration.data?.delaiGrace),
           })
         }
       />

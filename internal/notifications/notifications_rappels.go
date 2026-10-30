@@ -88,6 +88,10 @@ func (s *service) rappelerEcheancesVentesNotification(ctx context.Context, maint
 const echeancesParPage = 1000
 
 func (s *service) clientsEcheantLe(ctx context.Context, jour time.Time) ([]string, error) {
+	delai, err := ventes.LireDelaiGrace(ctx, s.Q)
+	if err != nil {
+		return nil, err
+	}
 	var clients []string
 	for apres := int64(0); ; {
 		page, err := s.Q.EcheancesVentesACredit(ctx, db.EcheancesVentesACreditParams{Apres: apres, Taille: echeancesParPage})
@@ -95,7 +99,7 @@ func (s *service) clientsEcheantLe(ctx context.Context, jour time.Time) ([]strin
 			return nil, err
 		}
 		for i := range page {
-			if echeanceLe(&page[i], jour) {
+			if slices.ContainsFunc(ventes.EcheancesDeLaVente(&page[i], delai), jour.Equal) {
 				clients = append(clients, page[i].Client)
 			}
 		}
@@ -105,15 +109,6 @@ func (s *service) clientsEcheantLe(ctx context.Context, jour time.Time) ([]strin
 		}
 		apres = page[len(page)-1].ID
 	}
-}
-
-func echeanceLe(vente *db.EcheancesVentesACreditRow, jour time.Time) bool {
-	nombre := int32(1)
-	if vente.NombreEcheances != nil {
-		nombre = *vente.NombreEcheances
-	}
-	dates := ventes.DatesEcheances(vente.PremierVersement.Time, vente.PeriodiciteMois, *vente.JourVersement, nombre)
-	return slices.ContainsFunc(dates, jour.Equal)
 }
 
 // Rappels promis et encore dus d'ici la fin de la journée, RETARDS COMPRIS :

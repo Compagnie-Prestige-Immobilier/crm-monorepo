@@ -178,7 +178,7 @@ WHERE "id" = $1 RETURNING *;
 
 -- name: EcheancesVentesACredit :many
 SELECT v."id", v."numero", v."client", v."telephone", v."site", v."prixTotal", v."acompte",
-    v."nombreEcheances", v."periodiciteMois", v."jourVersement", v."premierVersement",
+    v."dateSouscription", v."nombreEcheances", v."periodiciteMois", v."jourVersement", v."premierVersement",
     (SELECT COALESCE(SUM(vv."montant"), 0) FROM "ventes_versements" vv WHERE vv."venteId" = v."id")::bigint AS "verse"
 FROM "ventes" v
 WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuellement"

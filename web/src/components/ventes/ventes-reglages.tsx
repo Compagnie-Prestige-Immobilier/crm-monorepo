@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon, PencilIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -25,12 +25,15 @@ import {
 import {
   createCanalVente,
   createSiteVente,
+  fetchVentesConfiguration,
   formatFcfa,
   lotsRestants,
   setCanalVenteActive,
   setSiteVenteActive,
+  updateDelaiGrace,
   updateSiteVente,
   type CanalVente,
+  type DelaiGrace,
   type SiteVente,
   type SiteVenteInput,
   type SuperficieSite,
@@ -43,6 +46,12 @@ const MODES = [
   { value: 'POURCENTAGE_PROPRIETAIRE', label: 'Un pourcentage de la part propriétaire' },
   { value: 'MONTANT_PAR_LOT', label: 'Un montant fixe par lot' },
   { value: 'MONTANT_TOTAL', label: 'Un montant fixe par vente' },
+];
+
+const UNITES_DELAI: { value: DelaiGrace['unite']; label: string }[] = [
+  { value: 'MOIS', label: 'mois' },
+  { value: 'SEMAINE', label: 'semaine(s)' },
+  { value: 'JOUR', label: 'jour(s)' },
 ];
 
 const entier = (brut: string) => Number(brut.replace(/\D/g, '')) || 0;
@@ -127,6 +136,7 @@ export function PageReglages({
         ))}
       </Section>
       <Canaux canaux={canaux} onChange={() => void rafraichir()} />
+      <DelaiAvantEcheance />
       {edition === null ? null : (
         <SiteDialog
           site={edition === 'nouveau' ? null : edition}
@@ -229,6 +239,86 @@ function Canaux({ canaux, onChange }: { canaux: readonly CanalVente[]; onChange:
         </li>
       ))}
     </Section>
+  );
+}
+
+function DelaiAvantEcheance() {
+  const configuration = useQuery({
+    queryKey: queryKeys.ventesConfiguration,
+    queryFn: () => fetchVentesConfiguration(),
+  });
+  const enregistre = configuration.data?.delaiGrace;
+  return enregistre === undefined ? null : (
+    <FormulaireDelai key={`${enregistre.nombre}-${enregistre.unite}`} enregistre={enregistre} />
+  );
+}
+
+function FormulaireDelai({ enregistre }: { enregistre: DelaiGrace }) {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<DelaiGrace>(enregistre);
+  const enregistrer = useMutation({
+    mutationFn: () => updateDelaiGrace(draft),
+    onSuccess: () => {
+      toast.success('Délai enregistré.');
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ventes });
+    },
+    onError: (error) => toastApiError(error, 'Le délai n’a pas pu être enregistré.'),
+  });
+  const modifie = draft.nombre !== enregistre.nombre || draft.unite !== enregistre.unite;
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <h2 className="font-display text-[1.125rem] font-[700]">
+          Délai avant la première échéance
+        </h2>
+        <p className="text-[0.875rem] text-muted-foreground">
+          Compté depuis la date de vente. Une échéance prévue plus tôt passe au jour de versement
+          suivant, ventes déjà saisies comprises. 0 pour aucun délai.
+        </p>
+      </div>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          enregistrer.mutate();
+        }}
+      >
+        <Input
+          aria-label="Durée du délai"
+          inputMode="numeric"
+          className="w-20 text-center tabular-nums"
+          value={draft.nombre}
+          onChange={(e) => setDraft({ ...draft, nombre: Math.min(365, entier(e.target.value)) })}
+        />
+        <Select
+          items={UNITES_DELAI}
+          value={draft.unite}
+          onValueChange={(choix) =>
+            setDraft({
+              ...draft,
+              unite: UNITES_DELAI.find((unite) => unite.value === choix)?.value ?? 'MOIS',
+            })
+          }
+        >
+          <SelectTrigger aria-label="Unité du délai" className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UNITES_DELAI.map((unite) => (
+              <SelectItem key={unite.value} value={unite.value}>
+                {unite.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button type="submit" disabled={!modifie || enregistrer.isPending}>
+          {enregistrer.isPending ? (
+            <LoaderIcon className="animate-spin" aria-hidden="true" />
+          ) : null}
+          Enregistrer
+        </Button>
+      </form>
+    </section>
   );
 }
 
