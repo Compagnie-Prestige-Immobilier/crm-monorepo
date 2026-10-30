@@ -845,5 +845,6 @@
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": ["ADMIN"],
   "PUT /api/v1/users/{id}/active": ["ADMIN"],
   "PUT /api/v1/users/{id}/password": ["ADMIN"],
-  "PUT /api/v1/users/{id}/permissions": ["ADMIN"]
+  "PUT /api/v1/users/{id}/permissions": ["ADMIN"],
+  "PUT /api/v1/ventes/delai-grace": ["ADMIN", "DIRECTION"]
 }
